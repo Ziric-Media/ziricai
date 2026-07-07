@@ -1,0 +1,2563 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Central Motors Workspace - ZiricAI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        /* ===== CSS VARIABLES ===== */
+        :root {
+            --bg-body: #f0f4f8;
+            --bg-sidebar: #ffffff;
+            --bg-card: #ffffff;
+            --bg-hover: #f1f5f9;
+            --bg-muted: #f8fafc;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --border-color: #e2e8f0;
+            --border-light: #f1f5f9;
+            --primary: #7c3aed;
+            --primary-light: #8b5cf6;
+            --primary-dark: #6d28d9;
+            --primary-glow: rgba(124, 58, 237, 0.15);
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --warning: #f59e0b;
+            --warning-light: #fef3c7;
+            --danger: #ef4444;
+            --danger-light: #fee2e2;
+            --info: #3b82f6;
+            --info-light: #dbeafe;
+            --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+            --shadow-lg: 0 10px 25px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.03);
+            --shadow-xl: 0 20px 40px -5px rgba(0,0,0,0.1);
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --sidebar-width: 260px;
+            --topbar-height: 72px;
+            --ziva-gold: #f59e0b;
+            --ziva-gold-glow: rgba(245, 158, 11, 0.2);
+        }
+
+        /* ===== DARK THEME ===== */
+        [data-theme="dark"] {
+            --bg-body: #0f172a;
+            --bg-sidebar: #1e293b;
+            --bg-card: #1e293b;
+            --bg-hover: #334155;
+            --bg-muted: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+            --border-color: #334155;
+            --border-light: #1e293b;
+            --primary-glow: rgba(124, 58, 237, 0.25);
+            --ziva-gold-glow: rgba(245, 158, 11, 0.25);
+            --shadow: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
+            --shadow-lg: 0 10px 25px -3px rgba(0,0,0,0.5);
+            --shadow-xl: 0 20px 40px -5px rgba(0,0,0,0.6);
+        }
+
+        /* ===== RESET & BASE ===== */
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        body {
+            font-family: var(--font-family);
+            background: var(--bg-body);
+            color: var(--text-primary);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            transition: var(--transition);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        a { text-decoration: none; color: inherit; }
+        ul { list-style: none; }
+        
+        ::-webkit-scrollbar { 
+            width: 6px; 
+            height: 6px; 
+        }
+        ::-webkit-scrollbar-track { 
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb { 
+            background: var(--border-color); 
+            border-radius: 10px; 
+        }
+        ::-webkit-scrollbar-thumb:hover { 
+            background: var(--text-muted); 
+        }
+
+        /* ===== WORKSPACE SIDEBAR ===== */
+        .workspace-sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            transition: var(--transition);
+            overflow-y: auto;
+            padding: 0 16px 20px;
+            position: relative;
+            z-index: 10;
+            overflow-x: hidden;
+        }
+        
+        .workspace-sidebar .brand {
+            padding: 20px 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 16px;
+            flex-shrink: 0;
+        }
+        
+        .workspace-sidebar .brand .logo-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        
+        .workspace-sidebar .brand .org-info {
+            overflow: hidden;
+        }
+        
+        .workspace-sidebar .brand .org-info .name {
+            font-size: 18px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .workspace-sidebar .brand .org-info .sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .workspace-sidebar .brand .org-info .sub .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+        
+        .workspace-sidebar .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 8px;
+            text-decoration: none;
+        }
+        
+        .workspace-sidebar .back-link:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+        
+        .workspace-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+        }
+        
+        .workspace-nav .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            padding: 12px 12px 6px;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        
+        .workspace-nav a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            cursor: pointer;
+            position: relative;
+            text-decoration: none;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+        
+        .workspace-nav a:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            transform: translateX(4px);
+        }
+        
+        .workspace-nav a.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px var(--primary-glow);
+            transform: translateX(0);
+        }
+        
+        .workspace-nav a.active:hover {
+            background: var(--primary-dark);
+        }
+        
+        .workspace-nav a .icon { 
+            width: 20px; 
+            text-align: center; 
+            font-size: 16px; 
+            flex-shrink: 0;
+        }
+        
+        .workspace-nav a .badge {
+            margin-left: auto;
+            background: var(--bg-hover);
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            flex-shrink: 0;
+        }
+        
+        .workspace-nav a.active .badge { 
+            background: rgba(255,255,255,0.2); 
+            color: white; 
+        }
+        
+        /* ===== ZIVA STUDIO STAR ===== */
+        .workspace-nav a.ziva-studio {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05));
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        
+        .workspace-nav a.ziva-studio .icon {
+            color: var(--ziva-gold);
+        }
+        
+        .workspace-nav a.ziva-studio:hover {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+        
+        .workspace-nav a.ziva-studio.active {
+            background: linear-gradient(135deg, var(--ziva-gold), #d97706);
+            color: white;
+            border-color: var(--ziva-gold);
+            box-shadow: 0 4px 12px var(--ziva-gold-glow);
+        }
+        
+        .workspace-nav a.ziva-studio.active .icon {
+            color: white;
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg-body);
+            min-width: 0;
+        }
+
+        /* ===== TOPBAR ===== */
+        .topbar {
+            height: var(--topbar-height);
+            background: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            flex-shrink: 0;
+            transition: var(--transition);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            min-height: var(--topbar-height);
+        }
+        
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            min-width: 0;
+            flex: 1;
+        }
+        
+        .topbar-left .breadcrumb {
+            font-size: 14px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .topbar-left .breadcrumb span {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        
+        .topbar-actions button {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: var(--text-secondary);
+            padding: 8px;
+            border-radius: var(--radius-sm);
+            transition: var(--transition);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .topbar-actions button:hover { 
+            background: var(--bg-hover); 
+            color: var(--text-primary); 
+        }
+        
+        .topbar-actions .notification-dot {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 8px;
+            height: 8px;
+            background: var(--danger);
+            border-radius: 50%;
+            border: 2px solid var(--bg-sidebar);
+            animation: pulse-dot 2s infinite;
+        }
+        
+        @keyframes pulse-dot {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+        }
+        
+        .topbar-actions .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px 4px 4px;
+            border-radius: 30px;
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: var(--transition);
+            flex-shrink: 0;
+        }
+        
+        .topbar-actions .user-menu:hover { 
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+        
+        .topbar-actions .user-menu .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        
+        .topbar-actions .user-menu .user-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            overflow: hidden;
+        }
+        
+        .topbar-actions .user-menu .user-info .name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+        
+        .topbar-actions .user-menu .user-info .role {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        
+        .topbar-actions .user-menu .chevron {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: 4px;
+            flex-shrink: 0;
+        }
+
+        /* ===== PAGE CONTENT ===== */
+        .page-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            transition: var(--transition);
+            height: calc(100vh - var(--topbar-height));
+            overflow-x: hidden;
+            width: 100%;
+            max-width: 100%;
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 13px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            flex-shrink: 0;
+            white-space: nowrap;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transition: width 0.4s, height 0.4s, top 0.4s, left 0.4s;
+        }
+        
+        .btn:active::after {
+            width: 300px;
+            height: 300px;
+            top: -100px;
+            left: -100px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            box-shadow: 0 2px 8px var(--primary-glow);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--primary-glow);
+        }
+        
+        .btn-ziva {
+            background: linear-gradient(135deg, var(--ziva-gold), #d97706);
+            color: white;
+            box-shadow: 0 2px 8px var(--ziva-gold-glow);
+        }
+        
+        .btn-ziva:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--ziva-gold-glow);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #059669);
+            color: white;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--border-color);
+            transform: translateY(-1px);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        
+        .btn-outline:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--text-muted);
+            transform: translateY(-1px);
+        }
+        
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn-lg { padding: 12px 24px; font-size: 14px; }
+
+        /* ===== KPI CARDS ===== */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+            width: 100%;
+        }
+        
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .kpi-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        
+        .kpi-card .label {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .kpi-card .value {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 2px 0;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .kpi-card .trend {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 500;
+        }
+        
+        .kpi-card .trend.up { color: var(--success); }
+        .kpi-card .trend.down { color: var(--danger); }
+        .kpi-card .trend.neutral { color: var(--text-muted); }
+        
+        .kpi-card .icon-wrapper {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            background: var(--primary-glow);
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+        
+        .kpi-card .icon-wrapper.green { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .kpi-card .icon-wrapper.yellow { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+        .kpi-card .icon-wrapper.blue { background: rgba(59, 130, 246, 0.1); color: var(--info); }
+        .kpi-card .icon-wrapper.ziva { background: var(--ziva-gold-glow); color: var(--ziva-gold); }
+
+        /* ===== ZIVA STUDIO ===== */
+        .studio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .studio-header .title h1 {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .studio-header .title h1 .star {
+            color: var(--ziva-gold);
+        }
+        
+        .studio-header .title .sub {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .studio-header .actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .studio-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 24px;
+            overflow-x: auto;
+            padding-bottom: 0;
+        }
+        
+        .studio-tabs .tab {
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: var(--transition);
+            white-space: nowrap;
+            background: transparent;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+            font-family: inherit;
+        }
+        
+        .studio-tabs .tab:hover {
+            color: var(--text-primary);
+        }
+        
+        .studio-tabs .tab.active {
+            color: var(--ziva-gold);
+            border-bottom-color: var(--ziva-gold);
+        }
+        
+        .studio-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .studio-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== GENERAL TAB ===== */
+        .general-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .general-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            box-shadow: var(--shadow);
+        }
+        
+        .general-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-body);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            transition: var(--transition);
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--ziva-gold);
+            box-shadow: 0 0 0 3px var(--ziva-gold-glow);
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        /* ===== PERSONALITY TAB ===== */
+        .personality-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+        
+        .personality-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .personality-card:hover {
+            border-color: var(--ziva-gold);
+            transform: translateY(-2px);
+        }
+        
+        .personality-card.selected {
+            border-color: var(--ziva-gold);
+            background: var(--ziva-gold-glow);
+        }
+        
+        .personality-card .icon {
+            font-size: 28px;
+        }
+        
+        .personality-card .name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        
+        .personality-card .desc {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* ===== KNOWLEDGE TAB ===== */
+        .knowledge-library {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .knowledge-item {
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+        }
+        
+        .knowledge-item:hover {
+            border-color: var(--ziva-gold);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        
+        .knowledge-item .icon {
+            font-size: 32px;
+            margin-bottom: 6px;
+        }
+        
+        .knowledge-item .name {
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .knowledge-item .count {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        
+        .knowledge-item .status {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .knowledge-item .status.uploaded { background: var(--success); }
+        .knowledge-item .status.pending { background: var(--warning); }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius);
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            background: var(--bg-body);
+        }
+        
+        .upload-area:hover {
+            border-color: var(--ziva-gold);
+            background: var(--ziva-gold-glow);
+        }
+        
+        .upload-area .icon {
+            font-size: 48px;
+        }
+        
+        .upload-area .text {
+            font-weight: 500;
+            margin-top: 8px;
+        }
+        
+        .upload-area .sub {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* ===== SKILLS TAB ===== */
+        .skills-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .skill-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            transition: var(--transition);
+        }
+        
+        .skill-item:hover {
+            border-color: var(--ziva-gold);
+        }
+        
+        .skill-item .info .name {
+            font-weight: 500;
+        }
+        
+        .skill-item .info .desc {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        
+        .toggle-switch {
+            width: 44px;
+            height: 24px;
+            background: var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            flex-shrink: 0;
+        }
+        
+        .toggle-switch.on {
+            background: var(--ziva-gold);
+        }
+        
+        .toggle-switch .toggle-knob {
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+        }
+        
+        .toggle-switch.on .toggle-knob {
+            left: 23px;
+        }
+
+        /* ===== MEMORY TAB ===== */
+        .memory-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        .memory-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+        }
+        
+        .memory-item .info .name {
+            font-weight: 500;
+        }
+        
+        .memory-item .info .desc {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        
+        .memory-item .value {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        /* ===== LANGUAGES TAB ===== */
+        .languages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        
+        .language-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .language-item:hover {
+            border-color: var(--ziva-gold);
+        }
+        
+        .language-item.selected {
+            border-color: var(--ziva-gold);
+            background: var(--ziva-gold-glow);
+        }
+        
+        .language-item .flag {
+            font-size: 20px;
+        }
+        
+        .language-item .name {
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        /* ===== TESTING TAB ===== */
+        .testing-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+        }
+        
+        .testing-container .chat-area {
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            min-height: 200px;
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .testing-container .chat-area .message {
+            display: flex;
+            gap: 12px;
+            max-width: 80%;
+        }
+        
+        .testing-container .chat-area .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        
+        .testing-container .chat-area .message .bubble {
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .testing-container .chat-area .message.user .bubble {
+            background: var(--ziva-gold);
+            color: white;
+        }
+        
+        .testing-container .chat-area .message.ai .bubble {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+        }
+        
+        .testing-container .chat-area .message .meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        .testing-container .chat-input {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .testing-container .chat-input input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-body);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .testing-container .chat-input input:focus {
+            outline: none;
+            border-color: var(--ziva-gold);
+            box-shadow: 0 0 0 3px var(--ziva-gold-glow);
+        }
+        
+        .testing-container .chat-input button {
+            padding: 10px 20px;
+        }
+        
+        .testing-container .metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .testing-container .metrics .metric {
+            text-align: center;
+            padding: 12px;
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+        }
+        
+        .testing-container .metrics .metric .value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--ziva-gold);
+        }
+        
+        .testing-container .metrics .metric .label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* ===== TOAST ===== */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 340px;
+            width: calc(100% - 40px);
+        }
+        
+        .toast {
+            padding: 14px 18px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            animation: slideIn 0.3s ease;
+            transition: var(--transition);
+            width: 100%;
+        }
+        
+        .toast.success { border-left: 4px solid var(--success); }
+        .toast.error { border-left: 4px solid var(--danger); }
+        .toast.warning { border-left: 4px solid var(--warning); }
+        .toast.info { border-left: 4px solid var(--info); }
+        
+        .toast .toast-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        
+        .toast .toast-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .toast .toast-content .toast-title {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        .toast .toast-content .toast-message {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .toast .toast-close {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 14px;
+            padding: 2px;
+            transition: var(--transition);
+            flex-shrink: 0;
+        }
+        
+        .toast .toast-close:hover {
+            color: var(--text-primary);
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .toast.removing {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1200px) {
+            .general-grid { grid-template-columns: 1fr; }
+            .skills-grid { grid-template-columns: 1fr; }
+            .memory-grid { grid-template-columns: 1fr; }
+            .testing-container .metrics { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        @media (max-width: 992px) {
+            .knowledge-library { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+            .personality-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+        }
+        
+        @media (max-width: 768px) {
+            :root {
+                --sidebar-width: 64px;
+                --topbar-height: 60px;
+            }
+            
+            .workspace-sidebar .brand .org-info .sub,
+            .workspace-sidebar .brand .org-info .name,
+            .workspace-nav a span:not(.icon),
+            .workspace-nav .section-label,
+            .workspace-nav a .badge,
+            .workspace-sidebar .back-link span {
+                display: none;
+            }
+            .workspace-sidebar .brand { 
+                justify-content: center; 
+                padding: 12px 0; 
+                border-bottom: none;
+            }
+            .workspace-nav a { 
+                justify-content: center; 
+                padding: 10px; 
+            }
+            .workspace-nav a .icon { margin: 0; }
+            .workspace-sidebar .back-link { justify-content: center; padding: 8px; }
+            
+            .topbar { padding: 0 12px; }
+            .topbar-actions .user-menu .user-info { display: none; }
+            .topbar-actions .user-menu { padding: 4px; }
+            
+            .page-content { padding: 16px; }
+            .studio-tabs .tab { padding: 10px 14px; font-size: 13px; }
+            .languages-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+            .testing-container .chat-area .message { max-width: 100%; }
+        }
+        
+        @media (max-width: 480px) {
+            .general-grid { grid-template-columns: 1fr; }
+            .knowledge-library { grid-template-columns: 1fr 1fr; }
+            .skills-grid { grid-template-columns: 1fr; }
+            .memory-grid { grid-template-columns: 1fr; }
+            .studio-header { flex-direction: column; align-items: flex-start; }
+            .studio-header .actions { width: 100%; }
+            .studio-header .actions button { flex: 1; justify-content: center; }
+            .testing-container .metrics { grid-template-columns: 1fr; }
+            .testing-container .chat-input { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ===== WORKSPACE SIDEBAR ===== -->
+    <aside class="workspace-sidebar" id="sidebar">
+        <div class="back-link" onclick="navigateTo('organizations')">
+            <span>←</span> <span>Back to Organizations</span>
+        </div>
+        
+        <div class="brand">
+            <div class="logo-icon" style="background:linear-gradient(135deg,#7c3aed,#8b5cf6);">CM</div>
+            <div class="org-info">
+                <div class="name">Central Motors</div>
+                <div class="sub">
+                    <span class="dot"></span> Car Dealership · Business Plan
+                </div>
+            </div>
+        </div>
+        
+        <nav class="workspace-nav" id="workspaceNav">
+            <div class="section-label">Workspace</div>
+            <a href="#" data-page="overview">
+                <span class="icon">📊</span> 
+                <span>Overview</span>
+            </a>
+            <a href="#" class="ziva-studio active" data-page="ziva-studio">
+                <span class="icon">⭐</span> 
+                <span>ZIVA Studio</span>
+            </a>
+            <a href="#" data-page="knowledge">
+                <span class="icon">📚</span> 
+                <span>Knowledge Base</span>
+                <span class="badge">24</span>
+            </a>
+            <a href="#" data-page="whatsapp">
+                <span class="icon">📱</span> 
+                <span>WhatsApp</span>
+            </a>
+            <a href="#" data-page="conversations">
+                <span class="icon">💬</span> 
+                <span>Live Conversations</span>
+                <span class="badge">5</span>
+            </a>
+            <a href="#" data-page="customers">
+                <span class="icon">👤</span> 
+                <span>Customers</span>
+                <span class="badge">247</span>
+            </a>
+            <a href="#" data-page="products">
+                <span class="icon">🚗</span> 
+                <span>Products</span>
+                <span class="badge">28</span>
+            </a>
+            <a href="#" data-page="users">
+                <span class="icon">👥</span> 
+                <span>Users</span>
+                <span class="badge">12</span>
+            </a>
+            <a href="#" data-page="departments">
+                <span class="icon">🏢</span> 
+                <span>Departments</span>
+            </a>
+            <a href="#" data-page="payments">
+                <span class="icon">💳</span> 
+                <span>Payments</span>
+            </a>
+            <a href="#" data-page="analytics">
+                <span class="icon">📈</span> 
+                <span>Analytics</span>
+            </a>
+            <a href="#" data-page="settings">
+                <span class="icon">⚙️</span> 
+                <span>Settings</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- ===== MAIN ===== -->
+    <div class="main">
+        <!-- Topbar -->
+        <header class="topbar" id="topbar">
+            <div class="topbar-left">
+                <div class="breadcrumb" id="breadcrumb">
+                    Central Motors / <span id="pageTitle">ZIVA Studio</span>
+                </div>
+            </div>
+
+            <div class="topbar-actions">
+                <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+                    🌙
+                </button>
+                <button id="notifBtn" title="Notifications">
+                    🔔
+                    <span class="notification-dot"></span>
+                </button>
+                <div class="user-menu" id="userMenu">
+                    <div class="avatar">S</div>
+                    <div class="user-info">
+                        <span class="name">Spencer Gore</span>
+                        <span class="role">Super Admin</span>
+                    </div>
+                    <span class="chevron">▼</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <div class="page-content" id="pageContent">
+            <!-- Pages will be rendered here -->
+        </div>
+    </div>
+
+    <!-- ===== JAVASCRIPT ===== -->
+    <script>
+        // =============================================
+        // DATA STORE
+        // =============================================
+        const store = {
+            theme: localStorage.getItem('ziricai-theme') || 'light',
+            currentPage: 'ziva-studio',
+            studioTab: 'general',
+            ai: {
+                name: 'Central Motors Assistant',
+                role: 'Sales Consultant',
+                greeting: 'Welcome to Central Motors! How can I help you today?',
+                tone: 'Professional',
+                industry: 'Car Dealership',
+                businessHours: 'Mon-Fri 8:00 - 17:00',
+                personality: 'Professional',
+                languages: ['English', 'Zulu', 'Xitsonga', 'Tswana'],
+                skills: {
+                    'Answer Questions': true,
+                    'Generate Quotations': true,
+                    'Book Appointments': true,
+                    'Capture Leads': true,
+                    'Recommend Products': true,
+                    'Calculate Finance': true,
+                    'Track Orders': false,
+                    'Escalate to Staff': true,
+                    'Collect Payments': false
+                },
+                memory: {
+                    'Remember customer names': true,
+                    'Remember previous conversations': true,
+                    'Conversation history': '90 days',
+                    'Customer preferences': true
+                },
+                knowledge: [
+                    { name: 'Company Profile', count: '12 pages', icon: '🏢', status: 'uploaded' },
+                    { name: 'Vehicle Catalogue', count: '28 vehicles', icon: '🚗', status: 'uploaded' },
+                    { name: 'Finance Options', count: '6 plans', icon: '💰', status: 'uploaded' },
+                    { name: 'Price Lists', count: '32 items', icon: '🏷️', status: 'uploaded' },
+                    { name: 'Policies', count: '8 documents', icon: '📄', status: 'uploaded' },
+                    { name: 'FAQs', count: '47 questions', icon: '❓', status: 'pending' },
+                    { name: 'Branches', count: '5 locations', icon: '📍', status: 'pending' },
+                    { name: 'Videos', count: '12 clips', icon: '🎬', status: 'pending' },
+                    { name: 'Images', count: '24 photos', icon: '🖼️', status: 'pending' },
+                    { name: 'Website', count: 'centralmotors.co.za', icon: '🌐', status: 'uploaded' }
+                ],
+                version: 'v2.1',
+                lastTrained: '2 hours ago'
+            },
+            chatHistory: [
+                { role: 'user', content: 'How much is the Toyota Corolla?' },
+                { role: 'ai', content: 'The Toyota Corolla starts at R329,900. Would you like to see our current offers or book a test drive?' }
+            ],
+            overview: {
+                conversations: 154,
+                aiResolved: 142,
+                waiting: 12,
+                leads: 23,
+                testDrives: 9,
+                financeApps: 6,
+                messages: 432,
+                aiAccuracy: 96,
+                knowledgeScore: 98
+            }
+        };
+
+        // =============================================
+        // RENDER FUNCTIONS
+        // =============================================
+        const content = document.getElementById('pageContent');
+
+        // --- Overview ---
+        function renderOverview() {
+            const o = store.overview;
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>📊 Overview</h1>
+                        <div class="sub">Today's performance at Central Motors.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-secondary btn-sm" onclick="showToast('🔄 Refreshing data...', 'info')">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">Today's Conversations</div>
+                                <div class="value">${o.conversations}</div>
+                                <div class="trend up">↑ 12%</div>
+                            </div>
+                            <div class="icon-wrapper blue">💬</div>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">AI Resolved</div>
+                                <div class="value">${o.aiResolved}</div>
+                                <div class="trend up">↑ 8%</div>
+                            </div>
+                            <div class="icon-wrapper green">🤖</div>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">Waiting for Staff</div>
+                                <div class="value">${o.waiting}</div>
+                                <div class="trend down">↑ 2</div>
+                            </div>
+                            <div class="icon-wrapper yellow">⏳</div>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">Today's Leads</div>
+                                <div class="value">${o.leads}</div>
+                                <div class="trend up">↑ 15%</div>
+                            </div>
+                            <div class="icon-wrapper blue">🎯</div>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">Test Drives</div>
+                                <div class="value">${o.testDrives}</div>
+                                <div class="trend up">↑ 3</div>
+                            </div>
+                            <div class="icon-wrapper green">🚗</div>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">Finance Applications</div>
+                                <div class="value">${o.financeApps}</div>
+                                <div class="trend neutral">● Stable</div>
+                            </div>
+                            <div class="icon-wrapper yellow">💰</div>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">Messages</div>
+                                <div class="value">${o.messages}</div>
+                                <div class="trend up">↑ 5%</div>
+                            </div>
+                            <div class="icon-wrapper green">📱</div>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">AI Accuracy</div>
+                                <div class="value">${o.aiAccuracy}%</div>
+                                <div class="trend up">↑ 2%</div>
+                            </div>
+                            <div class="icon-wrapper ziva">⭐</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <h3 style="font-size:15px;font-weight:600;">ZIVA Studio Quick Actions</h3>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn-ziva btn-sm" onclick="navigateTo('ziva-studio')">⭐ Open ZIVA Studio</button>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                        <button class="btn-secondary btn-sm" onclick="showToast('🧪 Opening test mode...', 'info')">🧪 Test AI</button>
+                        <button class="btn-success btn-sm" onclick="showToast('🚀 Publishing AI to all channels...', 'success')">🚀 Publish AI</button>
+                        <button class="btn-outline btn-sm" onclick="showToast('📋 Viewing AI logs...', 'info')">📋 View Logs</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- ZIVA Studio: General ---
+        function renderZIVAStudio() {
+            const tab = store.studioTab;
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1><span class="star">⭐</span> ZIVA Studio</h1>
+                        <div class="sub">Train, test, and deploy your AI employee.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-secondary btn-sm" onclick="showToast('🔄 Resetting to defaults...', 'info')">🔄 Reset</button>
+                        <button class="btn-ziva btn-sm" onclick="publishAI()">🚀 Publish AI</button>
+                    </div>
+                </div>
+
+                <div class="studio-tabs">
+                    <button class="tab ${tab === 'general' ? 'active' : ''}" onclick="switchStudioTab('general')">⚙️ General</button>
+                    <button class="tab ${tab === 'personality' ? 'active' : ''}" onclick="switchStudioTab('personality')">🎭 Personality</button>
+                    <button class="tab ${tab === 'knowledge' ? 'active' : ''}" onclick="switchStudioTab('knowledge')">📚 Knowledge</button>
+                    <button class="tab ${tab === 'skills' ? 'active' : ''}" onclick="switchStudioTab('skills')">⚡ Skills</button>
+                    <button class="tab ${tab === 'memory' ? 'active' : ''}" onclick="switchStudioTab('memory')">🧠 Memory</button>
+                    <button class="tab ${tab === 'languages' ? 'active' : ''}" onclick="switchStudioTab('languages')">🌍 Languages</button>
+                    <button class="tab ${tab === 'testing' ? 'active' : ''}" onclick="switchStudioTab('testing')">🧪 Testing</button>
+                </div>
+
+                <div class="studio-content ${tab === 'general' ? 'active' : ''}" id="studio-general">
+                    <div class="general-grid">
+                        <div class="general-card">
+                            <h3>Identity</h3>
+                            <div class="form-group">
+                                <label>AI Name</label>
+                                <input type="text" id="aiName" value="${store.ai.name}" />
+                            </div>
+                            <div class="form-group">
+                                <label>Role</label>
+                                <select id="aiRole">
+                                    <option value="Sales Consultant" ${store.ai.role === 'Sales Consultant' ? 'selected' : ''}>Sales Consultant</option>
+                                    <option value="Customer Support" ${store.ai.role === 'Customer Support' ? 'selected' : ''}>Customer Support</option>
+                                    <option value="Advisor" ${store.ai.role === 'Advisor' ? 'selected' : ''}>Advisor</option>
+                                    <option value="Assistant" ${store.ai.role === 'Assistant' ? 'selected' : ''}>Assistant</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Greeting</label>
+                                <textarea id="aiGreeting">${store.ai.greeting}</textarea>
+                            </div>
+                            <button class="btn-ziva btn-sm" onclick="saveGeneral()">💾 Save</button>
+                        </div>
+
+                        <div class="general-card">
+                            <h3>Settings</h3>
+                            <div class="form-group">
+                                <label>Tone</label>
+                                <select id="aiTone">
+                                    <option value="Professional" ${store.ai.tone === 'Professional' ? 'selected' : ''}>Professional</option>
+                                    <option value="Friendly" ${store.ai.tone === 'Friendly' ? 'selected' : ''}>Friendly</option>
+                                    <option value="Luxury" ${store.ai.tone === 'Luxury' ? 'selected' : ''}>Luxury</option>
+                                    <option value="Corporate" ${store.ai.tone === 'Corporate' ? 'selected' : ''}>Corporate</option>
+                                    <option value="Youthful" ${store.ai.tone === 'Youthful' ? 'selected' : ''}>Youthful</option>
+                                    <option value="Casual" ${store.ai.tone === 'Casual' ? 'selected' : ''}>Casual</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Industry</label>
+                                <select id="aiIndustry">
+                                    <option value="Car Dealership" ${store.ai.industry === 'Car Dealership' ? 'selected' : ''}>Car Dealership</option>
+                                    <option value="Funeral Services" ${store.ai.industry === 'Funeral Services' ? 'selected' : ''}>Funeral Services</option>
+                                    <option value="School" ${store.ai.industry === 'School' ? 'selected' : ''}>School</option>
+                                    <option value="Church" ${store.ai.industry === 'Church' ? 'selected' : ''}>Church</option>
+                                    <option value="Law Firm" ${store.ai.industry === 'Law Firm' ? 'selected' : ''}>Law Firm</option>
+                                    <option value="Healthcare" ${store.ai.industry === 'Healthcare' ? 'selected' : ''}>Healthcare</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Business Hours</label>
+                                <input type="text" id="aiHours" value="${store.ai.businessHours}" />
+                            </div>
+                            <button class="btn-ziva btn-sm" onclick="saveGeneral()">💾 Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="studio-content ${tab === 'personality' ? 'active' : ''}" id="studio-personality">
+                    <div class="personality-grid">
+                        ${[
+                            { id: 'Professional', icon: '💼', desc: 'Formal, trustworthy, and knowledgeable' },
+                            { id: 'Friendly', icon: '😊', desc: 'Warm, approachable, and helpful' },
+                            { id: 'Luxury', icon: '✨', desc: 'Premium, sophisticated, and refined' },
+                            { id: 'Corporate', icon: '🏢', desc: 'Business-focused and efficient' },
+                            { id: 'Youthful', icon: '🌟', desc: 'Energetic, modern, and relatable' },
+                            { id: 'Casual', icon: '☕', desc: 'Relaxed, conversational, and informal' },
+                            { id: 'Helpful', icon: '🤝', desc: 'Supportive, patient, and encouraging' },
+                            { id: 'Sales-focused', icon: '🎯', desc: 'Persuasive, confident, and goal-oriented' }
+                        ].map(p => `
+                            <div class="personality-card ${store.ai.personality === p.id ? 'selected' : ''}" onclick="selectPersonality('${p.id}')">
+                                <div class="icon">${p.icon}</div>
+                                <div class="name">${p.id}</div>
+                                <div class="desc">${p.desc}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="studio-content ${tab === 'knowledge' ? 'active' : ''}" id="studio-knowledge">
+                    <div class="knowledge-library">
+                        ${store.ai.knowledge.map(k => `
+                            <div class="knowledge-item" onclick="showToast('📖 Opening ${k.name}...', 'info')">
+                                <div class="status ${k.status}"></div>
+                                <div class="icon">${k.icon}</div>
+                                <div class="name">${k.name}</div>
+                                <div class="count">${k.count}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="upload-area" onclick="showToast('📤 Select files to upload...', 'info')">
+                        <div class="icon">📄</div>
+                        <div class="text">Drag and drop files here</div>
+                        <div class="sub">or click to browse · PDF, DOCX, TXT, XLSX up to 10MB</div>
+                    </div>
+                </div>
+
+                <div class="studio-content ${tab === 'skills' ? 'active' : ''}" id="studio-skills">
+                    <div class="skills-grid">
+                        ${[
+                            { id: 'Answer Questions', desc: 'Respond to customer inquiries' },
+                            { id: 'Generate Quotations', desc: 'Create price quotes for products' },
+                            { id: 'Book Appointments', desc: 'Schedule test drives and service' },
+                            { id: 'Capture Leads', desc: 'Collect customer information' },
+                            { id: 'Recommend Products', desc: 'Suggest vehicles based on needs' },
+                            { id: 'Calculate Finance', desc: 'Estimate monthly payments' },
+                            { id: 'Track Orders', desc: 'Monitor vehicle delivery status' },
+                            { id: 'Escalate to Staff', desc: 'Transfer to human support' },
+                            { id: 'Collect Payments', desc: 'Process payments via secure gateway' }
+                        ].map(s => `
+                            <div class="skill-item">
+                                <div class="info">
+                                    <div class="name">${s.id}</div>
+                                    <div class="desc">${s.desc}</div>
+                                </div>
+                                <div class="toggle-switch ${store.ai.skills[s.id] ? 'on' : ''}" onclick="toggleSkill('${s.id}')">
+                                    <div class="toggle-knob"></div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="studio-content ${tab === 'memory' ? 'active' : ''}" id="studio-memory">
+                    <div class="memory-grid">
+                        <div class="memory-item">
+                            <div class="info">
+                                <div class="name">Remember customer names</div>
+                                <div class="desc">Store and recall customer names</div>
+                            </div>
+                            <div class="toggle-switch ${store.ai.memory['Remember customer names'] ? 'on' : ''}" onclick="toggleMemory('Remember customer names')">
+                                <div class="toggle-knob"></div>
+                            </div>
+                        </div>
+                        <div class="memory-item">
+                            <div class="info">
+                                <div class="name">Remember previous conversations</div>
+                                <div class="desc">Maintain context across chats</div>
+                            </div>
+                            <div class="toggle-switch ${store.ai.memory['Remember previous conversations'] ? 'on' : ''}" onclick="toggleMemory('Remember previous conversations')">
+                                <div class="toggle-knob"></div>
+                            </div>
+                        </div>
+                        <div class="memory-item">
+                            <div class="info">
+                                <div class="name">Conversation history</div>
+                                <div class="desc">How long to keep conversation records</div>
+                            </div>
+                            <div class="value">${store.ai.memory['Conversation history']}</div>
+                        </div>
+                        <div class="memory-item">
+                            <div class="info">
+                                <div class="name">Customer preferences</div>
+                                <div class="desc">Remember product interests and preferences</div>
+                            </div>
+                            <div class="toggle-switch ${store.ai.memory['Customer preferences'] ? 'on' : ''}" onclick="toggleMemory('Customer preferences')">
+                                <div class="toggle-knob"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="studio-content ${tab === 'languages' ? 'active' : ''}" id="studio-languages">
+                    <div class="languages-grid">
+                        ${[
+                            { id: 'English', flag: '🇬🇧' },
+                            { id: 'Zulu', flag: '🇿🇦' },
+                            { id: 'Xitsonga', flag: '🇿🇦' },
+                            { id: 'Tswana', flag: '🇿🇦' },
+                            { id: 'Venda', flag: '🇿🇦' },
+                            { id: 'Northern Sotho', flag: '🇿🇦' },
+                            { id: 'Shona', flag: '🇿🇼' },
+                            { id: 'French', flag: '🇫🇷' },
+                            { id: 'Portuguese', flag: '🇵🇹' }
+                        ].map(l => `
+                            <div class="language-item ${store.ai.languages.includes(l.id) ? 'selected' : ''}" onclick="toggleLanguage('${l.id}')">
+                                <span class="flag">${l.flag}</span>
+                                <span class="name">${l.id}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="studio-content ${tab === 'testing' ? 'active' : ''}" id="studio-testing">
+                    <div class="testing-container">
+                        <div class="chat-area" id="chatArea">
+                            ${store.chatHistory.map(msg => `
+                                <div class="message ${msg.role}">
+                                    <div class="bubble">${msg.content}</div>
+                                    <div class="meta">${msg.role === 'user' ? 'You' : 'ZIVA'} · ${msg.role === 'user' ? 'Just now' : '1s ago'}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="chat-input">
+                            <input type="text" id="chatInput" placeholder="Type a message to test your AI..." onkeypress="if(event.key==='Enter') sendMessage()" />
+                            <button class="btn-ziva" onclick="sendMessage()">Send</button>
+                        </div>
+
+                        <div class="metrics">
+                            <div class="metric">
+                                <div class="value">98%</div>
+                                <div class="label">Accuracy</div>
+                            </div>
+                            <div class="metric">
+                                <div class="value">1.2s</div>
+                                <div class="label">Response Time</div>
+                            </div>
+                            <div class="metric">
+                                <div class="value">📄 Vehicle Catalogue</div>
+                                <div class="label">Knowledge Source</div>
+                            </div>
+                            <div class="metric">
+                                <div class="value">${store.ai.version}</div>
+                                <div class="label">Version</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Knowledge Base ---
+        function renderKnowledge() {
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>📚 Knowledge Base</h1>
+                        <div class="sub">Central Motors business content library.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-primary btn-sm" onclick="showToast('📤 Opening file upload...', 'info')">📤 Upload Files</button>
+                    </div>
+                </div>
+
+                <div class="knowledge-library">
+                    ${store.ai.knowledge.map(k => `
+                        <div class="knowledge-item" onclick="showToast('📖 Opening ${k.name}...', 'info')">
+                            <div class="status ${k.status}"></div>
+                            <div class="icon">${k.icon}</div>
+                            <div class="name">${k.name}</div>
+                            <div class="count">${k.count}</div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="upload-area" onclick="showToast('📤 Select files to upload...', 'info')">
+                    <div class="icon">📄</div>
+                    <div class="text">Drag and drop files here</div>
+                    <div class="sub">or click to browse · PDF, DOCX, TXT, XLSX up to 10MB</div>
+                </div>
+            `;
+        }
+
+        // --- WhatsApp ---
+        function renderWhatsApp() {
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>📱 WhatsApp</h1>
+                        <div class="sub">Communication center for Central Motors.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-secondary btn-sm" onclick="showToast('🔄 Regenerating QR code...', 'info')">🔄 Refresh QR</button>
+                        <button class="btn-primary btn-sm" onclick="showToast('⚙️ Opening WhatsApp settings...', 'info')">⚙️ Settings</button>
+                    </div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:20px;padding:20px;background:var(--bg-body);border:1px solid var(--border-color);border-radius:var(--radius);margin-bottom:20px;">
+                    <div style="width:120px;height:120px;background:var(--bg-card);border:2px solid var(--border-color);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--text-muted);">📱</div>
+                    <div style="flex:1;">
+                        <div style="font-size:20px;font-weight:600;">+27 82 987 6543</div>
+                        <div style="font-size:14px;color:var(--text-muted);">Connected · Last sync: 2 minutes ago</div>
+                        <div style="display:flex;gap:20px;margin-top:8px;">
+                            <div><div style="font-weight:700;font-size:18px;">432</div><div style="font-size:12px;color:var(--text-muted);">Messages Today</div></div>
+                            <div><div style="font-weight:700;font-size:18px;">12</div><div style="font-size:12px;color:var(--text-muted);">Human Takeovers</div></div>
+                            <div><div style="font-weight:700;font-size:18px;">98%</div><div style="font-size:12px;color:var(--text-muted);">AI Resolution Rate</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                    <div style="background:var(--bg-body);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:16px;">
+                        <div style="font-size:13px;color:var(--text-muted);">Auto Reply</div>
+                        <div style="font-weight:500;margin-top:4px;">✅ Enabled</div>
+                    </div>
+                    <div style="background:var(--bg-body);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:16px;">
+                        <div style="font-size:13px;color:var(--text-muted);">Business Hours</div>
+                        <div style="font-weight:500;margin-top:4px;">Mon-Fri 8:00 - 17:00</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Live Conversations ---
+        function renderConversations() {
+            const convs = [
+                { id: 1, name: 'Mike Johnson', preview: 'I need help with my vehicle...', time: '2 min ago', avatar: 'MJ', color: '#7c3aed' },
+                { id: 2, name: 'Sarah Wilson', preview: 'When is my appointment?', time: '15 min ago', avatar: 'SW', color: '#10b981' },
+                { id: 3, name: 'David Brown', preview: 'Can I get a quote for a Corolla?', time: '1 hour ago', avatar: 'DB', color: '#f59e0b' },
+                { id: 4, name: 'Emily Davis', preview: 'What are your finance options?', time: '2 hours ago', avatar: 'ED', color: '#8b5cf6' },
+                { id: 5, name: 'Robert Taylor', preview: 'Is the RAV4 available?', time: '3 hours ago', avatar: 'RT', color: '#ef4444' }
+            ];
+
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>💬 Live Conversations</h1>
+                        <div class="sub">Real-time customer conversations.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-secondary btn-sm" onclick="showToast('🔄 Refreshing conversations...', 'info')">🔄 Refresh</button>
+                        <button class="btn-outline btn-sm" onclick="showToast('📥 Exporting conversation log...', 'info')">📥 Export</button>
+                    </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    ${convs.map(c => `
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--bg-body);border:1px solid var(--border-color);border-radius:var(--radius-sm);transition:var(--transition);">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:white;background:${c.color};">${c.avatar}</div>
+                                <div>
+                                    <div style="font-weight:500;">${c.name}</div>
+                                    <div style="font-size:13px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">${c.preview}</div>
+                                </div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+                                <span style="font-size:12px;color:var(--text-muted);">${c.time}</span>
+                                <div style="display:flex;gap:4px;">
+                                    <button class="btn-secondary btn-sm" onclick="showToast('👁️ Opening conversation with ${c.name}...', 'info')">👁️</button>
+                                    <button class="btn-secondary btn-sm" onclick="showToast('🔄 Taking over conversation from AI...', 'info')">🔄</button>
+                                    <button class="btn-success btn-sm" onclick="showToast('✅ Marking conversation as resolved...', 'success')">✅</button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // --- Customers ---
+        function renderCustomers() {
+            const customers = [
+                { name: 'Mike Johnson', phone: '+27 82 123 4567', product: 'Toyota Corolla', status: 'Hot', source: 'WhatsApp', avatar: 'MJ', color: '#7c3aed' },
+                { name: 'Sarah Wilson', phone: '+27 82 234 5678', product: 'Toyota RAV4', status: 'Warm', source: 'Walk-in', avatar: 'SW', color: '#10b981' },
+                { name: 'David Brown', phone: '+27 82 345 6789', product: 'Toyota Corolla', status: 'Hot', source: 'Web', avatar: 'DB', color: '#f59e0b' },
+                { name: 'Emily Davis', phone: '+27 82 456 7890', product: 'Toyota Fortuner', status: 'Cold', source: 'Referral', avatar: 'ED', color: '#8b5cf6' },
+                { name: 'Robert Taylor', phone: '+27 82 567 8901', product: 'Toyota RAV4', status: 'Warm', source: 'WhatsApp', avatar: 'RT', color: '#ef4444' },
+                { name: 'Lisa Chen', phone: '+27 82 678 9012', product: 'Toyota Corolla', status: 'Hot', source: 'Phone', avatar: 'LC', color: '#3b82f6' }
+            ];
+
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>👤 Customers</h1>
+                        <div class="sub">Manage your customer relationships.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-primary btn-sm" onclick="showToast('➕ Adding new customer...', 'info')">➕ Add Customer</button>
+                        <button class="btn-outline btn-sm" onclick="showToast('📥 Exporting customer list...', 'info')">📥 Export</button>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:16px;">
+                    ${customers.map(c => `
+                        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:16px;box-shadow:var(--shadow);cursor:pointer;transition:var(--transition);" onclick="showToast('👤 Opening profile for ${c.name}...', 'info')">
+                            <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:16px;color:white;background:${c.color};margin-bottom:8px;">${c.avatar}</div>
+                            <div style="font-weight:600;font-size:14px;">${c.name}</div>
+                            <div style="font-size:13px;color:var(--text-muted);">${c.phone}</div>
+                            <div style="font-size:13px;color:var(--text-muted);">Interested: ${c.product}</div>
+                            <div style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;margin-top:4px;background:${c.status === 'Hot' ? 'var(--danger-light)' : c.status === 'Warm' ? 'var(--warning-light)' : 'var(--bg-hover)'};color:${c.status === 'Hot' ? 'var(--danger)' : c.status === 'Warm' ? 'var(--warning)' : 'var(--text-muted)'};">${c.status}</div>
+                            <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Source: ${c.source}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // --- Products ---
+        function renderProducts() {
+            const products = [
+                { name: 'Toyota Corolla', price: 'R329,900', image: '🚗', category: 'Sedan', stock: 'In Stock' },
+                { name: 'Toyota RAV4', price: 'R459,900', image: '🚙', category: 'SUV', stock: 'In Stock' },
+                { name: 'Toyota Fortuner', price: 'R589,900', image: '🚙', category: 'SUV', stock: 'Limited' },
+                { name: 'Toyota Hilux', price: 'R419,900', image: '🚛', category: 'Pickup', stock: 'In Stock' },
+                { name: 'Toyota Land Cruiser', price: 'R899,900', image: '🚙', category: 'SUV', stock: 'Pre-order' },
+                { name: 'Toyota Camry', price: 'R389,900', image: '🚗', category: 'Sedan', stock: 'In Stock' }
+            ];
+
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>🚗 Products</h1>
+                        <div class="sub">Central Motors vehicle inventory.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-primary btn-sm" onclick="showToast('➕ Adding new vehicle...', 'info')">➕ Add Vehicle</button>
+                        <button class="btn-outline btn-sm" onclick="showToast('📥 Exporting inventory...', 'info')">📥 Export</button>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:16px;">
+                    ${products.map(p => `
+                        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:16px;box-shadow:var(--shadow);cursor:pointer;transition:var(--transition);" onclick="showToast('🚗 Opening ${p.name} details...', 'info')">
+                            <div style="width:100%;height:120px;background:var(--bg-hover);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:40px;color:var(--text-muted);margin-bottom:8px;">${p.image}</div>
+                            <div style="font-weight:600;font-size:14px;">${p.name}</div>
+                            <div style="font-size:13px;color:var(--text-muted);">${p.category}</div>
+                            <div style="font-weight:700;font-size:16px;margin-top:4px;color:var(--primary);">${p.price}</div>
+                            <div style="font-size:12px;color:var(--text-muted);">${p.stock}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // --- Users ---
+        function renderUsers() {
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>👥 Users</h1>
+                        <div class="sub">Staff members at Central Motors.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-primary btn-sm" onclick="showToast('➕ Adding new staff member...', 'info')">➕ Add User</button>
+                    </div>
+                </div>
+
+                <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr>
+                                <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Name</th>
+                                <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Department</th>
+                                <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Role</th>
+                                <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Status</th>
+                                <th style="padding:12px 16px;text-align:right;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid var(--border-color);">
+                                <td style="padding:12px 16px;font-weight:500;">John Smith</td>
+                                <td style="padding:12px 16px;">Sales</td>
+                                <td style="padding:12px 16px;">Manager</td>
+                                <td style="padding:12px 16px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--success-light);color:var(--success);">Active</span></td>
+                                <td style="padding:12px 16px;text-align:right;">
+                                    <button class="btn-secondary btn-sm" onclick="showToast('👤 Opening John Smith profile...', 'info')">⚙️</button>
+                                </td>
+                            </tr>
+                            <tr style="border-bottom:1px solid var(--border-color);">
+                                <td style="padding:12px 16px;font-weight:500;">Jane Wilson</td>
+                                <td style="padding:12px 16px;">Service</td>
+                                <td style="padding:12px 16px;">Technician</td>
+                                <td style="padding:12px 16px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--success-light);color:var(--success);">Active</span></td>
+                                <td style="padding:12px 16px;text-align:right;">
+                                    <button class="btn-secondary btn-sm" onclick="showToast('👤 Opening Jane Wilson profile...', 'info')">⚙️</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:12px 16px;font-weight:500;">Mike Chen</td>
+                                <td style="padding:12px 16px;">Finance</td>
+                                <td style="padding:12px 16px;">Accountant</td>
+                                <td style="padding:12px 16px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--bg-hover);color:var(--text-muted);">Inactive</span></td>
+                                <td style="padding:12px 16px;text-align:right;">
+                                    <button class="btn-secondary btn-sm" onclick="showToast('👤 Opening Mike Chen profile...', 'info')">⚙️</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // --- Departments ---
+        function renderDepartments() {
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>🏢 Departments</h1>
+                        <div class="sub">Organizational structure at Central Motors.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-primary btn-sm" onclick="showToast('➕ Adding new department...', 'info')">➕ Add Department</button>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:16px;">
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:20px;box-shadow:var(--shadow);">
+                        <div style="font-size:28px;margin-bottom:4px;">🚗</div>
+                        <div style="font-weight:600;">Sales</div>
+                        <div style="font-size:13px;color:var(--text-muted);">8 members</div>
+                        <div style="margin-top:8px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--success-light);color:var(--success);">Active</span></div>
+                    </div>
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:20px;box-shadow:var(--shadow);">
+                        <div style="font-size:28px;margin-bottom:4px;">🔧</div>
+                        <div style="font-weight:600;">Service</div>
+                        <div style="font-size:13px;color:var(--text-muted);">6 members</div>
+                        <div style="margin-top:8px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--success-light);color:var(--success);">Active</span></div>
+                    </div>
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:20px;box-shadow:var(--shadow);">
+                        <div style="font-size:28px;margin-bottom:4px;">💰</div>
+                        <div style="font-weight:600;">Finance</div>
+                        <div style="font-size:13px;color:var(--text-muted);">4 members</div>
+                        <div style="margin-top:8px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--success-light);color:var(--success);">Active</span></div>
+                    </div>
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:20px;box-shadow:var(--shadow);">
+                        <div style="font-size:28px;margin-bottom:4px;">👥</div>
+                        <div style="font-weight:600;">HR</div>
+                        <div style="font-size:13px;color:var(--text-muted);">3 members</div>
+                        <div style="margin-top:8px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--success-light);color:var(--success);">Active</span></div>
+                    </div>
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:20px;box-shadow:var(--shadow);">
+                        <div style="font-size:28px;margin-bottom:4px;">📦</div>
+                        <div style="font-weight:600;">Parts</div>
+                        <div style="font-size:13px;color:var(--text-muted);">2 members</div>
+                        <div style="margin-top:8px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--success-light);color:var(--success);">Active</span></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Payments ---
+        function renderPayments() {
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>💳 Payments</h1>
+                        <div class="sub">Transaction history and payment processing.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-primary btn-sm" onclick="showToast('💳 Opening payment gateway...', 'info')">💳 Process Payment</button>
+                    </div>
+                </div>
+
+                <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr>
+                                <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Date</th>
+                                <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Customer</th>
+                                <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Amount</th>
+                                <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Method</th>
+                                <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid var(--border-color);">
+                                <td style="padding:12px 16px;">2026-07-01</td>
+                                <td style="padding:12px 16px;">Mike Johnson</td>
+                                <td style="padding:12px 16px;font-weight:600;">R329,900</td>
+                                <td style="padding:12px 16px;">PayFast</td>
+                                <td style="padding:12px 16px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--success-light);color:var(--success);">Completed</span></td>
+                            </tr>
+                            <tr style="border-bottom:1px solid var(--border-color);">
+                                <td style="padding:12px 16px;">2026-06-28</td>
+                                <td style="padding:12px 16px;">Sarah Wilson</td>
+                                <td style="padding:12px 16px;font-weight:600;">R459,900</td>
+                                <td style="padding:12px 16px;">Ozow</td>
+                                <td style="padding:12px 16px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--success-light);color:var(--success);">Completed</span></td>
+                            </tr>
+                            <tr style="border-bottom:1px solid var(--border-color);">
+                                <td style="padding:12px 16px;">2026-06-15</td>
+                                <td style="padding:12px 16px;">David Brown</td>
+                                <td style="padding:12px 16px;font-weight:600;">R329,900</td>
+                                <td style="padding:12px 16px;">PayFast</td>
+                                <td style="padding:12px 16px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--success-light);color:var(--success);">Completed</span></td>
+                            </tr>
+                            <tr>
+                                <td style="padding:12px 16px;">2026-06-10</td>
+                                <td style="padding:12px 16px;">Emily Davis</td>
+                                <td style="padding:12px 16px;font-weight:600;">R589,900</td>
+                                <td style="padding:12px 16px;">Bank Transfer</td>
+                                <td style="padding:12px 16px;"><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;background:var(--warning-light);color:var(--warning);">Pending</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // --- Analytics ---
+        function renderAnalytics() {
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>📈 Analytics</h1>
+                        <div class="sub">Business intelligence for Central Motors.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-secondary btn-sm" onclick="showToast('📊 Generating report...', 'info')">📊 Generate Report</button>
+                        <button class="btn-outline btn-sm" onclick="showToast('📥 Exporting analytics...', 'info')">📥 Export</button>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">Total Revenue</div>
+                                <div class="value">R1,247,600</div>
+                                <div class="trend up">↑ 18%</div>
+                            </div>
+                            <div class="icon-wrapper green">💰</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">Conversions</div>
+                                <div class="value">342</div>
+                                <div class="trend up">↑ 12%</div>
+                            </div>
+                            <div class="icon-wrapper blue">🎯</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">Avg. Deal Size</div>
+                                <div class="value">R82,400</div>
+                                <div class="trend up">↑ 5%</div>
+                            </div>
+                            <div class="icon-wrapper yellow">📊</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div class="label">Customer Retention</div>
+                                <div class="value">78%</div>
+                                <div class="trend up">↑ 3%</div>
+                            </div>
+                            <div class="icon-wrapper green">👤</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);">
+                        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">📈 Monthly Sales</h3>
+                        <div style="display:flex;gap:6px;height:150px;align-items:flex-end;">
+                            ${['Jan','Feb','Mar','Apr','May','Jun'].map((m,i) => {
+                                const h = [40,50,65,85,100,90][i];
+                                return `
+                                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                                        <div style="width:100%;background:linear-gradient(180deg,var(--primary-light),var(--primary));border-radius:4px 4px 0 0;height:${h}%;"></div>
+                                        <span style="font-size:11px;color:var(--text-muted);">${m}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);">
+                        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">🏆 Top Products</h3>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+                                <span>🚗 Toyota Corolla</span>
+                                <span style="font-weight:600;">47 sold</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+                                <span>🚙 Toyota RAV4</span>
+                                <span style="font-weight:600;">32 sold</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;padding:8px 0;">
+                                <span>🚛 Toyota Hilux</span>
+                                <span style="font-weight:600;">28 sold</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Settings ---
+        function renderSettings() {
+            content.innerHTML = `
+                <div class="studio-header">
+                    <div class="title">
+                        <h1>⚙️ Settings</h1>
+                        <div class="sub">Configure Central Motors workspace.</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-primary btn-sm" onclick="showToast('💾 Settings saved successfully!', 'success')">💾 Save</button>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);">
+                        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">General</h3>
+                        <div style="display:flex;flex-direction:column;gap:12px;">
+                            <div>
+                                <label style="font-size:13px;font-weight:500;color:var(--text-secondary);">Organization Name</label>
+                                <input type="text" value="Central Motors" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-body);color:var(--text-primary);font-family:inherit;margin-top:4px;" />
+                            </div>
+                            <div>
+                                <label style="font-size:13px;font-weight:500;color:var(--text-secondary);">Industry</label>
+                                <input type="text" value="Car Dealership" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-body);color:var(--text-primary);font-family:inherit;margin-top:4px;" />
+                            </div>
+                            <div>
+                                <label style="font-size:13px;font-weight:500;color:var(--text-secondary);">Contact Email</label>
+                                <input type="email" value="info@centralmotors.co.za" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-body);color:var(--text-primary);font-family:inherit;margin-top:4px;" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);">
+                        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">Branding</h3>
+                        <div style="display:flex;flex-direction:column;gap:12px;">
+                            <div>
+                                <label style="font-size:13px;font-weight:500;color:var(--text-secondary);">Logo URL</label>
+                                <input type="text" value="https://centralmotors.co.za/logo.png" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-body);color:var(--text-primary);font-family:inherit;margin-top:4px;" />
+                            </div>
+                            <div>
+                                <label style="font-size:13px;font-weight:500;color:var(--text-secondary);">Brand Color</label>
+                                <div style="display:flex;gap:8px;margin-top:4px;">
+                                    <input type="color" value="#7c3aed" style="width:40px;height:40px;border:none;cursor:pointer;" />
+                                    <input type="text" value="#7c3aed" style="flex:1;padding:10px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-body);color:var(--text-primary);font-family:inherit;" />
+                                </div>
+                            </div>
+                            <div>
+                                <label style="font-size:13px;font-weight:500;color:var(--text-secondary);">Business Hours</label>
+                                <input type="text" value="Mon-Fri 8:00 - 17:00" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-body);color:var(--text-primary);font-family:inherit;margin-top:4px;" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // =============================================
+        // ZIVA STUDIO INTERACTIONS
+        // =============================================
+
+        function switchStudioTab(tab) {
+            store.studioTab = tab;
+            renderZIVAStudio();
+        }
+
+        function saveGeneral() {
+            store.ai.name = document.getElementById('aiName').value;
+            store.ai.role = document.getElementById('aiRole').value;
+            store.ai.greeting = document.getElementById('aiGreeting').value;
+            store.ai.tone = document.getElementById('aiTone').value;
+            store.ai.industry = document.getElementById('aiIndustry').value;
+            store.ai.businessHours = document.getElementById('aiHours').value;
+            showToast('✅ General settings saved!', 'success');
+        }
+
+        function selectPersonality(id) {
+            store.ai.personality = id;
+            document.querySelectorAll('.personality-card').forEach(el => el.classList.remove('selected'));
+            document.querySelector(`.personality-card[onclick="selectPersonality('${id}')"]`).classList.add('selected');
+            showToast(`✅ Personality set to ${id}!`, 'success');
+        }
+
+        function toggleSkill(id) {
+            store.ai.skills[id] = !store.ai.skills[id];
+            const el = document.querySelector(`.skill-item .toggle-switch[onclick="toggleSkill('${id}')"]`);
+            if (el) el.classList.toggle('on');
+        }
+
+        function toggleMemory(id) {
+            store.ai.memory[id] = !store.ai.memory[id];
+            const el = document.querySelector(`.memory-item .toggle-switch[onclick="toggleMemory('${id}')"]`);
+            if (el) el.classList.toggle('on');
+        }
+
+        function toggleLanguage(id) {
+            const idx = store.ai.languages.indexOf(id);
+            if (idx > -1) {
+                store.ai.languages.splice(idx, 1);
+            } else {
+                store.ai.languages.push(id);
+            }
+            const el = document.querySelector(`.language-item[onclick="toggleLanguage('${id}')"]`);
+            if (el) el.classList.toggle('selected');
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const chatArea = document.getElementById('chatArea');
+            chatArea.innerHTML += `
+                <div class="message user">
+                    <div class="bubble">${message}</div>
+                    <div class="meta">You · Just now</div>
+                </div>
+            `;
+
+            input.value = '';
+
+            setTimeout(() => {
+                const responses = [
+                    'The Toyota Corolla starts at R329,900. Would you like to see our current offers?',
+                    'We have several finance options available. Would you like me to calculate a monthly payment?',
+                    'The RAV4 is currently in stock. Would you like to book a test drive?',
+                    'Great question! Let me check our inventory for you...'
+                ];
+                const response = responses[Math.floor(Math.random() * responses.length)];
+                
+                chatArea.innerHTML += `
+                    <div class="message ai">
+                        <div class="bubble">${response}</div>
+                        <div class="meta">ZIVA · 1s ago</div>
+                    </div>
+                `;
+                chatArea.scrollTop = chatArea.scrollHeight;
+            }, 800);
+
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function publishAI() {
+            showToast('🚀 ZIVA published to WhatsApp, Website, and Messenger!', 'success');
+        }
+
+        // =============================================
+        // PAGE ROUTER
+        // =============================================
+        function navigateTo(page) {
+            store.currentPage = page;
+            
+            document.querySelectorAll('.workspace-nav a').forEach(a => a.classList.remove('active'));
+            const link = document.querySelector(`.workspace-nav a[data-page="${page}"]`);
+            if (link) link.classList.add('active');
+
+            const titles = {
+                overview: 'Overview',
+                'ziva-studio': 'ZIVA Studio',
+                knowledge: 'Knowledge Base',
+                whatsapp: 'WhatsApp',
+                conversations: 'Live Conversations',
+                customers: 'Customers',
+                products: 'Products',
+                users: 'Users',
+                departments: 'Departments',
+                payments: 'Payments',
+                analytics: 'Analytics',
+                settings: 'Settings'
+            };
+            document.getElementById('pageTitle').textContent = titles[page] || 'ZIVA Studio';
+
+            switch(page) {
+                case 'overview': renderOverview(); break;
+                case 'ziva-studio': renderZIVAStudio(); break;
+                case 'knowledge': renderKnowledge(); break;
+                case 'whatsapp': renderWhatsApp(); break;
+                case 'conversations': renderConversations(); break;
+                case 'customers': renderCustomers(); break;
+                case 'products': renderProducts(); break;
+                case 'users': renderUsers(); break;
+                case 'departments': renderDepartments(); break;
+                case 'payments': renderPayments(); break;
+                case 'analytics': renderAnalytics(); break;
+                case 'settings': renderSettings(); break;
+                default: renderOverview();
+            }
+        }
+
+        // =============================================
+        // THEME TOGGLE
+        // =============================================
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('ziricai-theme', next);
+            document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+            store.theme = next;
+            showToast(`Theme switched to ${next} mode`, 'info');
+        }
+
+        // =============================================
+        // TOAST NOTIFICATIONS
+        // =============================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="toast-icon">${icons[type] || 'ℹ️'}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${type.charAt(0).toUpperCase() + type.slice(1)}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+                <button class="toast-close" onclick="this.closest('.toast').remove()">✕</button>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('removing');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // =============================================
+        // EVENT LISTENERS
+        // =============================================
+        document.querySelectorAll('.workspace-nav a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const page = link.dataset.page;
+                if (page) navigateTo(page);
+            });
+        });
+
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+        document.getElementById('userMenu').addEventListener('click', () => {
+            showToast('👤 Spencer Gore\nSuper Admin\nspencer@ziricai.com', 'info');
+        });
+
+        document.getElementById('notifBtn').addEventListener('click', () => {
+            showToast('🔔 You have 5 unread notifications', 'info');
+        });
+
+        // =============================================
+        // INITIALIZATION
+        // =============================================
+        const savedTheme = localStorage.getItem('ziricai-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.getElementById('themeToggle').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+        // Render initial page
+        navigateTo('ziva-studio');
+
+        console.log('🚀 Central Motors Workspace with ZIVA Studio loaded!');
+        console.log('⭐ ZIVA Studio is now a first-class product with its own branding');
+        console.log('📊 12 modules including Overview, ZIVA Studio, Knowledge Base, WhatsApp, Live Conversations, Customers, Products, Users, Departments, Payments, Analytics, Settings');
+        console.log('💡 "Train your AI in ZIVA Studio." — Your new marketing message');
+    </script>
+</body>
+</html>

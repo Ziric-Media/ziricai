@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ziric Media AI — Firebase Auth Test</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "./node_modules/firebase/app/dist/esm/index.esm.js",
+      "firebase/auth": "./node_modules/firebase/auth/dist/esm/index.esm.js",
+      "firebase/firestore": "./node_modules/firebase/firestore/dist/esm/index.esm.js",
+      "firebase/storage": "./node_modules/firebase/storage/dist/esm/index.esm.js",
+      "@firebase/app": "./node_modules/@firebase/app/dist/esm/index.esm.js",
+      "@firebase/auth": "./node_modules/@firebase/auth/dist/esm/index.js",
+      "@firebase/firestore": "./node_modules/@firebase/firestore/dist/index.esm.js",
+      "@firebase/storage": "./node_modules/@firebase/storage/dist/index.esm.js",
+      "@firebase/util": "./node_modules/@firebase/util/dist/index.esm.js",
+      "@firebase/logger": "./node_modules/@firebase/logger/dist/esm/index.esm.js",
+      "@firebase/component": "./node_modules/@firebase/component/dist/esm/index.esm.js",
+      "@firebase/webchannel-wrapper/bloom-blob": "./node_modules/@firebase/webchannel-wrapper/dist/bloom-blob/esm/bloom_blob_es2018.js",
+      "@firebase/webchannel-wrapper/webchannel-blob": "./node_modules/@firebase/webchannel-wrapper/dist/webchannel-blob/esm/webchannel_blob_es2018.js",
+      "idb": "./node_modules/idb/build/index.js",
+      "re2js": "./node_modules/re2js/build/index.esm.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <h1>Firebase Auth Test</h1>
+  <p>Ziric Media AI — authentication testing only</p>
+
+  <div>
+    <label>
+      Email<br>
+      <input type="email" id="email" autocomplete="username">
+    </label>
+  </div>
+  <br>
+  <div>
+    <label>
+      Password<br>
+      <input type="password" id="password" autocomplete="current-password">
+    </label>
+  </div>
+  <br>
+  <div>
+    <button type="button" id="register-btn">Register</button>
+    <button type="button" id="login-btn">Login</button>
+    <button type="button" id="logout-btn">Logout</button>
+  </div>
+  <br>
+  <p id="status">Status: checking...</p>
+
+  <script>
+    if (location.protocol === 'file:') {
+      document.getElementById('status').textContent =
+        'Status: Cannot load ES modules from file://. Run "npm install" then "npx serve ." in the project folder and open the URL shown (e.g. http://localhost:3000/auth-test.html).';
+    }
+  </script>
+
+  <script type="module">
+        if (location.protocol === 'file:') {
+      throw new Error('Use a local HTTP server; file:// is not supported.');
+    }
+
+    let registerUser, loginUser, logoutUser, observeAuthState;
+    try {
+      ({ registerUser, loginUser, logoutUser, observeAuthState } = await import('./js/auth.js'));
+    } catch (err) {
+      document.getElementById('status').textContent =
+        'Status: Failed to load auth modules. Run npm install, serve over HTTP, and check the console. (' + err.message + ')';
+      throw err;
+    }
+
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const statusEl = document.getElementById('status');
+
+    function getCredentials() {
+      return {
+        email: emailInput.value.trim(),
+        password: passwordInput.value,
+      };
+    }
+
+    function updateAuthStatus(user) {
+      if (user) {
+        statusEl.textContent = `Status: Logged In — ${user.email}`;
+      } else {
+        statusEl.textContent = 'Status: Logged Out';
+      }
+    }
+
+    observeAuthState(updateAuthStatus);
+
+    document.getElementById('register-btn').addEventListener('click', async () => {
+      const { email, password } = getCredentials();
+      const result = await registerUser(email, password);
+      if (result.error) {
+        statusEl.textContent = `Status: ${result.error}`;
+      }
+    });
+
+    document.getElementById('login-btn').addEventListener('click', async () => {
+      const { email, password } = getCredentials();
+      const result = await loginUser(email, password);
+      if (result.error) {
+        statusEl.textContent = `Status: ${result.error}`;
+      }
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      const result = await logoutUser();
+      if (result.error) {
+        statusEl.textContent = `Status: ${result.error}`;
+      }
+    });
+  </script>
+</body>
+</html>
