@@ -1,0 +1,22 @@
+{
+    "company": "Ziric Media",
+    "description": "Ziric Media is a digital agency specializing in AI, website development, mobile app development, branding, graphic design, digital marketing and business automation.",
+  
+    "services": [
+      "Website Development",
+      "Mobile App Development",
+      "AI Agents",
+      "Social Media Marketing",
+      "Graphic Design",
+      "Branding",
+      "SEO",
+      "Hosting"
+    ],
+  
+    "website_price": "Starting from R3500",
+  
+    "contact": {
+      "email": "info@ziricmedia.com",
+      "phone": "+27..."
+    }
+  }

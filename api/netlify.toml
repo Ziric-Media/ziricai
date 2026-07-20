@@ -1,0 +1,22 @@
+# API backend — api.ziricai.com
+# Deploy on Railway, Render, Fly.io, or similar (Express + long-running workers).
+# Netlify Functions are NOT used — this server requires persistent process + webhooks.
+
+[build]
+  command = "npm ci"
+  publish = "public"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Placeholder static dir (health page). Real API runs as Node service.
+[[redirects]]
+  from = "/"
+  to = "/health"
+  status = 302
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

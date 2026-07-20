@@ -1,0 +1,245 @@
+﻿rules_version = '2';
+
+// Production: set TENANT_SCOPE_ENFORCEMENT=strict on Express API.
+// Client reads/writes here must match membership in companies/{companyId}/users/{uid}.
+// Platform provisioning and ops routes are gated server-side (superadmin or PLATFORM_API_KEY).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && (
+          userDoc().data.role == 'superadmin' ||
+          userDoc().data.role == 'Super Admin' ||
+          userDoc().data.role == 'super-admin' ||
+          userDoc().data.role == 'super_admin'
+        );
+    }
+
+    function userCompanyId() {
+      return userDoc().data.companyId != null
+        ? userDoc().data.companyId
+        : userDoc().data.company;
+    }
+
+    function isCompanyMember(companyId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userCompanyId() == companyId;
+    }
+
+    function canAccessCompany(companyId) {
+      return isSuperAdmin() || isCompanyMember(companyId);
+    }
+
+    function tenantSubcollection(companyId) {
+      return isSuperAdmin() || (
+        isSignedIn()
+        && exists(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid))
+      );
+    }
+
+    // Global auth profile — own document + superadmin read
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSuperAdmin();
+
+      match /sessions/{sessionId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+
+    // Tenant root document
+    match /companies/{companyId} {
+      allow read: if canAccessCompany(companyId);
+      allow write: if isSuperAdmin() || (
+        isCompanyMember(companyId)
+        && request.resource.data.keys().hasOnly([
+          'name', 'industry', 'plan', 'status', 'email', 'phone', 'website',
+          'owner', 'ownerEmail', 'ownerUid', 'whatsappNumber', 'whatsappConnected',
+          'branding', 'createdAt', 'updatedAt', 'provisionedAt'
+        ])
+      );
+      allow create: if isSuperAdmin();
+
+      match /users/{memberId} {
+        allow read: if tenantSubcollection(companyId);
+        allow create: if isSignedIn() && request.auth.uid == memberId && userCompanyId() == companyId;
+        allow update: if isSuperAdmin() || (
+          tenantSubcollection(companyId) && request.auth.uid == memberId
+        );
+        allow delete: if isSuperAdmin();
+      }
+
+      match /roles/{roleId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /departments/{deptId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /aiEmployees/{agentId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /knowledgeBases/{kbId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /conversations/{convId} {
+        allow read, write: if tenantSubcollection(companyId);
+        match /messages/{messageId} {
+          allow read, write: if tenantSubcollection(companyId);
+        }
+      }
+
+      match /contacts/{contactId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /leads/{leadId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /customers/{customerId} {
+        allow read, write: if tenantSubcollection(companyId);
+        match /messages/{messageId} {
+          allow read, write: if tenantSubcollection(companyId);
+        }
+      }
+
+      match /appointments/{apptId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /tasks/{taskId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /automations/{automationId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /events/{eventId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+
+      match /automationRuns/{runId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+
+      match /analyticsDaily/{docId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+
+      match /analyticsHourly/{docId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+
+      match /analyticsMetrics/{docId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+
+      match /marketplace/{docId} {
+        allow read, write: if tenantSubcollection(companyId);
+        match /installed/{packId} {
+          allow read, write: if tenantSubcollection(companyId);
+        }
+      }
+
+      match /analytics/{metricId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+
+      match /billing/{billingId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+
+      match /subscriptions/{subId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+
+      match /integrations/{integrationId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /notifications/{notificationId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /documents/{documentId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /files/{fileId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /settings/{settingId} {
+        allow read, write: if tenantSubcollection(companyId);
+      }
+
+      match /provisioning/{provId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+    }
+
+    // Platform-level marketplace catalog (read-only for signed-in users)
+    match /platform/{document=**} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // Legacy root collections — Phase 1 migration (server/superadmin only)
+    match /agents/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /customers/{customerId} {
+      allow read, write: if isSuperAdmin();
+      match /messages/{messageId} {
+        allow read, write: if isSuperAdmin();
+      }
+    }
+
+    match /knowledge/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /conversations/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /analytics/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /billing/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /memories/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+  }
+}

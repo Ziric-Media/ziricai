@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ZiricAI · AI Business OS</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon-portal.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/onboarding.css">
+    <link rel="stylesheet" href="css/ziricai-landing.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "./node_modules/firebase/app/dist/esm/index.esm.js",
+        "firebase/auth": "./node_modules/firebase/auth/dist/esm/index.esm.js",
+        "firebase/firestore": "./node_modules/firebase/firestore/dist/esm/index.esm.js",
+        "firebase/storage": "./node_modules/firebase/storage/dist/esm/index.esm.js",
+        "@firebase/app": "./node_modules/@firebase/app/dist/esm/index.esm.js",
+        "@firebase/auth": "./node_modules/@firebase/auth/dist/esm/index.js",
+        "@firebase/firestore": "./node_modules/@firebase/firestore/dist/index.esm.js",
+        "@firebase/storage": "./node_modules/@firebase/storage/dist/index.esm.js",
+        "@firebase/util": "./node_modules/@firebase/util/dist/index.esm.js",
+        "@firebase/logger": "./node_modules/@firebase/logger/dist/esm/index.esm.js",
+        "@firebase/component": "./node_modules/@firebase/component/dist/esm/index.esm.js",
+        "@firebase/webchannel-wrapper/bloom-blob": "./node_modules/@firebase/webchannel-wrapper/dist/bloom-blob/esm/bloom_blob_es2018.js",
+        "@firebase/webchannel-wrapper/webchannel-blob": "./node_modules/@firebase/webchannel-wrapper/dist/webchannel-blob/esm/webchannel_blob_es2018.js",
+        "idb": "./node_modules/idb/build/index.js",
+        "re2js": "./node_modules/re2js/build/index.esm.js"
+      }
+    }
+    </script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"https://api.ziricai.com","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://api.ziricai.com"}};</script>
+</head>
+<body>
+
+<div id="landingView" class="landing-view">
+
+<!-- ===== HEADER ===== -->
+<header class="landing-header">
+    <div class="container header-inner">
+        <a href="#" class="logo"><div class="logo-icon">Z</div> <span>ZiricAI</span></a>
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+        <nav class="nav-links" id="navLinks">
+            <a href="#ai-employees">AI Employees</a>
+            <a href="#marketplace">Marketplace</a>
+            <a href="#automation">Automation</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#faq">FAQ</a>
+            <button class="btn btn-sm" onclick="launchWizard()">Start Free Trial</button>
+        </nav>
+    </div>
+</header>
+
+<!-- ===== 1. HERO ===== -->
+<section class="hero-section" id="hero">
+    <div class="hero-stats-bar">
+        <div class="hero-stat"><strong>10+</strong> AI Employees</div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat"><strong>50+</strong> Industries</div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat"><strong>100+</strong> Automations</div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat"><strong>24/7</strong> Availability</div>
+    </div>
+    <div class="container hero-inner">
+        <div class="hero-content">
+            <div class="hero-badge"><span class="pulse-dot"></span> AI Business Operating System</div>
+            <h1>Your AI Workforce,<br>Ready in 10 Minutes.</h1>
+            <p class="hero-sub">Deploy intelligent AI employees that answer customers on WhatsApp, capture leads, book appointments, and automate your entire business — without writing a single line of code.</p>
+            <div class="hero-actions">
+                <button class="btn btn-glow btn-lg" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
+                <button class="btn btn-ghost btn-lg" id="watchDemoBtn"><i class="fa-solid fa-play"></i> Watch AI Live</button>
+            </div>
+            <p class="hero-trust-line"><i class="fa-solid fa-shield-check"></i> No credit card required · Setup in under 10 minutes · POPIA-ready</p>
+        </div>
+        <div class="hero-visual">
+            <div class="pipeline-panel">
+                <div class="pipeline-title"><i class="fa-solid fa-diagram-project"></i> How ZiricAI Works</div>
+                <div class="pipeline-flow">
+                    <div class="pipeline-node">
+                        <div class="pipeline-icon"><i class="fa-solid fa-user"></i></div>
+                        <span class="pipeline-label">Customer</span>
+                    </div>
+                    <div class="pipeline-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                    <div class="pipeline-node">
+                        <div class="pipeline-icon whatsapp"><i class="fa-brands fa-whatsapp"></i></div>
+                        <span class="pipeline-label">WhatsApp</span>
+                    </div>
+                    <div class="pipeline-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                    <div class="pipeline-node">
+                        <div class="pipeline-icon ai"><i class="fa-solid fa-robot"></i></div>
+                        <span class="pipeline-label">AI Employee</span>
+                    </div>
+                    <div class="pipeline-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                    <div class="pipeline-node">
+                        <div class="pipeline-icon kb"><i class="fa-solid fa-book"></i></div>
+                        <span class="pipeline-label">Knowledge Base</span>
+                    </div>
+                    <div class="pipeline-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                    <div class="pipeline-node">
+                        <div class="pipeline-icon crm"><i class="fa-solid fa-address-book"></i></div>
+                        <span class="pipeline-label">CRM</span>
+                    </div>
+                    <div class="pipeline-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                    <div class="pipeline-node">
+                        <div class="pipeline-icon auto"><i class="fa-solid fa-bolt"></i></div>
+                        <span class="pipeline-label">Automation</span>
+                    </div>
+                    <div class="pipeline-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                    <div class="pipeline-node">
+                        <div class="pipeline-icon analytics"><i class="fa-solid fa-chart-line"></i></div>
+                        <span class="pipeline-label">Analytics</span>
+                    </div>
+                </div>
+                <div class="hero-dashboard">
+                    <div class="hero-dashboard-header">
+                        <span><i class="fa-solid fa-satellite-dish"></i> Mission Control</span>
+                        <span class="live-dot"><span></span> Live</span>
+                    </div>
+                    <div class="hero-kpi-grid">
+                        <div class="hero-kpi">
+                            <div class="hero-kpi-value green">347</div>
+                            <div class="hero-kpi-label">AI Online</div>
+                        </div>
+                        <div class="hero-kpi">
+                            <div class="hero-kpi-value purple">143</div>
+                            <div class="hero-kpi-label">Live Chats</div>
+                        </div>
+                        <div class="hero-kpi">
+                            <div class="hero-kpi-value blue">R384K</div>
+                            <div class="hero-kpi-label">Revenue Today</div>
+                        </div>
+                        <div class="hero-kpi">
+                            <div class="hero-kpi-value green">98.8%</div>
+                            <div class="hero-kpi-label">AI Accuracy</div>
+                        </div>
+                    </div>
+                    <div class="hero-status-row">
+                        <span class="status-pill"><i class="fa-brands fa-whatsapp"></i> WhatsApp Connected</span>
+                        <span class="status-pill"><i class="fa-solid fa-brain"></i> OpenAI Connected</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== 2. TRUSTED BY / INTEGRATIONS ===== -->
+<section class="section section-alt" id="integrations">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">Trusted By</span>
+            <h2>Businesses across Africa trust ZiricAI</h2>
+            <p>From schools to law firms — pilot customers already running AI employees 24/7.</p>
+        </div>
+        <div class="trusted-grid">
+            <div class="trusted-card"><span class="icon">🏫</span> Schools</div>
+            <div class="trusted-card"><span class="icon">⚖️</span> Law Firms</div>
+            <div class="trusted-card"><span class="icon">🏥</span> Clinics</div>
+            <div class="trusted-card"><span class="icon">⚰️</span> Funeral Homes</div>
+            <div class="trusted-card"><span class="icon">🏢</span> Enterprises</div>
+        </div>
+        <div class="section-header" style="margin-bottom:28px;">
+            <span class="section-eyebrow">Integrations</span>
+            <h2>Connects to the tools you already use</h2>
+        </div>
+        <div class="integrations-row">
+            <span class="integration-pill whatsapp"><i class="fa-brands fa-whatsapp"></i> WhatsApp</span>
+            <span class="integration-pill facebook"><i class="fa-brands fa-facebook"></i> Facebook</span>
+            <span class="integration-pill instagram"><i class="fa-brands fa-instagram"></i> Instagram</span>
+            <span class="integration-pill telegram"><i class="fa-brands fa-telegram"></i> Telegram</span>
+            <span class="integration-pill google"><i class="fa-brands fa-google"></i> Google</span>
+            <span class="integration-pill microsoft"><i class="fa-brands fa-microsoft"></i> Microsoft</span>
+            <span class="integration-pill stripe"><i class="fa-brands fa-stripe"></i> Stripe</span>
+            <span class="integration-pill paystack"><i class="fa-solid fa-credit-card"></i> Paystack</span>
+            <span class="integration-pill firebase"><i class="fa-solid fa-fire"></i> Firebase</span>
+        </div>
+    </div>
+</section>
+
+<!-- ===== 3. PAIN POINTS ===== -->
+<section class="section pain-section" id="why-ai">
+    <div class="container">
+        <p class="pain-headline">Stop losing customers because your business sleeps.</p>
+        <p class="pain-subheadline">Your AI workforce works 24 hours a day.</p>
+        <div class="pain-checklist">
+            <div class="pain-item"><i class="fa-solid fa-circle-check"></i> Answers instantly</div>
+            <div class="pain-item"><i class="fa-solid fa-circle-check"></i> Books appointments</div>
+            <div class="pain-item"><i class="fa-solid fa-circle-check"></i> Generates quotations</div>
+            <div class="pain-item"><i class="fa-solid fa-circle-check"></i> Captures leads</div>
+            <div class="pain-item"><i class="fa-solid fa-circle-check"></i> Follows up automatically</div>
+            <div class="pain-item"><i class="fa-solid fa-circle-check"></i> Supports your team</div>
+            <div class="pain-item"><i class="fa-solid fa-circle-check"></i> Never takes leave</div>
+            <div class="pain-item"><i class="fa-solid fa-circle-check"></i> Never forgets</div>
+            <div class="pain-item"><i class="fa-solid fa-circle-check"></i> Never misses a customer</div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== 4. DASHBOARD / MISSION CONTROL ===== -->
+<section class="section section-dark" id="mission-control">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">Mission Control</span>
+            <h2>Watch every AI Employee live across every company in one dashboard</h2>
+            <p>Real-time visibility into conversations, revenue, accuracy, and platform health — from a single command center.</p>
+        </div>
+        <div class="mission-panel">
+            <div class="mission-header">
+                <h3><i class="fa-solid fa-globe"></i> AI Command Center</h3>
+                <span class="status-pill"><span class="live-dot"><span></span></span> Live · 347 AI Employees Online</span>
+            </div>
+            <div class="mission-kpi-grid">
+                <div class="mission-kpi kpi-green">
+                    <div class="mission-kpi-icon"><i class="fa-solid fa-robot"></i></div>
+                    <div class="mission-kpi-value">347</div>
+                    <div class="mission-kpi-label">AI Employees Online</div>
+                </div>
+                <div class="mission-kpi kpi-purple">
+                    <div class="mission-kpi-icon"><i class="fa-solid fa-comments"></i></div>
+                    <div class="mission-kpi-value">143</div>
+                    <div class="mission-kpi-label">Live Conversations</div>
+                </div>
+                <div class="mission-kpi kpi-blue">
+                    <div class="mission-kpi-icon"><i class="fa-solid fa-money-bill-wave"></i></div>
+                    <div class="mission-kpi-value">R384,000</div>
+                    <div class="mission-kpi-label">Revenue Today</div>
+                </div>
+                <div class="mission-kpi kpi-orange">
+                    <div class="mission-kpi-icon"><i class="fa-solid fa-bullseye"></i></div>
+                    <div class="mission-kpi-value">98.8%</div>
+                    <div class="mission-kpi-label">AI Accuracy</div>
+                </div>
+            </div>
+            <div class="mission-footer">
+                <div class="mission-activity">
+                    <div class="activity-line"><span class="dot"></span> Central Motors — Sales AI closed a R45,000 deal</div>
+                    <div class="activity-line"><span class="dot"></span> Greenfield Academy — Reception AI booked 12 parent meetings</div>
+                    <div class="activity-line"><span class="dot"></span> Mthembu Legal — Intake AI captured 8 new leads</div>
+                </div>
+                <div class="hero-status-row" style="padding:0;">
+                    <span class="status-pill"><i class="fa-brands fa-whatsapp"></i> WhatsApp Connected</span>
+                    <span class="status-pill"><i class="fa-solid fa-brain"></i> OpenAI Connected</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== 5. AI EMPLOYEES ===== -->
+<section class="section" id="ai-employees">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">AI Employees</span>
+            <h2>Specialized AI agents ready to work from day one</h2>
+            <p>Each AI employee is trained for a specific role — support, sales, reception, finance, and more.</p>
+        </div>
+        <div class="agent-grid">
+            <div class="agent-card"><div class="agent-avatar">💬</div><h4>Customer Support</h4><p>24/7 ticket resolution, FAQs, handoff</p></div>
+            <div class="agent-card"><div class="agent-avatar">💰</div><h4>Sales AI</h4><p>Lead qualification, follow-ups, proposals</p></div>
+            <div class="agent-card"><div class="agent-avatar">📈</div><h4>Marketing AI</h4><p>Campaigns, segmentation, content</p></div>
+            <div class="agent-card"><div class="agent-avatar">📞</div><h4>Receptionist AI</h4><p>Call routing, booking, inquiries</p></div>
+            <div class="agent-card"><div class="agent-avatar">🧑‍💼</div><h4>HR AI</h4><p>Onboarding, policies, leave requests</p></div>
+            <div class="agent-card"><div class="agent-avatar">📊</div><h4>Finance AI</h4><p>Invoicing, expenses, reports</p></div>
+            <div class="agent-card"><div class="agent-avatar">⚖️</div><h4>Legal AI</h4><p>Contract review, compliance, research</p></div>
+            <div class="agent-card"><div class="agent-avatar">🏫</div><h4>School AI</h4><p>Student inquiries, parent comms</p></div>
+            <div class="agent-card"><div class="agent-avatar">🏥</div><h4>Healthcare AI</h4><p>Appointments, triage, patient info</p></div>
+            <div class="agent-card"><div class="agent-avatar">⛪</div><h4>Church AI</h4><p>Events, member care, donations</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== 6. MARKETPLACE ===== -->
+<section class="section section-alt" id="marketplace">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">AI Marketplace</span>
+            <h2>Install complete AI solutions in one click</h2>
+            <p>Industry-specific AI packs with pre-trained knowledge, workflows, and integrations — ready to deploy.</p>
+        </div>
+        <div class="marketplace-grid">
+            <div class="marketplace-card">
+                <div class="marketplace-icon">🚗</div>
+                <h4>Car Dealer Pack</h4>
+                <p>Vehicle inventory, financing quotes, test drive booking, trade-in valuations.</p>
+                <span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> One click. Installed.</span>
+            </div>
+            <div class="marketplace-card">
+                <div class="marketplace-icon">⚰️</div>
+                <h4>Funeral Pack</h4>
+                <p>Compassionate intake, package selection, documentation, family coordination.</p>
+                <span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> One click. Installed.</span>
+            </div>
+            <div class="marketplace-card">
+                <div class="marketplace-icon">🏫</div>
+                <h4>School Pack</h4>
+                <p>Admissions, fee queries, parent communication, event scheduling.</p>
+                <span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> One click. Installed.</span>
+            </div>
+            <div class="marketplace-card">
+                <div class="marketplace-icon">🏥</div>
+                <h4>Hospital Pack</h4>
+                <p>Appointment booking, triage questions, patient info, follow-ups.</p>
+                <span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> One click. Installed.</span>
+            </div>
+            <div class="marketplace-card">
+                <div class="marketplace-icon">⚖️</div>
+                <h4>Law Firm Pack</h4>
+                <p>Client intake, case status, document collection, consultation booking.</p>
+                <span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> One click. Installed.</span>
+            </div>
+        </div>
+        <p class="marketplace-cta">One click. Installed. Your AI employee is live.</p>
+    </div>
+</section>
+
+<!-- ===== 7. WORKFLOW AUTOMATION ===== -->
+<section class="section" id="automation">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">Workflow Studio</span>
+            <h2>From customer message to completed work — automatically</h2>
+            <p>Visual automation flows that connect conversations to CRM, bookings, invoices, and team notifications.</p>
+        </div>
+        <div class="workflow-visual">
+            <div class="workflow-step">
+                <div class="workflow-step-icon"><i class="fa-solid fa-comment-dots"></i></div>
+                <h4>Customer asks</h4>
+                <p>Via WhatsApp, web chat, or social</p>
+            </div>
+            <div class="workflow-connector"><i class="fa-solid fa-arrow-right"></i></div>
+            <div class="workflow-step">
+                <div class="workflow-step-icon"><i class="fa-solid fa-robot"></i></div>
+                <h4>AI answers</h4>
+                <p>Using your knowledge base</p>
+            </div>
+            <div class="workflow-connector"><i class="fa-solid fa-arrow-right"></i></div>
+            <div class="workflow-step">
+                <div class="workflow-step-icon"><i class="fa-solid fa-user-plus"></i></div>
+                <h4>Creates CRM Lead</h4>
+                <p>Captures contact & intent</p>
+            </div>
+            <div class="workflow-connector"><i class="fa-solid fa-arrow-right"></i></div>
+            <div class="workflow-step">
+                <div class="workflow-step-icon"><i class="fa-solid fa-calendar-check"></i></div>
+                <h4>Books appointment</h4>
+                <p>Syncs with your calendar</p>
+            </div>
+            <div class="workflow-connector"><i class="fa-solid fa-arrow-right"></i></div>
+            <div class="workflow-step">
+                <div class="workflow-step-icon"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                <h4>Sends invoice</h4>
+                <p>Stripe, Paystack, or manual</p>
+            </div>
+            <div class="workflow-connector"><i class="fa-solid fa-arrow-right"></i></div>
+            <div class="workflow-step">
+                <div class="workflow-step-icon"><i class="fa-solid fa-bell"></i></div>
+                <h4>Notifies manager</h4>
+                <p>Email, WhatsApp, or dashboard</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== 8. KNOWLEDGE BASE ===== -->
+<section class="section section-alt" id="knowledge">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">Knowledge Base</span>
+            <h2>Your business knowledge, instantly accessible to every AI employee</h2>
+        </div>
+        <div class="knowledge-grid">
+            <div class="knowledge-features">
+                <div class="knowledge-feature">
+                    <div class="knowledge-feature-icon"><i class="fa-solid fa-file-pdf"></i></div>
+                    <div>
+                        <h4>Upload any document</h4>
+                        <p>PDFs, DOCX, spreadsheets, price lists, policies, and SOPs.</p>
+                    </div>
+                </div>
+                <div class="knowledge-feature">
+                    <div class="knowledge-feature-icon"><i class="fa-solid fa-globe"></i></div>
+                    <div>
+                        <h4>Import your website</h4>
+                        <p>Auto-crawl and index your existing web content and FAQs.</p>
+                    </div>
+                </div>
+                <div class="knowledge-feature">
+                    <div class="knowledge-feature-icon"><i class="fa-solid fa-brain"></i></div>
+                    <div>
+                        <h4>AI-powered training</h4>
+                        <p>Automatic chunking, embedding, and continuous learning.</p>
+                    </div>
+                </div>
+                <div class="knowledge-feature">
+                    <div class="knowledge-feature-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                    <div>
+                        <h4>Secure & isolated</h4>
+                        <p>Each company's knowledge is encrypted and completely separate.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="knowledge-mock">
+                <div class="knowledge-mock-header"><i class="fa-solid fa-book"></i> Knowledge Library — Central Motors</div>
+                <div class="knowledge-doc"><i class="fa-solid fa-file-pdf"></i> Vehicle Price List 2024.pdf <span class="badge">Trained</span></div>
+                <div class="knowledge-doc"><i class="fa-solid fa-file-word"></i> Financing Terms.docx <span class="badge">Trained</span></div>
+                <div class="knowledge-doc"><i class="fa-solid fa-file-lines"></i> FAQ — Trade-ins & Warranties <span class="badge">Trained</span></div>
+                <div class="knowledge-doc"><i class="fa-solid fa-globe"></i> centralmotors.co.za <span class="badge">Indexed</span></div>
+                <div class="knowledge-doc"><i class="fa-solid fa-file-pdf"></i> Service Packages.pdf <span class="badge">Training…</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== 9. INDUSTRIES ===== -->
+<section class="section" id="industries">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">Industries</span>
+            <h2>Built for every business, in every sector</h2>
+            <p>Pre-configured AI packs and workflows for 50+ industries across Africa and beyond.</p>
+        </div>
+        <div class="industries-grid">
+            <div class="industry-chip"><span>🏫</span> Education</div>
+            <div class="industry-chip"><span>⚖️</span> Legal</div>
+            <div class="industry-chip"><span>⚰️</span> Funeral</div>
+            <div class="industry-chip"><span>🏥</span> Healthcare</div>
+            <div class="industry-chip"><span>🚗</span> Automotive</div>
+            <div class="industry-chip"><span>🏪</span> Retail</div>
+            <div class="industry-chip"><span>⛪</span> Church</div>
+            <div class="industry-chip"><span>🏨</span> Hospitality</div>
+            <div class="industry-chip"><span>🏗️</span> Construction</div>
+            <div class="industry-chip"><span>🏛️</span> Government</div>
+            <div class="industry-chip"><span>🏠</span> Real Estate</div>
+            <div class="industry-chip"><span>🔒</span> Security</div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== 10. TESTIMONIALS ===== -->
+<section class="section section-alt" id="testimonials">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">Customer Stories</span>
+            <h2>What business owners are saying</h2>
+        </div>
+        <div class="testimonials-grid">
+            <div class="testimonial-card">
+                <div class="testimonial-stars"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+                <p class="testimonial-quote">"We went from missing WhatsApp enquiries after hours to closing deals at 11pm. Our Sales AI handles financing questions better than most of our junior staff."</p>
+                <div class="testimonial-author">
+                    <div class="testimonial-avatar">TM</div>
+                    <div><div class="testimonial-name">Thabo Mokoena</div><div class="testimonial-role">Owner, Central Motors</div></div>
+                </div>
+            </div>
+            <div class="testimonial-card">
+                <div class="testimonial-stars"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+                <p class="testimonial-quote">"Parent enquiries used to overwhelm our reception. Now the School AI handles admissions, fee questions, and event RSVPs — parents get instant answers."</p>
+                <div class="testimonial-author">
+                    <div class="testimonial-avatar">NK</div>
+                    <div><div class="testimonial-name">Nomsa Khumalo</div><div class="testimonial-role">Principal, Greenfield Academy</div></div>
+                </div>
+            </div>
+            <div class="testimonial-card">
+                <div class="testimonial-stars"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+                <p class="testimonial-quote">"Client intake used to take 30 minutes per call. The Legal AI captures case details, schedules consultations, and sends document checklists automatically."</p>
+                <div class="testimonial-author">
+                    <div class="testimonial-avatar">SM</div>
+                    <div><div class="testimonial-name">Sipho Mthembu</div><div class="testimonial-role">Partner, Mthembu Legal</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== 11. PRICING ===== -->
+<section class="section" id="pricing">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">Pricing</span>
+            <h2>Simple, scalable pricing</h2>
+            <p>Every plan includes setup, AI training, and access to future platform updates.</p>
+        </div>
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <div class="pricing-plan">Starter</div>
+                <div class="pricing-price">R999 <small>/month</small></div>
+                <ul class="pricing-features">
+                    <li><i class="fa-solid fa-check"></i> 1 AI Employee</li>
+                    <li><i class="fa-solid fa-check"></i> WhatsApp + Website Chat</li>
+                    <li><i class="fa-solid fa-check"></i> 2,000 conversations/mo</li>
+                    <li><i class="fa-solid fa-check"></i> Basic Knowledge Base</li>
+                    <li><i class="fa-solid fa-check"></i> Email Support</li>
+                </ul>
+                <button class="btn" onclick="launchWizard()">Start Free Trial</button>
+            </div>
+            <div class="pricing-card featured">
+                <div class="pricing-plan">Professional</div>
+                <div class="pricing-price">R2,999 <small>/month</small></div>
+                <ul class="pricing-features">
+                    <li><i class="fa-solid fa-check"></i> Up to 5 AI Employees</li>
+                    <li><i class="fa-solid fa-check"></i> Social Media + CRM</li>
+                    <li><i class="fa-solid fa-check"></i> Analytics Dashboard</li>
+                    <li><i class="fa-solid fa-check"></i> Team accounts</li>
+                    <li><i class="fa-solid fa-check"></i> Workflow automation</li>
+                </ul>
+                <button class="btn" onclick="launchWizard()">Start Free Trial</button>
+            </div>
+            <div class="pricing-card">
+                <div class="pricing-plan">Business</div>
+                <div class="pricing-price">R7,999 <small>/month</small></div>
+                <ul class="pricing-features">
+                    <li><i class="fa-solid fa-check"></i> Unlimited AI Employees</li>
+                    <li><i class="fa-solid fa-check"></i> Unlimited Knowledge</li>
+                    <li><i class="fa-solid fa-check"></i> API Access</li>
+                    <li><i class="fa-solid fa-check"></i> Multiple departments</li>
+                    <li><i class="fa-solid fa-check"></i> Priority Support</li>
+                </ul>
+                <button class="btn" onclick="launchWizard()">Start Free Trial</button>
+            </div>
+            <div class="pricing-card">
+                <div class="pricing-plan">Enterprise</div>
+                <div class="pricing-price">Custom</div>
+                <ul class="pricing-features">
+                    <li><i class="fa-solid fa-check"></i> Custom AI development</li>
+                    <li><i class="fa-solid fa-check"></i> On-premise deployment</li>
+                    <li><i class="fa-solid fa-check"></i> Dedicated infrastructure</li>
+                    <li><i class="fa-solid fa-check"></i> SLA + Staff training</li>
+                    <li><i class="fa-solid fa-check"></i> Custom workflows</li>
+                </ul>
+                <button class="btn btn-outline" onclick="showToast('Contact sales for enterprise pricing','info')">Contact Sales</button>
+            </div>
+        </div>
+        <p class="pricing-note">14-day free trial on all plans. No credit card required.</p>
+    </div>
+</section>
+
+<!-- ===== 12. FAQ ===== -->
+<section class="section section-alt" id="faq">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">FAQ</span>
+            <h2>Frequently asked questions</h2>
+        </div>
+        <div class="faq-list">
+            <div class="faq-item">
+                <button class="faq-question" type="button">How long does setup take? <i class="fa-solid fa-chevron-down"></i></button>
+                <div class="faq-answer"><p>Most businesses go live in under 10 minutes. Create your account, choose your industry pack, connect WhatsApp, upload knowledge, and your AI employee is ready.</p></div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question" type="button">Do I need coding skills? <i class="fa-solid fa-chevron-down"></i></button>
+                <div class="faq-answer"><p>No. ZiricAI is designed for business owners and teams. Everything is point-and-click — from onboarding to workflow automation.</p></div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question" type="button">Which channels are supported? <i class="fa-solid fa-chevron-down"></i></button>
+                <div class="faq-answer"><p>WhatsApp, Facebook Messenger, Instagram DMs, Telegram, website live chat, email, and SMS. More channels are added regularly.</p></div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question" type="button">Is my data secure? <i class="fa-solid fa-chevron-down"></i></button>
+                <div class="faq-answer"><p>Yes. All data is encrypted at rest and in transit. Each company's knowledge base is fully isolated. ZiricAI is POPIA-ready with role-based access and audit logs.</p></div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question" type="button">Can I try before I pay? <i class="fa-solid fa-chevron-down"></i></button>
+                <div class="faq-answer"><p>Absolutely. Every plan includes a 14-day free trial with full access. No credit card required to start.</p></div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question" type="button">What happens after the trial? <i class="fa-solid fa-chevron-down"></i></button>
+                <div class="faq-answer"><p>Choose a plan that fits your business. Your AI employees, knowledge base, and conversation history carry over seamlessly.</p></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== 13. FINAL CTA ===== -->
+<section class="final-cta" id="start">
+    <h2>Start your AI employee in under 10 minutes</h2>
+    <p>Join businesses across Africa using ZiricAI to automate customer service, sales, and operations.</p>
+    <div class="hero-actions">
+        <button class="btn btn-glow btn-lg" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
+        <button class="btn btn-ghost btn-lg" id="watchDemoBtn2"><i class="fa-solid fa-play"></i> Watch AI Live</button>
+    </div>
+</section>
+
+<!-- ===== 14. FOOTER ===== -->
+<footer class="site-footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <a href="#" class="logo"><div class="logo-icon">Z</div> <span>ZiricAI</span></a>
+                <p>The AI Business Operating System. Deploy intelligent AI employees that automate work, support customers, and drive growth.</p>
+            </div>
+            <div class="footer-col">
+                <h5>Product</h5>
+                <a href="#ai-employees">AI Employees</a>
+                <a href="#marketplace">Marketplace</a>
+                <a href="#automation">Automation</a>
+                <a href="#knowledge">CRM & Knowledge</a>
+                <a href="#pricing">Pricing</a>
+            </div>
+            <div class="footer-col">
+                <h5>Company</h5>
+                <a href="#industries">About</a>
+                <a href="#" onclick="showToast('Careers page coming soon','info');return false;">Careers</a>
+                <a href="#" onclick="showToast('Partners program coming soon','info');return false;">Partners</a>
+                <a href="#" onclick="showToast('Contact: hello@ziric.ai','info');return false;">Contact</a>
+            </div>
+            <div class="footer-col">
+                <h5>Resources</h5>
+                <a href="#" onclick="showToast('Documentation coming soon','info');return false;">Documentation</a>
+                <a href="#" onclick="showToast('API docs coming soon','info');return false;">API</a>
+                <a href="#faq">Help Center</a>
+                <a href="#" onclick="showToast('Blog coming soon','info');return false;">Blog</a>
+            </div>
+            <div class="footer-col">
+                <h5>Developers</h5>
+                <a href="#" onclick="showToast('API docs coming soon','info');return false;">API Reference</a>
+                <a href="#" onclick="showToast('Webhooks docs coming soon','info');return false;">Webhooks</a>
+                <a href="#" onclick="showToast('SDK coming soon','info');return false;">SDK</a>
+                <a href="./">Platform Admin</a>
+                <a href="./">Company Portal</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>&copy; 2026 ZiricAI — built by Ziric Media</span>
+            <div class="footer-bottom-links">
+                <a href="#">Privacy</a>
+                <a href="#">Terms</a>
+                <a href="./">Super Admin</a>
+                <a href="./">Portal</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+</div><!-- /landingView -->
+
+<!-- ===== WATCH AI LIVE — DEMO MODAL ===== -->
+<div class="demo-overlay" id="demoOverlay">
+    <div class="demo-modal" role="dialog" aria-label="AI Live Demo">
+        <div class="demo-modal-header">
+            <h3><i class="fa-brands fa-whatsapp"></i> Central Motors — Sales AI</h3>
+            <button class="demo-close" id="demoClose" aria-label="Close">&times;</button>
+        </div>
+        <div class="demo-chat" id="demoChat"></div>
+        <div class="demo-modal-footer">Simulated conversation · Powered by ZiricAI</div>
+    </div>
+</div>
+
+<!-- ===== ONBOARDING WIZARD ===== -->
+<div id="wizardView" class="wizard-view hidden onboarding-body">
+    <div class="onboarding-bg"></div>
+
+    <header class="onboarding-header">
+        <a href="#" class="onboarding-brand" id="wizardBackHome">
+            <div class="brand-icon">Z</div>
+            <span>ZiricAI</span>
+        </a>
+        <div class="onboarding-header-meta">
+            <span class="trial-pill"><i class="fa-solid fa-gift"></i> 14-day free trial</span>
+            <a href="./" class="link-muted">Sign in</a>
+        </div>
+    </header>
+
+    <main class="onboarding-main">
+        <aside class="onboarding-progress-panel">
+            <h2>Launch in minutes</h2>
+            <p class="progress-sub">Set up your AI workforce — no credit card required.</p>
+            <ol class="step-list" id="stepList"></ol>
+            <div class="progress-bar-wrap">
+                <div class="progress-bar"><div class="progress-fill" id="overallProgress"></div></div>
+                <span id="progressLabel">Step 1 of 7</span>
+            </div>
+        </aside>
+
+        <section class="onboarding-card" id="wizardCard">
+            <div id="stepContent"></div>
+            <div class="wizard-actions" id="wizardActions"></div>
+            <p class="wizard-status" id="wizardStatus"></p>
+        </section>
+    </main>
+
+    <footer class="onboarding-footer">
+        <span>&copy; ZiricAI &middot; POPIA-ready &middot; <a href="./">Platform Admin</a></span>
+    </footer>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+    function launchWizard() {
+        document.getElementById('landingView').classList.add('hidden');
+        document.getElementById('wizardView').classList.remove('hidden');
+        document.body.classList.add('wizard-active');
+        history.replaceState(null, '', '#start');
+        window.scrollTo(0, 0);
+    }
+
+    function showLanding() {
+        document.getElementById('wizardView').classList.add('hidden');
+        document.getElementById('landingView').classList.remove('hidden');
+        document.body.classList.remove('wizard-active');
+        history.replaceState(null, '', window.location.pathname);
+    }
+
+    document.getElementById('wizardBackHome')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showLanding();
+    });
+
+    if (location.hash === '#start' || location.hash === '#wizard') {
+        launchWizard();
+    }
+</script>
+<script type="module" src="js/onboarding/main.js"></script>
+<script>
+    // ===== TOAST =====
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `<span>${type === 'success' ? '✅' : 'ℹ️'}</span><span>${message}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    // ===== SMOOTH SCROLL =====
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+            const href = this.getAttribute('href');
+            if (href === '#') return;
+            const target = document.querySelector(href);
+            if (target) {
+                e.preventDefault();
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+
+    // ===== MOBILE MENU =====
+    document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
+        document.getElementById('navLinks')?.classList.toggle('open');
+    });
+
+    // ===== FAQ ACCORDION =====
+    document.querySelectorAll('.faq-question').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const item = btn.closest('.faq-item');
+            const wasOpen = item.classList.contains('open');
+            document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+            if (!wasOpen) item.classList.add('open');
+        });
+    });
+
+    // ===== WATCH AI LIVE DEMO =====
+    const demoMessages = [
+        { role: 'customer', text: 'Do you sell Toyota Hilux?' },
+        { role: 'ai', text: 'Yes! We have 2022, 2023, and 2024 Toyota Hilux models available. Would you like financing options or to book a test drive?' },
+    ];
+    let demoRunning = false;
+
+    function openDemo() {
+        const overlay = document.getElementById('demoOverlay');
+        const chat = document.getElementById('demoChat');
+        overlay.classList.add('active');
+        chat.innerHTML = '';
+        demoRunning = true;
+        playDemo(chat, 0);
+    }
+
+    function closeDemo() {
+        document.getElementById('demoOverlay').classList.remove('active');
+        demoRunning = false;
+    }
+
+    async function playDemo(chat, index) {
+        if (!demoRunning || index >= demoMessages.length) return;
+        const msg = demoMessages[index];
+
+        if (msg.role === 'ai') {
+            const typing = document.createElement('div');
+            typing.className = 'chat-bubble typing';
+            typing.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+            chat.appendChild(typing);
+            chat.scrollTop = chat.scrollHeight;
+            await delay(1400);
+            if (!demoRunning) return;
+            typing.remove();
+        }
+
+        const bubble = document.createElement('div');
+        bubble.className = `chat-bubble ${msg.role}`;
+        bubble.textContent = msg.text;
+        chat.appendChild(bubble);
+        chat.scrollTop = chat.scrollHeight;
+
+        await delay(msg.role === 'customer' ? 800 : 2000);
+        playDemo(chat, index + 1);
+    }
+
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    document.getElementById('watchDemoBtn')?.addEventListener('click', openDemo);
+    document.getElementById('watchDemoBtn2')?.addEventListener('click', openDemo);
+    document.getElementById('demoClose')?.addEventListener('click', closeDemo);
+    document.getElementById('demoOverlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'demoOverlay') closeDemo();
+    });
+
+    // ===== AGENT CARD CLICK =====
+    document.querySelectorAll('.agent-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const name = card.querySelector('h4')?.textContent || 'AI Employee';
+            showToast(`${name} — deploy with one click during onboarding`, 'info');
+        });
+    });
+
+    console.log('ZiricAI landing — AI Business OS ready.');
+</script>
+<script type="module">
+import { getSiteUrls } from './js/shared/siteUrls.js';
+document.querySelectorAll('[data-site-link]').forEach((el) => {
+  const key = el.getAttribute('data-site-link');
+  const urls = getSiteUrls();
+  if (urls[key]) el.href = urls[key];
+});
+</script>
+</body>
+</html>

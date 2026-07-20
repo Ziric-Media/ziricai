@@ -1,0 +1,8 @@
+# ZiricAI monorepo — Netlify multi-site
+# See docs/deployment/NETLIFY.md for per-site setup and troubleshooting.
+#
+# This root file is NOT used when each Netlify site has its own base directory.
+# Configure Netlify sites with base: marketing | app | admin
+#
+# If you see "Base directory does not exist: …/marketing", the marketing/ folder
+# is missing from the Git branch Netlify builds — commit and push marketing/ first.

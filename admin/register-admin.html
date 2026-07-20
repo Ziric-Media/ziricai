@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ziric Media AI — Register Admin (Test)</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "./node_modules/firebase/app/dist/esm/index.esm.js",
+      "firebase/auth": "./node_modules/firebase/auth/dist/esm/index.esm.js",
+      "firebase/firestore": "./node_modules/firebase/firestore/dist/esm/index.esm.js",
+      "firebase/storage": "./node_modules/firebase/storage/dist/esm/index.esm.js",
+      "@firebase/app": "./node_modules/@firebase/app/dist/esm/index.esm.js",
+      "@firebase/auth": "./node_modules/@firebase/auth/dist/esm/index.js",
+      "@firebase/firestore": "./node_modules/@firebase/firestore/dist/index.esm.js",
+      "@firebase/storage": "./node_modules/@firebase/storage/dist/index.esm.js",
+      "@firebase/util": "./node_modules/@firebase/util/dist/index.esm.js",
+      "@firebase/logger": "./node_modules/@firebase/logger/dist/esm/index.esm.js",
+      "@firebase/component": "./node_modules/@firebase/component/dist/esm/index.esm.js",
+      "@firebase/webchannel-wrapper/bloom-blob": "./node_modules/@firebase/webchannel-wrapper/dist/bloom-blob/esm/bloom_blob_es2018.js",
+      "@firebase/webchannel-wrapper/webchannel-blob": "./node_modules/@firebase/webchannel-wrapper/dist/webchannel-blob/esm/webchannel_blob_es2018.js",
+      "idb": "./node_modules/idb/build/index.js",
+      "re2js": "./node_modules/re2js/build/index.esm.js"
+    }
+  }
+  </script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"https://api.ziricai.com","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://api.ziricai.com"}};</script>
+</head>
+<body>
+  <h1>Register Admin</h1>
+  <p>Ziric Media AI — temporary Super Admin registration test page</p>
+
+  <div>
+    <label>
+      Full Name<br>
+      <input type="text" id="full-name" autocomplete="name">
+    </label>
+  </div>
+  <br>
+  <div>
+    <label>
+      Email<br>
+      <input type="email" id="email" autocomplete="username">
+    </label>
+  </div>
+  <br>
+  <div>
+    <label>
+      Password<br>
+      <input type="password" id="password" autocomplete="new-password">
+    </label>
+  </div>
+  <br>
+  <div>
+    <button type="button" id="register-btn">Register</button>
+  </div>
+  <br>
+  <p id="status">Status: ready</p>
+
+  <script>
+    if (location.protocol === 'file:') {
+      document.getElementById('status').textContent =
+        'Status: Cannot load ES modules from file://. Run "npm install" then "npx serve ." in the project folder and open the URL shown (e.g. http://localhost:3000/register-admin.html).';
+    }
+  </script>
+
+  <script type="module">
+    if (location.protocol === 'file:') {
+      throw new Error('Use a local HTTP server; file:// is not supported.');
+    }
+
+    let registerUser, createUserProfile;
+    try {
+      ({ registerUser } = await import('./js/auth.js'));
+      ({ createUserProfile } = await import('./js/users.js'));
+    } catch (err) {
+      document.getElementById('status').textContent =
+        'Status: Failed to load modules. Run npm install, serve over HTTP, and check the console. (' + err.message + ')';
+      throw err;
+    }
+
+    const fullNameInput = document.getElementById('full-name');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const statusEl = document.getElementById('status');
+    const registerBtn = document.getElementById('register-btn');
+
+    function getFormValues() {
+      return {
+        fullName: fullNameInput.value.trim(),
+        email: emailInput.value.trim(),
+        password: passwordInput.value,
+      };
+    }
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    registerBtn.addEventListener('click', async () => {
+      const { fullName, email, password } = getFormValues();
+
+      if (!fullName) {
+        setStatus('Status: Please enter your full name.');
+        return;
+      }
+      if (!email) {
+        setStatus('Status: Please enter your email address.');
+        return;
+      }
+      if (!password) {
+        setStatus('Status: Please enter your password.');
+        return;
+      }
+
+      registerBtn.disabled = true;
+      setStatus('Status: Creating Firebase Auth account...');
+
+      let authResult;
+      try {
+        authResult = await registerUser(email, password);
+      } catch (err) {
+        console.error('registerUser threw:', err);
+        setStatus('Status: Unexpected error during registration: ' + (err?.message || err));
+        registerBtn.disabled = false;
+        return;
+      }
+
+      if (authResult.error) {
+        setStatus('Status: ' + authResult.error);
+        registerBtn.disabled = false;
+        return;
+      }
+
+      const uid = authResult.user.uid;
+      setStatus('Status: Auth account created. Writing Firestore profile (users/' + uid + ')...');
+
+      let profileResult;
+      try {
+        profileResult = await createUserProfile(uid, {
+          fullName,
+          email,
+          role: 'Super Admin',
+          company: 'Ziric Media',
+          status: 'Active',
+        });
+      } catch (err) {
+        console.error('createUserProfile threw:', err);
+        setStatus(
+          'Status: Auth succeeded but Firestore profile write crashed: ' +
+            (err?.message || err) +
+            ' (uid: ' + uid + '). Check browser console and Firebase Console (Firestore enabled + rules deployed).'
+        );
+        registerBtn.disabled = false;
+        return;
+      }
+
+      if (profileResult.error) {
+        setStatus(
+          'Status: Auth account created, but Firestore profile failed: ' +
+            profileResult.error +
+            ' (uid: ' + uid + '). Enable Firestore (default DB), deploy firestore.rules, then retry or create users/' +
+            uid +
+            ' manually.'
+        );
+        registerBtn.disabled = false;
+        return;
+      }
+
+      setStatus(
+        'Status: Success — Super Admin account created for ' +
+          profileResult.profile.email +
+          ' (uid: ' + uid + ').'
+      );
+      registerBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>

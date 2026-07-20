@@ -1,0 +1,52 @@
+# Super admin console — admin.ziricai.com
+# Netlify dashboard: Base directory = admin
+
+[build]
+  command = "cd .. && npm ci && node scripts/prepare-sites.js admin"
+  publish = "."
+
+[build.environment]
+  NETLIFY = "true"
+  USE_CDN_FIREBASE = "true"
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://api.ziricai.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    X-XSS-Protection = "1; mode=block"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[context.production.environment]
+  API_BASE_URL = "https://api.ziricai.com"
+  MARKETING_BASE_URL = "https://marketing.ziricai.com"
+  APP_BASE_URL = "https://app.ziricai.com"
+  ADMIN_BASE_URL = "https://admin.ziricai.com"

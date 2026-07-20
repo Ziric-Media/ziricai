@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Education AI · ZiricAI</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon-portal.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/ziricai-landing.css">
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"https://api.ziricai.com","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://api.ziricai.com"}};</script>
+</head>
+<body>
+<section class="industry-hero">
+    <div class="container">
+        <a href="./" class="industry-back"><i class="fa-solid fa-arrow-left"></i> Back to ZiricAI</a>
+        <span class="hero-badge"><span class="pulse-dot"></span> School Pack</span>
+        <h1>🏫 AI for Schools & Academies</h1>
+        <p>Give every parent an instant answer. Admissions, fee queries, and event RSVPs — without overwhelming reception.</p>
+        <div class="industry-hero-actions">
+            <a href="./#start" class="btn btn-glow btn-lg"><i class="fa-solid fa-rocket"></i> Start Free Trial</a>
+            <a href="./#product-tour" class="btn btn-ghost btn-lg"><i class="fa-solid fa-play"></i> Watch Demo</a>
+        </div>
+    </div>
+</section>
+<section class="industry-features">
+    <div class="container">
+        <div class="section-header">
+            <h2>Built for education</h2>
+            <p>From 3-hour response times to 15 seconds — let AI handle parent communication at scale.</p>
+        </div>
+        <div class="industry-features-grid">
+            <div class="agent-card"><div class="agent-avatar">📝</div><h4>Admissions</h4><p>Application status and requirements</p></div>
+            <div class="agent-card"><div class="agent-avatar">💳</div><h4>Fee queries</h4><p>Payment plans, deadlines, bursaries</p></div>
+            <div class="agent-card"><div class="agent-avatar">📅</div><h4>Parent meetings</h4><p>Book conferences and school tours</p></div>
+            <div class="agent-card"><div class="agent-avatar">🎉</div><h4>Event RSVPs</h4><p>Sports days, concerts, open days</p></div>
+        </div>
+        <p style="text-align:center;margin-top:32px;"><a href="./#case-studies" class="btn">See Greenfield Academy case study</a></p>
+    </div>
+</section>
+<footer class="site-footer"><div class="container"><div class="footer-bottom"><span>&copy; 2026 ZiricAI</span><div class="footer-bottom-links"><a href="./">Home</a><a href="./">Portal</a></div></div></div></footer>
+<script type="module">
+import { getSiteUrls } from './js/shared/siteUrls.js';
+document.querySelectorAll('[data-site-link]').forEach((el) => {
+  const key = el.getAttribute('data-site-link');
+  const urls = getSiteUrls();
+  if (urls[key]) el.href = urls[key];
+});
+</script>
+</body>
+</html>

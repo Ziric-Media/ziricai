@@ -25,10 +25,17 @@
     }
   }
   </script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 24px auto; padding: 0 16px; }
+    input { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    button { margin-right: 8px; margin-top: 8px; padding: 8px 12px; cursor: pointer; }
+    pre { background: #f4f4f4; padding: 12px; overflow: auto; font-size: 13px; }
+    .section { margin-top: 24px; padding-top: 16px; border-top: 1px solid #ddd; }
+  </style>
 </head>
 <body>
   <h1>Firebase Auth Test</h1>
-  <p>Ziric Media AI — authentication testing only</p>
+  <p>ZiricAI — authentication, session API, and MFA scaffold</p>
 
   <div>
     <label>
@@ -52,21 +59,37 @@
   <br>
   <p id="status">Status: checking...</p>
 
+  <div class="section">
+    <h2>Session API</h2>
+    <button type="button" id="session-btn">GET /api/auth/session</button>
+    <pre id="session-output">(not loaded)</pre>
+  </div>
+
+  <div class="section">
+    <h2>MFA scaffold</h2>
+    <p>Placeholder for Firebase TOTP enrollment. Sets <code>mfaEnabled</code> on your Firestore profile.</p>
+    <button type="button" id="mfa-enable-btn">Enable MFA (demo flag)</button>
+    <p id="mfa-status"></p>
+  </div>
+
   <script>
     if (location.protocol === 'file:') {
       document.getElementById('status').textContent =
-        'Status: Cannot load ES modules from file://. Run "npm install" then "npx serve ." in the project folder and open the URL shown (e.g. http://localhost:3000/auth-test.html).';
+        'Status: Cannot load ES modules from file://. Run "npm install" then "npm run dev" and open http://localhost:3000/auth-test.html';
     }
   </script>
 
   <script type="module">
-        if (location.protocol === 'file:') {
+    if (location.protocol === 'file:') {
       throw new Error('Use a local HTTP server; file:// is not supported.');
     }
 
-    let registerUser, loginUser, logoutUser, observeAuthState;
+    let registerUser, loginUser, logoutUser, observeAuthState, resolveAuthProfile, getIdToken;
+    let updateUserProfile, apiRequest;
     try {
-      ({ registerUser, loginUser, logoutUser, observeAuthState } = await import('./js/auth.js'));
+      ({ registerUser, loginUser, logoutUser, observeAuthState, resolveAuthProfile, getIdToken } = await import('./js/auth.js'));
+      ({ updateUserProfile } = await import('./js/users.js'));
+      ({ apiRequest } = await import('./js/shared/apiRequest.js'));
     } catch (err) {
       document.getElementById('status').textContent =
         'Status: Failed to load auth modules. Run npm install, serve over HTTP, and check the console. (' + err.message + ')';
@@ -76,6 +99,8 @@
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const statusEl = document.getElementById('status');
+    const sessionOutput = document.getElementById('session-output');
+    const mfaStatus = document.getElementById('mfa-status');
 
     function getCredentials() {
       return {
@@ -86,9 +111,10 @@
 
     function updateAuthStatus(user) {
       if (user) {
-        statusEl.textContent = `Status: Logged In — ${user.email}`;
+        statusEl.textContent = `Status: Logged In — ${user.email} (${user.uid.slice(0, 8)}…)`;
       } else {
         statusEl.textContent = 'Status: Logged Out';
+        sessionOutput.textContent = '(not loaded)';
       }
     }
 
@@ -107,6 +133,11 @@
       const result = await loginUser(email, password);
       if (result.error) {
         statusEl.textContent = `Status: ${result.error}`;
+        return;
+      }
+      const profile = result.profile || (await resolveAuthProfile(result.user, { allowDemo: true }));
+      if (profile) {
+        statusEl.textContent += ` | role=${profile.role} company=${profile.companyId || profile.company || 'n/a'}`;
       }
     });
 
@@ -115,6 +146,36 @@
       if (result.error) {
         statusEl.textContent = `Status: ${result.error}`;
       }
+    });
+
+    document.getElementById('session-btn').addEventListener('click', async () => {
+      sessionOutput.textContent = 'Loading...';
+      const result = await apiRequest('/api/auth/session');
+      if (result.error) {
+        sessionOutput.textContent = `Error: ${result.error} (${result.status || ''})`;
+        return;
+      }
+      sessionOutput.textContent = JSON.stringify(result.data, null, 2);
+    });
+
+    document.getElementById('mfa-enable-btn').addEventListener('click', async () => {
+      const token = await getIdToken();
+      if (!token) {
+        mfaStatus.textContent = 'Sign in first.';
+        return;
+      }
+      const session = await apiRequest('/api/auth/session');
+      const uid = session.data?.uid;
+      if (!uid) {
+        mfaStatus.textContent = 'Could not resolve uid from session.';
+        return;
+      }
+      const updated = await updateUserProfile(uid, { mfaEnabled: true });
+      if (updated.error) {
+        mfaStatus.textContent = updated.error;
+        return;
+      }
+      mfaStatus.textContent = 'MFA demo flag enabled on profile (mfaEnabled=true). Full TOTP enrollment coming in Settings.';
     });
   </script>
 </body>

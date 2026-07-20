@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="ZiricAI Super Admin">
+  <defs>
+    <linearGradient id="sa" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#sa)"/>
+  <path fill="#fff" d="M9 9h14v3.2H13.8L21.6 19.8V23H9v-3.2h9.2L9 9z"/>
+</svg>

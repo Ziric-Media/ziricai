@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZiricAI Super Admin Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/admin-dashboard.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "./node_modules/firebase/app/dist/esm/index.esm.js",
+        "firebase/auth": "./node_modules/firebase/auth/dist/esm/index.esm.js",
+        "firebase/firestore": "./node_modules/firebase/firestore/dist/esm/index.esm.js",
+        "firebase/storage": "./node_modules/firebase/storage/dist/esm/index.esm.js",
+        "@firebase/app": "./node_modules/@firebase/app/dist/esm/index.esm.js",
+        "@firebase/auth": "./node_modules/@firebase/auth/dist/esm/index.js",
+        "@firebase/firestore": "./node_modules/@firebase/firestore/dist/index.esm.js",
+        "@firebase/storage": "./node_modules/@firebase/storage/dist/index.esm.js",
+        "@firebase/util": "./node_modules/@firebase/util/dist/index.esm.js",
+        "@firebase/logger": "./node_modules/@firebase/logger/dist/esm/index.esm.js",
+        "@firebase/component": "./node_modules/@firebase/component/dist/esm/index.esm.js",
+        "@firebase/webchannel-wrapper/bloom-blob": "./node_modules/@firebase/webchannel-wrapper/dist/bloom-blob/esm/bloom_blob_es2018.js",
+        "@firebase/webchannel-wrapper/webchannel-blob": "./node_modules/@firebase/webchannel-wrapper/dist/webchannel-blob/esm/webchannel_blob_es2018.js",
+        "idb": "./node_modules/idb/build/index.js",
+        "re2js": "./node_modules/re2js/build/index.esm.js"
+      }
+    }
+    </script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"https://api.ziricai.com","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://api.ziricai.com"}};</script>
+</head>
+<body>
+
+    <!-- Login -->
+    <div class="auth-screen open" id="loginScreen">
+        <div class="auth-card">
+            <h1>ZiricAI Super Admin</h1>
+            <p>Sign in with your super admin account to manage multi-tenant companies.</p>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" autocomplete="username" required />
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" autocomplete="current-password" required />
+                </div>
+                <button class="btn btn-primary" type="submit" style="width:100%;margin-top:8px;">Sign In</button>
+            </form>
+            <p id="loginStatus" style="margin-top:16px;font-size:13px;color:var(--text-muted);"></p>
+            <p style="margin-top:12px;font-size:12px;color:var(--text-muted);">No account? Use <a href="superadmin-register.html">superadmin-register.html</a></p>
+        </div>
+    </div>
+
+    <!-- Access denied -->
+    <div class="auth-screen" id="accessDeniedScreen">
+        <div class="auth-card">
+            <h1>Access Denied</h1>
+            <p id="accessDeniedMessage">Super admin role required.</p>
+            <button class="btn btn-secondary" type="button" id="headerLogoutBtn">Sign Out</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div id="appShell" class="hidden">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="logo-icon">Z</div>
+                <div class="logo-text">
+                    <span>ZiricAI</span>
+                    <span>Super Admin</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav" id="sidebarNav">
+                <div class="section-label">Platform</div>
+                <a href="#" class="active" data-page="dashboard">
+                    <span class="icon">📊</span><span>Dashboard</span>
+                </a>
+                <a href="#" data-page="companies">
+                    <span class="icon">🏢</span><span>Companies</span>
+                    <span class="badge" id="companyCount">0</span>
+                </a>
+                <a href="#" data-page="agents">
+                    <span class="icon">🤖</span><span>AI Agents</span>
+                    <span class="badge" id="agentCount">—</span>
+                </a>
+                <a href="#" data-page="knowledge">
+                    <span class="icon">📚</span><span>Knowledge Base</span>
+                </a>
+                <a href="#" data-page="customers">
+                    <span class="icon">👥</span><span>Customers</span>
+                </a>
+                <a href="#" data-page="analytics">
+                    <span class="icon">📈</span><span>Analytics</span>
+                </a>
+                <a href="#" data-page="billing">
+                    <span class="icon">💳</span><span>Billing</span>
+                </a>
+                <div class="section-label">System</div>
+                <a href="#" data-page="settings">
+                    <span class="icon">⚙️</span><span>Settings</span>
+                </a>
+            </nav>
+        </aside>
+
+        <div class="main">
+            <header class="topbar" id="topbar">
+                <div class="topbar-left">
+                    <div class="breadcrumb" id="breadcrumb">
+                        Home / <span id="pageTitle">Dashboard</span>
+                    </div>
+                </div>
+                <div class="company-scope">
+                    <label for="companySelector" style="font-size:12px;color:var(--text-muted);">Scope</label>
+                    <select id="companySelector">
+                        <option value="">All Companies</option>
+                    </select>
+                </div>
+                <div class="topbar-search" id="globalSearch">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" placeholder="Search..." id="searchInput" />
+                    <span class="shortcut">⌘K</span>
+                </div>
+                <div class="topbar-actions">
+                    <button class="theme-toggle" id="themeToggle" type="button" title="Toggle theme">🌙</button>
+                    <div class="user-menu" id="userMenu">
+                        <div class="avatar">S</div>
+                        <div class="user-info hidden-mobile">
+                            <span class="name">Super Admin</span>
+                            <span class="role">superadmin</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            <div class="page-content" id="pageContent"></div>
+        </div>
+    </div>
+
+    <script type="module" src="js/admin/main.js"></script>
+</body>
+</html>
