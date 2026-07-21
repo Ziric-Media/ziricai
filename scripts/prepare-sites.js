@@ -12,8 +12,14 @@ const SOURCES = path.join(ROOT, '_sources');
 
 function sourcePath(name) {
   const fromSources = path.join(SOURCES, name);
+  const fromRoot = path.join(ROOT, name);
+  if (fs.existsSync(fromSources) && fs.existsSync(fromRoot)) {
+    const sourcesMtime = fs.statSync(fromSources).mtimeMs;
+    const rootMtime = fs.statSync(fromRoot).mtimeMs;
+    return rootMtime > sourcesMtime ? fromRoot : fromSources;
+  }
   if (fs.existsSync(fromSources)) return fromSources;
-  return path.join(ROOT, name);
+  return fromRoot;
 }
 
 function readSource(name) {

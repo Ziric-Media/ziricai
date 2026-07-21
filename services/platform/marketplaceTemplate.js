@@ -19,6 +19,26 @@ export const MARKETPLACE_BROWSE_CATEGORIES = [
     { id: "retail", label: "Retail", icon: "🛒", color: "#16a34a", legacyIds: ["retail"] },
 ];
 
+/** Pack IDs shown on the marketing landing page marketplace section */
+export const LANDING_MARKETPLACE_PACK_IDS = [
+    "pack-school-ai",
+    "pack-law-ai",
+    "pack-clinic-ai",
+    "pack-sales-ai",
+    "pack-customer-support-ai",
+    "pack-appointment-ai",
+    "pack-collections-ai",
+    "pack-hr-ai",
+    "pack-recruitment-ai",
+    "pack-estate-agent-ai",
+    "pack-insurance-ai",
+    "pack-funeral-ai",
+    "pack-restaurant-ai",
+    "pack-construction-ai",
+    "pack-church-ai",
+    "pack-security-ai",
+];
+
 /** Canonical pack IDs for the 12 flagship marketplace items */
 export const FLAGSHIP_PACK_IDS = [
     "pack-school-ai",

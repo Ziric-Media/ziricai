@@ -110,6 +110,8 @@ After editing root `js/`, `css/`, or source HTML, re-run:
 npm run prepare:sites
 ```
 
+**Important:** `prepare-sites.js` reads HTML from `_sources/` when that file exists (otherwise from the repo root). After any landing HTML edit, keep `_sources/ziricai.html` and root `ziricai.html` in sync, run `npm run prepare:sites marketing`, and **commit and push both the source files and the synced `marketing/` folder** so Netlify deploys the full page (Sarah widget, FAQ panels, phone simulators, etc.). If root and `_sources/` diverge, the newer file wins at build time.
+
 ## API deployment options
 
 ### Recommended: External Node (Railway / Render)
@@ -250,4 +252,4 @@ The file at the repo root (`netlify.toml`) is **documentation only** when each N
 2. Confirm production env vars in Netlify match the table above (`API_BASE_URL`, etc.).
 3. Re-run locally with Netlify-like env:  
    `$env:NETLIFY='true'; node scripts/prepare-sites.js marketing` (PowerShell)
-4. Check build log for missing source files — `prepare-sites.js` reads `ziricai.html` and `industry-*.html` from the repo root (or `_sources/` if present).
+4. Check build log for missing source files — `prepare-sites.js` reads `ziricai.html` and `industry-*.html` from `_sources/` when present, otherwise from the repo root (newer file wins if both exist).

@@ -339,8 +339,12 @@
         updateDemoPhoneMeta(config);
         resetDemoFeed();
 
+        chat.innerHTML = '';
         chat.classList.add('is-transitioning');
-        if (action) action.classList.remove('visible');
+        if (action) {
+            action.textContent = '';
+            action.classList.remove('visible');
+        }
 
         setTimeout(() => {
             if (token !== demoRenderToken) return;
@@ -713,6 +717,36 @@
         });
     }
 
+    // ===== MARKETPLACE GRID =====
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function initMarketplace() {
+        const grid = document.getElementById('marketplaceGrid');
+        if (!grid) return;
+
+        const packs = globalThis.ZiricMarketplacePacks?.getLandingMarketplacePacks?.() || [];
+        if (!packs.length) return;
+
+        grid.innerHTML = packs
+            .map(
+                (pack) => `
+            <div class="marketplace-card">
+                <div class="marketplace-icon">${pack.icon}</div>
+                <span class="marketplace-category">${escapeHtml(pack.categoryLabel)}</span>
+                <h4>${escapeHtml(pack.name)}</h4>
+                <p>${escapeHtml(pack.description)}</p>
+                <span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> Installs in minutes</span>
+            </div>`
+            )
+            .join('');
+    }
+
     // ===== INIT =====
     function init() {
         initCounters();
@@ -732,6 +766,7 @@
         initWatchAiLive();
         initProductTour();
         initDashboardPreview();
+        initMarketplace();
 
         document.getElementById('watchDemoBtn')?.addEventListener('click', () => openDemo('sales'));
         document.getElementById('watchDemoBtn2')?.addEventListener('click', () => openDemo('sales'));
