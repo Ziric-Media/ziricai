@@ -5,6 +5,7 @@ import express from "express";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import { getConfiguredStorageBackend } from "../services/storage/storageAdapter.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -39,7 +40,7 @@ logStartup("ZiricAI booting", {
     node: process.version,
     port: PORT,
     env: process.env.NODE_ENV || "development",
-    storage: process.env.STORAGE_BACKEND || "auto",
+    storage: process.env.STORAGE_BACKEND || getConfiguredStorageBackend(),
 });
 
 app.listen(PORT, "0.0.0.0", () => {

@@ -24,46 +24,59 @@ Optional later: point `api.ziricai.com` CNAME at Railway and update Netlify redi
 
 After deploy, note the public URL (e.g. `https://ziricai-production.up.railway.app`).
 
-## 2. Required Railway environment variables
+## 2. Railway environment variables — set these now
 
-Copy from `.env.example`. Minimum for a healthy deploy:
+Copy from `.env.example`. **Minimum for a healthy deploy today:**
 
-| Variable | Example / value | Notes |
-|----------|-----------------|-------|
-| `NODE_ENV` | `production` | Enables production caching, CORS rules |
-| `STORAGE_BACKEND` | `memory` (initial) or `firestore` | Use `memory` until Firestore is configured; `auto` tries Firestore then falls back |
-| `TENANT_SCOPE_ENFORCEMENT` | `strict` | Required in production (see `docs/deployment/SPRINT5_SECURITY.md`) |
-| `PLATFORM_API_KEY` | long random secret | Super-admin / provisioning via `X-Platform-Api-Key` |
-| `OPENAI_API_KEY` | `sk-...` | AI replies + Sarah |
-| `APP_BASE_URL` | `https://app.ziricai.com` | CORS + link generation |
-| `ADMIN_BASE_URL` | `https://admin.ziricai.com` | CORS |
-| `MARKETING_BASE_URL` | `https://marketing.ziricai.com` | CORS |
-| `ZIRICAI_ROOT_URL` | `https://ziricai.com` | Optional apex CORS |
+| Variable | Set to | Required |
+|----------|--------|----------|
+| `NODE_ENV` | `production` | Yes |
+| `STORAGE_BACKEND` | `memory` | **Yes** — until Firestore database exists (see below) |
+| `TENANT_SCOPE_ENFORCEMENT` | `strict` | Yes |
+| `PLATFORM_API_KEY` | long random secret | Yes |
+| `APP_BASE_URL` | `https://app.ziricai.com` | Yes |
+| `ADMIN_BASE_URL` | `https://admin.ziricai.com` | Yes |
+| `MARKETING_BASE_URL` | `https://marketing.ziricai.com` | Yes |
+| `OPENAI_API_KEY` | `sk-...` | Recommended (AI + Sarah; boot succeeds without it) |
 
-WhatsApp (when ready):
+**Optional — add when ready (not required for boot):**
 
 | Variable | Description |
 |----------|-------------|
 | `VERIFY_TOKEN` | Meta webhook verify token |
 | `PHONE_NUMBER_ID` | WhatsApp Cloud API phone number ID |
 | `WHATSAPP_TOKEN` | Meta system user / WhatsApp access token |
+| `ZIRICAI_ROOT_URL` | `https://ziricai.com` — apex CORS |
+| `DEFAULT_COMPANY_ID` | Auto-provision tenant on startup |
+| `QUEUE_CONCURRENCY` | Default `1` |
+| `OPENAI_MODEL` | Default `gpt-4o-mini` |
+| `MFA_ENFORCEMENT` | Default `off` |
 
-Optional:
+Missing WhatsApp or OpenAI keys are logged as `[startup] Missing optional env vars: ...` — **they do not block startup**.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `QUEUE_CONCURRENCY` | `1` | Message worker concurrency |
-| `DEFAULT_COMPANY_ID` | — | Auto-provision tenant on startup |
-| `FIRESTORE_PING_TIMEOUT_MS` | `8000` | Auto storage backend Firestore probe timeout |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Model override |
-| `MFA_ENFORCEMENT` | `off` | MFA policy |
-| `DEMO_SEED` | — | Seed demo data (memory backend) |
+Railway injects `RAILWAY_PUBLIC_DOMAIN` and `RAILWAY_ENVIRONMENT` — CORS allows `https://${RAILWAY_PUBLIC_DOMAIN}` when set.
 
-Railway may inject `RAILWAY_PUBLIC_DOMAIN` — CORS allows `https://${RAILWAY_PUBLIC_DOMAIN}` when set.
+### Storage backend behavior
 
-### Firebase / Firestore
+| `STORAGE_BACKEND` | Behavior |
+|-------------------|----------|
+| *(unset)* + `NODE_ENV=production` | **memory** (safe default on Railway) |
+| `memory` | In-memory storage; data lost on restart |
+| `auto` | On Railway: **memory** (no Firestore probe). Locally: probes Firestore; on `NOT_FOUND` or timeout → memory |
+| `firestore` | Firestore only — use **after** database is created in Firebase Console |
 
-For `STORAGE_BACKEND=firestore`, ensure Firebase client config in `js/firebase.js` is valid and Firestore rules are deployed. No `firebase-admin` package is required for the current adapter (client SDK + REST token verify).
+**Do not use `auto` or `firestore` on Railway until Firestore is provisioned.** A missing Firestore database causes `NOT_FOUND` gRPC errors and can hang or crash the API.
+
+### Create Firestore database (before `STORAGE_BACKEND=firestore`)
+
+1. [Firebase Console](https://console.firebase.google.com) → project **ziricai**
+2. **Build** → **Firestore Database** → **Create database**
+3. Choose region (e.g. `eur3` or closest to Railway)
+4. Start in **production mode** (deploy rules from repo separately)
+5. Wait until the database shows **Active**
+6. On Railway, set `STORAGE_BACKEND=firestore` and redeploy
+
+Ensure Firebase web config in `js/firebase.js` matches project **ziricai**. No `firebase-admin` package is required for the current adapter (client SDK + REST token verify).
 
 ## 3. Custom domain `api.ziricai.com` (optional)
 
@@ -155,7 +168,7 @@ curl https://marketing.ziricai.com/api/health
 **Checklist:**
 
 1. Confirm **start command** is `node api/server.js` from **repo root** (not `api/`).
-2. Set `STORAGE_BACKEND=memory` until Firestore is configured (`auto` probes Firestore with a server-side ping; failures fall back to memory).
+2. Set `STORAGE_BACKEND=memory` until Firestore database is created in Firebase Console (unset also defaults to memory in production).
 3. Check Railway **Deploy Logs** for:
    - `[startup] Listening on 0.0.0.0:<port>` — must appear within a few seconds of boot
    - `[startup] Fatal:` or stack traces — process crashed before/during init
@@ -174,19 +187,27 @@ curl https://marketing.ziricai.com/api/health
 [startup] Background initialization complete
 ```
 
-**Minimum env for first healthy deploy:**
+**Minimum env for first healthy deploy (copy into Railway → Variables):**
 
-| Variable | Value |
-|----------|-------|
-| `NODE_ENV` | `production` |
-| `STORAGE_BACKEND` | `memory` |
-| `TENANT_SCOPE_ENFORCEMENT` | `strict` |
-| `PLATFORM_API_KEY` | random secret |
-| `APP_BASE_URL` | `https://app.ziricai.com` |
-| `ADMIN_BASE_URL` | `https://admin.ziricai.com` |
-| `MARKETING_BASE_URL` | `https://marketing.ziricai.com` |
+```
+NODE_ENV=production
+STORAGE_BACKEND=memory
+TENANT_SCOPE_ENFORCEMENT=strict
+PLATFORM_API_KEY=<generate-a-long-random-secret>
+APP_BASE_URL=https://app.ziricai.com
+ADMIN_BASE_URL=https://admin.ziricai.com
+MARKETING_BASE_URL=https://marketing.ziricai.com
+```
 
-`OPENAI_API_KEY` and WhatsApp vars are optional for boot — missing keys are logged as `[startup] Missing optional env vars` and AI/WhatsApp features stay disabled until configured.
+Add `OPENAI_API_KEY` when AI features are needed. WhatsApp vars (`VERIFY_TOKEN`, `PHONE_NUMBER_ID`, `WHATSAPP_TOKEN`) are optional — missing keys log `[startup] Missing optional env vars: ...` and do not block startup.
+
+### Firestore `NOT_FOUND` in deploy logs
+
+If logs show `[storage] Auto-selected Firestore adapter` followed by `FirebaseError: [code=not-found]: 5 NOT_FOUND`:
+
+1. Set `STORAGE_BACKEND=memory` on Railway and redeploy (or redeploy latest `main` which defaults production to memory).
+2. Create the Firestore database in Firebase Console (see above).
+3. Only then switch to `STORAGE_BACKEND=firestore`.
 
 ### Netlify `/api/*` returns 502
 

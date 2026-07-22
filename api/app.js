@@ -21,7 +21,7 @@ import {
     getConversation,
     listConversations,
 } from "../services/conversationService.js";
-import { getStorageAdapter } from "../services/storage/storageAdapter.js";
+import { getStorageAdapter, getConfiguredStorageBackend } from "../services/storage/storageAdapter.js";
 import { seedDemoCustomersIfEmpty } from "../services/storage/seedDemoCustomers.js";
 import { seedCustomerOpsDemoIfEmpty } from "../services/storage/seedCustomerOpsDemo.js";
 import {
@@ -895,7 +895,7 @@ app.get("/api/admin/config", (req, res) => {
             configured: Boolean(process.env.OPENAI_API_KEY),
             model: process.env.OPENAI_MODEL || "gpt-4o-mini",
         },
-        storage: process.env.STORAGE_BACKEND || "auto",
+        storage: getConfiguredStorageBackend(),
         tenantScopeEnforcement: (process.env.TENANT_SCOPE_ENFORCEMENT || "lax").toLowerCase(),
         mfaEnforcement: (process.env.MFA_ENFORCEMENT || "off").toLowerCase(),
     });

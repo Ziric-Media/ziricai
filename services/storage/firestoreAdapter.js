@@ -18,6 +18,18 @@ import {
 } from "firebase/firestore";
 import { db } from "../../js/firebase.js";
 
+/** True when Firestore DB is missing, wrong project, or backend unreachable. */
+export function isFirestoreUnavailableError(err) {
+    if (!err) return false;
+    const code = err.code;
+    const msg = String(err.message || err);
+    if (code === "not-found" || code === 5) return true;
+    if (/NOT_FOUND/i.test(msg)) return true;
+    if (/Could not reach Cloud Firestore backend/i.test(msg)) return true;
+    if (/database.*does not exist/i.test(msg)) return true;
+    return false;
+}
+
 function toIso(value) {
     if (!value) return null;
     if (typeof value === "string") return value;
@@ -29,9 +41,20 @@ export const firestoreAdapter = {
     name: "firestore",
 
     async ping() {
-        const q = query(collection(db, "customers"), limit(1));
-        await getDocsFromServer(q);
-        return true;
+        try {
+            const q = query(collection(db, "_healthcheck"), limit(1));
+            await getDocsFromServer(q);
+            return true;
+        } catch (err) {
+            if (isFirestoreUnavailableError(err)) {
+                const wrapped = new Error(
+                    `Firestore database not available (create it in Firebase Console → Firestore): ${err.message}`
+                );
+                wrapped.code = err.code || "not-found";
+                throw wrapped;
+            }
+            throw err;
+        }
     },
 
     async saveMessage(phone, role, message, options = {}) {

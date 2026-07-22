@@ -5,14 +5,43 @@ let initPromise = null;
 
 /**
  * Resolve storage backend from env:
- *   STORAGE_BACKEND=memory|firestore|auto (default: auto)
- * auto tries Firestore ping, falls back to in-memory on failure.
+ *   STORAGE_BACKEND=memory|firestore|auto
+ * Unset in production defaults to memory (Railway-safe).
+ * auto tries Firestore ping locally; on Railway or NOT_FOUND → memory.
  */
+export function getConfiguredStorageBackend() {
+    const raw = (process.env.STORAGE_BACKEND || "").trim().toLowerCase();
+    if (raw) return raw;
+    if (process.env.NODE_ENV === "production") return "memory";
+    return "auto";
+}
+
+function isRailwayRuntime() {
+    return Boolean(
+        process.env.RAILWAY_ENVIRONMENT ||
+        process.env.RAILWAY_PROJECT_ID ||
+        process.env.RAILWAY_SERVICE_ID
+    );
+}
+
+async function probeFirestore(firestoreAdapter) {
+    const pingMs = Number(process.env.FIRESTORE_PING_TIMEOUT_MS) || 8000;
+    await Promise.race([
+        firestoreAdapter.ping(),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Firestore ping timed out after ${pingMs}ms`)), pingMs)
+        ),
+    ]);
+}
+
 async function resolveAdapter() {
-    const backend = (process.env.STORAGE_BACKEND || "auto").toLowerCase();
+    const backend = getConfiguredStorageBackend();
 
     if (backend === "memory") {
-        console.error("[storage] Using memory adapter (STORAGE_BACKEND=memory)");
+        const reason = process.env.STORAGE_BACKEND
+            ? "STORAGE_BACKEND=memory"
+            : "production default (unset STORAGE_BACKEND)";
+        console.error(`[storage] Using memory adapter (${reason})`);
         return memoryAdapter;
     }
 
@@ -23,18 +52,29 @@ async function resolveAdapter() {
         return firestoreAdapter;
     }
 
+    if (backend !== "auto") {
+        console.error(`[storage] Unknown STORAGE_BACKEND="${backend}", using memory`);
+        return memoryAdapter;
+    }
+
+    if (isRailwayRuntime()) {
+        console.error(
+            "[storage] Railway runtime: skipping Firestore auto-probe; using memory adapter. " +
+            "Set STORAGE_BACKEND=firestore after creating a Firestore database in Firebase Console."
+        );
+        return memoryAdapter;
+    }
+
     try {
-        const pingMs = Number(process.env.FIRESTORE_PING_TIMEOUT_MS) || 8000;
-        await Promise.race([
-            firestoreAdapter.ping(),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error(`Firestore ping timed out after ${pingMs}ms`)), pingMs)
-            ),
-        ]);
+        await probeFirestore(firestoreAdapter);
         console.error("[storage] Auto-selected Firestore adapter");
         return firestoreAdapter;
     } catch (err) {
-        console.error("[storage] Firestore unavailable, falling back to memory:", err.message);
+        console.error(
+            "[storage] Firestore unavailable, falling back to memory:",
+            err.code ? `[${err.code}]` : "",
+            err.message
+        );
         return memoryAdapter;
     }
 }
