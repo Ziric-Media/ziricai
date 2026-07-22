@@ -442,30 +442,59 @@
     }
 
     const pk = window.ZiricPlatformKnowledge;
+    let sarahSessionId = null;
+    let sarahLastTopicId = null;
 
-    const sarahReplies = [
-        { keys: ['setup', 'long', 'minutes', 'install', 'onboard', 'start', 'launch'], reply: 'Most businesses go live in under 10 minutes. Create your account, pick your industry pack, connect WhatsApp, upload your knowledge base — and Sarah starts handling enquiries immediately. No developers needed.' },
-        { keys: ['industr', 'school', 'legal', 'health', 'automotive', 'car', 'funeral', 'retail', 'church', 'dealer'], reply: 'We support 50+ industries with pre-built packs — automotive, schools, legal, healthcare, funeral, retail, church, and more. Each pack includes trained workflows, knowledge templates, and channel integrations ready to deploy.' },
-        { keys: ['whatsapp', 'channel', 'facebook', 'instagram', 'telegram', 'social', 'web chat'], reply: 'Sarah works on WhatsApp, Facebook Messenger, Instagram DMs, Telegram, website live chat, email, and SMS — all from one dashboard. Connect WhatsApp in onboarding with a QR scan. One AI, every channel, 24/7.' },
-        { keys: ['trial', 'free', 'demo', 'try', 'test'], reply: 'Yes! Every plan includes a 14-day free trial with full access — no credit card required. Click "Start Free Trial" anywhere on the page, or I can walk you through what Sarah can do for your business right here.' },
-        { keys: ['security', 'popia', 'gdpr', 'data', 'encrypt', 'safe', 'secure'], reply: 'Your data is encrypted in transit (TLS 1.3) and at rest (AES-256) on Google Firebase. Each company\'s knowledge is fully isolated with role-based access, audit logs, and POPIA/GDPR-ready consent tools.' },
-        { keys: ['sarah', 'who', 'what', 'reception', 'employee', 'ai'], reply: 'I\'m Sarah — your Reception AI. I answer every WhatsApp and web enquiry, book appointments, capture leads, and send quotes — 24/7, in under 2 seconds. I never call in sick and I remember every customer detail.' },
-        { keys: ['roi', 'save', 'revenue', 'lead', 'miss'], reply: 'Most businesses lose 30–40% of after-hours enquiries. With Sarah handling them instantly, customers like Central Motors saw a 42% increase in after-hours lead conversion. Scroll down to our ROI calculator to see your numbers.' },
-    ];
+    const sarahDefaultReply = pk?.getDefaultReply?.() || window.ZiricBillingPlans?.getDefaultPlatformReply?.() ||
+        'Great question! ZiricAI deploys AI employees to handle customer enquiries 24/7 on WhatsApp, web, and social. Setup takes under 10 minutes, and every plan includes a 14-day free trial. Ask about pricing, setup, industries, WhatsApp, or security — or click Start Free Trial to get going!';
 
-    const sarahDefaultReply = pk?.getDefaultReply?.() || window.ZiricBillingPlans?.getDefaultPlatformReply?.() || 'Great question! ZiricAI deploys AI employees like me to handle customer enquiries 24/7 on WhatsApp, web, and social. Setup takes under 10 minutes, and you get a 14-day free trial. Try asking about pricing, setup time, industries, or WhatsApp integration — or click Start Free Trial to get going!';
+    function getSarahApiBase() {
+        return window.__ZIRICAI_CONFIG__?.apiBase ||
+            window.__ZIRICAI_CONFIG__?.sites?.api ||
+            (typeof location !== 'undefined' && /localhost|127\.0\.0\.1/.test(location.hostname) ? '' : 'https://api.ziricai.com');
+    }
 
-    function getSarahReply(text) {
+    function getSarahReplyLocal(text) {
+        const context = { lastTopicId: sarahLastTopicId };
         if (pk?.matchPlatformQuestion) {
-            const matched = pk.matchPlatformQuestion(text);
-            if (matched) return matched;
+            const matched = pk.matchPlatformQuestion(text, context);
+            if (matched) {
+                if (typeof matched === 'string') return matched;
+                if (matched.id && matched.id !== 'unclear') sarahLastTopicId = matched.id;
+                return matched.answer || matched;
+            }
             return pk.getDefaultReply?.() || sarahDefaultReply;
         }
-        const lower = text.toLowerCase();
-        for (const entry of sarahReplies) {
-            if (entry.keys.some((k) => lower.includes(k))) return entry.reply;
-        }
         return sarahDefaultReply;
+    }
+
+    async function fetchSarahReplyFromApi(text) {
+        const apiBase = getSarahApiBase();
+        if (!apiBase) return null;
+
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 4500);
+            const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/sarah/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify({ message: text, sessionId: sarahSessionId, surface: 'landing' }),
+                signal: controller.signal,
+            });
+            clearTimeout(timeout);
+            if (!res.ok) return null;
+            const data = await res.json();
+            if (data.sessionId) sarahSessionId = data.sessionId;
+            return data.reply?.trim() || null;
+        } catch {
+            return null;
+        }
+    }
+
+    async function getSarahReply(text) {
+        const apiReply = await fetchSarahReplyFromApi(text);
+        if (apiReply) return apiReply;
+        return getSarahReplyLocal(text);
     }
 
     function initSarahChat() {
@@ -521,7 +550,9 @@
 
             await delay(800 + Math.random() * 600);
             typing.remove();
-            appendMessage(getSarahReply(trimmed), 'ai');
+            const reply = await getSarahReply(trimmed);
+            appendMessage(reply, 'ai');
+            messages.scrollTop = messages.scrollHeight;
         }
 
         form?.addEventListener('submit', (e) => {
