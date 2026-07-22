@@ -10,6 +10,7 @@ import {
     setDoc,
     getDoc,
     getDocs,
+    getDocsFromServer,
     query,
     orderBy,
     limit,
@@ -29,7 +30,7 @@ export const firestoreAdapter = {
 
     async ping() {
         const q = query(collection(db, "customers"), limit(1));
-        await getDocs(q);
+        await getDocsFromServer(q);
         return true;
     },
 

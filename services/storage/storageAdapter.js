@@ -1,4 +1,3 @@
-import { firestoreAdapter } from "./firestoreAdapter.js";
 import { memoryAdapter } from "./memoryAdapter.js";
 
 let adapter = null;
@@ -13,12 +12,14 @@ async function resolveAdapter() {
     const backend = (process.env.STORAGE_BACKEND || "auto").toLowerCase();
 
     if (backend === "memory") {
-        console.log("[storage] Using memory adapter (STORAGE_BACKEND=memory)");
+        console.error("[storage] Using memory adapter (STORAGE_BACKEND=memory)");
         return memoryAdapter;
     }
 
+    const { firestoreAdapter } = await import("./firestoreAdapter.js");
+
     if (backend === "firestore") {
-        console.log("[storage] Using Firestore adapter (STORAGE_BACKEND=firestore)");
+        console.error("[storage] Using Firestore adapter (STORAGE_BACKEND=firestore)");
         return firestoreAdapter;
     }
 
@@ -30,10 +31,10 @@ async function resolveAdapter() {
                 setTimeout(() => reject(new Error(`Firestore ping timed out after ${pingMs}ms`)), pingMs)
             ),
         ]);
-        console.log("[storage] Auto-selected Firestore adapter");
+        console.error("[storage] Auto-selected Firestore adapter");
         return firestoreAdapter;
     } catch (err) {
-        console.warn("[storage] Firestore unavailable, falling back to memory:", err.message);
+        console.error("[storage] Firestore unavailable, falling back to memory:", err.message);
         return memoryAdapter;
     }
 }
@@ -53,7 +54,7 @@ export function storageAdapter() {
     return adapter;
 }
 
-export { firestoreAdapter, memoryAdapter };
+export { memoryAdapter };
 
 /**
  * Resolve tenant-scoped storage mode for dual-write migration.

@@ -148,10 +148,45 @@ curl https://marketing.ziricai.com/api/health
 
 ### Railway returns 502 “Application failed to respond”
 
-- Confirm **start command** is `node api/server.js` from repo root.
-- Set `STORAGE_BACKEND=memory` to rule out Firestore probe hangs.
-- Check Railway **Deploy Logs** for `[startup] Fatal` or crash stack traces.
-- Ensure required env vars are set (`NODE_ENV=production` recommended).
+**Root cause:** Railway’s proxy requires a process listening on `0.0.0.0:$PORT` before the health check times out. The API previously loaded ~140 service modules synchronously (~5s) before binding HTTP, so probes saw no listener and returned 502.
+
+**Fix (in repo):** `api/server.js` binds immediately with a minimal `/api/health` that returns `{ "status": "starting" }` (HTTP 503), then lazy-loads `api/app.js` routes in the background.
+
+**Checklist:**
+
+1. Confirm **start command** is `node api/server.js` from **repo root** (not `api/`).
+2. Set `STORAGE_BACKEND=memory` until Firestore is configured (`auto` probes Firestore with a server-side ping; failures fall back to memory).
+3. Check Railway **Deploy Logs** for:
+   - `[startup] Listening on 0.0.0.0:<port>` — must appear within a few seconds of boot
+   - `[startup] Fatal:` or stack traces — process crashed before/during init
+4. Ensure `NODE_ENV=production` and required CORS URLs are set (see table above).
+5. If logs show `Listening` but public URL still 502, verify the service **public domain** is enabled and health check path is `/api/health`.
+
+**Expected deploy log lines:**
+
+```
+[startup] ZiricAI booting {"node":"v20.x","port":8080,"env":"production","storage":"memory"}
+[startup] Listening on 0.0.0.0:8080
+[startup] Loading application modules
+[startup] Application routes mounted
+[storage] Using memory adapter (STORAGE_BACKEND=memory)
+[startup] Storage backend: memory
+[startup] Background initialization complete
+```
+
+**Minimum env for first healthy deploy:**
+
+| Variable | Value |
+|----------|-------|
+| `NODE_ENV` | `production` |
+| `STORAGE_BACKEND` | `memory` |
+| `TENANT_SCOPE_ENFORCEMENT` | `strict` |
+| `PLATFORM_API_KEY` | random secret |
+| `APP_BASE_URL` | `https://app.ziricai.com` |
+| `ADMIN_BASE_URL` | `https://admin.ziricai.com` |
+| `MARKETING_BASE_URL` | `https://marketing.ziricai.com` |
+
+`OPENAI_API_KEY` and WhatsApp vars are optional for boot — missing keys are logged as `[startup] Missing optional env vars` and AI/WhatsApp features stay disabled until configured.
 
 ### Netlify `/api/*` returns 502
 

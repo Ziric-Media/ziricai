@@ -3,9 +3,15 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+let openai = null;
+
+if (process.env.OPENAI_API_KEY) {
+    openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+    });
+} else {
+    console.warn("OPENAI_API_KEY is not configured.");
+}
 
 const SYSTEM_PROMPT = `You are ZiricAI, the AI assistant for Ziric Media. You are intelligent, friendly and professional. Always answer politely. Keep replies concise unless the user asks for detail.`;
 
@@ -15,7 +21,7 @@ export async function askAI(message, options = {}) {
         return "I didn't catch that. Please send a text message.";
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!openai) {
         console.error("[openai] OPENAI_API_KEY is not set");
         return "Sorry, I'm not configured to respond right now.";
     }
