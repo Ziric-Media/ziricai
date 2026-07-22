@@ -843,11 +843,15 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 3rem;
-    font-weight: 800;
-    color: #fff;
+    overflow: hidden;
     box-shadow: 0 12px 40px rgba(124, 58, 237, 0.35);
     border: 4px solid #fff;
+}
+.sarah-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 .sarah-status {
     display: inline-flex;
@@ -1923,12 +1927,17 @@ body {
     height: 44px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--primary), var(--accent-blue));
-    color: #fff;
-    font-weight: 800;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    overflow: hidden;
+}
+.faq-sarah-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 .faq-sarah-prompt strong {
     display: block;
@@ -3654,9 +3663,14 @@ body.demo-active { overflow: hidden; }
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 800;
-    font-size: 1.1rem;
     flex-shrink: 0;
+    overflow: hidden;
+}
+.sarah-bubble-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 .sarah-bubble-text {
     font-size: 0.85rem;
@@ -3706,7 +3720,14 @@ body.demo-active { overflow: hidden; }
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 800;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.sarah-panel-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 .sarah-panel-header strong { display: block; font-size: 0.95rem; }
 .sarah-panel-header span { font-size: 0.75rem; opacity: 0.85; }

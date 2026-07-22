@@ -167,8 +167,6 @@ function prepareMarketing() {
     }
   }
 
-  copyFile(path.join(ROOT, 'assets/favicon-portal.svg'), path.join(dir, 'assets/favicon-portal.svg'));
-
   copyDir(path.join(ROOT, 'js/onboarding'), path.join(dir, 'js/onboarding'));
   copyDir(path.join(ROOT, 'js/landing'), path.join(dir, 'js/landing'));
   copyDir(path.join(ROOT, 'js/shared'), path.join(dir, 'js/shared'));
@@ -178,6 +176,11 @@ function prepareMarketing() {
 
   for (const css of ['onboarding.css', 'ziricai-landing.css']) {
     copyFile(path.join(ROOT, 'css', css), path.join(dir, 'css', css));
+  }
+
+  copyFile(path.join(ROOT, 'assets/favicon-portal.svg'), path.join(dir, 'assets/favicon-portal.svg'));
+  if (fs.existsSync(path.join(ROOT, 'assets/sarah-avatar.svg'))) {
+    copyFile(path.join(ROOT, 'assets/sarah-avatar.svg'), path.join(dir, 'assets/sarah-avatar.svg'));
   }
 }
 

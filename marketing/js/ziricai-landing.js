@@ -268,7 +268,7 @@
             title: 'Greenfield Academy — Sarah Reception',
             contact: 'Greenfield Academy',
             agent: 'Sarah · Reception AI',
-            avatar: 'S',
+            avatar: '<img src="assets/sarah-avatar.svg" alt="Sarah" width="36" height="36">',
             desc: 'Sarah handles a parent enquiry — fees, documents, and a principal meeting — all in one conversation.',
             action: '✓ Parent meeting booked · Fee guide sent',
             messages: [
@@ -462,6 +462,11 @@
                 if (typeof matched === 'string') return matched;
                 if (matched.id && matched.id !== 'unclear') sarahLastTopicId = matched.id;
                 return matched.answer || matched;
+            }
+            const normalized = pk.normalizeQuestionText?.(text) || String(text || '').toLowerCase();
+            const hasClearIntent = /\b(support|help|contact|pricing|price|cost|setup|set up|whatsapp|restaurant|security|trial|ziricai)\b/.test(normalized);
+            if (hasClearIntent) {
+                return pk.PLATFORM_UNCLEAR_REPLY || sarahDefaultReply;
             }
             return pk.getDefaultReply?.() || sarahDefaultReply;
         }

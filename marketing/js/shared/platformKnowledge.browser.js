@@ -16,7 +16,31 @@
     }
 
     const PLATFORM_UNCLEAR_REPLY =
-        'I want to make sure I help you properly — could you rephrase that? I can answer questions about what ZiricAI is, pricing, setup, industries (including restaurants), WhatsApp integration, security, the free trial, and more. Or click "Start Free Trial" to explore the platform yourself.';
+        'I want to make sure I help you properly — could you rephrase that? I can answer questions about what ZiricAI is, pricing, setup, support, industries (including restaurants), WhatsApp integration, security, the free trial, and more.';
+
+    const QUESTION_OPENER_PATTERNS = [
+        /do you (offer|have|provide|give)/,
+        /can i get/,
+        /is there/,
+        /are there/,
+        /do i get/,
+        /does ziricai (offer|have|provide)/,
+    ];
+
+    const TOPIC_INTENT_HINTS = {
+        support: [
+            'support', 'customer service', 'customer support', 'technical support',
+            'help desk', 'human help', 'get in touch', 'contact us', 'live chat',
+            'email support', 'assistance', 'contact', 'help',
+        ],
+        pricing: ['how much', 'pricing', 'price', 'cost', 'subscription', 'monthly fee', 'afford', 'pay'],
+        overview: ['what is ziricai', 'what is this', 'tell me about ziricai', 'about ziricai'],
+        setup: ['set up', 'setup', 'onboarding', 'onboard', 'get started', 'go live', 'install'],
+        trial: ['free trial', '14 day', '14-day', 'try free', 'no credit card', 'demo account'],
+        whatsapp: ['whatsapp'],
+        restaurant: ['restaurant', 'cafe', 'café', 'hospitality', 'food business'],
+        security: ['security', 'data protection', 'popia', 'gdpr', 'privacy', 'encrypted'],
+    ];
 
     const FOLLOW_UP_PATTERNS = [
         'tell me more',
@@ -257,17 +281,31 @@
         support: {
             keywords: [
                 'support',
+                'offer support',
+                'any support',
+                'do you offer support',
+                'customer support',
+                'help',
+                'need help',
+                'get help',
+                'customer service',
                 'contact',
+                'contact us',
+                'assistance',
+                'technical support',
+                'human help',
                 'speak to someone',
                 'talk to a human',
                 'help desk',
-                'customer service',
                 'get in touch',
                 'contact team',
                 'email support',
+                'live chat',
+                'reach you',
+                'reach your team',
             ],
             answer:
-                'Happy to help! The fastest way to explore ZiricAI is the 14-day free trial — no credit card required. If you\'d like to speak with our team, use the contact options on this page or start a trial and ask Sarah inside the portal — she can guide you through setup, integrations, and day-to-day questions.',
+                'Yes — we offer full support by email and live chat (see the Contact section on this page), and I\'m here to help you right now. During your free trial and beyond, you get onboarding assistance, setup walkthroughs with Sarah in the Company Portal, and friendly help from our team whenever you need it.',
         },
         roi: {
             keywords: [
@@ -348,11 +386,94 @@
             return answer;
         }
 
-        if (id === 'whatsapp' && /work with|support|integrate|connect/.test(normalized)) {
+        if (id === 'whatsapp' && /work with|integrate|connect|whatsapp/.test(normalized)) {
             return answer.startsWith('Yes') ? answer : `Yes — ${answer.charAt(0).toLowerCase()}${answer.slice(1)}`;
         }
 
+        if (id === 'support' && /support|help|contact|assistance|customer service|human|reach/.test(normalized)) {
+            return answer;
+        }
+
+        if (id === 'setup' && /help|someone|assist|walk me|set up|setup/.test(normalized)) {
+            return /^(yes|absolutely)/i.test(answer)
+                ? answer
+                : `Yes — we offer onboarding assistance. ${answer}`;
+        }
+
+        if (id === 'overview' && /what is|tell me about|explain|about ziricai/.test(normalized)) {
+            return answer;
+        }
+
+        if (id === 'trial' && /offer|have|include/.test(normalized) && !/support|help desk|customer service/.test(normalized)) {
+            return answer;
+        }
+
         return answer;
+    }
+
+    function hasQuestionOpener(normalized) {
+        return QUESTION_OPENER_PATTERNS.some((p) => p.test(normalized));
+    }
+
+    function scoreTopicIntentBoost(normalized, topicId) {
+        const hints = TOPIC_INTENT_HINTS[topicId];
+        if (!hints) return 0;
+
+        let boost = 0;
+        const opener = hasQuestionOpener(normalized);
+
+        for (const hint of hints) {
+            if (!hint) continue;
+            const matched = hint.includes(' ')
+                ? normalized.includes(hint)
+                : new RegExp(`\\b${escapeRegExp(hint)}\\b`).test(normalized);
+            if (matched) {
+                boost = Math.max(boost, 18 + hint.length * 2 + (opener ? 22 : 0));
+            }
+        }
+
+        return boost;
+    }
+
+    function scoreTrialPenalty(normalized, topicId) {
+        if (topicId !== 'trial') return 0;
+        const supportIntent =
+            /\b(support|help desk|customer service|customer support|technical support|human help|contact us|get in touch|assistance)\b/.test(
+                normalized
+            );
+        const trialIntent = /\b(free trial|trial|try free|demo account|no credit card|test it out)\b/.test(normalized);
+        if (supportIntent && !trialIntent) return -50;
+        return 0;
+    }
+
+    function matchByIntentHints(normalized, question) {
+        let best = null;
+        let bestScore = 0;
+
+        for (const [id, hints] of Object.entries(TOPIC_INTENT_HINTS)) {
+            if (!PLATFORM_FAQ[id]) continue;
+            for (const hint of hints) {
+                const matched = hint.includes(' ')
+                    ? normalized.includes(hint)
+                    : new RegExp(`\\b${escapeRegExp(hint)}\\b`).test(normalized);
+                if (!matched) continue;
+                const score = hint.length * 3 + (hasQuestionOpener(normalized) ? 20 : 0);
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = id;
+                }
+            }
+        }
+
+        if (!best) return null;
+
+        const entry = PLATFORM_FAQ[best];
+        const answer = resolveFaqAnswer(best, entry);
+        return {
+            id: best,
+            answer: formatReplyForQuestion(best, answer, question),
+            title: entry.title || best,
+        };
     }
 
     function isFollowUpQuestion(normalized) {
@@ -401,6 +522,8 @@
             for (const kw of entry.keywords) {
                 topicScore = Math.max(topicScore, scoreKeywordMatch(normalized, kw));
             }
+            topicScore += scoreTopicIntentBoost(normalized, id);
+            topicScore += scoreTrialPenalty(normalized, id);
             if (topicScore > bestScore) {
                 bestScore = topicScore;
                 best = { id, entry };
@@ -416,6 +539,9 @@
                 title: best.entry.title || best.id,
             };
         }
+
+        const hinted = matchByIntentHints(normalized, text);
+        if (hinted) return hinted;
 
         if (isLikelyGibberish(normalized)) {
             return { id: 'unclear', answer: PLATFORM_UNCLEAR_REPLY, title: 'Help' };
