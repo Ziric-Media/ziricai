@@ -49,6 +49,10 @@ const FIREBASE_IMPORTMAP_CDN = `"firebase/app": "https://esm.sh/firebase@12.15.0
 
 const useCdnFirebase = process.env.NETLIFY === 'true' || process.env.USE_CDN_FIREBASE === 'true';
 
+/** Production API host (Railway). Override with PRODUCTION_API_URL env at build time. */
+const PRODUCTION_API_URL =
+  process.env.PRODUCTION_API_URL || 'https://ziricai-production.up.railway.app';
+
 function siteConfigBlock(site) {
   const apiBase =
     process.env.API_BASE_URL !== undefined
@@ -56,14 +60,14 @@ function siteConfigBlock(site) {
       : useCdnFirebase && (site === 'marketing' || site === 'app' || site === 'admin')
         ? ''
         : site === 'marketing' || site === 'app' || site === 'admin'
-          ? 'https://api.ziricai.com'
+          ? PRODUCTION_API_URL
           : '';
   const marketing = process.env.MARKETING_BASE_URL || 'https://marketing.ziricai.com';
   const app = process.env.APP_BASE_URL || 'https://app.ziricai.com';
   const admin = process.env.ADMIN_BASE_URL || 'https://admin.ziricai.com';
   return `<script>window.__ZIRICAI_CONFIG__=${JSON.stringify({
     apiBase,
-    sites: { marketing, app, admin, api: apiBase || 'https://api.ziricai.com' },
+    sites: { marketing, app, admin, api: apiBase },
   })};</script>`;
 }
 

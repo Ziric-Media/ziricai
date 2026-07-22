@@ -10,6 +10,8 @@ function isLocalHost() {
 
 const LOCAL = isLocalHost();
 
+const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
+
 const DEFAULT_SITES = LOCAL
   ? {
       marketing: 'http://localhost:3000',
@@ -21,7 +23,7 @@ const DEFAULT_SITES = LOCAL
       marketing: 'https://marketing.ziricai.com',
       app: 'https://app.ziricai.com',
       admin: 'https://admin.ziricai.com',
-      api: 'https://api.ziricai.com',
+      api: PRODUCTION_API_URL,
     };
 
 /** @returns {{ marketing: string, app: string, admin: string, api: string }} */

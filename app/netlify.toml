@@ -12,7 +12,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://api.ziricai.com/api/:splat"
+  to = "https://ziricai-production.up.railway.app/api/:splat"
   status = 200
   force = true
 
@@ -51,7 +51,7 @@
     Cache-Control = "public, max-age=86400"
 
 [context.production.environment]
-  # Empty = same-origin /api/* Netlify proxy (recommended). Set to https://api.ziricai.com for direct API calls.
+  # Empty = same-origin /api/* Netlify proxy to Railway (recommended).
   API_BASE_URL = ""
   MARKETING_BASE_URL = "https://marketing.ziricai.com"
   APP_BASE_URL = "https://app.ziricai.com"

@@ -35,11 +35,27 @@ const AUTH_ERROR_MESSAGES = {
     'Email/password sign-in is not enabled for this project.',
   'auth/network-request-failed':
     'Network error. Check your connection and try again.',
+  'auth/unauthorized-domain':
+    'This domain is not authorized for sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains.',
   'auth/missing-password': 'Please enter your password.',
   'auth/missing-email': 'Please enter your email address.',
 };
 
 let cachedEnforcement = null;
+
+/** API base for auth helpers — prefers same-origin /api proxy on Netlify static sites. */
+const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
+
+function getApiBase() {
+  if (typeof window === 'undefined') return PRODUCTION_API_URL;
+  const cfg = window.__ZIRICAI_CONFIG__;
+  if (cfg?.apiBase !== undefined && cfg.apiBase !== null) return cfg.apiBase;
+  if (cfg?.sites?.api) return cfg.sites.api;
+  const host = location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') return '';
+  if (/\.ziricai\.com$/i.test(host) && host !== 'api.ziricai.com') return '';
+  return PRODUCTION_API_URL;
+}
 
 /**
  * Converts a Firebase Auth error into a user-friendly message.
@@ -80,7 +96,7 @@ export async function isLaxTenantMode() {
     return cachedEnforcement === 'lax';
   }
   try {
-    const res = await fetch('/api/admin/config');
+    const res = await fetch(`${getApiBase()}/api/admin/config`);
     const data = await res.json().catch(() => ({}));
     cachedEnforcement = (data.tenantScopeEnforcement || 'lax').toLowerCase();
   } catch {
@@ -220,7 +236,7 @@ export async function logoutUser() {
     if (user) {
       try {
         const token = await user.getIdToken();
-        await fetch('/api/auth/logout', {
+        await fetch(`${getApiBase()}/api/auth/logout`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });

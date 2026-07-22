@@ -7,7 +7,7 @@ ZiricAI is split into four deploy surfaces:
 | `marketing.ziricai.com` | `marketing/` | Landing page, industry pages, onboarding wizard |
 | `app.ziricai.com` | `app/` | Company portal (SPA) |
 | `admin.ziricai.com` | `admin/` | Super admin console |
-| `api.ziricai.com` | `api/` + root `services/` | Express API, webhooks, workers |
+| `api.ziricai.com` (optional) | `api/` + root `services/` | Express API on Railway — default host `ziricai-production.up.railway.app` |
 
 Source HTML/CSS/JS lives at the repo root (`ziricai.html`, `js/`, `css/`). Before deploy, `scripts/prepare-sites.js` copies assets into each publish folder.
 
@@ -28,7 +28,7 @@ The API is **not** a Netlify static site. Deploy `api/server.js` on Railway, Ren
 node api/server.js
 ```
 
-Set `PORT` from the host. Point `api.ziricai.com` CNAME to that service.
+Set `PORT` from the host. Default Railway URL: `https://ziricai-production.up.railway.app`. Optionally point `api.ziricai.com` CNAME to Railway (see [RAILWAY.md](./RAILWAY.md)).
 
 ## DNS / subdomain mapping
 
@@ -37,9 +37,9 @@ Set `PORT` from the host. Point `api.ziricai.com` CNAME to that service.
 | `marketing.ziricai.com` | Netlify (marketing site) |
 | `app.ziricai.com` | Netlify (app site) |
 | `admin.ziricai.com` | Netlify (admin site) |
-| `api.ziricai.com` | Railway/Render/Fly (Node API) |
+| `api.ziricai.com` | Railway (Node API) — or use `ziricai-production.up.railway.app` until DNS is ready |
 
-Static sites proxy `/api/*` to `https://api.ziricai.com/api/*` via `[[redirects]]` in each `netlify.toml`.
+Static sites proxy `/api/*` to `https://ziricai-production.up.railway.app/api/*` via `[[redirects]]` in each `netlify.toml`.
 
 ## Environment variables
 
@@ -272,11 +272,11 @@ The file at the repo root (`netlify.toml`) is **documentation only** when each N
    - `marketing.ziricai.com`
    - `ziricai.com` (if using apex)
 
-3. **API not deployed** — `api.ziricai.com` must resolve and serve `GET /api/health`. Static sites proxy `/api/*` to that host; if the API is down, proxied calls return **502** (Firebase sign-in can still work; post-login data loads will fail).  
-   **Verify:** `curl -I https://api.ziricai.com/api/health` or `curl -I https://app.ziricai.com/api/health`  
-   **Fix:** Deploy `node api/server.js` on Railway/Render/Fly and point DNS `api.ziricai.com` to it.
+3. **API not deployed** — Railway must serve `GET /api/health`. Static sites proxy `/api/*` to `https://ziricai-production.up.railway.app`. If the API is down, proxied calls return **502** (Firebase sign-in can still work; post-login data loads will fail).  
+   **Verify:** `curl https://ziricai-production.up.railway.app/api/health` or `curl https://app.ziricai.com/api/health`  
+   **Fix:** Deploy `node api/server.js` on Railway with env vars (see [RAILWAY.md](./RAILWAY.md)).
 
-4. **Wrong `API_BASE_URL`** — Cross-origin calls to `https://api.ziricai.com` require CORS on the API. Prefer **empty** `API_BASE_URL` on Netlify static sites so the browser uses same-origin `/api/*` (proxied, no CORS).  
+4. **Wrong `API_BASE_URL`** — Direct cross-origin calls to Railway require CORS on the API. Prefer **empty** `API_BASE_URL` on Netlify static sites so the browser uses same-origin `/api/*` (proxied, no CORS).  
    **Netlify env (app/admin/marketing):** `API_BASE_URL=""` (already in each `netlify.toml` production context).
 
 5. **Firebase CDN import map** — Static hosts must build with `USE_CDN_FIREBASE=true` (set in `netlify.toml`). Local `node_modules` paths in the import map break on Netlify.  

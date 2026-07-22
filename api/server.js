@@ -165,11 +165,13 @@ app.use((req, res, next) => {
         process.env.APP_BASE_URL,
         process.env.ADMIN_BASE_URL,
         process.env.ZIRICAI_ROOT_URL,
+        process.env.RAILWAY_PUBLIC_DOMAIN && `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`,
         'https://marketing.ziricai.com',
         'https://app.ziricai.com',
         'https://admin.ziricai.com',
         'https://ziricai.com',
         'https://www.ziricai.com',
+        'https://ziricai-production.up.railway.app',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
     ].filter(Boolean);
@@ -224,18 +226,29 @@ app.get("/company-portal.html", (req, res) => {
 app.get("/ziric-superadmin-console.html", (req, res) => res.redirect(301, "/admin/"));
 app.get("/onboarding.html", (req, res) => res.redirect(301, "/#start"));
 
-app.get("/api/health", async (req, res) => {
-    const adapter = await getStorageAdapter();
-    res.json({
-        status: "ok",
-        whatsapp: Boolean(process.env.PHONE_NUMBER_ID && process.env.WHATSAPP_TOKEN),
-        openai: Boolean(process.env.OPENAI_API_KEY),
-        storage: adapter.name,
-        queue: getQueueStats(),
-        tenantScopeEnforcement: (process.env.TENANT_SCOPE_ENFORCEMENT || "lax").toLowerCase(),
-        timestamp: new Date().toISOString(),
-    });
-});
+async function healthHandler(req, res) {
+    try {
+        const adapter = await getStorageAdapter();
+        res.json({
+            status: "ok",
+            whatsapp: Boolean(process.env.PHONE_NUMBER_ID && process.env.WHATSAPP_TOKEN),
+            openai: Boolean(process.env.OPENAI_API_KEY),
+            storage: adapter.name,
+            queue: getQueueStats(),
+            tenantScopeEnforcement: (process.env.TENANT_SCOPE_ENFORCEMENT || "lax").toLowerCase(),
+            timestamp: new Date().toISOString(),
+        });
+    } catch (err) {
+        res.status(503).json({
+            status: "starting",
+            error: err.message,
+            timestamp: new Date().toISOString(),
+        });
+    }
+}
+
+app.get("/api/health", healthHandler);
+app.get("/health", healthHandler);
 
 /** Auth — current session profile */
 app.get("/api/auth/session", attachTenantContext(), async (req, res) => {
@@ -1373,50 +1386,48 @@ const PORT = process.env.PORT || 3000;
 async function bootstrap() {
     initEventSystem();
     initIntegrationHub();
-    const adapter = await getStorageAdapter();
-    await seedDemoCustomersIfEmpty(adapter);
-    await seedCustomerOpsDemoIfEmpty();
-    try {
-        await seedPackVersions();
-    } catch (err) {
-        console.warn("[startup] Marketplace version seed skipped:", err.message);
-    }
 
-    if (process.env.DEFAULT_COMPANY_ID) {
-        try {
-            await provisionCompany(process.env.DEFAULT_COMPANY_ID, {
-                name: "Default Tenant",
-                plan: "business",
-                status: "active",
-            });
-            console.log("[startup] Provisioned DEFAULT_COMPANY_ID:", process.env.DEFAULT_COMPANY_ID);
-        } catch (err) {
-            console.warn("[startup] DEFAULT_COMPANY_ID provisioning skipped:", err.message);
-        }
-    }
-
-    startMessageWorker();
-    console.log("[startup] Storage backend:", adapter.name);
-
-    app.listen(PORT, () => {
+    // Bind immediately so Railway/Render health checks pass while async init runs.
+    app.listen(PORT, "0.0.0.0", () => {
         console.log("");
         console.log("===================================");
         console.log(`ZiricAI running on port ${PORT}`);
+        console.log("Health: GET /api/health or GET /health");
         console.log("Webhook: GET/POST /webhook (legacy WhatsApp)");
         console.log("Webhooks: GET/POST /webhooks/:channel[/:companyId]");
         console.log("Integrations: GET /api/integrations/health");
-        console.log(`Storage: ${adapter.name} | Queue concurrency: ${process.env.QUEUE_CONCURRENCY || 1}`);
-        console.log("");
-        console.log("Meta callback URL (update after each ngrok restart):");
-        console.log("  https://<your-ngrok-host>/webhook");
-        console.log("Verify token must match VERIFY_TOKEN in .env");
-        console.log("");
-        console.log("Dev mode: message FROM your personal WhatsApp TO the Meta test");
-        console.log("business number; add your personal number (E.164, no +) under");
-        console.log("Meta -> WhatsApp -> API Setup -> send/receive messages -> To.");
-        console.log("Watch this console for [webhook] Incoming POST when you send.");
+        console.log(`Queue concurrency: ${process.env.QUEUE_CONCURRENCY || 1}`);
         console.log("===================================");
     });
+
+    try {
+        const adapter = await getStorageAdapter();
+        await seedDemoCustomersIfEmpty(adapter);
+        await seedCustomerOpsDemoIfEmpty();
+        try {
+            await seedPackVersions();
+        } catch (err) {
+            console.warn("[startup] Marketplace version seed skipped:", err.message);
+        }
+
+        if (process.env.DEFAULT_COMPANY_ID) {
+            try {
+                await provisionCompany(process.env.DEFAULT_COMPANY_ID, {
+                    name: "Default Tenant",
+                    plan: "business",
+                    status: "active",
+                });
+                console.log("[startup] Provisioned DEFAULT_COMPANY_ID:", process.env.DEFAULT_COMPANY_ID);
+            } catch (err) {
+                console.warn("[startup] DEFAULT_COMPANY_ID provisioning skipped:", err.message);
+            }
+        }
+
+        startMessageWorker();
+        console.log("[startup] Storage backend:", adapter.name);
+    } catch (err) {
+        console.error("[startup] Background init error:", err.message);
+    }
 }
 
 bootstrap().catch((err) => {

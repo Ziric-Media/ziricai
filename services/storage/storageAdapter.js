@@ -23,7 +23,13 @@ async function resolveAdapter() {
     }
 
     try {
-        await firestoreAdapter.ping();
+        const pingMs = Number(process.env.FIRESTORE_PING_TIMEOUT_MS) || 8000;
+        await Promise.race([
+            firestoreAdapter.ping(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error(`Firestore ping timed out after ${pingMs}ms`)), pingMs)
+            ),
+        ]);
         console.log("[storage] Auto-selected Firestore adapter");
         return firestoreAdapter;
     } catch (err) {

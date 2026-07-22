@@ -4,12 +4,33 @@
 
 import { auth } from '../firebase.js';
 
+/** Resolve API origin: injected config, same-origin Netlify proxy, or production default. */
+const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
 
+function resolveApiBase() {
+  if (typeof window === 'undefined') return PRODUCTION_API_URL;
 
-const API_BASE =
-  typeof window !== 'undefined' && window.__ZIRICAI_CONFIG__?.apiBase !== undefined
-    ? window.__ZIRICAI_CONFIG__.apiBase
-    : '';
+  const cfg = window.__ZIRICAI_CONFIG__;
+  if (cfg?.apiBase !== undefined && cfg.apiBase !== null) {
+    return cfg.apiBase;
+  }
+  if (cfg?.sites?.api) {
+    return cfg.sites.api;
+  }
+
+  const host = location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return '';
+  }
+  // Static Netlify sites proxy /api/* — same-origin avoids CORS when apiBase is unset.
+  if (/\.ziricai\.com$/i.test(host) && host !== 'api.ziricai.com') {
+    return '';
+  }
+
+  return PRODUCTION_API_URL;
+}
+
+const API_BASE = resolveApiBase();
 
 
 

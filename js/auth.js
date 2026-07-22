@@ -44,15 +44,17 @@ const AUTH_ERROR_MESSAGES = {
 let cachedEnforcement = null;
 
 /** API base for auth helpers — prefers same-origin /api proxy on Netlify static sites. */
+const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
+
 function getApiBase() {
-  if (typeof window === 'undefined') return 'https://api.ziricai.com';
+  if (typeof window === 'undefined') return PRODUCTION_API_URL;
   const cfg = window.__ZIRICAI_CONFIG__;
   if (cfg?.apiBase !== undefined && cfg.apiBase !== null) return cfg.apiBase;
   if (cfg?.sites?.api) return cfg.sites.api;
   const host = location.hostname;
   if (host === 'localhost' || host === '127.0.0.1') return '';
   if (/\.ziricai\.com$/i.test(host) && host !== 'api.ziricai.com') return '';
-  return 'https://api.ziricai.com';
+  return PRODUCTION_API_URL;
 }
 
 /**

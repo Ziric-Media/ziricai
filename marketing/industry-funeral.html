@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="css/ziricai-landing.css">
-<script>window.__ZIRICAI_CONFIG__={"apiBase":"https://api.ziricai.com","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://api.ziricai.com"}};</script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":""}};</script>
 </head>
 <body>
 <section class="industry-hero">
@@ -38,13 +38,5 @@
     </div>
 </section>
 <footer class="site-footer"><div class="container"><div class="footer-bottom"><span>&copy; 2026 ZiricAI</span><div class="footer-bottom-links"><a href="./">Home</a><a href="./">Portal</a></div></div></div></footer>
-<script type="module">
-import { getSiteUrls } from './js/shared/siteUrls.js';
-document.querySelectorAll('[data-site-link]').forEach((el) => {
-  const key = el.getAttribute('data-site-link');
-  const urls = getSiteUrls();
-  if (urls[key]) el.href = urls[key];
-});
-</script>
 </body>
 </html>

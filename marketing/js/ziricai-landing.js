@@ -449,9 +449,9 @@
         'Great question! ZiricAI deploys AI employees to handle customer enquiries 24/7 on WhatsApp, web, and social. Setup takes under 10 minutes, and every plan includes a 14-day free trial. Ask about pricing, setup, industries, WhatsApp, or security — or click Start Free Trial to get going!';
 
     function getSarahApiBase() {
-        return window.__ZIRICAI_CONFIG__?.apiBase ||
-            window.__ZIRICAI_CONFIG__?.sites?.api ||
-            (typeof location !== 'undefined' && /localhost|127\.0\.0\.1/.test(location.hostname) ? '' : 'https://api.ziricai.com');
+        return window.__ZIRICAI_CONFIG__?.apiBase ??
+            window.__ZIRICAI_CONFIG__?.sites?.api ??
+            (typeof location !== 'undefined' && /localhost|127\.0\.0\.1/.test(location.hostname) ? '' : 'https://ziricai-production.up.railway.app');
     }
 
     function getSarahReplyLocal(text) {
