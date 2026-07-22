@@ -14,27 +14,28 @@ export async function bootstrap() {
   }
 
   try {
-  applyTheme(state.theme);
-  bindLoginForm();
-  bindLogout();
-  initRouter();
-  bindShellEvents();
-  document.addEventListener('ziric:companies-updated', refreshCompanies);
+    applyTheme(state.theme);
+    bindLoginForm();
+    bindLogout();
+    initRouter();
+    bindShellEvents();
+    document.addEventListener('ziric:companies-updated', refreshCompanies);
 
-  initAuthGuard({
-    onReady: () => {
-      setState({ companies: DEMO_COMPANIES });
-      // Render dashboard immediately — do not block on Firestore (can hang when billing/rules fail)
-      navigateTo('dashboard');
-      refreshCompanies().catch((err) => console.warn('Companies refresh:', err));
-    },
-  });
-} catch (err) {
-  console.error('[admin] Bootstrap failed:', err);
-  const status = document.getElementById('loginStatus');
-  const message = err?.message || 'Failed to load console. Refresh the page or contact support.';
-  if (status) status.textContent = message;
-  showToast?.(message, 'error');
+    initAuthGuard({
+      onReady: () => {
+        setState({ companies: DEMO_COMPANIES });
+        // Render dashboard immediately — do not block on Firestore (can hang when billing/rules fail)
+        navigateTo('dashboard');
+        refreshCompanies().catch((err) => console.warn('Companies refresh:', err));
+      },
+    });
+  } catch (err) {
+    console.error('[admin] Bootstrap failed:', err);
+    const status = document.getElementById('loginStatus');
+    const message = err?.message || 'Failed to load console. Refresh the page or contact support.';
+    if (status) status.textContent = message;
+    showToast?.(message, 'error');
+  }
 }
 
 async function refreshCompanies() {
