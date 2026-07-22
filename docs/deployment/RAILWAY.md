@@ -31,7 +31,7 @@ Copy from `.env.example`. **Minimum for a healthy deploy today:**
 | Variable | Set to | Required |
 |----------|--------|----------|
 | `NODE_ENV` | `production` | Yes |
-| `STORAGE_BACKEND` | `memory` | **Yes** — until Firestore database exists (see below) |
+| `STORAGE_BACKEND` | `memory` | **Recommended** — set explicitly on Railway. Unset + `NODE_ENV=production` also defaults to memory, but explicit avoids surprises. Do not use `auto`/`firestore` until Firestore database exists (see below) |
 | `TENANT_SCOPE_ENFORCEMENT` | `strict` | Yes |
 | `PLATFORM_API_KEY` | long random secret | Yes |
 | `APP_BASE_URL` | `https://app.ziricai.com` | Yes |
@@ -62,7 +62,7 @@ Railway injects `RAILWAY_PUBLIC_DOMAIN` and `RAILWAY_ENVIRONMENT` — CORS allow
 |-------------------|----------|
 | *(unset)* + `NODE_ENV=production` | **memory** (safe default on Railway) |
 | `memory` | In-memory storage; data lost on restart |
-| `auto` | On Railway: **memory** (no Firestore probe). Locally: probes Firestore; on `NOT_FOUND` or timeout → memory |
+| `auto` | On Railway: **memory** (no Firestore probe — detected via `RAILWAY_ENVIRONMENT`, `RAILWAY_PROJECT_ID`, or `RAILWAY_SERVICE_ID`). Locally: probes Firestore; on `NOT_FOUND` or timeout → memory |
 | `firestore` | Firestore only — use **after** database is created in Firebase Console |
 
 **Do not use `auto` or `firestore` on Railway until Firestore is provisioned.** A missing Firestore database causes `NOT_FOUND` gRPC errors and can hang or crash the API.
