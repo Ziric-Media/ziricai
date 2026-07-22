@@ -164,6 +164,12 @@ app.use((req, res, next) => {
         process.env.MARKETING_BASE_URL,
         process.env.APP_BASE_URL,
         process.env.ADMIN_BASE_URL,
+        process.env.ZIRICAI_ROOT_URL,
+        'https://marketing.ziricai.com',
+        'https://app.ziricai.com',
+        'https://admin.ziricai.com',
+        'https://ziricai.com',
+        'https://www.ziricai.com',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
     ].filter(Boolean);

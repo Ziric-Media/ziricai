@@ -13,6 +13,7 @@ export async function bootstrap() {
     return;
   }
 
+  try {
   applyTheme(state.theme);
   bindLoginForm();
   bindLogout();
@@ -28,6 +29,12 @@ export async function bootstrap() {
       refreshCompanies().catch((err) => console.warn('Companies refresh:', err));
     },
   });
+} catch (err) {
+  console.error('[admin] Bootstrap failed:', err);
+  const status = document.getElementById('loginStatus');
+  const message = err?.message || 'Failed to load console. Refresh the page or contact support.';
+  if (status) status.textContent = message;
+  showToast?.(message, 'error');
 }
 
 async function refreshCompanies() {

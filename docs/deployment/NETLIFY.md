@@ -68,7 +68,7 @@ Set in Netlify → Site settings → Environment variables (production context):
 
 | Variable | Example |
 |----------|---------|
-| `API_BASE_URL` | `https://api.ziricai.com` |
+| `API_BASE_URL` | `""` (empty — use same-origin `/api/*` Netlify proxy) or `https://api.ziricai.com` for direct cross-origin calls |
 | `MARKETING_BASE_URL` | `https://marketing.ziricai.com` |
 | `APP_BASE_URL` | `https://app.ziricai.com` |
 | `ADMIN_BASE_URL` | `https://admin.ziricai.com` |
@@ -253,3 +253,49 @@ The file at the repo root (`netlify.toml`) is **documentation only** when each N
 3. Re-run locally with Netlify-like env:  
    `$env:NETLIFY='true'; node scripts/prepare-sites.js marketing` (PowerShell)
 4. Check build log for missing source files — `prepare-sites.js` reads `ziricai.html` and `industry-*.html` from `_sources/` when present, otherwise from the repo root (newer file wins if both exist).
+
+### Sign-in does nothing or login form never responds (app / admin)
+
+**Symptoms:** Clicking **Sign In** on `app.ziricai.com` or `admin.ziricai.com` has no effect, or the page stays on the login screen with no error.
+
+**Common root causes:**
+
+1. **Missing JS module on app portal** — `js/portal/main.js` imports `js/admin/ui.js`. If `prepare-sites.js` did not copy that file, Netlify’s SPA fallback serves `index.html` for `/js/admin/ui.js` and the entire app fails to bootstrap (login handler never binds).  
+   **Verify:** Open DevTools → Network → reload → check `/js/admin/ui.js` returns JavaScript (not HTML).  
+   **Fix:** Run `npm run prepare:sites app` (includes `ui.js` copy) and redeploy.
+
+2. **Firebase authorized domains** — Firebase Auth blocks sign-in from domains not listed in the Firebase Console.  
+   **Verify:** DevTools Console shows `auth/unauthorized-domain`.  
+   **Fix:** Firebase Console → Authentication → Settings → Authorized domains → add:
+   - `app.ziricai.com`
+   - `admin.ziricai.com`
+   - `marketing.ziricai.com`
+   - `ziricai.com` (if using apex)
+
+3. **API not deployed** — `api.ziricai.com` must resolve and serve `GET /api/health`. Static sites proxy `/api/*` to that host; if the API is down, proxied calls return **502** (Firebase sign-in can still work; post-login data loads will fail).  
+   **Verify:** `curl -I https://api.ziricai.com/api/health` or `curl -I https://app.ziricai.com/api/health`  
+   **Fix:** Deploy `node api/server.js` on Railway/Render/Fly and point DNS `api.ziricai.com` to it.
+
+4. **Wrong `API_BASE_URL`** — Cross-origin calls to `https://api.ziricai.com` require CORS on the API. Prefer **empty** `API_BASE_URL` on Netlify static sites so the browser uses same-origin `/api/*` (proxied, no CORS).  
+   **Netlify env (app/admin/marketing):** `API_BASE_URL=""` (already in each `netlify.toml` production context).
+
+5. **Firebase CDN import map** — Static hosts must build with `USE_CDN_FIREBASE=true` (set in `netlify.toml`). Local `node_modules` paths in the import map break on Netlify.  
+   **Verify:** View page source — import map should use `https://esm.sh/firebase@12.15.0/...`, not `./node_modules/...`.
+
+**Firebase Console checklist (manual — cannot be done from code):**
+
+- [ ] Authentication → Sign-in method → **Email/Password** enabled
+- [ ] Authentication → Settings → Authorized domains: `app.ziricai.com`, `admin.ziricai.com`, `marketing.ziricai.com`, `localhost`
+- [ ] Firestore Database created (default) with `firestore.rules` deployed
+- [ ] User has a document in `users/{uid}` with `role` and (for portal) `companyId`, or (for admin) `role: superadmin`
+
+**Netlify env vars per site (production):**
+
+| Site | Required vars |
+|------|----------------|
+| **app** | `API_BASE_URL=""`, `APP_BASE_URL`, `ADMIN_BASE_URL`, `MARKETING_BASE_URL`, `USE_CDN_FIREBASE=true` |
+| **admin** | Same as app |
+| **marketing** | Same as app |
+| **API (Railway/Render)** | `APP_BASE_URL`, `ADMIN_BASE_URL`, `MARKETING_BASE_URL`, `NODE_ENV=production`, Firebase Admin creds |
+
+**After sign-in succeeds but portal shows “No profile”:** Create the Firestore `users/{uid}` profile or complete onboarding on marketing site.

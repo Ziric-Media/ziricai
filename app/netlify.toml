@@ -51,7 +51,8 @@
     Cache-Control = "public, max-age=86400"
 
 [context.production.environment]
-  API_BASE_URL = "https://api.ziricai.com"
+  # Empty = same-origin /api/* Netlify proxy (recommended). Set to https://api.ziricai.com for direct API calls.
+  API_BASE_URL = ""
   MARKETING_BASE_URL = "https://marketing.ziricai.com"
   APP_BASE_URL = "https://app.ziricai.com"
   ADMIN_BASE_URL = "https://admin.ziricai.com"

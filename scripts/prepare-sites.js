@@ -50,7 +50,14 @@ const FIREBASE_IMPORTMAP_CDN = `"firebase/app": "https://esm.sh/firebase@12.15.0
 const useCdnFirebase = process.env.NETLIFY === 'true' || process.env.USE_CDN_FIREBASE === 'true';
 
 function siteConfigBlock(site) {
-  const apiBase = process.env.API_BASE_URL || (site === 'marketing' || site === 'app' || site === 'admin' ? 'https://api.ziricai.com' : '');
+  const apiBase =
+    process.env.API_BASE_URL !== undefined
+      ? process.env.API_BASE_URL
+      : useCdnFirebase && (site === 'marketing' || site === 'app' || site === 'admin')
+        ? ''
+        : site === 'marketing' || site === 'app' || site === 'admin'
+          ? 'https://api.ziricai.com'
+          : '';
   const marketing = process.env.MARKETING_BASE_URL || 'https://marketing.ziricai.com';
   const app = process.env.APP_BASE_URL || 'https://app.ziricai.com';
   const admin = process.env.ADMIN_BASE_URL || 'https://admin.ziricai.com';
@@ -135,11 +142,16 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
     out = out.replace(/superadmin-register\.html/g, 'superadmin-register.html');
   }
 
-  if (!out.includes('__ZIRICAI_CONFIG__')) {
+  if (out.includes('__ZIRICAI_CONFIG__')) {
+    out = out.replace(
+      /<script>window\.__ZIRICAI_CONFIG__=[^<]*<\/script>/,
+      siteConfigBlock(site).trim()
+    );
+  } else {
     out = out.replace('</head>', `${siteConfigBlock(site)}\n</head>`);
   }
 
-  if (!out.includes('data-site-link') && site === 'marketing') {
+  if (out.includes('data-site-link') && !out.includes('getSiteUrls')) {
     out = out.replace('</body>', `<script type="module">
 import { getSiteUrls } from './js/shared/siteUrls.js';
 document.querySelectorAll('[data-site-link]').forEach((el) => {
@@ -210,6 +222,8 @@ function prepareApp() {
   copyDir(path.join(ROOT, 'js/portal'), path.join(dir, 'js/portal'));
   copyDir(path.join(ROOT, 'js/onboarding'), path.join(dir, 'js/onboarding'));
   copyDir(path.join(ROOT, 'js/shared'), path.join(dir, 'js/shared'));
+  // Portal imports shared UI helpers from js/admin/ui.js — must exist on static app host.
+  copyFile(path.join(ROOT, 'js/admin/ui.js'), path.join(dir, 'js/admin/ui.js'));
   for (const f of ['auth.js', 'firebase.js', 'users.js']) {
     copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
   }

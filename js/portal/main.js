@@ -29,21 +29,29 @@ export async function bootstrap() {
     return;
   }
 
-  applyTheme(state.theme);
-  registerApiErrorToast(showToast);
-  bindLoginForm();
-  bindLogout();
-  initRouter();
-  bindShellEvents();
+  try {
+    applyTheme(state.theme);
+    registerApiErrorToast(showToast);
+    bindLoginForm();
+    bindLogout();
+    initRouter();
+    bindShellEvents();
 
-  initAuthGuard({
-    onReady: () => {
-      initAppShell();
-      applySidebarVisibility();
-      initPortalSarah();
-      navigateTo('dashboard');
-    },
-  });
+    initAuthGuard({
+      onReady: () => {
+        initAppShell();
+        applySidebarVisibility();
+        initPortalSarah();
+        navigateTo('dashboard');
+      },
+    });
+  } catch (err) {
+    console.error('[portal] Bootstrap failed:', err);
+    const status = document.getElementById('loginStatus');
+    const message = err?.message || 'Failed to load portal. Refresh the page or contact support.';
+    if (status) status.textContent = message;
+    showToast?.(message, 'error');
+  }
 }
 
 function bindShellEvents() {
