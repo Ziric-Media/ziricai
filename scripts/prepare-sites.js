@@ -97,6 +97,26 @@ function writeText(relPath, content) {
   fs.writeFileSync(dest, content, 'utf8');
 }
 
+/** Static sites have no services/ folder — sync canonical plans into js/shared for ES modules. */
+function syncBillingPlansShared() {
+  const canonical = path.join(ROOT, 'services/platform/billingPlans.js');
+  const dest = path.join(ROOT, 'js/shared/billingPlans.js');
+  if (!fs.existsSync(canonical)) {
+    console.warn('Missing services/platform/billingPlans.js — skipping billingPlans sync');
+    return;
+  }
+  let body = fs.readFileSync(canonical, 'utf8');
+  body = body.replace(/^\/\*\*[\s\S]*?\*\/\s*\n?/, '');
+  const header = `/**
+ * Browser ES module — billing plans for static deploys (app/admin/marketing).
+ * Synced from services/platform/billingPlans.js by prepare-sites. Node/API uses services/ path.
+ * Do not import from services/ in client bundles.
+ */
+
+`;
+  fs.writeFileSync(dest, header + body, 'utf8');
+}
+
 function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node' } = {}) {
   let out = html;
   if (importmapMode === 'cdn') {
@@ -264,6 +284,8 @@ const runners = {
   app: prepareApp,
   admin: prepareAdmin,
 };
+
+syncBillingPlansShared();
 
 if (target && runners[target]) {
   runners[target]();
