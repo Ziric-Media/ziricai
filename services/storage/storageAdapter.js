@@ -35,7 +35,14 @@ async function probeFirestore(firestoreAdapter) {
 }
 
 async function resolveAdapter() {
-    const backend = getConfiguredStorageBackend();
+    const backend = "memory";
+    console.error({
+        NODE_ENV: process.env.NODE_ENV,
+        RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT,
+        RAILWAY_PROJECT_ID: process.env.RAILWAY_PROJECT_ID,
+        RAILWAY_SERVICE_ID: process.env.RAILWAY_SERVICE_ID,
+        STORAGE_BACKEND: process.env.STORAGE_BACKEND,
+    });
 
     if (backend === "memory") {
         const reason = process.env.STORAGE_BACKEND
