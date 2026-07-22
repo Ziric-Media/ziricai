@@ -97,24 +97,53 @@ function writeText(relPath, content) {
   fs.writeFileSync(dest, content, 'utf8');
 }
 
+const SHARED_BROWSER_TARGETS = [
+  'js/shared',
+  'marketing/js/shared',
+  'app/js/shared',
+  'admin/js/shared',
+];
+
+function writeSharedBrowserFile(filename, content) {
+  for (const relDir of SHARED_BROWSER_TARGETS) {
+    const dest = path.join(ROOT, relDir, filename);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, content, 'utf8');
+  }
+}
+
 /** Static sites have no services/ folder — sync canonical plans into js/shared for ES modules. */
 function syncBillingPlansShared() {
   const canonical = path.join(ROOT, 'services/platform/billingPlans.js');
-  const dest = path.join(ROOT, 'js/shared/billingPlans.js');
   if (!fs.existsSync(canonical)) {
     console.warn('Missing services/platform/billingPlans.js — skipping billingPlans sync');
     return;
   }
   let body = fs.readFileSync(canonical, 'utf8');
   body = body.replace(/^\/\*\*[\s\S]*?\*\/\s*\n?/, '');
-  const header = `/**
+  const content = `/**
  * Browser ES module — billing plans for static deploys (app/admin/marketing).
  * Synced from services/platform/billingPlans.js by prepare-sites. Node/API uses services/ path.
  * Do not import from services/ in client bundles.
  */
 
-`;
-  fs.writeFileSync(dest, header + body, 'utf8');
+${body}`;
+  writeSharedBrowserFile('billingPlans.js', content);
+}
+
+/** Inline marketplace pack constants — static sites cannot import services/platform/*. */
+function syncMarketplacePacksShared() {
+  const src = path.join(ROOT, 'js/shared/marketplacePacks.js');
+  if (!fs.existsSync(src)) {
+    console.warn('Missing js/shared/marketplacePacks.js — skipping marketplacePacks sync');
+    return;
+  }
+  let body = fs.readFileSync(src, 'utf8');
+  if (body.includes('../../services/platform/')) {
+    console.warn('js/shared/marketplacePacks.js still imports services/ — fix source before sync');
+    return;
+  }
+  writeSharedBrowserFile('marketplacePacks.js', body);
 }
 
 function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node' } = {}) {
@@ -286,6 +315,7 @@ const runners = {
 };
 
 syncBillingPlansShared();
+syncMarketplacePacksShared();
 
 if (target && runners[target]) {
   runners[target]();

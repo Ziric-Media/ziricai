@@ -1,9 +1,31 @@
 /**
  * Landing page marketplace packs — keep in sync with services/platform/marketplaceTemplate.js
  * (LANDING_MARKETPLACE_PACK_IDS) and pack metadata in marketplaceRegistry.js / employeePacks.js.
+ * Browser ES module for static deploys — do not import from services/ in client bundles.
  */
-import { INSTALL_TAGLINE } from "../../services/platform/employeePacks.js";
-import { LANDING_MARKETPLACE_PACK_IDS } from "../../services/platform/marketplaceTemplate.js";
+
+/** @see services/platform/employeePacks.js INSTALL_TAGLINE */
+export const INSTALL_TAGLINE = "Installs in minutes — customize your knowledge base and branding";
+
+/** @see services/platform/marketplaceTemplate.js LANDING_MARKETPLACE_PACK_IDS */
+export const LANDING_MARKETPLACE_PACK_IDS = [
+    "pack-school-ai",
+    "pack-law-ai",
+    "pack-clinic-ai",
+    "pack-sales-ai",
+    "pack-customer-support-ai",
+    "pack-appointment-ai",
+    "pack-collections-ai",
+    "pack-hr-ai",
+    "pack-recruitment-ai",
+    "pack-estate-agent-ai",
+    "pack-insurance-ai",
+    "pack-funeral-ai",
+    "pack-restaurant-ai",
+    "pack-construction-ai",
+    "pack-church-ai",
+    "pack-security-ai",
+];
 
 /** Human-readable category labels for landing cards */
 export const LANDING_CATEGORY_LABELS = {
@@ -141,8 +163,6 @@ export const LANDING_MARKETPLACE_PACKS = [
         description: "Access control, incident reporting, and patrol schedule FAQs.",
     },
 ];
-
-export { INSTALL_TAGLINE, LANDING_MARKETPLACE_PACK_IDS };
 
 export function getLandingMarketplacePacks() {
     return LANDING_MARKETPLACE_PACKS.map((pack) => ({
