@@ -40,7 +40,7 @@
         whatsapp: ['whatsapp'],
         restaurant: ['restaurant', 'cafe', 'café', 'hospitality', 'food business'],
         security: ['security', 'data protection', 'popia', 'gdpr', 'privacy', 'encrypted'],
-    ];
+    };
 
     const FOLLOW_UP_PATTERNS = [
         'tell me more',

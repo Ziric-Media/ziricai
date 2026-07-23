@@ -691,7 +691,7 @@
 </section>
 
 <!-- ===== 13. FINAL CTA ===== -->
-<section class="final-cta" id="start">
+<section class="final-cta" id="get-started">
     <h2>Start your AI employee in under 10 minutes</h2>
     <p>Join businesses across Africa using ZiricAI to automate customer service, sales, and operations.</p>
     <div class="hero-actions">
@@ -904,16 +904,24 @@
 <script type="module" src="js/landing/pricing.js"></script>
 <script>
     function launchWizard() {
-        document.getElementById('landingView').classList.add('hidden');
-        document.getElementById('wizardView').classList.remove('hidden');
+        const landing = document.getElementById('landingView');
+        const wizard = document.getElementById('wizardView');
+        if (!landing || !wizard) {
+            window.location.href = (window.location.pathname || './') + '#start';
+            return;
+        }
+        landing.classList.add('hidden');
+        wizard.classList.remove('hidden');
         document.body.classList.add('wizard-active');
         history.replaceState(null, '', '#start');
         window.scrollTo(0, 0);
+        window.dispatchEvent(new CustomEvent('ziric:wizard-open'));
     }
+    window.launchWizard = launchWizard;
 
     function showLanding() {
-        document.getElementById('wizardView').classList.add('hidden');
-        document.getElementById('landingView').classList.remove('hidden');
+        document.getElementById('wizardView')?.classList.add('hidden');
+        document.getElementById('landingView')?.classList.remove('hidden');
         document.body.classList.remove('wizard-active');
         history.replaceState(null, '', window.location.pathname);
     }
@@ -923,9 +931,13 @@
         showLanding();
     });
 
-    if (location.hash === '#start' || location.hash === '#wizard') {
-        launchWizard();
+    function maybeOpenWizardFromHash() {
+        if (location.hash === '#start' || location.hash === '#wizard') {
+            launchWizard();
+        }
     }
+    maybeOpenWizardFromHash();
+    window.addEventListener('hashchange', maybeOpenWizardFromHash);
 </script>
 <script type="module" src="js/onboarding/main.js"></script>
 <script>
@@ -948,6 +960,11 @@
         anchor.addEventListener('click', function(e) {
             const href = this.getAttribute('href');
             if (href === '#') return;
+            if (href === '#start' || href === '#wizard') {
+                e.preventDefault();
+                launchWizard();
+                return;
+            }
             const target = document.querySelector(href);
             if (target) {
                 e.preventDefault();

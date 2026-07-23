@@ -49,6 +49,7 @@ if (!el.stepContent) {
     '<p>Run <code>npm run dev</code> and open <a href="' + marketingUrl() + '">' + marketingUrl() + '</a></p>';
 } else {
   bootstrap();
+  window.addEventListener('ziric:wizard-open', () => render());
 }
 
 async function bootstrap() {
@@ -421,6 +422,8 @@ async function handleAccountStep() {
   if (!companyName || !ownerName || !ownerEmail || !password) {
     throw new Error('Please fill in all fields.');
   }
+
+  state.companyName = companyName;
 
   setStatus('Creating your account...');
   const authResult = await registerUser(ownerEmail, password);
