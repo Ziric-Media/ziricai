@@ -42,10 +42,7 @@ const FIREBASE_IMPORTMAP_NODE = `"firebase/app": "./node_modules/firebase/app/di
         "idb": "./node_modules/idb/build/index.js",
         "re2js": "./node_modules/re2js/build/index.esm.js"`;
 
-const FIREBASE_IMPORTMAP_CDN = `"firebase/app": "https://esm.sh/firebase@12.15.0/app",
-        "firebase/auth": "https://esm.sh/firebase@12.15.0/auth",
-        "firebase/firestore": "https://esm.sh/firebase@12.15.0/firestore",
-        "firebase/storage": "https://esm.sh/firebase@12.15.0/storage"`;
+const FIREBASE_IMPORTMAP_CDN = `"firebase/": "https://esm.sh/firebase@12.15.0/"`;
 
 const useCdnFirebase = process.env.NETLIFY === 'true' || process.env.USE_CDN_FIREBASE === 'true';
 
@@ -150,14 +147,18 @@ function syncMarketplacePacksShared() {
   writeSharedBrowserFile('marketplacePacks.js', body);
 }
 
+const FIREBASE_IMPORTMAP_CDN_BLOCK = `<script type="importmap">
+    {
+      "imports": {
+        ${FIREBASE_IMPORTMAP_CDN}
+      }
+    }
+    </script>`;
+
 function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node' } = {}) {
   let out = html;
   if (importmapMode === 'cdn') {
-    out = out.replace(FIREBASE_IMPORTMAP_NODE, FIREBASE_IMPORTMAP_CDN);
-    out = out.replace(/<script type="importmap">[\s\S]*?<\/script>/, (block) => {
-      if (block.includes('esm.sh/firebase')) return block;
-      return block.replace(FIREBASE_IMPORTMAP_NODE, FIREBASE_IMPORTMAP_CDN);
-    });
+    out = out.replace(/<script type="importmap">[\s\S]*?<\/script>/, FIREBASE_IMPORTMAP_CDN_BLOCK);
   }
 
   out = out.replace(/ziricai\.html/g, 'index.html');

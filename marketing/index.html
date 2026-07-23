@@ -12,10 +12,7 @@
     <script type="importmap">
     {
       "imports": {
-        "firebase/app": "https://esm.sh/firebase@12.15.0/app",
-        "firebase/auth": "https://esm.sh/firebase@12.15.0/auth",
-        "firebase/firestore": "https://esm.sh/firebase@12.15.0/firestore",
-        "firebase/storage": "https://esm.sh/firebase@12.15.0/storage"
+        "firebase/": "https://esm.sh/firebase@12.15.0/"
       }
     }
     </script>
@@ -867,10 +864,12 @@
             <div class="sarah-msg ai">Hi 👋 I'm Sarah. Ask me anything about ZiricAI — pricing, setup, industries, WhatsApp integration. No signup required!</div>
         </div>
         <div class="sarah-panel-suggestions" id="sarahSuggestions">
-            <button type="button" data-q="How much does ZiricAI cost?">Pricing</button>
-            <button type="button" data-q="How long does setup take?">Setup time</button>
-            <button type="button" data-q="Which industries do you support?">Industries</button>
+            <button type="button" data-q="How much does it cost?">Pricing</button>
+            <button type="button" data-q="What is ZiricAI?">What is ZiricAI?</button>
+            <button type="button" data-q="Can it work for my restaurant?">Restaurants</button>
             <button type="button" data-q="Does it work with WhatsApp?">WhatsApp</button>
+            <button type="button" data-q="How long does setup take?">Setup</button>
+            <button type="button" data-q="Is there a free trial?">Free trial</button>
         </div>
         <form class="sarah-panel-input" id="sarahForm">
             <input type="text" id="sarahInput" placeholder="Ask Sarah anything…" autocomplete="off" maxlength="500">
@@ -906,6 +905,7 @@
         history.replaceState(null, '', '#start');
         window.scrollTo(0, 0);
         window.dispatchEvent(new CustomEvent('ziric:wizard-open'));
+        window.initOnboarding?.();
     }
     window.launchWizard = launchWizard;
 

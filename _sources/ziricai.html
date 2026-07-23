@@ -916,6 +916,7 @@
         history.replaceState(null, '', '#start');
         window.scrollTo(0, 0);
         window.dispatchEvent(new CustomEvent('ziric:wizard-open'));
+        window.initOnboarding?.();
     }
     window.launchWizard = launchWizard;
 
