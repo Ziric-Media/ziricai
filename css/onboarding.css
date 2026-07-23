@@ -76,6 +76,12 @@
     font-weight: 800;
     box-shadow: 0 4px 14px var(--primary-glow);
 }
+.onboarding-brand .logo-img {
+    height: 36px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+}
 
 .onboarding-header-meta {
     display: flex;

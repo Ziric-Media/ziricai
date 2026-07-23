@@ -248,6 +248,9 @@ function prepareMarketing() {
   if (fs.existsSync(path.join(ROOT, 'assets/sarah-avatar.svg'))) {
     copyFile(path.join(ROOT, 'assets/sarah-avatar.svg'), path.join(dir, 'assets/sarah-avatar.svg'));
   }
+  if (fs.existsSync(path.join(ROOT, 'assets/ZIRICAI LOGO.png'))) {
+    copyFile(path.join(ROOT, 'assets/ZIRICAI LOGO.png'), path.join(dir, 'assets/ZIRICAI LOGO.png'));
+  }
 }
 
 function prepareApp() {
@@ -286,6 +289,9 @@ function prepareApp() {
     copyFile(path.join(ROOT, 'css', css), path.join(dir, 'css', css));
   }
   copyFile(path.join(ROOT, 'assets/favicon-portal.svg'), path.join(dir, 'assets/favicon-portal.svg'));
+  if (fs.existsSync(path.join(ROOT, 'assets/ZIRICAI LOGO.png'))) {
+    copyFile(path.join(ROOT, 'assets/ZIRICAI LOGO.png'), path.join(dir, 'assets/ZIRICAI LOGO.png'));
+  }
 }
 
 function prepareAdmin() {
@@ -310,6 +316,9 @@ function prepareAdmin() {
 
   copyFile(path.join(ROOT, 'css/admin-dashboard.css'), path.join(dir, 'css/admin-dashboard.css'));
   copyFile(path.join(ROOT, 'assets/favicon-superadmin.svg'), path.join(dir, 'assets/favicon-superadmin.svg'));
+  if (fs.existsSync(path.join(ROOT, 'assets/ZIRICAI LOGO.png'))) {
+    copyFile(path.join(ROOT, 'assets/ZIRICAI LOGO.png'), path.join(dir, 'assets/ZIRICAI LOGO.png'));
+  }
 }
 
 const target = process.argv[2];

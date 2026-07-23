@@ -130,6 +130,18 @@ body {
     font-weight: 700;
     font-size: 1.1rem;
 }
+.logo-img {
+    height: 36px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+}
+.landing-header .logo-img {
+    height: 36px;
+}
+.site-footer .logo-img {
+    height: 32px;
+}
 .nav-links {
     display: flex;
     gap: 24px;
@@ -2716,6 +2728,9 @@ body.demo-active { overflow: hidden; }
 }
 
 @media (max-width: 768px) {
+    .landing-header .logo-img { height: 32px; }
+    .site-footer .logo-img { height: 28px; }
+    .onboarding-brand .logo-img { height: 32px; }
     .why-ai-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .why-ai-stat { padding: 12px 8px; }
     .faq-categories {
