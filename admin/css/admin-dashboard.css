@@ -148,7 +148,7 @@ ul { list-style: none; }
     box-shadow: 0 4px 12px var(--primary-glow);
 }
 .sidebar-brand .logo-img {
-    height: 36px;
+    height: 42px;
     width: auto;
     display: block;
     object-fit: contain;
@@ -1846,8 +1846,8 @@ ul { list-style: none; }
         border-bottom: none;
     }
     .sidebar-brand .logo-img {
-        height: 28px;
-        max-width: 56px;
+        height: 34px;
+        max-width: 68px;
         object-fit: contain;
         object-position: center;
     }
