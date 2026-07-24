@@ -1,6 +1,6 @@
 {
   "fileCount": 25,
-  "questionCount": 1298,
+  "questionCount": 1345,
   "categoryCount": 25,
   "categories": [
     {
@@ -18,8 +18,8 @@
       "file": "02_Pricing.md",
       "phase": 1,
       "phaseTarget": 350,
-      "count": 63,
-      "progressPct": 18
+      "count": 86,
+      "progressPct": 24.57
     },
     {
       "id": "faq",
@@ -27,8 +27,8 @@
       "file": "03_FAQ.md",
       "phase": 1,
       "phaseTarget": 300,
-      "count": 38,
-      "progressPct": 12.67
+      "count": 42,
+      "progressPct": 14
     },
     {
       "id": "industries",
@@ -117,8 +117,8 @@
       "file": "13_Tutorials.md",
       "phase": 4,
       "phaseTarget": 400,
-      "count": 44,
-      "progressPct": 11
+      "count": 59,
+      "progressPct": 14.75
     },
     {
       "id": "documentation",
@@ -207,8 +207,8 @@
       "file": "23_Billing.md",
       "phase": 4,
       "phaseTarget": 250,
-      "count": 23,
-      "progressPct": 9.2
+      "count": 28,
+      "progressPct": 11.2
     },
     {
       "id": "blogs",
@@ -235,8 +235,8 @@
       "name": "Core",
       "description": "About, FAQ, Pricing, AI Employees, Features, Company",
       "target": 2000,
-      "count": 354,
-      "progressPct": 17.7
+      "count": 381,
+      "progressPct": 19.05
     },
     {
       "phase": 2,
@@ -259,8 +259,8 @@
       "name": "Technical & Compliance",
       "description": "Documentation, Tutorials, Support, Security, POPIA, GDPR, Billing",
       "target": 3000,
-      "count": 214,
-      "progressPct": 7.13
+      "count": 234,
+      "progressPct": 7.8
     },
     {
       "phase": 5,
@@ -273,8 +273,8 @@
   ],
   "v1": {
     "target": 10000,
-    "count": 1298,
-    "progressPct": 12.98,
+    "count": 1345,
+    "progressPct": 13.45,
     "modules": [
       {
         "module": 1,
@@ -291,8 +291,8 @@
         "title": "Pricing",
         "file": "02_Pricing.md",
         "target": 300,
-        "count": 63,
-        "progressPct": 21
+        "count": 86,
+        "progressPct": 28.67
       },
       {
         "module": 3,
@@ -300,8 +300,8 @@
         "title": "FAQ",
         "file": "03_FAQ.md",
         "target": 800,
-        "count": 38,
-        "progressPct": 4.75
+        "count": 42,
+        "progressPct": 5.25
       },
       {
         "module": 4,
@@ -377,12 +377,12 @@
     {
       "filename": "02_Pricing.md",
       "category": "pricing",
-      "count": 63
+      "count": 86
     },
     {
       "filename": "03_FAQ.md",
       "category": "faq",
-      "count": 38
+      "count": 42
     },
     {
       "filename": "04_Industries.md",
@@ -432,7 +432,7 @@
     {
       "filename": "13_Tutorials.md",
       "category": "tutorials",
-      "count": 44
+      "count": 59
     },
     {
       "filename": "14_Documentation.md",
@@ -482,7 +482,7 @@
     {
       "filename": "23_Billing.md",
       "category": "billing",
-      "count": 23
+      "count": 28
     },
     {
       "filename": "24_Blogs.md",
@@ -496,7 +496,7 @@
     }
   ],
   "target": 50000,
-  "progressPct": 2.6,
-  "entriesWithMetadata": 1298,
+  "progressPct": 2.69,
+  "entriesWithMetadata": 1345,
   "metadataCoveragePct": 100
 }

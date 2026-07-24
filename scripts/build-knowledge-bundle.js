@@ -108,6 +108,14 @@ export function getRelatedEntries(id, options = {}) {
 
 export function getPlatformKnowledgeSummary(options = {}) {
     const { query = "", maxChars = 4500, matchLimit = 6, audience = null } = options;
+    const detailedCategories = new Set(["pricing", "billing", "faq", "tutorials"]);
+    const answerLimit = (pair) => {
+        const sub = (pair.sub || "").toLowerCase();
+        if (detailedCategories.has(pair.cat) || sub.includes("trial") || sub.includes("setup") || sub.includes("getting started")) {
+            return 2000;
+        }
+        return 220;
+    };
     const lines = [
         "ZiricAI Knowledge Base (" + PLATFORM_KNOWLEDGE_STATS.questionCount + " Q&A, metadata " + PLATFORM_KNOWLEDGE_STATS.metadataCoveragePct + "%)",
         "",
@@ -123,7 +131,7 @@ export function getPlatformKnowledgeSummary(options = {}) {
                 const aud = m.aud?.length ? " [" + m.aud.join(", ") + "]" : "";
                 lines.push("• [" + (m.id || m.cat) + "] " + m.catTitle + " / " + m.sub + aud);
                 lines.push("  Q: " + m.q);
-                lines.push("  A: " + m.a.slice(0, 220) + (m.a.length > 220 ? "…" : ""));
+                lines.push("  A: " + m.a.slice(0, answerLimit(m)) + (m.a.length > answerLimit(m) ? "…" : ""));
                 if (m.style) lines.push("  Response style: " + m.style.slice(0, 180) + (m.style.length > 180 ? "…" : ""));
                 if (m.rel?.length) lines.push("  Related: " + m.rel.slice(0, 3).join(", "));
             }

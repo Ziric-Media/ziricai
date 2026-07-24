@@ -33,7 +33,12 @@ related: []
 ---
 
 ## Q: How much does ZiricAI cost?
-**A:** Trial free 14 days; Starter R999.99/month; Professional R2,999; Business R4,999; Enterprise custom.
+
+**A:** ZiricAI offers transparent pricing in South African Rand (ZAR), starting with a **14-day free trial** at no cost and no credit card required.
+
+Paid plans begin at **R999.99/month** (Starter), **R2,999/month** (Professional — most popular), **R4,999/month** (Business), and **Enterprise** with custom pricing. Every tier includes WhatsApp, web chat, CRM, analytics, Sarah, and Knowledge Base — what scales is capacity: AI employees, conversations, messages, team users, and automation limits.
+
+Most growing SMEs choose Professional for five AI employees and 5,000 monthly conversations. There are no hidden setup fees on standard plans, VAT may be added at checkout, and you can cancel monthly subscriptions anytime. See the Pricing section or ziricai.com/pricing for full plan comparison.
 
 ---
 id: KB-FAQ-0003
@@ -48,7 +53,12 @@ related: []
 ---
 
 ## Q: Is there a free trial?
-**A:** Yes — 14 days, full access, no credit card.
+
+**A:** Yes — ZiricAI includes a **14-day free trial** with full platform access and **no credit card required**.
+
+During trial you get one AI employee, WhatsApp and web channels, CRM, analytics, Sarah, Knowledge Base, and Automation Builder — the same features as paid plans with trial-scale limits (100 conversations, 500 messages). Click **Start Free Trial** on ziricai.com to begin; most businesses go live in under 10 minutes.
+
+At the end of 14 days, subscribe to continue or your workspace pauses with data retained. Upgrade anytime during trial to unlock higher limits immediately.
 
 ---
 id: KB-FAQ-0004
@@ -79,7 +89,10 @@ related: []
 ---
 
 ## Q: How long is setup?
-**A:** Under 10 minutes for most businesses.
+
+**A:** Standard ZiricAI setup takes **under 10 minutes** for most businesses — from signup to a live AI employee handling enquiries.
+
+The onboarding wizard guides you through workspace creation, industry pack selection, knowledge upload, and AI activation. Web chat works instantly. WhatsApp requires Meta Business verification (typically one to three business days), but you can test AI responses via web chat while waiting. Sarah provides step-by-step guidance throughout. No developers or IT staff needed.
 
 ---
 id: KB-FAQ-0006
@@ -437,7 +450,10 @@ related: []
 ---
 
 ## Q: After trial ends?
-**A:** Subscribe or workspace pauses — data retained briefly.
+
+**A:** When your 14-day free trial ends, you can **subscribe to a paid plan** or allow your workspace to **pause**.
+
+Subscribing to Starter (R999.99), Professional (R2,999), Business (R4,999), or Enterprise continues service uninterrupted — all CRM data, knowledge, and AI configurations carry over. Add a payment method in Billing before subscribing. If you do not subscribe, AI employees stop responding but your data is retained for a grace period so you can return without starting over. Email reminders are sent before and after expiry.
 
 ---
 id: KB-FAQ-0029
@@ -468,7 +484,10 @@ related: []
 ---
 
 ## Q: Get started now?
-**A:** Click Start Free Trial on ziricai.com — live in minutes.
+
+**A:** Start now by visiting **ziricai.com** and clicking **Start Free Trial** — no credit card required.
+
+Complete the onboarding wizard: enter your business details, choose an industry pack, upload your first FAQ document, and activate your AI employee. Connect WhatsApp or enable web chat to begin receiving customer messages. Sarah guides you through each step inside the Company Portal. Most businesses are live within 10 minutes and can handle real enquiries the same day.
 
 ---
 id: KB-FAQ-0031
@@ -624,3 +643,150 @@ related: []
 
 ## Q: How quickly does Sarah respond?
 **A:** Sarah replies in seconds inside the Company Portal using the same knowledge base as customer-facing AI employees.
+
+---
+id: KB-FAQ-0039
+category: FAQ
+sub_category: Pricing
+difficulty: Beginner
+keywords:
+  - payment methods
+  - payfast
+  - stripe
+  - card payment
+  - how to pay
+audience:
+  - Customer
+ai_response_style: "List card, PayFast, Stripe, and Enterprise EFT options."
+last_updated: 2026-07-24
+related:
+  - KB-PRICING-0074
+  - KB-FAQ-0025
+  - KB-BILL-0011
+---
+
+## Q: How do I pay for ZiricAI?
+
+**A:** ZiricAI accepts **credit/debit card** payments in ZAR through the Company Portal for monthly subscriptions. South African customers can also pay via **PayFast** (card, EFT, instant EFT). International customers may use **Stripe** where supported. Enterprise accounts typically use **EFT or invoice billing** on annual contracts.
+
+Add or update your payment method under Billing → Payment Method. ZiricAI never stores full card numbers — payments are processed by PCI-compliant providers. VAT is calculated at checkout for applicable South African businesses.
+
+---
+id: KB-FAQ-0040
+category: FAQ
+sub_category: Setup
+difficulty: Beginner
+keywords:
+  - onboarding wizard
+  - setup guide
+  - guided setup
+audience:
+  - Customer
+  - Prospects
+ai_response_style: "Describe the 7-step onboarding wizard briefly."
+last_updated: 2026-07-24
+related:
+  - KB-TUT-0048
+  - KB-TUT-0047
+---
+
+## Q: What is the ZiricAI onboarding wizard?
+
+**A:** The onboarding wizard is a guided setup flow that takes you from signup to a live AI employee in minutes — no technical skills required.
+
+It covers seven steps: account creation, industry pack selection, WhatsApp connection (skippable initially), knowledge upload, AI training, test conversation, and go-live activation. Progress saves at each step so you can pause and return. Sarah provides contextual help throughout. The wizard is free on trial and all paid plans.
+
+---
+id: KB-FAQ-0041
+category: FAQ
+sub_category: Trial
+difficulty: Beginner
+keywords:
+  - credit card trial
+  - card required
+  - no card
+audience:
+  - Customer
+  - Prospects
+ai_response_style: "Emphasize no credit card for trial."
+last_updated: 2026-07-24
+related:
+  - KB-PRICING-0078
+  - KB-BILL-0014
+---
+
+## Q: Do I need a credit card to start the free trial?
+
+**A:** **No** — the ZiricAI 14-day free trial requires no credit card. Sign up with your business email, complete onboarding, and start using the platform immediately. Payment details are only needed when you choose to subscribe to a paid plan after trial.
+
+---
+id: KB-FAQ-0042
+category: FAQ
+sub_category: Trial
+difficulty: Beginner
+keywords:
+  - trial vs paid
+  - trial difference
+  - trial limits
+audience:
+  - Customer
+  - Prospects
+ai_response_style: "Same features, different capacity limits."
+last_updated: 2026-07-24
+related:
+  - KB-PRICING-0083
+  - KB-PRICING-0079
+---
+
+## Q: What's different between the free trial and paid plans?
+
+**A:** The free trial includes the **same platform features** as paid plans — WhatsApp, CRM, analytics, Sarah, Knowledge Base, and automations. The difference is **capacity**: trial gives one AI employee, 100 conversations, and one user; Starter (R999.99) gives 1,500 conversations and two users; Professional (R2,999) gives five AI employees and 5,000 conversations. No core feature is locked behind a paywall.
+
+---
+id: KB-FAQ-0043
+category: FAQ
+sub_category: Pricing
+difficulty: Beginner
+keywords:
+  - hidden fees
+  - extra costs
+  - setup fee
+audience:
+  - Customer
+  - Prospects
+ai_response_style: "No hidden fees. Mention VAT and Meta WhatsApp costs separately."
+last_updated: 2026-07-24
+related:
+  - KB-PRICING-0084
+  - KB-BILL-0012
+---
+
+## Q: Are there hidden fees with ZiricAI?
+
+**A:** No hidden fees on Trial through Business plans. Your subscription covers the platform — no setup fee, no surprise per-seat charges beyond your plan cap, and no lock-in on monthly billing. VAT may be added at checkout. Meta WhatsApp API messaging fees are billed separately by Meta, not ZiricAI.
+
+---
+id: KB-FAQ-0044
+category: FAQ
+sub_category: Pricing
+difficulty: Beginner
+keywords:
+  - ROI
+  - worth it
+  - value
+  - vs staff
+  - save money
+audience:
+  - Customer
+  - Sales
+  - Prospects
+ai_response_style: "Compare to hiring cost. Use Central Motors 42% stat."
+last_updated: 2026-07-24
+related:
+  - KB-PRICING-0087
+  - KB-FAQ-0012
+---
+
+## Q: Is ZiricAI good value for money?
+
+**A:** Yes — for most SMEs, ZiricAI costs far less than hiring additional staff while providing 24/7 coverage. Professional at R2,999/month gives five AI employees versus R8,000–R15,000/month for one junior employee who only works business hours. Central Motors saw a 42% increase in after-hours lead conversion. Most businesses recover the subscription from the first after-hours lead.

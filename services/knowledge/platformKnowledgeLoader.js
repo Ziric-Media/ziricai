@@ -78,7 +78,7 @@ export const CATEGORY_ALIASES = {
     "about-ziricai": "about-ziricai",
 };
 
-const ENTRY_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n\r?\n## Q:\s*(.+?)\r?\n(?:\r?\n)?\*\*A:\*\*\s*([\s\S]*?)(?=^---\r?\n|^## Q:|$)/gm;
+const ENTRY_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n\r?\n## Q:\s*(.+?)\r?\n(?:\r?\n)?\*\*A:\*\*\s*([\s\S]*?)(?=^---\r?\n|^## Q:|$(?![\r\n]))/gm;
 const LEGACY_QA_RE = /^## Q:\s*(.+?)\r?\n(?:\r?\n)?\*\*A:\*\*\s*([\s\S]*?)(?=^## Q:|$)/gm;
 
 let _cache = null;
@@ -490,6 +490,14 @@ export function getPlatformKnowledgeSummary(options = {}) {
     const { query = "", maxChars = 4500, matchLimit = 6, audience = null } = options;
     const stats = getKnowledgeStats();
     const data = loadAllKnowledgeFiles();
+    const detailedCategories = new Set(["pricing", "billing", "faq", "tutorials"]);
+    const answerLimit = (entry) => {
+        const sub = (entry.subCategory || "").toLowerCase();
+        if (detailedCategories.has(entry.category) || sub.includes("trial") || sub.includes("setup") || sub.includes("getting started")) {
+            return 2000;
+        }
+        return 220;
+    };
 
     const lines = [
         `ZiricAI Knowledge Base v1.0 (${stats.questionCount} Q&A across ${stats.categoryCount} categories; v1.0 target ${stats.v1?.target?.toLocaleString() || "10,000"}+)`,
@@ -511,7 +519,7 @@ export function getPlatformKnowledgeSummary(options = {}) {
                 const aud = m.audience?.length ? ` [${m.audience.join(", ")}]` : "";
                 lines.push(`• [${m.id || m.category}] ${m.categoryTitle} / ${m.subCategory}${aud}`);
                 lines.push(`  Q: ${m.question}`);
-                lines.push(`  A: ${m.answer.slice(0, 220)}${m.answer.length > 220 ? "…" : ""}`);
+                lines.push(`  A: ${m.answer.slice(0, answerLimit(m))}${m.answer.length > answerLimit(m) ? "…" : ""}`);
                 if (m.aiResponseStyle) {
                     lines.push(`  Response style: ${m.aiResponseStyle.slice(0, 180)}${m.aiResponseStyle.length > 180 ? "…" : ""}`);
                 }
