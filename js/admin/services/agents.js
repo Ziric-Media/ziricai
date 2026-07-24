@@ -173,9 +173,9 @@ export async function deleteAgent(id) {
   if (!result.error) return result;
 
   // TEMP: demo fallback
-  const items = loadDemoStore().filter((a) => a.id !== id);
-  if (items.length === loadDemoStore().length) return { error: 'Employee not found' };
-  saveDemoStore(items);
+  const next = items.filter((a) => a.id !== id);
+  if (next.length === items.length) return { error: 'Employee not found' };
+  saveDemoStore(next);
   return { success: true, isDemo: true };
 }
 
