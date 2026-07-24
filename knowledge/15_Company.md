@@ -19,6 +19,51 @@ related: []
 **A:** A South African technology company building AI Business Operating Systems for SMEs.
 
 ---
+id: KB-CO-0001A
+category: Company
+sub_category: About Us
+difficulty: Beginner
+keywords:
+  - made
+  - created
+  - developed
+  - Ziric Media
+  - founders
+audience:
+  - Customer
+  - Sales
+last_updated: 2026-07-24
+related:
+  - KB-ABOUT-0015
+  - KB-ABOUT-0015A
+---
+
+## Q: Who made ZiricAI?
+**A:** ZiricAI was made by Ziric Media, a South African technology company. Ziric Media builds AI Business Operating Systems that help SMEs automate customer service, sales, and operations—especially on WhatsApp—with POPIA-aware data handling and local ZAR pricing.
+
+---
+id: KB-CO-0001B
+category: Company
+sub_category: About Us
+difficulty: Beginner
+keywords:
+  - created
+  - developed
+  - Ziric Media
+  - founded
+audience:
+  - Customer
+  - Sales
+last_updated: 2026-07-24
+related:
+  - KB-ABOUT-0015
+  - KB-ABOUT-0015B
+---
+
+## Q: Who created ZiricAI?
+**A:** Ziric Media created ZiricAI. The company combines AI engineering, business automation, and customer experience design to deliver a unified platform for AI employees, CRM, workflows, and industry-specific intelligence.
+
+---
 id: KB-CO-0002
 category: Company
 sub_category: About Us
@@ -359,6 +404,11 @@ category: Company
 sub_category: Success Stories
 difficulty: Beginner
 keywords:
+  - Thabo Mokoena
+  - Central Motors
+  - testimonial
+  - dealership
+  - automotive customer
 audience:
   - Customer
   - Sales

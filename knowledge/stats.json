@@ -1,6 +1,6 @@
 {
   "fileCount": 25,
-  "questionCount": 1345,
+  "questionCount": 1348,
   "categoryCount": 25,
   "categories": [
     {
@@ -9,8 +9,8 @@
       "file": "01_About_ZiricAI.md",
       "phase": 1,
       "phaseTarget": 300,
-      "count": 66,
-      "progressPct": 22
+      "count": 69,
+      "progressPct": 23
     },
     {
       "id": "pricing",
@@ -235,8 +235,8 @@
       "name": "Core",
       "description": "About, FAQ, Pricing, AI Employees, Features, Company",
       "target": 2000,
-      "count": 381,
-      "progressPct": 19.05
+      "count": 384,
+      "progressPct": 19.2
     },
     {
       "phase": 2,
@@ -273,8 +273,8 @@
   ],
   "v1": {
     "target": 10000,
-    "count": 1345,
-    "progressPct": 13.45,
+    "count": 1348,
+    "progressPct": 13.48,
     "modules": [
       {
         "module": 1,
@@ -282,8 +282,8 @@
         "title": "About ZiricAI",
         "file": "01_About_ZiricAI.md",
         "target": 300,
-        "count": 66,
-        "progressPct": 22
+        "count": 69,
+        "progressPct": 23
       },
       {
         "module": 2,
@@ -372,7 +372,7 @@
     {
       "filename": "01_About_ZiricAI.md",
       "category": "about-ziricai",
-      "count": 66
+      "count": 69
     },
     {
       "filename": "02_Pricing.md",
@@ -496,7 +496,7 @@
     }
   ],
   "target": 50000,
-  "progressPct": 2.69,
-  "entriesWithMetadata": 1345,
+  "progressPct": 2.7,
+  "entriesWithMetadata": 1348,
   "metadataCoveragePct": 100
 }

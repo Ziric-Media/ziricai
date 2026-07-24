@@ -317,13 +317,52 @@ export function loadAllKnowledgeFiles(options = {}) {
 export function normalizeQuestionText(text) {
     return String(text || "")
         .toLowerCase()
-        .replace(/[^\w\s?]/g, " ")
+        .replace(/[^\w\s]/g, " ")
         .replace(/\s+/g, " ")
         .trim();
 }
 
 function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const CREATOR_VERBS = new Set(["made", "create", "created", "develop", "developed", "found", "founded", "build", "built"]);
+const SUCCESS_STORY_SUBCATEGORIES = new Set(["success stories", "case studies", "testimonials", "customer stories"]);
+const ABOUT_CATEGORIES = new Set(["about-ziricai", "company"]);
+const ABOUT_SUBCATEGORIES = new Set(["about us", "introduction", "company background", "founders"]);
+
+function tokenizeQuery(normalizedQuery) {
+    return normalizedQuery.split(" ").filter((w) => w.length > 2);
+}
+
+function isCreatorOriginQuestion(normalizedQuery) {
+    if (!/\bwho\b/.test(normalizedQuery)) return false;
+    const mentionsZiric = normalizedQuery.includes("ziricai") || normalizedQuery.includes("ziric media");
+    const hasCreatorVerb = [...CREATOR_VERBS].some((verb) => normalizedQuery.includes(verb));
+    const asksWhoIsBehind = normalizedQuery.includes("behind");
+    return mentionsZiric && (hasCreatorVerb || asksWhoIsBehind);
+}
+
+function creatorVerbMatchesQuery(queryWords, qNorm) {
+    const queryVerbs = queryWords.filter((w) => CREATOR_VERBS.has(w));
+    if (!queryVerbs.length) return false;
+    for (const verb of queryVerbs) {
+        if (new RegExp(`\\b${escapeRegExp(verb)}\\b`).test(qNorm)) return true;
+    }
+    for (const verb of queryVerbs) {
+        for (const synonym of CREATOR_VERBS) {
+            if (new RegExp(`\\b${escapeRegExp(synonym)}\\b`).test(qNorm)) return true;
+        }
+    }
+    return false;
+}
+
+function keywordMatchesWord(word, kwNorm) {
+    if (kwNorm === word) return true;
+    if (word.length >= 4 && kwNorm.length >= 4) {
+        if (kwNorm.includes(word) || word.includes(kwNorm)) return true;
+    }
+    return false;
 }
 
 export function scoreKnowledgeMatch(normalizedQuery, pair, options = {}) {
@@ -336,19 +375,42 @@ export function scoreKnowledgeMatch(normalizedQuery, pair, options = {}) {
     if (qNorm === normalizedQuery) score += 200;
     else if (qNorm.includes(normalizedQuery) || normalizedQuery.includes(qNorm)) score += 80;
 
-    const queryWords = normalizedQuery.split(" ").filter((w) => w.length > 2);
+    const queryWords = tokenizeQuery(normalizedQuery);
+    let questionWordHits = 0;
+
     for (const word of queryWords) {
         const re = new RegExp(`\\b${escapeRegExp(word)}\\b`);
-        if (re.test(qNorm)) score += 18;
+        if (re.test(qNorm)) {
+            score += 18;
+            questionWordHits += 1;
+        }
         if (re.test(aNorm)) score += 6;
         for (const kw of pair.keywords || []) {
             const kwNorm = normalizeQuestionText(kw);
-            if (kwNorm === word || kwNorm.includes(word) || word.includes(kwNorm)) score += 8;
+            if (keywordMatchesWord(word, kwNorm)) score += 8;
         }
     }
 
+    if (normalizedQuery.includes("ziricai") && (qNorm.includes("ziricai") || aNorm.includes("ziricai"))) score += 24;
+    if (creatorVerbMatchesQuery(queryWords, qNorm)) score += 20;
+
+    const creatorQuestion = isCreatorOriginQuestion(normalizedQuery);
+    const subNorm = normalizeQuestionText(pair.subCategory || "");
+    const isSuccessStory = SUCCESS_STORY_SUBCATEGORIES.has(subNorm);
+    const isAboutEntry = ABOUT_CATEGORIES.has(pair.category)
+        && (ABOUT_SUBCATEGORIES.has(subNorm) || pair.category === "about-ziricai");
+
+    if (creatorQuestion) {
+        if (isAboutEntry) score += 35;
+        if (isSuccessStory) score -= 50;
+        if ((pair.answer || "").length < 180 && isSuccessStory) score -= 25;
+        const hasZiricSignal = qNorm.includes("ziricai") || aNorm.includes("ziricai") || aNorm.includes("ziric media");
+        if (!hasZiricSignal) score -= 30;
+        if (questionWordHits < 2 && !qNorm.includes("ziricai")) score -= 20;
+    }
+
     if (pair.category && normalizedQuery.includes(pair.category.replace(/-/g, " "))) score += 12;
-    if (pair.subCategory && normalizedQuery.includes(normalizeQuestionText(pair.subCategory))) score += 10;
+    if (pair.subCategory && normalizedQuery.includes(subNorm)) score += 10;
 
     if (audience && pair.audience?.some((a) => a.toLowerCase() === audience.toLowerCase())) score += 15;
     if (subCategory && pair.subCategory?.toLowerCase() === subCategory.toLowerCase()) score += 20;

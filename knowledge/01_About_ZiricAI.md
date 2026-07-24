@@ -489,6 +489,100 @@ The product team combines experience in software engineering, customer experienc
 Rather than adapting generic international chatbot tools, ZiricAI was designed from the ground up as an AI Business Operating System with multi-channel routing, CRM, automation, and industry-specific intelligence built in.
 
 ---
+id: KB-ABOUT-0015A
+category: About ZiricAI
+sub_category: Introduction
+difficulty: Beginner
+keywords:
+  - made
+  - created
+  - Ziric Media
+  - founders
+  - who made
+  - who created
+audience:
+  - General
+  - Prospects
+  - Customers
+  - Partners
+  - Sales
+last_updated: 2026-07-24
+related:
+  - KB-ABOUT-0015
+  - KB-ABOUT-0034
+---
+
+## Q: Who made ZiricAI?
+
+**A:** ZiricAI was made by Ziric Media, a South African technology company that builds AI Business Operating Systems for SMEs and growing organizations.
+
+Ziric Media created ZiricAI to give businesses a unified platform for AI employees, CRM, automation, WhatsApp messaging, and industry-specific intelligence—rather than stitching together separate chatbot and automation tools.
+
+The company's vision is to make enterprise-grade AI accessible to local businesses with POPIA-aware design, ZAR pricing, and deep WhatsApp integration.
+
+---
+id: KB-ABOUT-0015B
+category: About ZiricAI
+sub_category: Introduction
+difficulty: Beginner
+keywords:
+  - created
+  - made
+  - Ziric Media
+  - founded
+  - who created
+audience:
+  - General
+  - Prospects
+  - Customers
+  - Partners
+  - Sales
+last_updated: 2026-07-24
+related:
+  - KB-ABOUT-0015
+  - KB-ABOUT-0015A
+---
+
+## Q: Who created ZiricAI?
+
+**A:** ZiricAI was created by Ziric Media.
+
+Ziric Media is a South African digital technology company focused on AI, business automation, and customer experience platforms. The team built ZiricAI as an AI Business Operating System (AI BOS)—a single platform where specialized AI employees handle sales, support, marketing, and operations using your company's knowledge base.
+
+If you want background on the company behind the product, Ziric Media combines software engineering, UX design, and hands-on SME consulting experience.
+
+---
+id: KB-ABOUT-0015C
+category: About ZiricAI
+sub_category: Introduction
+difficulty: Beginner
+keywords:
+  - behind
+  - Ziric Media
+  - company
+  - founders
+audience:
+  - General
+  - Prospects
+  - Customers
+  - Partners
+  - Sales
+last_updated: 2026-07-24
+related:
+  - KB-ABOUT-0015
+  - KB-ABOUT-0015A
+  - KB-ABOUT-0034
+---
+
+## Q: Who is behind ZiricAI?
+
+**A:** ZiricAI comes from Ziric Media—a South African technology company that develops AI platforms for business automation.
+
+Ziric Media's team designed ZiricAI to solve a practical problem: SMEs lose leads after hours, juggle too many disconnected tools, and need POPIA-compliant AI that works on WhatsApp. The platform reflects that focus—multi-channel AI employees, built-in CRM, workflow automation, and industry packs in one place.
+
+For company background, leadership bios, and partnership enquiries, visit the About section on ziricai.com or email hello@ziricai.com.
+
+---
 id: KB-ABOUT-0016
 category: About ZiricAI
 sub_category: Introduction
