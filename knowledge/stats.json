@@ -1,31 +1,31 @@
 {
   "fileCount": 31,
-  "questionCount": 841,
+  "questionCount": 1366,
   "categoryCount": 31,
   "categories": [
     {
       "id": "about",
       "title": "About",
       "file": "01-about.md",
-      "count": 55
+      "count": 80
     },
     {
       "id": "ai-employees",
       "title": "AI Employees",
       "file": "02-ai-employees.md",
-      "count": 55
+      "count": 121
     },
     {
       "id": "features",
       "title": "Features",
       "file": "03-features.md",
-      "count": 25
+      "count": 81
     },
     {
       "id": "industries",
       "title": "Industries",
       "file": "04-industries.md",
-      "count": 55
+      "count": 238
     },
     {
       "id": "pricing",
@@ -43,13 +43,13 @@
       "id": "automation",
       "title": "Automation",
       "file": "07-automation.md",
-      "count": 23
+      "count": 50
     },
     {
       "id": "crm",
       "title": "CRM",
       "file": "08-crm.md",
-      "count": 23
+      "count": 50
     },
     {
       "id": "analytics",
@@ -61,7 +61,7 @@
       "id": "whatsapp",
       "title": "WhatsApp",
       "file": "10-whatsapp.md",
-      "count": 25
+      "count": 60
     },
     {
       "id": "integrations",
@@ -109,19 +109,19 @@
       "id": "sales",
       "title": "Sales",
       "file": "18-sales.md",
-      "count": 25
+      "count": 60
     },
     {
       "id": "objections",
       "title": "Objection Handling",
       "file": "19-objections.md",
-      "count": 55
+      "count": 102
     },
     {
       "id": "comparisons",
       "title": "Competitive Comparison",
       "file": "20-comparisons.md",
-      "count": 25
+      "count": 50
     },
     {
       "id": "billing",
@@ -157,7 +157,7 @@
       "id": "glossary",
       "title": "Glossary",
       "file": "26-glossary.md",
-      "count": 23
+      "count": 22
     },
     {
       "id": "internal-policies",
@@ -194,22 +194,22 @@
     {
       "filename": "01-about.md",
       "category": "about",
-      "count": 55
+      "count": 80
     },
     {
       "filename": "02-ai-employees.md",
       "category": "ai-employees",
-      "count": 55
+      "count": 121
     },
     {
       "filename": "03-features.md",
       "category": "features",
-      "count": 25
+      "count": 81
     },
     {
       "filename": "04-industries.md",
       "category": "industries",
-      "count": 55
+      "count": 238
     },
     {
       "filename": "05-pricing.md",
@@ -224,12 +224,12 @@
     {
       "filename": "07-automation.md",
       "category": "automation",
-      "count": 23
+      "count": 50
     },
     {
       "filename": "08-crm.md",
       "category": "crm",
-      "count": 23
+      "count": 50
     },
     {
       "filename": "09-analytics.md",
@@ -239,7 +239,7 @@
     {
       "filename": "10-whatsapp.md",
       "category": "whatsapp",
-      "count": 25
+      "count": 60
     },
     {
       "filename": "11-integrations.md",
@@ -279,17 +279,17 @@
     {
       "filename": "18-sales.md",
       "category": "sales",
-      "count": 25
+      "count": 60
     },
     {
       "filename": "19-objections.md",
       "category": "objections",
-      "count": 55
+      "count": 102
     },
     {
       "filename": "20-comparisons.md",
       "category": "comparisons",
-      "count": 25
+      "count": 50
     },
     {
       "filename": "21-billing.md",
@@ -319,7 +319,7 @@
     {
       "filename": "26-glossary.md",
       "category": "glossary",
-      "count": 23
+      "count": 22
     },
     {
       "filename": "27-internal-policies.md",
@@ -348,5 +348,5 @@
     }
   ],
   "target": 15000,
-  "progressPct": 5.61
+  "progressPct": 9.11
 }

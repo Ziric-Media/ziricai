@@ -165,3 +165,81 @@
 
 ## Q: How does it improve conversion?
 **A:** Instant replies keep prospects engaged; Central Motors saw 42% higher after-hours conversion.
+
+## Q: What is a Business Operating System?
+**A:** A BOS connects customer channels, AI employees, knowledge, CRM, automation, and analytics as one operational layer — not disconnected tools.
+
+## Q: Is ZiricAI only for South Africa?
+**A:** Built for SA SMEs first with ZAR pricing and POPIA tooling, but any business using WhatsApp and web chat can benefit.
+
+## Q: Can ZiricAI work with my existing website?
+**A:** Embed web chat or add Click-to-WhatsApp buttons — no website rebuild required.
+
+## Q: Does ZiricAI support franchises?
+**A:** Each location can run separate numbers, knowledge, and AI employees while HQ views consolidated analytics on Business plans.
+
+## Q: What is the difference between Sarah and AI employees?
+**A:** Sarah helps you operate the platform inside the Company Portal; AI employees serve your customers on WhatsApp and social channels.
+
+## Q: Can ZiricAI integrate with my accounting software?
+**A:** Webhook and API automations push CRM and payment events to Xero, Sage, or custom accounting systems.
+
+## Q: Does ZiricAI support voice calls?
+**A:** Primary focus is text channels — WhatsApp, web, social, email, and SMS. Voice is on the long-term roadmap.
+
+## Q: How does ZiricAI handle load shedding?
+**A:** Cloud-hosted AI stays online when customers have connectivity; your team needs internet to use the portal.
+
+## Q: Can I white-label ZiricAI for clients?
+**A:** Enterprise partners can discuss white-label arrangements for agencies and franchise networks.
+
+## Q: What happens after my trial ends?
+**A:** Subscribe to Starter, Professional, or Business, or your workspace pauses — export data before closure if needed.
+
+## Q: Is ZiricAI suitable for solopreneurs?
+**A:** Starter at R999.99/month with one AI employee is designed for owner-operators who cannot answer WhatsApp at night.
+
+## Q: Can ZiricAI help with lead generation?
+**A:** Instant replies on WhatsApp and web chat capture enquiries that would otherwise go unanswered after hours.
+
+## Q: Does ZiricAI replace my website?
+**A:** No — it brings your website FAQ content to WhatsApp and chat where customers actually message.
+
+## Q: What is tenant isolation?
+**A:** Each company workspace has separate data, users, and knowledge — no cross-tenant access.
+
+## Q: Can ZiricAI send SMS?
+**A:** SMS integration supports outbound notifications and two-way messaging where your provider allows.
+
+## Q: Does ZiricAI work on mobile browsers?
+**A:** The responsive Company Portal works on phones and tablets for agents managing the inbox on the go.
+
+## Q: How often is the platform updated?
+**A:** Biweekly improvements plus quarterly feature releases — all included in your subscription.
+
+## Q: Can I use ZiricAI for internal HR questions?
+**A:** Install the HR AI pack for leave policies, onboarding FAQs, and payroll questions from staff.
+
+## Q: What is the Central Motors case study?
+**A:** A Gauteng dealership achieved 42% higher after-hours lead conversion using Automotive Sales AI on WhatsApp.
+
+## Q: Does ZiricAI support Telegram?
+**A:** Yes — connect a Telegram bot and route threads to the same unified inbox as WhatsApp.
+
+## Q: Can ZiricAI help with collections?
+**A:** Collections AI pack handles outstanding balance FAQs, payment plan info, and routes disputes to finance staff.
+
+## Q: Is there a partner programme?
+**A:** Agencies and integrators can manage multiple client tenants — contact partners@ziricai.com.
+
+## Q: What browsers work best?
+**A:** Latest Chrome, Edge, Firefox, and Safari on desktop and mobile for the Company Portal.
+
+## Q: Can ZiricAI handle peak season traffic?
+**A:** Cloud scaling handles registration week, Black Friday, or holiday rushes — upgrade plan before peak if needed.
+
+## Q: How does ZiricAI compare to hiring a receptionist?
+**A:** Starter costs less than a part-time salary and covers 24/7 including weekends and public holidays.
+
+## Q: Does ZiricAI require Meta Business verification?
+**A:** WhatsApp Business API requires Meta Business verification — Sarah guides you through the steps.

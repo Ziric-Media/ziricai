@@ -165,3 +165,201 @@
 
 ## Q: How do AI Employees help Central Motors?
 **A:** Central Motors uses Sales AI for vehicle enquiries 24/7, improving after-hours lead conversion by 42%.
+
+## Q: Can I create a custom AI employee role?
+**A:** Beyond Reception, Sales, and Support, name roles like Admissions AI or Booking AI and link sector-specific knowledge.
+
+## Q: How do AI employees use the Knowledge Base?
+**A:** RAG retrieval searches your uploaded documents first, then composes answers grounded in your approved content.
+
+## Q: Can one AI employee handle multiple languages?
+**A:** Yes — upload parallel FAQ documents per language and configure multilingual greetings.
+
+## Q: What happens when an AI employee hits message limits?
+**A:** Portal warnings appear at 80% usage; upgrade plan or wait for next billing cycle reset.
+
+## Q: Can AI employees send payment links?
+**A:** Sales workflows integrate Stripe or Paystack to share payment links for deposits or membership fees.
+
+## Q: How do I assign channels to an AI employee?
+**A:** Settings → AI Employees → select employee → assign WhatsApp, web chat, Facebook, Instagram, or email.
+
+## Q: Can AI employees detect angry customers?
+**A:** Sentiment analysis flags negative tone and can trigger human escalation automations automatically.
+
+## Q: Do AI employees work on public holidays?
+**A:** Yes — 24/7 coverage including Christmas, Easter, and SA public holidays when your office is closed.
+
+## Q: Can I set different greetings per channel?
+**A:** Configure channel-specific welcome messages — formal on email, friendly on WhatsApp.
+
+## Q: How do AI employees handle competitor questions?
+**A:** Scope rules keep answers on your business; AI declines to compare competitors unless you add comparison docs.
+
+## Q: Can AI employees collect survey feedback?
+**A:** Post-conversation automations can send satisfaction prompts or collect NPS via approved templates.
+
+## Q: What is Admissions AI?
+**A:** School pack role answering fee queries, application steps, and term calendar questions for parents on WhatsApp.
+
+## Q: What is Booking AI?
+**A:** Appointment-focused role from the Appointment AI pack — slots, confirmations, and rescheduling across industries.
+
+## Q: What is Intake AI?
+**A:** Legal and healthcare intake role collecting matter details, urgency, and contact info before human review.
+
+## Q: Can AI employees reference order numbers?
+**A:** Support AI can ask for order or reference numbers per your scripts before sharing account-specific info.
+
+## Q: How do I measure AI employee ROI?
+**A:** Analytics shows leads captured, appointments booked, and after-hours conversions attributable to each employee.
+
+## Q: Can AI employees run on Instagram only?
+**A:** Assign Instagram DMs exclusively to one employee while WhatsApp routes to another.
+
+## Q: Do AI employees support quick replies?
+**A:** Configure canned responses and WhatsApp quick replies for common follow-up messages.
+
+## Q: Can I limit AI to business hours only?
+**A:** Set after-hours mode to collect details and promise next-day callback instead of full AI replies.
+
+## Q: How do AI employees handle profanity?
+**A:** Escalation rules can notify managers and pause AI when abusive language is detected.
+
+## Q: Can AI employees share location pins?
+**A:** Send approved address links and directions from knowledge on WhatsApp and web chat.
+
+## Q: What is Collections AI?
+**A:** Finance pack role handling invoice queries, payment plan FAQs, and routing disputes to accounts staff.
+
+## Q: What is HR AI?
+**A:** Internal-facing role answering leave, payroll, and onboarding questions from employees via configured channels.
+
+## Q: What is Recruitment AI?
+**A:** Captures applications, shares open roles, and schedules interviews from careers page and WhatsApp enquiries.
+
+## Q: Can AI employees hand off to specific agents?
+**A:** Automation rules assign escalated threads to named team members or round-robin queues.
+
+## Q: How do AI employees handle long conversations?
+**A:** Context is maintained within the session; CRM timeline preserves full history for returning customers.
+
+## Q: Can I disable AI for VIP customers?
+**A:** Tag VIP contacts in CRM and automation pauses AI so only human agents reply.
+
+## Q: Do AI employees support rich WhatsApp messages?
+**A:** Send text, approved images, PDFs, and links — catalogs and carousels where Meta allows.
+
+## Q: How do AI employees learn new products?
+**A:** Upload new product sheets to Knowledge Base — no retraining or coding; answers update immediately.
+
+## Q: Can AI employees confirm appointments?
+**A:** Calendar integration sends confirmation messages and reminder automations before scheduled slots.
+
+## Q: What is Security AI?
+**A:** Security pack role for access control FAQs, incident reporting intake, and patrol schedule questions.
+
+## Q: Can AI employees handle warranty claims?
+**A:** Support AI follows warranty policy documents and creates CRM tasks for claims requiring human approval.
+
+## Q: How do AI employees differ from ChatGPT?
+**A:** AI employees are grounded in your Knowledge Base with CRM, channels, and automations — not general web knowledge.
+
+## Q: Can I run Reception and Sales as separate employees?
+**A:** Professional plan includes 5 employees — split roles so each has focused knowledge and tone.
+
+## Q: Do AI employees log unanswered questions?
+**A:** Knowledge gap suggestions appear in portal when AI cannot find answers — add docs to improve coverage.
+
+## Q: Can AI employees send follow-up messages?
+**A:** Automation wait steps trigger follow-ups 24 or 48 hours after no customer reply.
+
+## Q: How do AI employees handle multiple products?
+**A:** Organize knowledge by product line and link relevant docs to the assigned AI employee.
+
+## Q: Can AI employees qualify budget?
+**A:** Sales scripts collect budget range, timeline, and decision-maker into CRM fields automatically.
+
+## Q: What happens if I delete an AI employee?
+**A:** Configuration is removed but conversation history remains in CRM for compliance.
+
+## Q: Can AI employees share video links?
+**A:** Send YouTube or hosted video URLs from knowledge for product demos or tutorials.
+
+## Q: How do AI employees handle repeat customers?
+**A:** CRM recognizes returning WhatsApp numbers and continues the existing timeline with context.
+
+## Q: Can AI employees operate in Afrikaans?
+**A:** Upload Afrikaans knowledge documents and configure bilingual greetings for SA customers.
+
+## Q: Do AI employees support appointment reminders?
+**A:** Automation sends WhatsApp template reminders 24 hours before booked calendar slots.
+
+## Q: Can AI employees collect signatures?
+**A:** Route customers to approved e-sign links; AI explains the process from knowledge docs.
+
+## Q: How do AI employees handle stock checks?
+**A:** Retail knowledge documents define in-stock rules; AI cites uploaded inventory policies accurately.
+
+## Q: Can AI employees run A/B greeting tests?
+**A:** Duplicate employees with different greetings and compare conversion in analytics.
+
+## Q: What is Estate Agent AI?
+**A:** Real estate pack role qualifying buyers, sharing listings, and booking property viewings from WhatsApp leads.
+
+## Q: Can AI employees integrate with Google Sheets?
+**A:** Webhook automations push lead data to Google Sheets or any endpoint accepting JSON.
+
+## Q: How do AI employees handle emergencies?
+**A:** Configure emergency keywords to bypass AI and notify on-call staff immediately via SMS or email.
+
+## Q: Can AI employees suggest alternatives?
+**A:** Sales AI recommends alternate products from approved upsell scripts in your catalogue knowledge.
+
+## Q: Do AI employees work with Facebook ads?
+**A:** Click-to-Messenger ads route to assigned AI employees with ad-specific greeting context.
+
+## Q: Can I preview AI employee responses?
+**A:** Sandbox mode in portal lets you test questions against Knowledge Base before going live.
+
+## Q: How do AI employees handle GDPR erasure?
+**A:** When a contact is deleted from CRM, associated AI conversation context is removed per retention policy.
+
+## Q: Can AI employees handle event registration?
+**A:** Church and school packs capture RSVP details and add registrants to CRM segments.
+
+## Q: What limits apply on Starter for AI employees?
+**A:** Starter includes 1 AI employee, 1,000 messages, and 100,000 tokens monthly.
+
+## Q: What limits apply on Professional for AI employees?
+**A:** Professional includes 5 AI employees, 3,000 messages, and 250,000 tokens monthly.
+
+## Q: Can AI employees send invoice PDFs?
+**A:** Share approved invoice templates or payment links from knowledge — not generate amounts without docs.
+
+## Q: How do AI employees support onboarding new staff?
+**A:** HR AI answers policy questions so managers spend less time on repetitive internal FAQs.
+
+## Q: Can AI employees handle franchise enquiries?
+**A:** Franchise FAQ knowledge with location routing automations directs leads to correct branch CRM.
+
+## Q: Do AI employees support Instagram story replies?
+**A:** Instagram DMs including story replies route to unified inbox when Meta account is connected.
+
+## Q: Can AI employees collect deposit payments?
+**A:** Stripe or Paystack payment links in Sales workflows collect deposits for bookings or orders.
+
+## Q: How do AI employees handle public holidays messaging?
+**A:** Configure holiday auto-replies explaining reduced human availability while AI continues answering FAQs.
+
+## Q: Can AI employees reference case studies?
+**A:** Upload success stories to knowledge — Sales AI cites them when prospects ask for proof.
+
+## Q: What is Clinic AI?
+**A:** Healthcare pack role for appointment booking, facility hours, and patient info — never medical diagnosis.
+
+## Q: Can AI employees handle loyalty programme questions?
+**A:** Retail knowledge documents explain points, tiers, and redemption rules accurately.
+
+## Q: How do AI employees support multi-branch businesses?
+**A:** Separate employees or location-tagged knowledge keeps branch-specific answers accurate.

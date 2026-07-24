@@ -6,6 +6,18 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+    ABOUT_EXPANSION,
+    AI_EMPLOYEES_EXPANSION,
+    FEATURES_EXPANSION,
+    INDUSTRIES_EXPANSION,
+    AUTOMATION_EXPANSION,
+    CRM_EXPANSION,
+    WHATSAPP_EXPANSION,
+    SALES_EXPANSION,
+    OBJECTIONS_EXPANSION,
+    COMPARISONS_EXPANSION,
+} from "./knowledge-expansions.js";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const KNOWLEDGE_DIR = path.join(ROOT, "knowledge");
@@ -1010,16 +1022,16 @@ function buildReadme(categories, totalQA) {
 }
 
 const CATEGORY_DEFS = [
-    { file: "01-about.md", id: "about", title: "About", qa: ABOUT_QA },
-    { file: "02-ai-employees.md", id: "ai-employees", title: "AI Employees", qa: AI_EMPLOYEES_QA },
-    { file: "03-features.md", id: "features", title: "Features", qa: FEATURES_QA },
-    { file: "04-industries.md", id: "industries", title: "Industries", qa: INDUSTRIES_QA },
+    { file: "01-about.md", id: "about", title: "About", qa: [...ABOUT_QA, ...ABOUT_EXPANSION] },
+    { file: "02-ai-employees.md", id: "ai-employees", title: "AI Employees", qa: [...AI_EMPLOYEES_QA, ...AI_EMPLOYEES_EXPANSION] },
+    { file: "03-features.md", id: "features", title: "Features", qa: [...FEATURES_QA, ...FEATURES_EXPANSION] },
+    { file: "04-industries.md", id: "industries", title: "Industries", qa: [...INDUSTRIES_QA, ...INDUSTRIES_EXPANSION] },
     { file: "05-pricing.md", id: "pricing", title: "Pricing", qa: PRICING_QA },
     { file: "06-marketplace.md", id: "marketplace", title: "Marketplace", qa: MARKETPLACE_QA },
-    { file: "07-automation.md", id: "automation", title: "Automation", qa: AUTOMATION_QA },
-    { file: "08-crm.md", id: "crm", title: "CRM", qa: CRM_QA },
+    { file: "07-automation.md", id: "automation", title: "Automation", qa: [...AUTOMATION_QA, ...AUTOMATION_EXPANSION] },
+    { file: "08-crm.md", id: "crm", title: "CRM", qa: [...CRM_QA, ...CRM_EXPANSION] },
     { file: "09-analytics.md", id: "analytics", title: "Analytics", qa: ANALYTICS_QA },
-    { file: "10-whatsapp.md", id: "whatsapp", title: "WhatsApp", qa: WHATSAPP_QA },
+    { file: "10-whatsapp.md", id: "whatsapp", title: "WhatsApp", qa: [...WHATSAPP_QA, ...WHATSAPP_EXPANSION] },
     { file: "11-integrations.md", id: "integrations", title: "Integrations", qa: INTEGRATIONS_QA },
     { file: "12-api.md", id: "api", title: "API", qa: API_QA },
     { file: "13-tutorials.md", id: "tutorials", title: "Tutorials", qa: TUTORIALS_QA },
@@ -1027,9 +1039,9 @@ const CATEGORY_DEFS = [
     { file: "15-security.md", id: "security", title: "Security", qa: SECURITY_QA },
     { file: "16-popia.md", id: "popia", title: "POPIA", qa: POPIA_QA },
     { file: "17-gdpr.md", id: "gdpr", title: "GDPR", qa: GDPR_QA },
-    { file: "18-sales.md", id: "sales", title: "Sales", qa: SALES_QA },
-    { file: "19-objections.md", id: "objections", title: "Objection Handling", qa: OBJECTIONS_QA },
-    { file: "20-comparisons.md", id: "comparisons", title: "Competitive Comparison", qa: COMPARISONS_QA },
+    { file: "18-sales.md", id: "sales", title: "Sales", qa: [...SALES_QA, ...SALES_EXPANSION] },
+    { file: "19-objections.md", id: "objections", title: "Objection Handling", qa: [...OBJECTIONS_QA, ...OBJECTIONS_EXPANSION] },
+    { file: "20-comparisons.md", id: "comparisons", title: "Competitive Comparison", qa: [...COMPARISONS_QA, ...COMPARISONS_EXPANSION] },
     { file: "21-billing.md", id: "billing", title: "Billing", qa: BILLING_QA },
     { file: "22-support.md", id: "support", title: "Support", qa: SUPPORT_QA },
     { file: "23-company.md", id: "company", title: "Company", qa: COMPANY_QA },

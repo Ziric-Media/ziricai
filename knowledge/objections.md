@@ -165,3 +165,144 @@
 
 ## Q: Too many features overwhelm us.
 **A:** Start with one AI employee and one channel — expand later.
+
+## Q: We already have a website contact form.
+**A:** Forms have 5% response expectation — WhatsApp gets 98% open rates in SA. AI brings answers to where customers actually message.
+
+## Q: Our industry is too regulated for AI.
+**A:** Legal and healthcare packs scope informational intake only — professionals still advise; AI administers and captures leads.
+
+## Q: We tried Meta auto-replies and they felt robotic.
+**A:** ZiricAI conversational AI uses your full knowledge library with natural tone — not rigid keyword auto-replies.
+
+## Q: I'm worried about AI saying something embarrassing.
+**A:** RAG grounds answers in your documents; escalation rules hand off edge cases; sandbox testing before go-live.
+
+## Q: We don't have documented FAQs yet.
+**A:** Start with 5 documents Sarah suggests from your industry pack — most teams are live same day.
+
+## Q: Our customers are elderly and won't use WhatsApp.
+**A:** Many SA seniors use WhatsApp daily; add web chat and phone handoff for those who prefer calling.
+
+## Q: We need approval from head office first.
+**A:** Franchise pack demo shows HQ consistency; provide security and POPIA summary for approval pack.
+
+## Q: What if the internet goes down?
+**A:** Same as any cloud tool — AI resumes when connectivity returns; customers message when they have data.
+
+## Q: We had a bad experience with overseas support tools.
+**A:** ZiricAI is South African with ZAR billing, local time zone support, and WhatsApp-first design.
+
+## Q: AI can't understand our local context.
+**A:** Upload local terminology, township delivery areas, and SA-specific policies — AI answers from your context.
+
+## Q: We're going through a restructure.
+**A:** Perfect time to automate tier-1 enquiries while team size changes — trial proves ROI before hiring.
+
+## Q: Our CRM is Salesforce already.
+**A:** ZiricAI CRM included for front office; webhook syncs leads to Salesforce on Business+ if needed.
+
+## Q: We need on-premise deployment.
+**A:** Cloud SaaS on Firebase; Enterprise discusses dedicated infrastructure for strict data residency requirements.
+
+## Q: WhatsApp templates seem complicated.
+**A:** Sarah walks template creation; industry packs include starter templates — support helps Meta approval.
+
+## Q: I don't want customers knowing it's AI.
+**A:** Configure AI employee with human name and brand tone — transparency is your choice.
+
+## Q: We only get 2 enquiries a day.
+**A:** At R999.99/month one converted lead monthly justifies Starter — measure trial capture rate.
+
+## Q: Our product is too complex for AI.
+**A:** Upload technical specs and qualification scripts — Sales AI handles tier-1 and routes complex deals to experts.
+
+## Q: We tried free ChatGPT widget.
+**A:** ChatGPT hallucinates prices and lacks CRM. ZiricAI RAG plus WhatsApp plus CRM is purpose-built for business.
+
+## Q: Board wants three vendor quotes.
+**A:** Provide comparison sheet vs Intercom, HubSpot, and custom build — ZiricAI wins on ZAR price and WhatsApp-native.
+
+## Q: I'm the only decision maker and too busy.
+**A:** Sarah sets up in 10 minutes while you handle customers — trial runs parallel to your current process.
+
+## Q: We need multilingual support.
+**A:** Upload Afrikaans, isiZulu, or isiXhosa knowledge documents — AI replies in language of customer question.
+
+## Q: What about wrong medical advice liability?
+**A:** Healthcare pack explicitly avoids diagnosis — facility info and booking only; disclaimers in knowledge.
+
+## Q: Customers will demand to speak to the owner.
+**A:** Configure instant escalation keyword 'owner' to notify you with full conversation context on WhatsApp.
+
+## Q: We tried Zendesk and it was too expensive.
+**A:** Zendesk USD pricing adds up. ZiricAI Starter R999.99 includes AI, CRM, and WhatsApp in one.
+
+## Q: Our WhatsApp is on the owner's personal phone.
+**A:** Migrating to Business API centralizes team inbox, CRM logging, and POPIA compliance — support guides port.
+
+## Q: AI will reduce our personal touch.
+**A:** AI handles repetitive FAQ in seconds so your team spends more time on high-value personal interactions.
+
+## Q: We need proof it works in our town.
+**A:** 14-day trial captures your local leads — your data beats any generic case study.
+
+## Q: Finance won't approve another SaaS.
+**A:** Position as revenue capture not cost — one R45,000 deal like Central Motors pays for years of subscription.
+
+## Q: What if Meta bans our number?
+**A:** Follow Meta quality guidelines and opt-in rules; ZiricAI monitors integration health and support assists recovery.
+
+## Q: We already answer WhatsApp ourselves.
+**A:** Measure your actual after-hours response time — owners typically find 6+ hour gaps AI fills instantly.
+
+## Q: Our team is unionized and will resist.
+**A:** Position AI as removing boring FAQ work, not headcount reduction — involve agents in knowledge upload.
+
+## Q: We need ISO 27001 certification.
+**A:** Enterprise security pack and DPA for procurement; Firebase SOC-aligned infrastructure documented.
+
+## Q: Can't we just hire a VA overseas?
+**A:** VA lacks CRM integration, 2-second response, and industry packs — and costs more than R999.99 with management overhead.
+
+## Q: What about accent and tone on WhatsApp?
+**A:** Configure friendly professional tone; upload example responses in knowledge for consistent brand voice.
+
+## Q: We sell high-ticket items — AI can't close.
+**A:** Correct — AI qualifies and books appointments; your closers handle R500k deals with full CRM brief.
+
+## Q: Our IT vendor said they can build it.
+**A:** Ask about ongoing Meta API maintenance, RAG pipeline, CRM, and SLA — build cost exceeds SaaS within months.
+
+## Q: We need to wait until next fiscal year.
+**A:** Free trial now builds ROI data for budget request — leads captured in trial strengthen your business case.
+
+## Q: What if customers ask questions AI can't answer?
+**A:** Graceful escalation collects callback details — better than silence or wrong guess from generic bot.
+
+## Q: We're B2B — WhatsApp isn't professional.
+**A:** SA B2B buyers use WhatsApp for quotes and follow-ups — legal, insurance, and wholesale clients expect it.
+
+## Q: Our data is too sensitive.
+**A:** AES-256 encryption, tenant isolation, RBAC, and POPIA tools — more secure than WhatsApp on personal devices.
+
+## Q: I need to see it work in my language first.
+**A:** Upload one Afrikaans FAQ doc and test in sandbox — proof in 5 minutes before commitment.
+
+## Q: We tried and staff ignored the inbox.
+**A:** Set mobile notifications and SLA alerts; start with after-hours AI-only so team sees value without workflow change.
+
+## Q: What about competitor espionage via chat?
+**A:** Scope rules limit sensitive info; verify identity before sharing account-specific data per your scripts.
+
+## Q: Our marketing agency handles social.
+**A:** Agency manages content; ZiricAI handles DM replies and lead capture — complementary not replacement.
+
+## Q: We need 99.9% uptime guarantee.
+**A:** Enterprise SLA covers uptime commitments — standard plans run on Firebase high availability infrastructure.
+
+## Q: AI won't know our current promotions.
+**A:** Update promotion doc same day it launches — AI immediately cites new offers from knowledge.
+
+## Q: Customers will try to trick the AI.
+**A:** Human escalation and scope rules handle edge cases; monitor inbox weekly for abuse patterns.

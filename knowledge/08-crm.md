@@ -75,3 +75,84 @@
 
 ## Q: How does CRM help Central Motors?
 **A:** Every after-hours WhatsApp enquiry becomes a scored lead for sales consultants next morning.
+
+## Q: What CRM fields are included by default?
+**A:** Name, phone, email, channel source, tags, lead score, pipeline stage, and conversation timeline.
+
+## Q: Can I create custom CRM pipelines?
+**A:** Build multiple pipelines for sales, support, and admissions with unique stages per process.
+
+## Q: How does CRM link to WhatsApp numbers?
+**A:** Phone number matching auto-identifies returning customers and loads their full timeline.
+
+## Q: Can I bulk import CRM contacts?
+**A:** CSV import with field mapping; duplicates flagged for merge review before commit.
+
+## Q: What is organization-level CRM?
+**A:** Business plan links multiple contacts to company accounts for B2B relationship tracking.
+
+## Q: Can CRM track deal probability?
+**A:** Set win probability percentage on pipeline cards for weighted forecast reporting.
+
+## Q: How do CRM tasks integrate with calendar?
+**A:** Task due dates sync to agent workflow; overdue tasks appear in notification centre.
+
+## Q: Can I filter CRM by last activity?
+**A:** Sort and filter contacts by last message date to find stale leads needing follow-up.
+
+## Q: Does CRM support contact photos?
+**A:** Profile photos from WhatsApp or manually uploaded avatars display on CRM cards.
+
+## Q: Can CRM track referral sources?
+**A:** Custom field captures who referred the contact for referral programme reporting.
+
+## Q: How do CRM webhooks work?
+**A:** Subscribe to crm.updated events; POST fires when contacts, stages, or tags change.
+
+## Q: Can I set CRM field validation?
+**A:** Required fields on stage transition ensure data quality before deals move forward.
+
+## Q: What is CRM activity scoring?
+**A:** Engagement score increases with message frequency, response speed, and positive sentiment.
+
+## Q: Can CRM segment by purchase history?
+**A:** Tag contacts by product interest captured in conversation and custom deal fields.
+
+## Q: How do CRM notes work for compliance?
+**A:** Timestamped notes with author attribution support audit and handover documentation.
+
+## Q: Can I share CRM views with team?
+**A:** Save filtered views — e.g., Hot Leads This Week — for team dashboard access.
+
+## Q: Does CRM support lost reason tracking?
+**A:** Mark deals lost with reason codes for win/loss analysis reporting.
+
+## Q: Can CRM automate stage progression?
+**A:** Workflow moves stage when keywords like 'invoice sent' detected in conversation.
+
+## Q: How do CRM exports handle POPIA?
+**A:** Export only authorized fields; log export actions in admin audit trail.
+
+## Q: Can CRM track multiple phone numbers?
+**A:** Link secondary numbers to same contact profile for customers with work and personal WhatsApp.
+
+## Q: What is CRM lifecycle stage?
+**A:** Separate lifecycle labels — Subscriber, Lead, Customer, Advocate — from active deal pipeline.
+
+## Q: Can CRM integrate with email marketing?
+**A:** Export opted-in segments or webhook to Mailchimp-compatible endpoints.
+
+## Q: How do CRM permissions work?
+**A:** Agents see assigned contacts; admins see all; viewers have read-only access.
+
+## Q: Can CRM log offline interactions?
+**A:** Agents manually log phone calls and in-person meetings on customer timeline.
+
+## Q: Does CRM show channel preference?
+**A:** Timeline analytics reveal whether customer prefers WhatsApp, email, or Instagram.
+
+## Q: Can CRM track SLA per contact?
+**A:** VIP tag triggers shorter SLA alert threshold in supervisor dashboard.
+
+## Q: How do CRM automations prevent duplicates?
+**A:** Phone number normalization checks existing records before creating new contact.
