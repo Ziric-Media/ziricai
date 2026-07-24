@@ -67454,6 +67454,8 @@ export function scoreKnowledgeMatch(normalizedQuery, pair, options = {}) {
     }
     if (pair.cat && normalizedQuery.includes(pair.cat.replace(/-/g, " "))) score += 12;
     if (pair.sub && normalizedQuery.includes(normalizeQuestionText(pair.sub))) score += 10;
+    if (pair.cat && normalizedQuery.includes(pair.cat.replace(/-/g, " "))) score += 12;
+    if (pair.sub && normalizedQuery.includes(normalizeQuestionText(pair.sub))) score += 10;
     if (audience && pair.aud?.some((a) => a.toLowerCase() === audience.toLowerCase())) score += 15;
     if (subCategory && pair.sub?.toLowerCase() === subCategory.toLowerCase()) score += 20;
     return score;

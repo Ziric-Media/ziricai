@@ -46,6 +46,8 @@
                 }
             }
         }
+        if (pair.cat && normalized.indexOf(pair.cat.replace(/-/g, ' ')) >= 0) score += 12;
+        if (pair.sub && normalized.indexOf(normalizeQuestionText(pair.sub)) >= 0) score += 10;
         if (opts.audience && pair.aud && pair.aud.some(function(a) { return a.toLowerCase() === opts.audience.toLowerCase(); })) score += 15;
         return score;
     }
@@ -60,8 +62,8 @@
         if (category) pool = pool.filter(function(p) { return p.cat === category; });
         if (audience) pool = pool.filter(function(p) { return p.aud && p.aud.some(function(a) { return a.toLowerCase() === audience.toLowerCase(); }); });
         if (!normalized) return pool.slice(0, limit);
-        return pool.map(function(p) { return Object.assign({}, p, { score: scoreMatch(normalized, p, opts); }); })
-            .filter(function(p) { return p.score >= 12; })
+        return pool.map(function(p) { return Object.assign({}, p, { score: scoreMatch(normalized, p, opts) }); })
+            .filter(function(p) { return p.score >= (opts.minScore || 12); })
             .sort(function(a, b) { return b.score - a.score; })
             .slice(0, limit);
     }
@@ -83,7 +85,7 @@
 
     function matchPlatformQuestion(text, context) {
         context = context || {};
-        var matches = searchKnowledge(text, { limit: 1, audience: context.audience });
+        var matches = searchKnowledge(text, { limit: 1, minScore: 15, audience: context.audience });
         if (matches.length) {
             var best = matches[0];
             return { id: best.id || best.cat, answer: best.a, title: best.catTitle, question: best.q, related: best.rel, audience: best.aud };

@@ -454,6 +454,12 @@
             (typeof location !== 'undefined' && /localhost|127\.0\.0\.1/.test(location.hostname) ? '' : 'https://ziricai-production.up.railway.app');
     }
 
+    function isGenericSarahReply(reply) {
+        if (!reply) return true;
+        const defaults = [sarahDefaultReply, pk?.getDefaultReply?.(), pk?.PLATFORM_UNCLEAR_REPLY].filter(Boolean);
+        return defaults.some((d) => reply === d);
+    }
+
     function getSarahReplyLocal(text) {
         const context = { lastTopicId: sarahLastTopicId };
         if (pk?.matchPlatformQuestion) {
@@ -461,9 +467,21 @@
             if (matched) {
                 if (typeof matched === 'string') return matched;
                 if (matched.id && matched.id !== 'unclear') sarahLastTopicId = matched.id;
-                return matched.answer || matched;
+                const answer = matched.answer || matched;
+                if (answer && !isGenericSarahReply(answer)) return answer;
+            }
+            if (pk.searchKnowledge) {
+                const results = pk.searchKnowledge(text, { limit: 1, minScore: 12 });
+                if (results.length && results[0].a) {
+                    if (results[0].id) sarahLastTopicId = results[0].id;
+                    return results[0].a;
+                }
             }
             const normalized = pk.normalizeQuestionText?.(text) || String(text || '').toLowerCase();
+            if (/\b(price|pricing|cost|how much|plan|plans|r999|r2999|r4999)\b/.test(normalized)) {
+                const pricing = window.ZiricBillingPlans?.getPricingSummaryText?.();
+                if (pricing) return pricing;
+            }
             const hasClearIntent = /\b(support|help|contact|pricing|price|cost|setup|set up|whatsapp|restaurant|security|trial|ziricai)\b/.test(normalized);
             if (hasClearIntent) {
                 return pk.PLATFORM_UNCLEAR_REPLY || sarahDefaultReply;
@@ -497,9 +515,11 @@
     }
 
     async function getSarahReply(text) {
+        const localReply = getSarahReplyLocal(text);
+        if (!isGenericSarahReply(localReply)) return localReply;
         const apiReply = await fetchSarahReplyFromApi(text);
-        if (apiReply) return apiReply;
-        return getSarahReplyLocal(text);
+        if (apiReply && !isGenericSarahReply(apiReply)) return apiReply;
+        return localReply || apiReply || sarahDefaultReply;
     }
 
     function initSarahChat() {
