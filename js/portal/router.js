@@ -1,13 +1,13 @@
-import { state, setState } from '../core/dataStore.js';
-import { canAccessModule } from '../permissions.js';
-import { errorState } from '../../admin/ui.js';
-import { loadModule, showModuleSkeleton, prefetchModules } from '../core/lazyLoader.js';
+import { state, setState } from './core/dataStore.js';
+import { canAccessModule } from './permissions.js';
+import { errorState } from '../admin/ui.js';
+import { loadModule, showModuleSkeleton, prefetchModules } from './core/lazyLoader.js';
 import {
   applySidebarVisibility,
   updateBreadcrumb,
   MODULE_LABELS,
   renderSidebarNav,
-} from '../core/appShell.js';
+} from './core/appShell.js';
 
 export { MODULE_LABELS, applySidebarVisibility };
 

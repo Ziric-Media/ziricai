@@ -281,6 +281,8 @@ function prepareApp() {
   copyDir(path.join(ROOT, 'js/shared'), path.join(dir, 'js/shared'));
   // Portal imports shared UI helpers from js/admin/ui.js — must exist on static app host.
   copyFile(path.join(ROOT, 'js/admin/ui.js'), path.join(dir, 'js/admin/ui.js'));
+  copyFile(path.join(ROOT, 'js/admin/utils.js'), path.join(dir, 'js/admin/utils.js'));
+  copyFile(path.join(ROOT, 'js/admin/demo-data.js'), path.join(dir, 'js/admin/demo-data.js'));
   for (const f of ['auth.js', 'firebase.js', 'users.js']) {
     copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
   }
