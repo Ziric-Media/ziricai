@@ -1,34 +1,21 @@
-import { getPlatformAnswer, matchPlatformQuestion, PLATFORM_FAQ } from "../platformKnowledge.js";
+import {
+    getPlatformAnswer,
+    matchPlatformQuestion,
+    searchKnowledge,
+    getKnowledgeStats,
+    CATEGORY_MANIFEST,
+} from "../platformKnowledge.js";
 
 export default {
     name: "platformHelp",
     description:
-        "Answer questions about ZiricAI platform features, pricing, setup, roles, industries, WhatsApp, CRM, automation, marketplace, and best practices.",
+        "Search the ZiricAI knowledge base for answers about platform features, pricing, setup, roles, industries, WhatsApp, CRM, automation, marketplace, security, objections, and best practices.",
     parameters: {
         type: "object",
         properties: {
             topic: {
                 type: "string",
-                enum: [
-                    "overview",
-                    "aiEmployee",
-                    "pricing",
-                    "trial",
-                    "setup",
-                    "whatsapp",
-                    "restaurant",
-                    "marketplace",
-                    "integrations",
-                    "crm",
-                    "automation",
-                    "knowledge",
-                    "sarah",
-                    "security",
-                    "support",
-                    "roi",
-                    "general",
-                ],
-                description: "Help topic area",
+                description: "Optional category filter (about, pricing, industries, whatsapp, crm, etc.)",
             },
             question: { type: "string", description: "Specific question from the user" },
         },
@@ -36,24 +23,67 @@ export default {
     requiredPermissions: [],
     async execute(_ctx, args) {
         const question = args.question || "";
-        let result;
+        const topic = args.topic && args.topic !== "general" ? args.topic : null;
 
-        if (args.topic && args.topic !== "general" && PLATFORM_FAQ[args.topic]) {
-            result = getPlatformAnswer(args.topic);
-        } else if (question) {
-            result = matchPlatformQuestion(question) || getPlatformAnswer(question);
-        } else {
-            result = getPlatformAnswer(args.topic || "general");
+        let results = [];
+        if (question) {
+            results = searchKnowledge(question, { limit: 5, category: topic, minScore: 10 });
         }
 
-        const answer = result.answer;
-        const prefix = question && !answer.includes(question.slice(0, 20))
-            ? `${answer}`
-            : answer;
+        if (!results.length && topic) {
+            const categoryAnswer = getPlatformAnswer(topic);
+            if (categoryAnswer?.answer) {
+                return {
+                    message: categoryAnswer.answer,
+                    data: {
+                        topic: categoryAnswer.id,
+                        title: categoryAnswer.title,
+                        categories: CATEGORY_MANIFEST.map((c) => c.id),
+                    },
+                };
+            }
+        }
+
+        if (!results.length && question) {
+            const matched = matchPlatformQuestion(question) || getPlatformAnswer(question);
+            return {
+                message: matched.answer,
+                data: {
+                    topic: matched.id,
+                    title: matched.title,
+                    categories: CATEGORY_MANIFEST.map((c) => c.id),
+                },
+            };
+        }
+
+        if (!results.length) {
+            const general = getPlatformAnswer("general");
+            return {
+                message: general.answer,
+                data: { topic: "general", stats: getKnowledgeStats() },
+            };
+        }
+
+        const best = results[0];
+        const extras =
+            results.length > 1
+                ? "\n\nRelated:\n" +
+                  results
+                      .slice(1, 4)
+                      .map((r) => `• ${r.question}: ${r.answer.slice(0, 120)}…`)
+                      .join("\n")
+                : "";
 
         return {
-            message: prefix,
-            data: { topic: result.id, title: result.title, topics: Object.keys(PLATFORM_FAQ) },
+            message: best.answer + extras,
+            data: {
+                topic: best.category,
+                title: best.categoryTitle,
+                question: best.question,
+                score: best.score,
+                matchCount: results.length,
+                stats: getKnowledgeStats(),
+            },
         };
     },
 };

@@ -17,7 +17,9 @@
         "migrate:tenants": "node scripts/migrate-demo-to-tenants.js",
         "migrate:tenants:dry": "node scripts/migrate-demo-to-tenants.js --dry-run",
         "verify:sprint1": "node scripts/verify-sprint1-flow.js",
-        "verify:journey": "node scripts/verify-customer-journey.js"
+        "verify:journey": "node scripts/verify-customer-journey.js",
+        "build:knowledge": "node scripts/build-knowledge-bundle.js",
+        "seed:knowledge": "node scripts/seed-knowledge-content.js"
     },
     "dependencies": {
         "axios": "^1.18.1",

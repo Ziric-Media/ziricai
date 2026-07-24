@@ -1,0 +1,352 @@
+{
+  "fileCount": 31,
+  "questionCount": 841,
+  "categoryCount": 31,
+  "categories": [
+    {
+      "id": "about",
+      "title": "About",
+      "file": "01-about.md",
+      "count": 55
+    },
+    {
+      "id": "ai-employees",
+      "title": "AI Employees",
+      "file": "02-ai-employees.md",
+      "count": 55
+    },
+    {
+      "id": "features",
+      "title": "Features",
+      "file": "03-features.md",
+      "count": 25
+    },
+    {
+      "id": "industries",
+      "title": "Industries",
+      "file": "04-industries.md",
+      "count": 55
+    },
+    {
+      "id": "pricing",
+      "title": "Pricing",
+      "file": "05-pricing.md",
+      "count": 55
+    },
+    {
+      "id": "marketplace",
+      "title": "Marketplace",
+      "file": "06-marketplace.md",
+      "count": 25
+    },
+    {
+      "id": "automation",
+      "title": "Automation",
+      "file": "07-automation.md",
+      "count": 23
+    },
+    {
+      "id": "crm",
+      "title": "CRM",
+      "file": "08-crm.md",
+      "count": 23
+    },
+    {
+      "id": "analytics",
+      "title": "Analytics",
+      "file": "09-analytics.md",
+      "count": 20
+    },
+    {
+      "id": "whatsapp",
+      "title": "WhatsApp",
+      "file": "10-whatsapp.md",
+      "count": 25
+    },
+    {
+      "id": "integrations",
+      "title": "Integrations",
+      "file": "11-integrations.md",
+      "count": 25
+    },
+    {
+      "id": "api",
+      "title": "API",
+      "file": "12-api.md",
+      "count": 20
+    },
+    {
+      "id": "tutorials",
+      "title": "Tutorials",
+      "file": "13-tutorials.md",
+      "count": 19
+    },
+    {
+      "id": "documentation",
+      "title": "Documentation",
+      "file": "14-documentation.md",
+      "count": 15
+    },
+    {
+      "id": "security",
+      "title": "Security",
+      "file": "15-security.md",
+      "count": 25
+    },
+    {
+      "id": "popia",
+      "title": "POPIA",
+      "file": "16-popia.md",
+      "count": 20
+    },
+    {
+      "id": "gdpr",
+      "title": "GDPR",
+      "file": "17-gdpr.md",
+      "count": 20
+    },
+    {
+      "id": "sales",
+      "title": "Sales",
+      "file": "18-sales.md",
+      "count": 25
+    },
+    {
+      "id": "objections",
+      "title": "Objection Handling",
+      "file": "19-objections.md",
+      "count": 55
+    },
+    {
+      "id": "comparisons",
+      "title": "Competitive Comparison",
+      "file": "20-comparisons.md",
+      "count": 25
+    },
+    {
+      "id": "billing",
+      "title": "Billing",
+      "file": "21-billing.md",
+      "count": 25
+    },
+    {
+      "id": "support",
+      "title": "Support",
+      "file": "22-support.md",
+      "count": 20
+    },
+    {
+      "id": "company",
+      "title": "Company",
+      "file": "23-company.md",
+      "count": 20
+    },
+    {
+      "id": "blogs",
+      "title": "Blogs",
+      "file": "24-blogs.md",
+      "count": 15
+    },
+    {
+      "id": "product-updates",
+      "title": "Product Updates",
+      "file": "25-product-updates.md",
+      "count": 15
+    },
+    {
+      "id": "glossary",
+      "title": "Glossary",
+      "file": "26-glossary.md",
+      "count": 23
+    },
+    {
+      "id": "internal-policies",
+      "title": "Internal Policies",
+      "file": "27-internal-policies.md",
+      "count": 15
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Technical Troubleshooting",
+      "file": "28-troubleshooting.md",
+      "count": 25
+    },
+    {
+      "id": "best-practices",
+      "title": "Best Practices",
+      "file": "29-best-practices.md",
+      "count": 25
+    },
+    {
+      "id": "success-stories",
+      "title": "Success Stories",
+      "file": "30-success-stories.md",
+      "count": 20
+    },
+    {
+      "id": "faq",
+      "title": "FAQ",
+      "file": null,
+      "count": 28
+    }
+  ],
+  "files": [
+    {
+      "filename": "01-about.md",
+      "category": "about",
+      "count": 55
+    },
+    {
+      "filename": "02-ai-employees.md",
+      "category": "ai-employees",
+      "count": 55
+    },
+    {
+      "filename": "03-features.md",
+      "category": "features",
+      "count": 25
+    },
+    {
+      "filename": "04-industries.md",
+      "category": "industries",
+      "count": 55
+    },
+    {
+      "filename": "05-pricing.md",
+      "category": "pricing",
+      "count": 55
+    },
+    {
+      "filename": "06-marketplace.md",
+      "category": "marketplace",
+      "count": 25
+    },
+    {
+      "filename": "07-automation.md",
+      "category": "automation",
+      "count": 23
+    },
+    {
+      "filename": "08-crm.md",
+      "category": "crm",
+      "count": 23
+    },
+    {
+      "filename": "09-analytics.md",
+      "category": "analytics",
+      "count": 20
+    },
+    {
+      "filename": "10-whatsapp.md",
+      "category": "whatsapp",
+      "count": 25
+    },
+    {
+      "filename": "11-integrations.md",
+      "category": "integrations",
+      "count": 25
+    },
+    {
+      "filename": "12-api.md",
+      "category": "api",
+      "count": 20
+    },
+    {
+      "filename": "13-tutorials.md",
+      "category": "tutorials",
+      "count": 19
+    },
+    {
+      "filename": "14-documentation.md",
+      "category": "documentation",
+      "count": 15
+    },
+    {
+      "filename": "15-security.md",
+      "category": "security",
+      "count": 25
+    },
+    {
+      "filename": "16-popia.md",
+      "category": "popia",
+      "count": 20
+    },
+    {
+      "filename": "17-gdpr.md",
+      "category": "gdpr",
+      "count": 20
+    },
+    {
+      "filename": "18-sales.md",
+      "category": "sales",
+      "count": 25
+    },
+    {
+      "filename": "19-objections.md",
+      "category": "objections",
+      "count": 55
+    },
+    {
+      "filename": "20-comparisons.md",
+      "category": "comparisons",
+      "count": 25
+    },
+    {
+      "filename": "21-billing.md",
+      "category": "billing",
+      "count": 25
+    },
+    {
+      "filename": "22-support.md",
+      "category": "support",
+      "count": 20
+    },
+    {
+      "filename": "23-company.md",
+      "category": "company",
+      "count": 20
+    },
+    {
+      "filename": "24-blogs.md",
+      "category": "blogs",
+      "count": 15
+    },
+    {
+      "filename": "25-product-updates.md",
+      "category": "product-updates",
+      "count": 15
+    },
+    {
+      "filename": "26-glossary.md",
+      "category": "glossary",
+      "count": 23
+    },
+    {
+      "filename": "27-internal-policies.md",
+      "category": "internal-policies",
+      "count": 15
+    },
+    {
+      "filename": "28-troubleshooting.md",
+      "category": "troubleshooting",
+      "count": 25
+    },
+    {
+      "filename": "29-best-practices.md",
+      "category": "best-practices",
+      "count": 25
+    },
+    {
+      "filename": "30-success-stories.md",
+      "category": "success-stories",
+      "count": 20
+    },
+    {
+      "filename": "faq.md",
+      "category": "faq",
+      "count": 28
+    }
+  ],
+  "target": 15000,
+  "progressPct": 5.61
+}

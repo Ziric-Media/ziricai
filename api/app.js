@@ -129,6 +129,11 @@ import { handleSarahChat } from "../services/sarah/sarahOrchestrator.js";
 import { getToolsForContext } from "../services/sarah/toolRegistry.js";
 import { initSarahTools } from "../services/sarah/tools/index.js";
 import {
+    searchKnowledge,
+    getKnowledgeStats,
+    getPlatformKnowledgeSummary,
+} from "../services/knowledge/platformKnowledgeLoader.js";
+import {
     initIntegrationHub,
     mountIntegrationRoutes,
     handleLegacyWhatsAppWebhook,
@@ -798,6 +803,29 @@ app.get("/api/sarah/tools", requireTenantScope({ optional: true }), async (req, 
     } catch (err) {
         console.error("[api/sarah/tools] error:", err.message);
         res.status(err.status || 500).json({ error: err.message || "Failed to list Sarah tools" });
+    }
+});
+
+/** Sarah — platform knowledge search (landing + portal FAQ) */
+app.get("/api/sarah/knowledge", async (req, res) => {
+    try {
+        const query = String(req.query.q || req.query.query || "").trim();
+        const category = req.query.category || null;
+        const limit = Math.min(parseInt(req.query.limit, 10) || 8, 20);
+
+        if (!query) {
+            const stats = getKnowledgeStats();
+            return res.json({
+                stats,
+                summary: getPlatformKnowledgeSummary({ maxChars: 2000 }),
+            });
+        }
+
+        const results = searchKnowledge(query, { limit, category, minScore: 10 });
+        res.json({ query, category, results, count: results.length });
+    } catch (err) {
+        console.error("[api/sarah/knowledge] error:", err.message);
+        res.status(500).json({ error: err.message || "Knowledge search failed" });
     }
 });
 

@@ -1,15 +1,32 @@
 /**
- * Server re-export of shared platform FAQ (js/shared/platformKnowledge.js).
+ * Server re-export of platform knowledge loader (knowledge/*.md source of truth).
  */
 export {
-    PLATFORM_FAQ,
-    PLATFORM_INTENTS,
-    PLATFORM_DEFAULT_REPLY,
-    PLATFORM_UNCLEAR_REPLY,
+    CATEGORY_MANIFEST,
+    FLAT_ALIASES,
+    KNOWLEDGE_DIR,
+    parseMarkdownQA,
+    loadKnowledgeFile,
+    loadAllKnowledgeFiles,
     normalizeQuestionText,
-    scoreKeywordMatch,
-    formatReplyForQuestion,
+    scoreKnowledgeMatch,
+    searchKnowledge,
+    getKnowledgeStats,
+    getPlatformKnowledgeSummary,
     matchPlatformQuestion,
     getPlatformAnswer,
-    getPlatformKnowledgeSummary,
+    clearKnowledgeCache,
+    getPricingSummaryText,
+    getDefaultPlatformReply,
+    formatPrice,
+    getPlan,
+    getPublicPlans,
+} from "../knowledge/platformKnowledgeLoader.js";
+
+export {
+    PLATFORM_DEFAULT_REPLY,
+    PLATFORM_UNCLEAR_REPLY,
+    PLATFORM_FAQ,
+    PLATFORM_INTENTS,
+    formatReplyForQuestion,
 } from "../../js/shared/platformKnowledge.js";
