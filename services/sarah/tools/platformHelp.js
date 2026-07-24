@@ -106,6 +106,8 @@ export default {
                 subCategory: best.subCategory,
                 question: best.question,
                 audience: best.audience,
+                intent: best.intent,
+                aiResponseStyle: best.aiResponseStyle,
                 score: best.score,
                 matchCount: results.length,
                 related: relatedQuestions.map((r) => ({

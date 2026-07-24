@@ -10,9 +10,26 @@ import { getPricingSummaryText, getDefaultPlatformReply, formatPrice, getPlan, g
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const KNOWLEDGE_DIR = path.join(ROOT, "knowledge");
 
+/** v1.0 Knowledge Base target (10 module roadmap) */
+export const V1_TARGET = 10000;
+
+/** v1.0 module targets (10 core modules toward 10k entries) */
+export const V1_MODULE_MANIFEST = [
+    { module: 1, id: "about-ziricai", title: "About ZiricAI", file: "01_About_ZiricAI.md", target: 300 },
+    { module: 2, id: "pricing", title: "Pricing", file: "02_Pricing.md", target: 300 },
+    { module: 3, id: "faq", title: "FAQ", file: "03_FAQ.md", target: 800 },
+    { module: 4, id: "industries", title: "Industries", file: "04_Industries.md", target: 2000 },
+    { module: 5, id: "ai-employees", title: "AI Employees", file: "05_AI_Employees.md", target: 500 },
+    { module: 6, id: "marketplace", title: "Marketplace", file: "06_Marketplace.md", target: 400 },
+    { module: 7, id: "automation", title: "Automation", file: "07_Automation.md", target: 600 },
+    { module: 8, id: "crm", title: "CRM", file: "08_CRM.md", target: 600 },
+    { module: 9, id: "whatsapp", title: "WhatsApp", file: "10_WhatsApp.md", target: 500 },
+    { module: 10, id: "integrations", title: "Integrations", file: "11_Integrations.md", target: 400 },
+];
+
 /** 25-category taxonomy with phase targets */
 export const CATEGORY_MANIFEST = [
-    { order: 1, id: "about-ziricai", title: "About ZiricAI", file: "01_About_ZiricAI.md", idPrefix: "ABOUT", phase: 1, phaseTarget: 400 },
+    { order: 1, id: "about-ziricai", title: "About ZiricAI", file: "01_About_ZiricAI.md", idPrefix: "ABOUT", phase: 1, phaseTarget: 300 },
     { order: 2, id: "pricing", title: "Pricing", file: "02_Pricing.md", idPrefix: "PRICING", phase: 1, phaseTarget: 350 },
     { order: 3, id: "faq", title: "FAQ", file: "03_FAQ.md", idPrefix: "FAQ", phase: 1, phaseTarget: 300 },
     { order: 4, id: "industries", title: "Industries", file: "04_Industries.md", idPrefix: "IND", phase: 3, phaseTarget: 600 },
@@ -61,8 +78,8 @@ export const CATEGORY_ALIASES = {
     "about-ziricai": "about-ziricai",
 };
 
-const ENTRY_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n\r?\n## Q:\s*(.+?)\r?\n\*\*A:\*\*\s*([\s\S]*?)(?=^---\r?\n|^## Q:|$)/gm;
-const LEGACY_QA_RE = /^## Q:\s*(.+?)\r?\n\*\*A:\*\*\s*([\s\S]*?)(?=^## Q:|$)/gm;
+const ENTRY_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n\r?\n## Q:\s*(.+?)\r?\n(?:\r?\n)?\*\*A:\*\*\s*([\s\S]*?)(?=^---\r?\n|^## Q:|$)/gm;
+const LEGACY_QA_RE = /^## Q:\s*(.+?)\r?\n(?:\r?\n)?\*\*A:\*\*\s*([\s\S]*?)(?=^## Q:|$)/gm;
 
 let _cache = null;
 let _cacheMtime = 0;
@@ -115,10 +132,13 @@ export function parseFrontmatter(yamlBlock) {
             list.push(line.replace(/^\s+-\s+/, "").trim());
             continue;
         }
-        const m = line.match(/^(\w+):\s*(.*)$/);
+        const m = line.match(/^([\w_]+):\s*(.*)$/);
         if (!m) continue;
         currentKey = m[1];
-        const val = m[2].trim();
+        let val = m[2].trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+        }
         if (val === "" || val === "[]") {
             list = [];
             meta[currentKey] = list;
@@ -170,8 +190,10 @@ export function parseMarkdownQA(content, fileMeta = {}) {
             categoryTitle: resolveCategoryTitle(categoryId),
             subCategory: fm.sub_category || fm.subCategory || "General",
             difficulty: fm.difficulty || "Beginner",
+            intent: fm.intent || null,
             keywords: extractKeywords(question, answer, fm.keywords),
             audience: normalizeAudience(fm.audience),
+            aiResponseStyle: fm.ai_response_style || fm.aiResponseStyle || null,
             lastUpdated: fm.last_updated || fm.lastUpdated || null,
             related: Array.isArray(fm.related) ? fm.related.filter(Boolean) : [],
             sourceFile: fileMeta.sourceFile || null,
@@ -365,7 +387,16 @@ export function searchKnowledge(query, options = {}) {
         .slice(0, limit);
 }
 
-/** Get related entries by KB id */
+/** Resolve a related reference (KB id or question text) to an entry */
+function resolveRelatedRef(ref, data) {
+    if (!ref) return null;
+    const trimmed = String(ref).trim();
+    if (data.byId[trimmed]) return data.byId[trimmed];
+    const normalized = normalizeQuestionText(trimmed);
+    return data.pairs.find((p) => normalizeQuestionText(p.question) === normalized) || null;
+}
+
+/** Get related entries by KB id — resolves related as ids or question text */
 export function getRelatedEntries(id, options = {}) {
     const { limit = 5 } = options;
     const data = loadAllKnowledgeFiles();
@@ -375,13 +406,11 @@ export function getRelatedEntries(id, options = {}) {
     const related = [];
     const seen = new Set([id]);
 
-    for (const relId of entry.related || []) {
-        if (seen.has(relId)) continue;
-        const rel = data.byId[relId];
-        if (rel) {
-            related.push(rel);
-            seen.add(relId);
-        }
+    for (const ref of entry.related || []) {
+        const rel = resolveRelatedRef(ref, data);
+        if (!rel || seen.has(rel.id)) continue;
+        related.push(rel);
+        seen.add(rel.id);
     }
 
     if (related.length < limit) {
@@ -422,12 +451,33 @@ export function getKnowledgeStats() {
         };
     });
 
+    const v1ModuleStats = V1_MODULE_MANIFEST.map((mod) => {
+        const count = (data.byCategory[mod.id] || []).length;
+        return {
+            module: mod.module,
+            id: mod.id,
+            title: mod.title,
+            file: mod.file,
+            target: mod.target,
+            count,
+            progressPct: Math.round((count / mod.target) * 10000) / 100,
+        };
+    });
+
+    const v1Count = data.pairs.length;
+
     return {
         fileCount: data.files.length,
         questionCount: data.pairs.length,
         categoryCount: categoryStats.filter((c) => c.count > 0).length,
         categories: categoryStats,
         phases: phaseStats,
+        v1: {
+            target: V1_TARGET,
+            count: v1Count,
+            progressPct: Math.round((v1Count / V1_TARGET) * 10000) / 100,
+            modules: v1ModuleStats,
+        },
         files: data.files,
         target: LONG_TERM_TARGET,
         progressPct: Math.round((data.pairs.length / LONG_TERM_TARGET) * 10000) / 100,
@@ -442,8 +492,8 @@ export function getPlatformKnowledgeSummary(options = {}) {
     const data = loadAllKnowledgeFiles();
 
     const lines = [
-        `ZiricAI Knowledge Base (${stats.questionCount} Q&A across ${stats.categoryCount} categories; long-term target ${stats.target.toLocaleString()}+)`,
-        `Metadata coverage: ${stats.metadataCoveragePct}% | Phase 1 progress: ${stats.phases[0]?.progressPct}%`,
+        `ZiricAI Knowledge Base v1.0 (${stats.questionCount} Q&A across ${stats.categoryCount} categories; v1.0 target ${stats.v1?.target?.toLocaleString() || "10,000"}+)`,
+        `v1.0 progress: ${stats.v1?.progressPct || 0}% | Metadata coverage: ${stats.metadataCoveragePct}%`,
         "",
         "Categories:",
         ...CATEGORY_MANIFEST.map((c) => {
@@ -462,6 +512,9 @@ export function getPlatformKnowledgeSummary(options = {}) {
                 lines.push(`• [${m.id || m.category}] ${m.categoryTitle} / ${m.subCategory}${aud}`);
                 lines.push(`  Q: ${m.question}`);
                 lines.push(`  A: ${m.answer.slice(0, 220)}${m.answer.length > 220 ? "…" : ""}`);
+                if (m.aiResponseStyle) {
+                    lines.push(`  Response style: ${m.aiResponseStyle.slice(0, 180)}${m.aiResponseStyle.length > 180 ? "…" : ""}`);
+                }
                 if (m.related?.length) {
                     lines.push(`  Related: ${m.related.slice(0, 3).join(", ")}`);
                 }
@@ -494,6 +547,7 @@ export function matchPlatformQuestion(text, context = {}) {
             score: best.score,
             related: best.related,
             audience: best.audience,
+            aiResponseStyle: best.aiResponseStyle,
         };
     }
 

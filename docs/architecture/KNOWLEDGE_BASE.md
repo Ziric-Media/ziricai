@@ -2,9 +2,13 @@
 
 ## Overview
 
-The ZiricAI platform knowledge base is a **metadata-rich, 25-category Q&A system** designed to scale to **25,000–50,000 curated question-answer pairs**. It powers Sarah (AI Operating Assistant) on the landing page, Company Portal, and Railway API.
+The **ZiricAI Knowledge Base v1.0** is the official, metadata-rich documentation system that serves as the **single source of truth** for Sarah, AI employees, landing pages, and the Company Portal. It is designed to scale to **10,000+ curated entries in v1.0** and **50,000+ long-term**.
 
 **Source of truth:** `knowledge/*.md` (25 numbered category files)
+
+**Branding:** `ZIRICAI KNOWLEDGE BASE v1.0 | MODULE NN: {NAME} | SECTION N: {SECTION}`
+
+See also: [Intelligence Library Vision](./INTELLIGENCE_LIBRARY.md)
 
 ## Folder Structure
 
@@ -12,10 +16,10 @@ The ZiricAI platform knowledge base is a **metadata-rich, 25-category Q&A system
 knowledge/
 ├── README.md                 # Format spec, phase tracker, category index
 ├── stats.json                # Auto-generated counts (npm run build:knowledge)
-├── 01_About_ZiricAI.md
-├── 02_Pricing.md
-├── 03_FAQ.md
-├── 04_Industries.md
+├── 01_About_ZiricAI.md       # Module 01 — target 300 entries
+├── 02_Pricing.md             # Module 02 — target 300 entries
+├── 03_FAQ.md                 # Module 03 — target 800 entries
+├── 04_Industries.md          # Module 04 — target 2,000 entries
 ├── 05_AI_Employees.md
 ├── 06_Marketplace.md
 ├── 07_Automation.md
@@ -39,9 +43,9 @@ knowledge/
 └── 25_Updates.md
 ```
 
-## Metadata Entry Format
+## Official Entry Format (v1.0)
 
-Every Q&A entry includes YAML frontmatter:
+Every Q&A entry includes YAML frontmatter followed by a detailed answer (typically 2–4 paragraphs):
 
 ```yaml
 ---
@@ -49,36 +53,59 @@ id: KB-ABOUT-0001
 category: About ZiricAI
 sub_category: Introduction
 difficulty: Beginner
+intent: Platform Introduction
 keywords:
+  - ZiricAI
   - AI Business Operating System
+  - AI BOS
 audience:
-  - Customer
+  - General
+  - Prospects
+  - Customers
+  - Partners
   - Sales
+ai_response_style: "Explain using simple business language. Avoid technical jargon unless requested."
 last_updated: 2026-07-24
 related:
   - KB-ABOUT-0002
+  - What are AI Employees?
 ---
 
 ## Q: What is ZiricAI?
 
-**A:** ZiricAI is an AI Business Operating System...
+**A:** ZiricAI is an AI Business Operating System (AI BOS) developed by Ziric Media...
 ```
+
+### Metadata Fields
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `id` | Yes | `KB-{PREFIX}-{NNNN}` |
+| `category` | Yes | Module category |
+| `sub_category` | Yes | Section within module |
+| `difficulty` | Yes | Beginner / Intermediate / Advanced |
+| `intent` | No | Query intent for retrieval |
+| `keywords` | Yes | Search terms |
+| `audience` | Yes | Customer, Sales, Developer, Partners, etc. |
+| `ai_response_style` | No | How Sarah should tailor responses by audience |
+| `last_updated` | Yes | ISO date |
+| `related` | Yes | KB IDs or question text for follow-ups |
 
 ### ID Convention
 
-`KB-{CATEGORY_PREFIX}-{NNNN}` — e.g. `KB-PRICING-0042`, `KB-AIEMP-0121`
+`KB-{CATEGORY_PREFIX}-{NNNN}` — e.g. `KB-ABOUT-0001`, `KB-PRICING-0042`, `KB-AIEMP-0121`
 
-## Phased Roadmap
+## Version Roadmap
 
-| Phase | Name | Target | Scope |
+| Version | Name | Target | Scope |
 | --- | --- | ---: | --- |
-| 1 | Core | ~2,000 | About, FAQ, Pricing, AI Employees, Features, Company |
-| 2 | Business Platform | ~3,000 | CRM, Automation, Marketplace, Analytics, WhatsApp, Integrations, API |
-| 3 | Sales & Growth | ~2,500 | Sales, Objections, Comparisons, Industries |
-| 4 | Technical & Compliance | ~3,000 | Documentation, Tutorials, Support, Security, POPIA, GDPR, Billing |
-| 5 | Content | ~5,000 | Blogs, Updates, Best Practices, Success Stories |
+| **v1.0** | Knowledge Base | 10,000+ | Core platform Q&A (25 modules) |
+| **v2.0** | Industry Intelligence | — | Industry-specific knowledge |
+| **v3.0** | Training Scenarios | — | AI conversation training data |
+| **v4.0** | Technical Docs | — | API, SDK, integration guides |
+| **v5.0** | Sales & CS Intelligence | — | Scripts, objections, ROI playbooks |
 
-**Long-term target:** 25,000–50,000 curated Q&A pairs
+**Long-term target:** 50,000 curated entries across all Intelligence Library collections
 
 ## Loader API
 
@@ -87,34 +114,34 @@ related:
 | Function | Description |
 |----------|-------------|
 | `loadAllKnowledgeFiles()` | Read all `knowledge/NN_*.md`, parse YAML + Q&A, dedupe |
-| `parseFrontmatter(yaml)` | Parse YAML metadata block |
+| `parseFrontmatter(yaml)` | Parse YAML metadata block (supports `intent`, `ai_response_style`) |
 | `getPlatformKnowledgeSummary({ query, audience })` | Category manifest + smart retrieval for Sarah |
-| `searchKnowledge(query, { category, subCategory, audience })` | Metadata-aware keyword search |
-| `getRelatedEntries(id)` | Follow-up questions via `related` links + same sub_category |
-| `getKnowledgeStats()` | Counts by category and phase with progress percentages |
+| `searchKnowledge(query, { category, subCategory, audience })` | Metadata-aware keyword search; returns `aiResponseStyle` |
+| `getRelatedEntries(id)` | Follow-up questions via `related` IDs or question text |
+| `getKnowledgeStats()` | Counts by category, phase, and v1.0 progress |
 | `matchPlatformQuestion(text)` | Best single match (legacy compat) |
 
 ### Smart Retrieval (Sarah)
 
 Sarah does **not** dump all entries into every prompt. Instead:
 
-1. **System prompt** includes category manifest + top matches for the user's message, filtered by audience (Sales vs Customer)
+1. **System prompt** includes category manifest + top matches for the user's message, filtered by audience, including `ai_response_style` when present
 2. **`platformHelp` tool** calls `searchKnowledge()` with category/audience/sub_category filters
-3. **Related entries** surfaced via `getRelatedEntries()` for follow-up suggestions
+3. **Related entries** surfaced via `getRelatedEntries()` — resolves both KB IDs and question text
 4. Token budget: ~4,500 chars for knowledge summary (configurable)
 
 ## Build Pipeline
 
 ```bash
-npm run seed:knowledge    # Regenerate starter markdown with metadata IDs
 npm run build:knowledge   # Parse markdown → browser bundles + stats
+npm run prepare:sites marketing  # Sync bundles to marketing site
 ```
 
 **Outputs:**
 - `js/shared/platformKnowledgeData.js` — ES module with full metadata
 - `js/shared/platformKnowledge.browser.js` — IIFE for landing Sarah
 - Synced copies in `marketing/`, `admin/`, `app/` js/shared/
-- `knowledge/stats.json` — Q&A counts per file and phase
+- `knowledge/stats.json` — Q&A counts, v1.0 progress, per-module stats
 
 ## API
 
@@ -133,16 +160,9 @@ npm run build:knowledge   # Parse markdown → browser bundles + stats
 
 | Component | Role |
 |-----------|------|
-| `services/sarah/prompts/systemPrompt.js` | Injects metadata-aware summary with audience filter |
+| `services/sarah/prompts/systemPrompt.js` | Injects metadata-aware summary; follows `ai_response_style` |
 | `services/sarah/tools/platformHelp.js` | Search + related entries with metadata in response |
 | `api/app.js` | Public knowledge search endpoint |
-
-## Landing Page (Netlify)
-
-Static sites use the generated browser bundle:
-
-- `marketing/js/shared/platformKnowledge.browser.js` → `window.ZiricPlatformKnowledge`
-- Supports `searchKnowledge()`, `getRelatedEntries()`, audience filtering
 
 ## Pricing Accuracy
 
@@ -159,13 +179,15 @@ Run `npm run build:knowledge` after any pricing plan changes.
 ## Growth Workflow
 
 1. Add Q&A with full YAML frontmatter to the appropriate category file
-2. Link related entries via `related: [KB-XXX-NNNN]`
-3. Run `npm run build:knowledge`
-4. Commit both markdown and generated bundles
-5. Monitor progress via `knowledge/stats.json` or `getKnowledgeStats()`
+2. Write detailed 2–4 paragraph answers (not one-liners)
+3. Set `ai_response_style` for audience-sensitive topics
+4. Link related entries via `related: [KB-XXX-NNNN]` or question text
+5. Run `npm run build:knowledge`
+6. Commit both markdown and generated bundles
+7. Monitor progress via `knowledge/stats.json` → `v1.progressPct`
 
 ## Related Docs
 
-- [Sarah AI](../agents/04-sarah-ai.md)
-- [Knowledge Base Agent](../agents/06-knowledge-base.md)
+- [Intelligence Library Vision](./INTELLIGENCE_LIBRARY.md)
+- [Sarah AI](./SARAH.md)
 - [Billing Plans](../../services/platform/billingPlans.js)

@@ -122,6 +122,7 @@ export function getPlatformKnowledgeSummary(options = {}) {
                 lines.push("• [" + (m.id || m.cat) + "] " + m.catTitle + " / " + m.sub + aud);
                 lines.push("  Q: " + m.q);
                 lines.push("  A: " + m.a.slice(0, 220) + (m.a.length > 220 ? "…" : ""));
+                if (m.style) lines.push("  Response style: " + m.style.slice(0, 180) + (m.style.length > 180 ? "…" : ""));
                 if (m.rel?.length) lines.push("  Related: " + m.rel.slice(0, 3).join(", "));
             }
             lines.push("");
@@ -136,7 +137,7 @@ export function matchPlatformQuestion(text) {
     const matches = searchKnowledge(text, { limit: 1, minScore: 15 });
     if (!matches.length) return null;
     const best = matches[0];
-    return { id: best.id || best.cat, answer: best.a, title: best.catTitle, question: best.q, score: best.score, related: best.rel, audience: best.aud };
+    return { id: best.id || best.cat, answer: best.a, title: best.catTitle, question: best.q, score: best.score, related: best.rel, audience: best.aud, aiResponseStyle: best.style };
 }
 
 export function getPlatformAnswer(topicOrQuestion = "general") {
@@ -162,8 +163,10 @@ function buildBrowserBundle() {
         catTitle: p.categoryTitle,
         sub: p.subCategory,
         diff: p.difficulty,
+        intent: p.intent || null,
         kw: p.keywords?.slice(0, 30) || [],
         aud: p.audience || [],
+        style: p.aiResponseStyle || null,
         rel: p.related || [],
         phase: p.phase,
         updated: p.lastUpdated,

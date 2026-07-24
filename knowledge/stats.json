@@ -1,6 +1,6 @@
 {
   "fileCount": 25,
-  "questionCount": 1398,
+  "questionCount": 1298,
   "categoryCount": 25,
   "categories": [
     {
@@ -8,9 +8,9 @@
       "title": "About ZiricAI",
       "file": "01_About_ZiricAI.md",
       "phase": 1,
-      "phaseTarget": 400,
-      "count": 169,
-      "progressPct": 42.25
+      "phaseTarget": 300,
+      "count": 66,
+      "progressPct": 22
     },
     {
       "id": "pricing",
@@ -27,8 +27,8 @@
       "file": "03_FAQ.md",
       "phase": 1,
       "phaseTarget": 300,
-      "count": 36,
-      "progressPct": 12
+      "count": 38,
+      "progressPct": 12.67
     },
     {
       "id": "industries",
@@ -54,8 +54,8 @@
       "file": "06_Marketplace.md",
       "phase": 2,
       "phaseTarget": 300,
-      "count": 25,
-      "progressPct": 8.33
+      "count": 24,
+      "progressPct": 8
     },
     {
       "id": "automation",
@@ -72,8 +72,8 @@
       "file": "08_CRM.md",
       "phase": 2,
       "phaseTarget": 400,
-      "count": 50,
-      "progressPct": 12.5
+      "count": 52,
+      "progressPct": 13
     },
     {
       "id": "analytics",
@@ -126,8 +126,8 @@
       "file": "14_Documentation.md",
       "phase": 4,
       "phaseTarget": 350,
-      "count": 38,
-      "progressPct": 10.86
+      "count": 39,
+      "progressPct": 11.14
     },
     {
       "id": "company",
@@ -180,8 +180,8 @@
       "file": "20_POPIA.md",
       "phase": 4,
       "phaseTarget": 250,
-      "count": 19,
-      "progressPct": 7.6
+      "count": 18,
+      "progressPct": 7.2
     },
     {
       "id": "gdpr",
@@ -235,16 +235,16 @@
       "name": "Core",
       "description": "About, FAQ, Pricing, AI Employees, Features, Company",
       "target": 2000,
-      "count": 455,
-      "progressPct": 22.75
+      "count": 354,
+      "progressPct": 17.7
     },
     {
       "phase": 2,
       "name": "Business Platform",
       "description": "CRM, Automation, Marketplace, Analytics, WhatsApp, Integrations, API",
       "target": 3000,
-      "count": 250,
-      "progressPct": 8.33
+      "count": 251,
+      "progressPct": 8.37
     },
     {
       "phase": 3,
@@ -271,11 +271,108 @@
       "progressPct": 0.6
     }
   ],
+  "v1": {
+    "target": 10000,
+    "count": 1298,
+    "progressPct": 12.98,
+    "modules": [
+      {
+        "module": 1,
+        "id": "about-ziricai",
+        "title": "About ZiricAI",
+        "file": "01_About_ZiricAI.md",
+        "target": 300,
+        "count": 66,
+        "progressPct": 22
+      },
+      {
+        "module": 2,
+        "id": "pricing",
+        "title": "Pricing",
+        "file": "02_Pricing.md",
+        "target": 300,
+        "count": 63,
+        "progressPct": 21
+      },
+      {
+        "module": 3,
+        "id": "faq",
+        "title": "FAQ",
+        "file": "03_FAQ.md",
+        "target": 800,
+        "count": 38,
+        "progressPct": 4.75
+      },
+      {
+        "module": 4,
+        "id": "industries",
+        "title": "Industries",
+        "file": "04_Industries.md",
+        "target": 2000,
+        "count": 238,
+        "progressPct": 11.9
+      },
+      {
+        "module": 5,
+        "id": "ai-employees",
+        "title": "AI Employees",
+        "file": "05_AI_Employees.md",
+        "target": 500,
+        "count": 129,
+        "progressPct": 25.8
+      },
+      {
+        "module": 6,
+        "id": "marketplace",
+        "title": "Marketplace",
+        "file": "06_Marketplace.md",
+        "target": 400,
+        "count": 24,
+        "progressPct": 6
+      },
+      {
+        "module": 7,
+        "id": "automation",
+        "title": "Automation",
+        "file": "07_Automation.md",
+        "target": 600,
+        "count": 50,
+        "progressPct": 8.33
+      },
+      {
+        "module": 8,
+        "id": "crm",
+        "title": "CRM",
+        "file": "08_CRM.md",
+        "target": 600,
+        "count": 52,
+        "progressPct": 8.67
+      },
+      {
+        "module": 9,
+        "id": "whatsapp",
+        "title": "WhatsApp",
+        "file": "10_WhatsApp.md",
+        "target": 500,
+        "count": 60,
+        "progressPct": 12
+      },
+      {
+        "module": 10,
+        "id": "integrations",
+        "title": "Integrations",
+        "file": "11_Integrations.md",
+        "target": 400,
+        "count": 25,
+        "progressPct": 6.25
+      }
+    ]
+  },
   "files": [
     {
       "filename": "01_About_ZiricAI.md",
       "category": "about-ziricai",
-      "count": 169
+      "count": 66
     },
     {
       "filename": "02_Pricing.md",
@@ -285,7 +382,7 @@
     {
       "filename": "03_FAQ.md",
       "category": "faq",
-      "count": 36
+      "count": 38
     },
     {
       "filename": "04_Industries.md",
@@ -300,7 +397,7 @@
     {
       "filename": "06_Marketplace.md",
       "category": "marketplace",
-      "count": 25
+      "count": 24
     },
     {
       "filename": "07_Automation.md",
@@ -310,7 +407,7 @@
     {
       "filename": "08_CRM.md",
       "category": "crm",
-      "count": 50
+      "count": 52
     },
     {
       "filename": "09_Analytics.md",
@@ -340,7 +437,7 @@
     {
       "filename": "14_Documentation.md",
       "category": "documentation",
-      "count": 38
+      "count": 39
     },
     {
       "filename": "15_Company.md",
@@ -370,7 +467,7 @@
     {
       "filename": "20_POPIA.md",
       "category": "popia",
-      "count": 19
+      "count": 18
     },
     {
       "filename": "21_GDPR.md",
@@ -399,7 +496,7 @@
     }
   ],
   "target": 50000,
-  "progressPct": 2.8,
-  "entriesWithMetadata": 1398,
+  "progressPct": 2.6,
+  "entriesWithMetadata": 1298,
   "metadataCoveragePct": 100
 }

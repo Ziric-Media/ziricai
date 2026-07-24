@@ -4,6 +4,8 @@
 export {
     CATEGORY_MANIFEST,
     PHASE_MANIFEST,
+    V1_TARGET,
+    V1_MODULE_MANIFEST,
     CATEGORY_ALIASES,
     KNOWLEDGE_DIR,
     parseFrontmatter,
