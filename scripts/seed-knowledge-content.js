@@ -973,86 +973,115 @@ const FAQ_QA = [
     qa("Human handoff?", "Yes — unified inbox takeover anytime."),
     qa("Get started now?", "Click Start Free Trial on ziricai.com — live in minutes."),
 ];
-function formatMarkdown(title, categoryId, pairs) {
-    const header = `# ${title}\n> Category: ${categoryId} | ZiricAI Platform Knowledge Base\n\n`;
-    const body = pairs
-        .map(({ q, a }) => `## Q: ${q}\n**A:** ${a}`)
-        .join("\n\n");
-    return header + body + "\n";
+function formatEntry(idPrefix, index, def, q, a) {
+    const id = `KB-${idPrefix}-${String(index).padStart(4, "0")}`;
+    return [
+        "---",
+        `id: ${id}`,
+        `category: ${def.title}`,
+        `sub_category: ${def.subCategory}`,
+        `difficulty: ${def.difficulty}`,
+        "keywords:",
+        ...(def.keywords || ["ZiricAI"]).map((k) => `  - ${k}`),
+        "audience:",
+        ...def.audience.map((aud) => `  - ${aud}`),
+        `last_updated: ${new Date().toISOString().slice(0, 10)}`,
+        "related: []",
+        "---",
+        "",
+        `## Q: ${q}`,
+        `**A:** ${a}`,
+        "",
+    ].join("\n");
 }
 
-function buildReadme(categories, totalQA) {
+function formatMarkdown(def, pairs) {
+    const header = `# ${def.title}\n> ZiricAI Platform Knowledge Base | Phase ${def.phase}\n\n`;
+    const body = pairs
+        .map(({ q, a }, i) => formatEntry(def.idPrefix, i + 1, def, q, a))
+        .join("\n");
+    return header + body;
+}
+
+function buildReadme(categories, totalQA, stats) {
     const fence = "```";
     const lines = [
         "# ZiricAI Platform Knowledge Base",
-        "> Master index of platform knowledge categories",
+        "> Master index — 25-category metadata-rich Q&A system",
         "",
         "## Format specification",
         "",
-        "Each knowledge file uses this Q&A structure:",
+        "Each Q&A entry includes YAML frontmatter:",
         "",
         fence,
-        "## Q: Question here?",
-        "**A:** Answer here.",
-        fence,
+        "---",
+        "id: KB-ABOUT-0001",
+        "category: About ZiricAI",
+        "sub_category: Introduction",
+        "difficulty: Beginner",
+        "keywords:",
+        "  - AI Business Operating System",
+        "audience:",
+        "  - Customer",
+        "  - Sales",
+        "last_updated: 2026-07-24",
+        "related:",
+        "  - KB-ABOUT-0002",
+        "---",
         "",
-        "Files start with a category title and metadata line:",
-        "",
-        fence,
-        "# Category Title",
-        "> Category: category-id | ZiricAI Platform Knowledge Base",
+        "## Q: What is ZiricAI?",
+        "**A:** ...",
         fence,
         "",
         "## Statistics",
         "",
         `- **Total Q&A pairs:** ${totalQA}`,
-        "- **Target:** 15,000+ pairs",
-        `- **Progress:** ${((totalQA / 15000) * 100).toFixed(2)}% toward 15,000 target`,
+        "- **Long-term target:** 25,000–50,000 curated Q&A",
+        `- **Progress:** ${stats.progressPct}% toward 50,000 target`,
+        `- **Metadata coverage:** ${stats.metadataCoveragePct}%`,
         "",
-        "## Categories (30)",
+        "## Phase roadmap",
         "",
-        "| # | File | Category ID | Q&A Count |",
-        "| --- | --- | --- | --- |",
+        "| Phase | Name | Target | Current | Progress |",
+        "| --- | --- | ---: | ---: | ---: |",
     ];
-    for (const cat of categories) {
-        lines.push(`| ${cat.order} | [${cat.title}](${cat.file}) | \`${cat.id}\` | ${cat.count} Q&A |`);
+    for (const ph of stats.phases || []) {
+        lines.push(`| ${ph.phase} | ${ph.name} | ${ph.target.toLocaleString()} | ${ph.count.toLocaleString()} | ${ph.progressPct}% |`);
     }
-    lines.push("", "## Cross-cutting FAQ", "", "| File | Description |", "| --- | --- |", "| [faq.md](faq.md) | General FAQ spanning all topics |", "");
+    lines.push("", "## Categories (25)", "", "| # | File | Category | Phase | Q&A |", "| --- | --- | --- | ---: | ---: |");
+    for (const cat of categories) {
+        lines.push(`| ${cat.order} | [${cat.title}](${cat.file}) | \`${cat.id}\` | ${cat.phase} | ${cat.count} |`);
+    }
+    lines.push("");
     return lines.join("\n");
 }
 
 const CATEGORY_DEFS = [
-    { file: "01-about.md", id: "about", title: "About", qa: [...ABOUT_QA, ...ABOUT_EXPANSION] },
-    { file: "02-ai-employees.md", id: "ai-employees", title: "AI Employees", qa: [...AI_EMPLOYEES_QA, ...AI_EMPLOYEES_EXPANSION] },
-    { file: "03-features.md", id: "features", title: "Features", qa: [...FEATURES_QA, ...FEATURES_EXPANSION] },
-    { file: "04-industries.md", id: "industries", title: "Industries", qa: [...INDUSTRIES_QA, ...INDUSTRIES_EXPANSION] },
-    { file: "05-pricing.md", id: "pricing", title: "Pricing", qa: PRICING_QA },
-    { file: "06-marketplace.md", id: "marketplace", title: "Marketplace", qa: MARKETPLACE_QA },
-    { file: "07-automation.md", id: "automation", title: "Automation", qa: [...AUTOMATION_QA, ...AUTOMATION_EXPANSION] },
-    { file: "08-crm.md", id: "crm", title: "CRM", qa: [...CRM_QA, ...CRM_EXPANSION] },
-    { file: "09-analytics.md", id: "analytics", title: "Analytics", qa: ANALYTICS_QA },
-    { file: "10-whatsapp.md", id: "whatsapp", title: "WhatsApp", qa: [...WHATSAPP_QA, ...WHATSAPP_EXPANSION] },
-    { file: "11-integrations.md", id: "integrations", title: "Integrations", qa: INTEGRATIONS_QA },
-    { file: "12-api.md", id: "api", title: "API", qa: API_QA },
-    { file: "13-tutorials.md", id: "tutorials", title: "Tutorials", qa: TUTORIALS_QA },
-    { file: "14-documentation.md", id: "documentation", title: "Documentation", qa: DOCUMENTATION_QA },
-    { file: "15-security.md", id: "security", title: "Security", qa: SECURITY_QA },
-    { file: "16-popia.md", id: "popia", title: "POPIA", qa: POPIA_QA },
-    { file: "17-gdpr.md", id: "gdpr", title: "GDPR", qa: GDPR_QA },
-    { file: "18-sales.md", id: "sales", title: "Sales", qa: [...SALES_QA, ...SALES_EXPANSION] },
-    { file: "19-objections.md", id: "objections", title: "Objection Handling", qa: [...OBJECTIONS_QA, ...OBJECTIONS_EXPANSION] },
-    { file: "20-comparisons.md", id: "comparisons", title: "Competitive Comparison", qa: [...COMPARISONS_QA, ...COMPARISONS_EXPANSION] },
-    { file: "21-billing.md", id: "billing", title: "Billing", qa: BILLING_QA },
-    { file: "22-support.md", id: "support", title: "Support", qa: SUPPORT_QA },
-    { file: "23-company.md", id: "company", title: "Company", qa: COMPANY_QA },
-    { file: "24-blogs.md", id: "blogs", title: "Blogs", qa: BLOGS_QA },
-    { file: "25-product-updates.md", id: "product-updates", title: "Product Updates", qa: PRODUCT_UPDATES_QA },
-    { file: "26-glossary.md", id: "glossary", title: "Glossary", qa: GLOSSARY_QA },
-    { file: "27-internal-policies.md", id: "internal-policies", title: "Internal Policies", qa: INTERNAL_POLICIES_QA },
-    { file: "28-troubleshooting.md", id: "troubleshooting", title: "Technical Troubleshooting", qa: TROUBLESHOOTING_QA },
-    { file: "29-best-practices.md", id: "best-practices", title: "Best Practices", qa: BEST_PRACTICES_QA },
-    { file: "30-success-stories.md", id: "success-stories", title: "Success Stories", qa: SUCCESS_STORIES_QA },
-    { file: "faq.md", id: "faq", title: "FAQ", qa: FAQ_QA },
+    { file: "01_About_ZiricAI.md", id: "about-ziricai", title: "About ZiricAI", idPrefix: "ABOUT", phase: 1, subCategory: "Introduction", difficulty: "Beginner", audience: ["Customer", "Sales"], keywords: ["ZiricAI"], qa: [...ABOUT_QA, ...ABOUT_EXPANSION] },
+    { file: "02_Pricing.md", id: "pricing", title: "Pricing", idPrefix: "PRICING", phase: 1, subCategory: "Plans", difficulty: "Beginner", audience: ["Customer", "Sales"], keywords: ["pricing", "plans"], qa: PRICING_QA },
+    { file: "03_FAQ.md", id: "faq", title: "FAQ", idPrefix: "FAQ", phase: 1, subCategory: "General", difficulty: "Beginner", audience: ["Customer"], keywords: ["FAQ"], qa: FAQ_QA },
+    { file: "04_Industries.md", id: "industries", title: "Industries", idPrefix: "IND", phase: 3, subCategory: "Verticals", difficulty: "Intermediate", audience: ["Customer", "Sales"], keywords: ["industries"], qa: [...INDUSTRIES_QA, ...INDUSTRIES_EXPANSION] },
+    { file: "05_AI_Employees.md", id: "ai-employees", title: "AI Employees", idPrefix: "AIEMP", phase: 1, subCategory: "Roles", difficulty: "Beginner", audience: ["Customer"], keywords: ["AI Employee"], qa: [...AI_EMPLOYEES_QA, ...AI_EMPLOYEES_EXPANSION] },
+    { file: "06_Marketplace.md", id: "marketplace", title: "Marketplace", idPrefix: "MKT", phase: 2, subCategory: "Industry Packs", difficulty: "Intermediate", audience: ["Customer"], keywords: ["Marketplace"], qa: MARKETPLACE_QA },
+    { file: "07_Automation.md", id: "automation", title: "Automation", idPrefix: "AUTO", phase: 2, subCategory: "Workflows", difficulty: "Intermediate", audience: ["Customer"], keywords: ["automation"], qa: [...AUTOMATION_QA, ...AUTOMATION_EXPANSION] },
+    { file: "08_CRM.md", id: "crm", title: "CRM", idPrefix: "CRM", phase: 2, subCategory: "Contacts", difficulty: "Intermediate", audience: ["Customer"], keywords: ["CRM"], qa: [...CRM_QA, ...CRM_EXPANSION] },
+    { file: "09_Analytics.md", id: "analytics", title: "Analytics", idPrefix: "ANLY", phase: 2, subCategory: "Dashboards", difficulty: "Intermediate", audience: ["Customer"], keywords: ["analytics"], qa: ANALYTICS_QA },
+    { file: "10_WhatsApp.md", id: "whatsapp", title: "WhatsApp", idPrefix: "WA", phase: 2, subCategory: "Setup", difficulty: "Intermediate", audience: ["Customer"], keywords: ["WhatsApp"], qa: [...WHATSAPP_QA, ...WHATSAPP_EXPANSION] },
+    { file: "11_Integrations.md", id: "integrations", title: "Integrations", idPrefix: "INTG", phase: 2, subCategory: "Channels", difficulty: "Intermediate", audience: ["Customer"], keywords: ["integrations"], qa: INTEGRATIONS_QA },
+    { file: "12_API.md", id: "api", title: "API", idPrefix: "API", phase: 2, subCategory: "REST", difficulty: "Advanced", audience: ["Developer"], keywords: ["API"], qa: API_QA },
+    { file: "13_Tutorials.md", id: "tutorials", title: "Tutorials", idPrefix: "TUT", phase: 4, subCategory: "Getting Started", difficulty: "Beginner", audience: ["Customer"], keywords: ["tutorial"], qa: TUTORIALS_QA },
+    { file: "14_Documentation.md", id: "documentation", title: "Documentation", idPrefix: "DOC", phase: 4, subCategory: "Reference", difficulty: "Advanced", audience: ["Developer"], keywords: ["documentation"], qa: DOCUMENTATION_QA },
+    { file: "15_Company.md", id: "company", title: "Company", idPrefix: "CO", phase: 1, subCategory: "About Us", difficulty: "Beginner", audience: ["Customer", "Sales"], keywords: ["company"], qa: COMPANY_QA },
+    { file: "16_Sales.md", id: "sales", title: "Sales", idPrefix: "SALES", phase: 3, subCategory: "Playbooks", difficulty: "Intermediate", audience: ["Sales"], keywords: ["sales"], qa: [...SALES_QA, ...SALES_EXPANSION] },
+    { file: "17_Objection_Handling.md", id: "objection-handling", title: "Objection Handling", idPrefix: "OBJ", phase: 3, subCategory: "Responses", difficulty: "Intermediate", audience: ["Sales"], keywords: ["objections"], qa: [...OBJECTIONS_QA, ...OBJECTIONS_EXPANSION] },
+    { file: "18_Competitive_Comparison.md", id: "competitive-comparison", title: "Competitive Comparison", idPrefix: "COMP", phase: 3, subCategory: "Alternatives", difficulty: "Intermediate", audience: ["Sales"], keywords: ["comparison"], qa: [...COMPARISONS_QA, ...COMPARISONS_EXPANSION] },
+    { file: "19_Security.md", id: "security", title: "Security", idPrefix: "SEC", phase: 4, subCategory: "Infrastructure", difficulty: "Advanced", audience: ["Customer", "Developer"], keywords: ["security"], qa: SECURITY_QA },
+    { file: "20_POPIA.md", id: "popia", title: "POPIA", idPrefix: "POPIA", phase: 4, subCategory: "Compliance", difficulty: "Intermediate", audience: ["Customer"], keywords: ["POPIA"], qa: POPIA_QA },
+    { file: "21_GDPR.md", id: "gdpr", title: "GDPR", idPrefix: "GDPR", phase: 4, subCategory: "Compliance", difficulty: "Intermediate", audience: ["Customer"], keywords: ["GDPR"], qa: GDPR_QA },
+    { file: "22_Support.md", id: "support", title: "Support", idPrefix: "SUP", phase: 4, subCategory: "Help", difficulty: "Beginner", audience: ["Customer"], keywords: ["support"], qa: SUPPORT_QA },
+    { file: "23_Billing.md", id: "billing", title: "Billing", idPrefix: "BILL", phase: 4, subCategory: "Payments", difficulty: "Beginner", audience: ["Customer"], keywords: ["billing"], qa: BILLING_QA },
+    { file: "24_Blogs.md", id: "blogs", title: "Blogs", idPrefix: "BLOG", phase: 5, subCategory: "Articles", difficulty: "Beginner", audience: ["Customer"], keywords: ["blog"], qa: BLOGS_QA },
+    { file: "25_Updates.md", id: "updates", title: "Updates", idPrefix: "UPD", phase: 5, subCategory: "Release Notes", difficulty: "Beginner", audience: ["Customer"], keywords: ["updates"], qa: PRODUCT_UPDATES_QA },
 ];
 
 function main() {
@@ -1060,20 +1089,35 @@ function main() {
     let total = 0;
 
     for (const def of CATEGORY_DEFS) {
-        const content = formatMarkdown(def.title, def.id, def.qa);
+        const content = formatMarkdown(def, def.qa);
         fs.writeFileSync(path.join(KNOWLEDGE_DIR, def.file), content, "utf8");
         total += def.qa.length;
-        console.log(`✓ ${def.file.padEnd(28)} ${def.qa.length} Q&A`);
+        console.log(`✓ ${def.file.padEnd(32)} ${def.qa.length} Q&A`);
     }
 
-    const readmeCategories = CATEGORY_DEFS.filter((d) => d.file !== "faq.md").map((d, i) => ({
+    const readmeCategories = CATEGORY_DEFS.map((d, i) => ({
         order: i + 1,
         title: d.title,
         file: d.file,
         id: d.id,
+        phase: d.phase,
         count: d.qa.length,
     }));
-    fs.writeFileSync(path.join(KNOWLEDGE_DIR, "README.md"), buildReadme(readmeCategories, total), "utf8");
+    const stats = {
+        progressPct: Math.round((total / 50000) * 10000) / 100,
+        metadataCoveragePct: 100,
+        phases: [
+            { phase: 1, name: "Core", target: 2000, count: CATEGORY_DEFS.filter((d) => d.phase === 1).reduce((s, d) => s + d.qa.length, 0), progressPct: 0 },
+            { phase: 2, name: "Business Platform", target: 3000, count: CATEGORY_DEFS.filter((d) => d.phase === 2).reduce((s, d) => s + d.qa.length, 0), progressPct: 0 },
+            { phase: 3, name: "Sales & Growth", target: 2500, count: CATEGORY_DEFS.filter((d) => d.phase === 3).reduce((s, d) => s + d.qa.length, 0), progressPct: 0 },
+            { phase: 4, name: "Technical & Compliance", target: 3000, count: CATEGORY_DEFS.filter((d) => d.phase === 4).reduce((s, d) => s + d.qa.length, 0), progressPct: 0 },
+            { phase: 5, name: "Content", target: 5000, count: CATEGORY_DEFS.filter((d) => d.phase === 5).reduce((s, d) => s + d.qa.length, 0), progressPct: 0 },
+        ],
+    };
+    for (const ph of stats.phases) {
+        ph.progressPct = Math.round((ph.count / ph.target) * 10000) / 100;
+    }
+    fs.writeFileSync(path.join(KNOWLEDGE_DIR, "README.md"), buildReadme(readmeCategories, total, stats), "utf8");
     console.log("");
     console.log(`Total Q&A pairs written: ${total}`);
     console.log(`Knowledge directory: ${KNOWLEDGE_DIR}`);

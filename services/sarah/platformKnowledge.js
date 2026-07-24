@@ -3,14 +3,17 @@
  */
 export {
     CATEGORY_MANIFEST,
-    FLAT_ALIASES,
+    PHASE_MANIFEST,
+    CATEGORY_ALIASES,
     KNOWLEDGE_DIR,
+    parseFrontmatter,
     parseMarkdownQA,
     loadKnowledgeFile,
     loadAllKnowledgeFiles,
     normalizeQuestionText,
     scoreKnowledgeMatch,
     searchKnowledge,
+    getRelatedEntries,
     getKnowledgeStats,
     getPlatformKnowledgeSummary,
     matchPlatformQuestion,

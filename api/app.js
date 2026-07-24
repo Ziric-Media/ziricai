@@ -132,6 +132,7 @@ import {
     searchKnowledge,
     getKnowledgeStats,
     getPlatformKnowledgeSummary,
+    getRelatedEntries,
 } from "../services/knowledge/platformKnowledgeLoader.js";
 import {
     initIntegrationHub,
@@ -811,18 +812,26 @@ app.get("/api/sarah/knowledge", async (req, res) => {
     try {
         const query = String(req.query.q || req.query.query || "").trim();
         const category = req.query.category || null;
+        const subCategory = req.query.sub_category || req.query.subCategory || null;
+        const audience = req.query.audience || null;
+        const relatedId = req.query.related || req.query.id || null;
         const limit = Math.min(parseInt(req.query.limit, 10) || 8, 20);
+
+        if (relatedId) {
+            const related = getRelatedEntries(relatedId, { limit });
+            return res.json({ id: relatedId, related, count: related.length });
+        }
 
         if (!query) {
             const stats = getKnowledgeStats();
             return res.json({
                 stats,
-                summary: getPlatformKnowledgeSummary({ maxChars: 2000 }),
+                summary: getPlatformKnowledgeSummary({ maxChars: 2000, audience }),
             });
         }
 
-        const results = searchKnowledge(query, { limit, category, minScore: 10 });
-        res.json({ query, category, results, count: results.length });
+        const results = searchKnowledge(query, { limit, category, subCategory, audience, minScore: 10 });
+        res.json({ query, category, subCategory, audience, results, count: results.length });
     } catch (err) {
         console.error("[api/sarah/knowledge] error:", err.message);
         res.status(500).json({ error: err.message || "Knowledge search failed" });

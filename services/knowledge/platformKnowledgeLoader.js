@@ -1,6 +1,6 @@
 /**
  * ZiricAI Platform Knowledge Loader
- * Reads all markdown Q&A from knowledge/ — source of truth for Sarah + landing FAQ.
+ * Reads metadata-rich markdown Q&A from knowledge/ — source of truth for Sarah + landing FAQ.
  */
 import fs from "fs";
 import path from "path";
@@ -10,70 +10,63 @@ import { getPricingSummaryText, getDefaultPlatformReply, formatPrice, getPlan, g
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const KNOWLEDGE_DIR = path.join(ROOT, "knowledge");
 
-/** 30-category taxonomy manifest */
+/** 25-category taxonomy with phase targets */
 export const CATEGORY_MANIFEST = [
-    { order: 1, id: "about", title: "About", file: "01-about.md" },
-    { order: 2, id: "ai-employees", title: "AI Employees", file: "02-ai-employees.md" },
-    { order: 3, id: "features", title: "Features", file: "03-features.md" },
-    { order: 4, id: "industries", title: "Industries", file: "04-industries.md" },
-    { order: 5, id: "pricing", title: "Pricing", file: "05-pricing.md" },
-    { order: 6, id: "marketplace", title: "Marketplace", file: "06-marketplace.md" },
-    { order: 7, id: "automation", title: "Automation", file: "07-automation.md" },
-    { order: 8, id: "crm", title: "CRM", file: "08-crm.md" },
-    { order: 9, id: "analytics", title: "Analytics", file: "09-analytics.md" },
-    { order: 10, id: "whatsapp", title: "WhatsApp", file: "10-whatsapp.md" },
-    { order: 11, id: "integrations", title: "Integrations", file: "11-integrations.md" },
-    { order: 12, id: "api", title: "API", file: "12-api.md" },
-    { order: 13, id: "tutorials", title: "Tutorials", file: "13-tutorials.md" },
-    { order: 14, id: "documentation", title: "Documentation", file: "14-documentation.md" },
-    { order: 15, id: "security", title: "Security", file: "15-security.md" },
-    { order: 16, id: "popia", title: "POPIA", file: "16-popia.md" },
-    { order: 17, id: "gdpr", title: "GDPR", file: "17-gdpr.md" },
-    { order: 18, id: "sales", title: "Sales", file: "18-sales.md" },
-    { order: 19, id: "objections", title: "Objection Handling", file: "19-objections.md" },
-    { order: 20, id: "comparisons", title: "Competitive Comparison", file: "20-comparisons.md" },
-    { order: 21, id: "billing", title: "Billing", file: "21-billing.md" },
-    { order: 22, id: "support", title: "Support", file: "22-support.md" },
-    { order: 23, id: "company", title: "Company", file: "23-company.md" },
-    { order: 24, id: "blogs", title: "Blogs", file: "24-blogs.md" },
-    { order: 25, id: "product-updates", title: "Product Updates", file: "25-product-updates.md" },
-    { order: 26, id: "glossary", title: "Glossary", file: "26-glossary.md" },
-    { order: 27, id: "internal-policies", title: "Internal Policies", file: "27-internal-policies.md" },
-    { order: 28, id: "troubleshooting", title: "Technical Troubleshooting", file: "28-troubleshooting.md" },
-    { order: 29, id: "best-practices", title: "Best Practices", file: "29-best-practices.md" },
-    { order: 30, id: "success-stories", title: "Success Stories", file: "30-success-stories.md" },
+    { order: 1, id: "about-ziricai", title: "About ZiricAI", file: "01_About_ZiricAI.md", idPrefix: "ABOUT", phase: 1, phaseTarget: 400 },
+    { order: 2, id: "pricing", title: "Pricing", file: "02_Pricing.md", idPrefix: "PRICING", phase: 1, phaseTarget: 350 },
+    { order: 3, id: "faq", title: "FAQ", file: "03_FAQ.md", idPrefix: "FAQ", phase: 1, phaseTarget: 300 },
+    { order: 4, id: "industries", title: "Industries", file: "04_Industries.md", idPrefix: "IND", phase: 3, phaseTarget: 600 },
+    { order: 5, id: "ai-employees", title: "AI Employees", file: "05_AI_Employees.md", idPrefix: "AIEMP", phase: 1, phaseTarget: 400 },
+    { order: 6, id: "marketplace", title: "Marketplace", file: "06_Marketplace.md", idPrefix: "MKT", phase: 2, phaseTarget: 300 },
+    { order: 7, id: "automation", title: "Automation", file: "07_Automation.md", idPrefix: "AUTO", phase: 2, phaseTarget: 400 },
+    { order: 8, id: "crm", title: "CRM", file: "08_CRM.md", idPrefix: "CRM", phase: 2, phaseTarget: 400 },
+    { order: 9, id: "analytics", title: "Analytics", file: "09_Analytics.md", idPrefix: "ANLY", phase: 2, phaseTarget: 250 },
+    { order: 10, id: "whatsapp", title: "WhatsApp", file: "10_WhatsApp.md", idPrefix: "WA", phase: 2, phaseTarget: 350 },
+    { order: 11, id: "integrations", title: "Integrations", file: "11_Integrations.md", idPrefix: "INTG", phase: 2, phaseTarget: 300 },
+    { order: 12, id: "api", title: "API", file: "12_API.md", idPrefix: "API", phase: 2, phaseTarget: 250 },
+    { order: 13, id: "tutorials", title: "Tutorials", file: "13_Tutorials.md", idPrefix: "TUT", phase: 4, phaseTarget: 400 },
+    { order: 14, id: "documentation", title: "Documentation", file: "14_Documentation.md", idPrefix: "DOC", phase: 4, phaseTarget: 350 },
+    { order: 15, id: "company", title: "Company", file: "15_Company.md", idPrefix: "CO", phase: 1, phaseTarget: 250 },
+    { order: 16, id: "sales", title: "Sales", file: "16_Sales.md", idPrefix: "SALES", phase: 3, phaseTarget: 400 },
+    { order: 17, id: "objection-handling", title: "Objection Handling", file: "17_Objection_Handling.md", idPrefix: "OBJ", phase: 3, phaseTarget: 500 },
+    { order: 18, id: "competitive-comparison", title: "Competitive Comparison", file: "18_Competitive_Comparison.md", idPrefix: "COMP", phase: 3, phaseTarget: 400 },
+    { order: 19, id: "security", title: "Security", file: "19_Security.md", idPrefix: "SEC", phase: 4, phaseTarget: 300 },
+    { order: 20, id: "popia", title: "POPIA", file: "20_POPIA.md", idPrefix: "POPIA", phase: 4, phaseTarget: 250 },
+    { order: 21, id: "gdpr", title: "GDPR", file: "21_GDPR.md", idPrefix: "GDPR", phase: 4, phaseTarget: 250 },
+    { order: 22, id: "support", title: "Support", file: "22_Support.md", idPrefix: "SUP", phase: 4, phaseTarget: 350 },
+    { order: 23, id: "billing", title: "Billing", file: "23_Billing.md", idPrefix: "BILL", phase: 4, phaseTarget: 250 },
+    { order: 24, id: "blogs", title: "Blogs", file: "24_Blogs.md", idPrefix: "BLOG", phase: 5, phaseTarget: 200 },
+    { order: 25, id: "updates", title: "Updates", file: "25_Updates.md", idPrefix: "UPD", phase: 5, phaseTarget: 200 },
 ];
 
-/** Flat alias filenames → canonical category id */
-export const FLAT_ALIASES = {
-    "about.md": "about",
-    "employees.md": "ai-employees",
-    "features.md": "features",
-    "industries.md": "industries",
-    "pricing.md": "pricing",
-    "marketplace.md": "marketplace",
-    "automation.md": "automation",
-    "crm.md": "crm",
-    "analytics.md": "analytics",
-    "whatsapp.md": "whatsapp",
-    "facebook.md": "integrations",
-    "instagram.md": "integrations",
-    "api.md": "api",
-    "billing.md": "billing",
-    "company.md": "company",
-    "support.md": "support",
-    "tutorials.md": "tutorials",
-    "blogs.md": "blogs",
-    "security.md": "security",
-    "comparisons.md": "comparisons",
-    "objections.md": "objections",
-    "faq.md": "faq",
+export const PHASE_MANIFEST = [
+    { phase: 1, name: "Core", target: 2000, categories: ["about-ziricai", "pricing", "faq", "ai-employees", "company"], description: "About, FAQ, Pricing, AI Employees, Features, Company" },
+    { phase: 2, name: "Business Platform", target: 3000, categories: ["crm", "automation", "marketplace", "analytics", "whatsapp", "integrations", "api"], description: "CRM, Automation, Marketplace, Analytics, WhatsApp, Integrations, API" },
+    { phase: 3, name: "Sales & Growth", target: 2500, categories: ["sales", "objection-handling", "competitive-comparison", "industries"], description: "Sales, Objections, Comparisons, Industries" },
+    { phase: 4, name: "Technical & Compliance", target: 3000, categories: ["documentation", "tutorials", "support", "security", "popia", "gdpr", "billing"], description: "Documentation, Tutorials, Support, Security, POPIA, GDPR, Billing" },
+    { phase: 5, name: "Content", target: 5000, categories: ["blogs", "updates"], description: "Blogs, Updates, Best Practices, Success Stories" },
+];
+
+export const LONG_TERM_TARGET = 50000;
+
+/** Legacy alias map for backward compatibility */
+export const CATEGORY_ALIASES = {
+    about: "about-ziricai",
+    features: "about-ziricai",
+    objections: "objection-handling",
+    comparisons: "competitive-comparison",
+    "product-updates": "updates",
+    "objection-handling": "objection-handling",
+    "competitive-comparison": "competitive-comparison",
+    "about-ziricai": "about-ziricai",
 };
 
-const QA_BLOCK_RE = /^## Q:\s*(.+?)\r?\n\*\*A:\*\*\s*([\s\S]*?)(?=^## Q:|$)/gm;
+const ENTRY_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n\r?\n## Q:\s*(.+?)\r?\n\*\*A:\*\*\s*([\s\S]*?)(?=^---\r?\n|^## Q:|$)/gm;
+const LEGACY_QA_RE = /^## Q:\s*(.+?)\r?\n\*\*A:\*\*\s*([\s\S]*?)(?=^## Q:|$)/gm;
 
 let _cache = null;
 let _cacheMtime = 0;
+let _byId = null;
 
 function getKnowledgeMtime() {
     if (!fs.existsSync(KNOWLEDGE_DIR)) return 0;
@@ -86,50 +79,132 @@ function getKnowledgeMtime() {
     return latest;
 }
 
-function resolveCategory(filename) {
+function resolveCategoryId(filename) {
     const base = path.basename(filename);
-    if (FLAT_ALIASES[base]) return FLAT_ALIASES[base];
     const manifest = CATEGORY_MANIFEST.find((c) => c.file === base);
     if (manifest) return manifest.id;
-    const numMatch = base.match(/^\d+-(.+)\.md$/);
-    if (numMatch) return numMatch[1];
+    const match = base.match(/^\d{2}_(.+)\.md$/);
+    if (match) return match[1].toLowerCase().replace(/_/g, "-");
     return base.replace(/\.md$/, "");
 }
 
 function resolveCategoryTitle(categoryId) {
-    const manifest = CATEGORY_MANIFEST.find((c) => c.id === categoryId);
+    const normalized = CATEGORY_ALIASES[categoryId] || categoryId;
+    const manifest = CATEGORY_MANIFEST.find((c) => c.id === normalized);
     if (manifest) return manifest.title;
-    if (categoryId === "faq") return "FAQ";
     return categoryId.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** Parse Q&A pairs from markdown content */
-export function parseMarkdownQA(content, meta = {}) {
+function normalizeCategoryFilter(category) {
+    if (!category) return null;
+    return CATEGORY_ALIASES[category] || category;
+}
+
+/** Parse YAML frontmatter block into metadata object */
+export function parseFrontmatter(yamlBlock) {
+    const meta = {};
+    if (!yamlBlock) return meta;
+
+    const lines = yamlBlock.split("\n");
+    let currentKey = null;
+    let list = null;
+
+    for (const raw of lines) {
+        const line = raw.trimEnd();
+        if (/^\s+-\s+/.test(line) && list) {
+            list.push(line.replace(/^\s+-\s+/, "").trim());
+            continue;
+        }
+        const m = line.match(/^(\w+):\s*(.*)$/);
+        if (!m) continue;
+        currentKey = m[1];
+        const val = m[2].trim();
+        if (val === "" || val === "[]") {
+            list = [];
+            meta[currentKey] = list;
+        } else {
+            meta[currentKey] = val;
+            list = null;
+        }
+    }
+    return meta;
+}
+
+function extractKeywords(question, answer, explicit = []) {
+    const fromMeta = Array.isArray(explicit) ? explicit : [];
+    if (fromMeta.length) return fromMeta;
+    const text = `${question} ${answer}`.toLowerCase();
+    const words = text.replace(/[^\w\s]/g, " ").split(/\s+/).filter((w) => w.length > 2);
+    return [...new Set(words)].slice(0, 20);
+}
+
+function normalizeAudience(audience) {
+    if (!audience) return ["Customer"];
+    if (Array.isArray(audience)) return audience;
+    return [String(audience)];
+}
+
+/** Parse metadata-rich or legacy markdown Q&A */
+export function parseMarkdownQA(content, fileMeta = {}) {
     const pairs = [];
     if (!content) return pairs;
 
-    QA_BLOCK_RE.lastIndex = 0;
+    ENTRY_RE.lastIndex = 0;
     let match;
-    while ((match = QA_BLOCK_RE.exec(content)) !== null) {
-        const question = match[1].trim();
-        const answer = match[2].trim().replace(/\s+$/g, "");
+    let foundMetadata = false;
+
+    while ((match = ENTRY_RE.exec(content)) !== null) {
+        foundMetadata = true;
+        const fm = parseFrontmatter(match[1]);
+        const question = match[2].trim();
+        const answer = match[3].trim().replace(/\s+$/g, "");
         if (!question || !answer) continue;
+
+        const categoryId = fileMeta.category || normalizeCategoryFilter(fm.category?.toLowerCase().replace(/\s+/g, "-")) || "general";
+
         pairs.push({
+            id: fm.id || null,
             question,
             answer,
-            category: meta.category || "general",
-            categoryTitle: meta.categoryTitle || resolveCategoryTitle(meta.category || "general"),
-            sourceFile: meta.sourceFile || null,
-            keywords: extractKeywords(question, answer),
+            category: categoryId,
+            categoryTitle: resolveCategoryTitle(categoryId),
+            subCategory: fm.sub_category || fm.subCategory || "General",
+            difficulty: fm.difficulty || "Beginner",
+            keywords: extractKeywords(question, answer, fm.keywords),
+            audience: normalizeAudience(fm.audience),
+            lastUpdated: fm.last_updated || fm.lastUpdated || null,
+            related: Array.isArray(fm.related) ? fm.related.filter(Boolean) : [],
+            sourceFile: fileMeta.sourceFile || null,
+            phase: fileMeta.phase || CATEGORY_MANIFEST.find((c) => c.id === categoryId)?.phase || null,
         });
     }
-    return pairs;
-}
 
-function extractKeywords(question, answer) {
-    const text = `${question} ${answer}`.toLowerCase();
-    const words = text.replace(/[^\w\s]/g, " ").split(/\s+/).filter((w) => w.length > 2);
-    return [...new Set(words)];
+    if (!foundMetadata) {
+        LEGACY_QA_RE.lastIndex = 0;
+        while ((match = LEGACY_QA_RE.exec(content)) !== null) {
+            const question = match[1].trim();
+            const answer = match[2].trim().replace(/\s+$/g, "");
+            if (!question || !answer) continue;
+            const categoryId = fileMeta.category || "general";
+            pairs.push({
+                id: null,
+                question,
+                answer,
+                category: categoryId,
+                categoryTitle: resolveCategoryTitle(categoryId),
+                subCategory: "General",
+                difficulty: "Beginner",
+                keywords: extractKeywords(question, answer),
+                audience: ["Customer"],
+                lastUpdated: null,
+                related: [],
+                sourceFile: fileMeta.sourceFile || null,
+                phase: fileMeta.phase || null,
+            });
+        }
+    }
+
+    return pairs;
 }
 
 function injectDynamicAnswers(pairs, categoryId) {
@@ -144,67 +219,64 @@ function injectDynamicAnswers(pairs, categoryId) {
     return pairs;
 }
 
-/** Read and parse a single markdown file */
 export function loadKnowledgeFile(filename) {
     const filePath = path.join(KNOWLEDGE_DIR, filename);
     if (!fs.existsSync(filePath)) return [];
     const content = fs.readFileSync(filePath, "utf8");
-    const category = resolveCategory(filename);
+    const category = resolveCategoryId(filename);
+    const manifest = CATEGORY_MANIFEST.find((c) => c.file === filename);
     const pairs = parseMarkdownQA(content, {
         category,
-        categoryTitle: resolveCategoryTitle(category),
         sourceFile: filename,
+        phase: manifest?.phase || null,
     });
     return injectDynamicAnswers(pairs, category);
 }
 
-/** Load all .md files from knowledge/, dedupe by question text */
 export function loadAllKnowledgeFiles(options = {}) {
     const { force = false } = options;
     const mtime = getKnowledgeMtime();
     if (!force && _cache && mtime === _cacheMtime) return _cache;
 
     if (!fs.existsSync(KNOWLEDGE_DIR)) {
-        _cache = { files: [], pairs: [], byCategory: {} };
+        _cache = { files: [], pairs: [], byCategory: {}, byId: {} };
+        _byId = {};
         _cacheMtime = mtime;
         return _cache;
     }
 
     const seenQuestions = new Set();
+    const seenIds = new Set();
     const files = [];
     const pairs = [];
     const byCategory = {};
-
-    const aliasFiles = new Set(Object.keys(FLAT_ALIASES));
-    const canonicalFiles = new Set(CATEGORY_MANIFEST.map((c) => c.file));
+    const byId = {};
 
     const mdFiles = fs
         .readdirSync(KNOWLEDGE_DIR)
-        .filter((f) => {
-            if (!f.endsWith(".md") || f === "README.md") return false;
-            // Skip flat aliases when canonical numbered file exists (avoid double-count)
-            if (aliasFiles.has(f) && f !== "faq.md") {
-                const manifest = CATEGORY_MANIFEST.find((c) => c.id === FLAT_ALIASES[f]);
-                if (manifest && fs.existsSync(path.join(KNOWLEDGE_DIR, manifest.file))) return false;
-            }
-            return true;
-        })
+        .filter((f) => f.endsWith(".md") && f !== "README.md" && /^\d{2}_/.test(f))
         .sort((a, b) => {
             const orderA = CATEGORY_MANIFEST.find((c) => c.file === a)?.order ?? 999;
             const orderB = CATEGORY_MANIFEST.find((c) => c.file === b)?.order ?? 999;
-            if (orderA !== orderB) return orderA - orderB;
-            return a.localeCompare(b);
+            return orderA - orderB || a.localeCompare(b);
         });
 
     for (const filename of mdFiles) {
         const filePairs = loadKnowledgeFile(filename);
-        const category = resolveCategory(filename);
+        const category = resolveCategoryId(filename);
         const deduped = [];
 
         for (const pair of filePairs) {
             const key = pair.question.toLowerCase().trim();
             if (seenQuestions.has(key)) continue;
             seenQuestions.add(key);
+
+            if (pair.id && seenIds.has(pair.id)) continue;
+            if (pair.id) {
+                seenIds.add(pair.id);
+                byId[pair.id] = pair;
+            }
+
             deduped.push(pair);
             pairs.push(pair);
             if (!byCategory[category]) byCategory[category] = [];
@@ -214,12 +286,12 @@ export function loadAllKnowledgeFiles(options = {}) {
         files.push({ filename, category, count: deduped.length });
     }
 
-    _cache = { files, pairs, byCategory };
+    _cache = { files, pairs, byCategory, byId };
+    _byId = byId;
     _cacheMtime = mtime;
     return _cache;
 }
 
-/** Normalize text for search matching */
 export function normalizeQuestionText(text) {
     return String(text || "")
         .toLowerCase()
@@ -232,15 +304,15 @@ function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Score a Q&A pair against a normalized query */
-export function scoreKnowledgeMatch(normalizedQuery, pair) {
+export function scoreKnowledgeMatch(normalizedQuery, pair, options = {}) {
     if (!normalizedQuery) return 0;
+    const { audience = null, subCategory = null } = options;
     const qNorm = normalizeQuestionText(pair.question);
     const aNorm = normalizeQuestionText(pair.answer);
     let score = 0;
 
-    if (qNorm === normalizedQuery) return 200;
-    if (qNorm.includes(normalizedQuery) || normalizedQuery.includes(qNorm)) score += 80;
+    if (qNorm === normalizedQuery) score += 200;
+    else if (qNorm.includes(normalizedQuery) || normalizedQuery.includes(qNorm)) score += 80;
 
     const queryWords = normalizedQuery.split(" ").filter((w) => w.length > 2);
     for (const word of queryWords) {
@@ -248,13 +320,16 @@ export function scoreKnowledgeMatch(normalizedQuery, pair) {
         if (re.test(qNorm)) score += 18;
         if (re.test(aNorm)) score += 6;
         for (const kw of pair.keywords || []) {
-            if (kw === word || kw.includes(word)) score += 4;
+            const kwNorm = normalizeQuestionText(kw);
+            if (kwNorm === word || kwNorm.includes(word) || word.includes(kwNorm)) score += 8;
         }
     }
 
-    if (pair.category && normalizedQuery.includes(pair.category.replace(/-/g, " "))) {
-        score += 12;
-    }
+    if (pair.category && normalizedQuery.includes(pair.category.replace(/-/g, " "))) score += 12;
+    if (pair.subCategory && normalizedQuery.includes(normalizeQuestionText(pair.subCategory))) score += 10;
+
+    if (audience && pair.audience?.some((a) => a.toLowerCase() === audience.toLowerCase())) score += 15;
+    if (subCategory && pair.subCategory?.toLowerCase() === subCategory.toLowerCase()) score += 20;
 
     return score;
 }
@@ -262,95 +337,139 @@ export function scoreKnowledgeMatch(normalizedQuery, pair) {
 /**
  * Keyword search across all knowledge Q&A pairs.
  * @param {string} query
- * @param {{ limit?: number, category?: string, minScore?: number }} [options]
+ * @param {{ limit?: number, category?: string, subCategory?: string, audience?: string, minScore?: number }} [options]
  */
 export function searchKnowledge(query, options = {}) {
-    const { limit = 8, category = null, minScore = 12 } = options;
+    const { limit = 8, category = null, subCategory = null, audience = null, minScore = 12 } = options;
     const normalized = normalizeQuestionText(query);
-    if (!normalized) return [];
+    const catFilter = normalizeCategoryFilter(category);
 
     const { pairs } = loadAllKnowledgeFiles();
-    const pool = category ? pairs.filter((p) => p.category === category) : pairs;
+    let pool = pairs;
+
+    if (catFilter) pool = pool.filter((p) => p.category === catFilter || CATEGORY_ALIASES[p.category] === catFilter);
+    if (subCategory) pool = pool.filter((p) => p.subCategory?.toLowerCase() === subCategory.toLowerCase());
+    if (audience) pool = pool.filter((p) => p.audience?.some((a) => a.toLowerCase() === audience.toLowerCase()));
+
+    if (!normalized) {
+        return pool.slice(0, limit).map((p) => ({ ...p, score: 0 }));
+    }
 
     return pool
-        .map((pair) => ({ ...pair, score: scoreKnowledgeMatch(normalized, pair) }))
+        .map((pair) => ({
+            ...pair,
+            score: scoreKnowledgeMatch(normalized, pair, { audience, subCategory }),
+        }))
         .filter((p) => p.score >= minScore)
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
 }
 
-/** Knowledge base statistics */
+/** Get related entries by KB id */
+export function getRelatedEntries(id, options = {}) {
+    const { limit = 5 } = options;
+    const data = loadAllKnowledgeFiles();
+    const entry = data.byId[id];
+    if (!entry) return [];
+
+    const related = [];
+    const seen = new Set([id]);
+
+    for (const relId of entry.related || []) {
+        if (seen.has(relId)) continue;
+        const rel = data.byId[relId];
+        if (rel) {
+            related.push(rel);
+            seen.add(relId);
+        }
+    }
+
+    if (related.length < limit) {
+        const sameSub = (data.byCategory[entry.category] || []).filter(
+            (p) => p.subCategory === entry.subCategory && p.id !== id && !seen.has(p.id)
+        );
+        for (const p of sameSub.slice(0, limit - related.length)) {
+            related.push(p);
+            seen.add(p.id);
+        }
+    }
+
+    return related.slice(0, limit);
+}
+
 export function getKnowledgeStats() {
     const data = loadAllKnowledgeFiles();
+
     const categoryStats = CATEGORY_MANIFEST.map((cat) => ({
         id: cat.id,
         title: cat.title,
         file: cat.file,
+        phase: cat.phase,
+        phaseTarget: cat.phaseTarget,
         count: (data.byCategory[cat.id] || []).length,
+        progressPct: Math.round(((data.byCategory[cat.id] || []).length / cat.phaseTarget) * 10000) / 100,
     }));
 
-    const extraCategories = Object.keys(data.byCategory)
-        .filter((id) => !CATEGORY_MANIFEST.find((c) => c.id === id))
-        .map((id) => ({
-            id,
-            title: resolveCategoryTitle(id),
-            file: null,
-            count: data.byCategory[id].length,
-        }));
+    const phaseStats = PHASE_MANIFEST.map((ph) => {
+        const count = ph.categories.reduce((sum, catId) => sum + (data.byCategory[catId] || []).length, 0);
+        return {
+            phase: ph.phase,
+            name: ph.name,
+            description: ph.description,
+            target: ph.target,
+            count,
+            progressPct: Math.round((count / ph.target) * 10000) / 100,
+        };
+    });
 
     return {
         fileCount: data.files.length,
         questionCount: data.pairs.length,
-        categoryCount: categoryStats.filter((c) => c.count > 0).length + extraCategories.filter((c) => c.count > 0).length,
-        categories: [...categoryStats, ...extraCategories],
+        categoryCount: categoryStats.filter((c) => c.count > 0).length,
+        categories: categoryStats,
+        phases: phaseStats,
         files: data.files,
-        target: 15000,
-        progressPct: Math.round((data.pairs.length / 15000) * 10000) / 100,
+        target: LONG_TERM_TARGET,
+        progressPct: Math.round((data.pairs.length / LONG_TERM_TARGET) * 10000) / 100,
+        entriesWithMetadata: data.pairs.filter((p) => p.id).length,
+        metadataCoveragePct: Math.round((data.pairs.filter((p) => p.id).length / Math.max(data.pairs.length, 1)) * 10000) / 100,
     };
 }
 
-/**
- * Build compact summary for Sarah system prompt.
- * Includes category manifest + smart retrieval when query provided.
- * @param {{ query?: string, maxChars?: number, matchLimit?: number }} [options]
- */
 export function getPlatformKnowledgeSummary(options = {}) {
-    const { query = "", maxChars = 4500, matchLimit = 6 } = options;
+    const { query = "", maxChars = 4500, matchLimit = 6, audience = null } = options;
     const stats = getKnowledgeStats();
     const data = loadAllKnowledgeFiles();
 
     const lines = [
-        `ZiricAI Knowledge Base (${stats.questionCount} Q&A across ${stats.categoryCount} categories; target ${stats.target.toLocaleString()}+)`,
+        `ZiricAI Knowledge Base (${stats.questionCount} Q&A across ${stats.categoryCount} categories; long-term target ${stats.target.toLocaleString()}+)`,
+        `Metadata coverage: ${stats.metadataCoveragePct}% | Phase 1 progress: ${stats.phases[0]?.progressPct}%`,
         "",
         "Categories:",
         ...CATEGORY_MANIFEST.map((c) => {
             const count = (data.byCategory[c.id] || []).length;
-            return `  ${c.order}. ${c.title} (${count} Q&A)`;
+            return `  ${c.order}. ${c.title} (${count} Q&A, Phase ${c.phase})`;
         }),
         "",
     ];
 
     if (query) {
-        const matches = searchKnowledge(query, { limit: matchLimit, minScore: 10 });
+        const matches = searchKnowledge(query, { limit: matchLimit, minScore: 10, audience });
         if (matches.length) {
             lines.push(`Relevant to current question (${matches.length} matches):`);
             for (const m of matches) {
-                lines.push(`• [${m.categoryTitle}] Q: ${m.question}`);
+                const aud = m.audience?.length ? ` [${m.audience.join(", ")}]` : "";
+                lines.push(`• [${m.id || m.category}] ${m.categoryTitle} / ${m.subCategory}${aud}`);
+                lines.push(`  Q: ${m.question}`);
                 lines.push(`  A: ${m.answer.slice(0, 220)}${m.answer.length > 220 ? "…" : ""}`);
+                if (m.related?.length) {
+                    lines.push(`  Related: ${m.related.slice(0, 3).join(", ")}`);
+                }
             }
             lines.push("");
         }
     }
 
-    lines.push("Category highlights (first Q per category):");
-    for (const cat of CATEGORY_MANIFEST) {
-        const first = (data.byCategory[cat.id] || [])[0];
-        if (first) {
-            lines.push(`• ${cat.title}: ${first.question} → ${first.answer.slice(0, 100)}…`);
-        }
-    }
-
-    lines.push("");
     lines.push(`Pricing (canonical): ${getPricingSummaryText()}`);
 
     let summary = lines.join("\n");
@@ -360,30 +479,33 @@ export function getPlatformKnowledgeSummary(options = {}) {
     return summary;
 }
 
-/** Match platform question — backward-compatible with legacy platformKnowledge.js */
 export function matchPlatformQuestion(text, context = {}) {
     const normalized = normalizeQuestionText(text);
     if (!normalized) return null;
 
-    const matches = searchKnowledge(text, { limit: 1, minScore: 15 });
+    const matches = searchKnowledge(text, { limit: 1, minScore: 15, audience: context.audience });
     if (matches.length) {
         const best = matches[0];
         return {
-            id: best.category,
+            id: best.id || best.category,
             answer: best.answer,
             title: best.categoryTitle,
             question: best.question,
             score: best.score,
+            related: best.related,
+            audience: best.audience,
         };
     }
 
     if (context.lastTopicId) {
-        const categoryPairs = loadAllKnowledgeFiles().byCategory[context.lastTopicId] || [];
+        const topicId = normalizeCategoryFilter(context.lastTopicId);
+        const categoryPairs = loadAllKnowledgeFiles().byCategory[topicId] || [];
         if (categoryPairs.length) {
             return {
-                id: context.lastTopicId,
+                id: categoryPairs[0].id || topicId,
                 answer: categoryPairs[0].answer,
-                title: resolveCategoryTitle(context.lastTopicId),
+                title: resolveCategoryTitle(topicId),
+                question: categoryPairs[0].question,
             };
         }
     }
@@ -391,7 +513,6 @@ export function matchPlatformQuestion(text, context = {}) {
     return null;
 }
 
-/** Get answer for topic or free-text question */
 export function getPlatformAnswer(topicOrQuestion = "general", context = {}) {
     const topic = String(topicOrQuestion || "").toLowerCase();
 
@@ -399,27 +520,32 @@ export function getPlatformAnswer(topicOrQuestion = "general", context = {}) {
         aiemployee: "ai-employees",
         aiemployees: "ai-employees",
         employees: "ai-employees",
-        overview: "about",
-        general: "about",
+        overview: "about-ziricai",
+        general: "about-ziricai",
+        about: "about-ziricai",
+        features: "about-ziricai",
         trial: "pricing",
         restaurant: "industries",
-        knowledge: "features",
-        sarah: "about",
+        knowledge: "about-ziricai",
+        sarah: "about-ziricai",
         roi: "sales",
         integrations: "integrations",
         whatsapp: "whatsapp",
+        objections: "objection-handling",
+        comparisons: "competitive-comparison",
     };
 
-    const categoryId = categoryMap[topic] || topic;
+    const categoryId = normalizeCategoryFilter(categoryMap[topic] || topic);
     const data = loadAllKnowledgeFiles();
     const categoryPairs = data.byCategory[categoryId];
 
     if (categoryPairs?.length) {
         return {
-            id: categoryId,
+            id: categoryPairs[0].id || categoryId,
             answer: categoryPairs[0].answer,
             title: resolveCategoryTitle(categoryId),
             question: categoryPairs[0].question,
+            related: categoryPairs[0].related,
         };
     }
 
@@ -433,10 +559,10 @@ export function getPlatformAnswer(topicOrQuestion = "general", context = {}) {
     };
 }
 
-/** Invalidate in-memory cache (for tests / hot reload) */
 export function clearKnowledgeCache() {
     _cache = null;
     _cacheMtime = 0;
+    _byId = null;
 }
 
 export { getPricingSummaryText, getDefaultPlatformReply, formatPrice, getPlan, getPublicPlans };

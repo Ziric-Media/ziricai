@@ -2,73 +2,83 @@
 
 ## Overview
 
-The ZiricAI platform knowledge base is a **markdown-first, 30-category Q&A system** designed to scale to **15,000+ question-answer pairs**. It powers Sarah (AI Operating Assistant) on the landing page, Company Portal, and Railway API.
+The ZiricAI platform knowledge base is a **metadata-rich, 25-category Q&A system** designed to scale to **25,000–50,000 curated question-answer pairs**. It powers Sarah (AI Operating Assistant) on the landing page, Company Portal, and Railway API.
 
-**Source of truth:** `knowledge/*.md`
+**Source of truth:** `knowledge/*.md` (25 numbered category files)
 
 ## Folder Structure
 
 ```
 knowledge/
-├── README.md                 # Category index, format spec, stats
+├── README.md                 # Format spec, phase tracker, category index
 ├── stats.json                # Auto-generated counts (npm run build:knowledge)
-├── 01-about.md               # 30-category numbered files
-├── 02-ai-employees.md
-├── ...
-├── 30-success-stories.md
-├── faq.md                    # Cross-cutting FAQ index
-└── about.md, pricing.md, ... # Flat aliases (synced from canonical files)
+├── 01_About_ZiricAI.md
+├── 02_Pricing.md
+├── 03_FAQ.md
+├── 04_Industries.md
+├── 05_AI_Employees.md
+├── 06_Marketplace.md
+├── 07_Automation.md
+├── 08_CRM.md
+├── 09_Analytics.md
+├── 10_WhatsApp.md
+├── 11_Integrations.md
+├── 12_API.md
+├── 13_Tutorials.md
+├── 14_Documentation.md
+├── 15_Company.md
+├── 16_Sales.md
+├── 17_Objection_Handling.md
+├── 18_Competitive_Comparison.md
+├── 19_Security.md
+├── 20_POPIA.md
+├── 21_GDPR.md
+├── 22_Support.md
+├── 23_Billing.md
+├── 24_Blogs.md
+└── 25_Updates.md
 ```
 
-### 30-Category Taxonomy
+## Metadata Entry Format
 
-| # | Category | File |
-|---|----------|------|
-| 1 | About | `01-about.md` |
-| 2 | AI Employees | `02-ai-employees.md` |
-| 3 | Features | `03-features.md` |
-| 4 | Industries | `04-industries.md` |
-| 5 | Pricing | `05-pricing.md` |
-| 6 | Marketplace | `06-marketplace.md` |
-| 7 | Automation | `07-automation.md` |
-| 8 | CRM | `08-crm.md` |
-| 9 | Analytics | `09-analytics.md` |
-| 10 | WhatsApp | `10-whatsapp.md` |
-| 11 | Integrations | `11-integrations.md` |
-| 12 | API | `12-api.md` |
-| 13 | Tutorials | `13-tutorials.md` |
-| 14 | Documentation | `14-documentation.md` |
-| 15 | Security | `15-security.md` |
-| 16 | POPIA | `16-popia.md` |
-| 17 | GDPR | `17-gdpr.md` |
-| 18 | Sales | `18-sales.md` |
-| 19 | Objection Handling | `19-objections.md` |
-| 20 | Competitive Comparison | `20-comparisons.md` |
-| 21 | Billing | `21-billing.md` |
-| 22 | Support | `22-support.md` |
-| 23 | Company | `23-company.md` |
-| 24 | Blogs | `24-blogs.md` |
-| 25 | Product Updates | `25-product-updates.md` |
-| 26 | Glossary | `26-glossary.md` |
-| 27 | Internal Policies | `27-internal-policies.md` |
-| 28 | Technical Troubleshooting | `28-troubleshooting.md` |
-| 29 | Best Practices | `29-best-practices.md` |
-| 30 | Success Stories | `30-success-stories.md` |
+Every Q&A entry includes YAML frontmatter:
 
-## Markdown Q&A Format
-
-Every Q&A pair uses this parseable format:
-
-```markdown
-# Category Title
-> Category: category-id | ZiricAI Platform Knowledge Base
+```yaml
+---
+id: KB-ABOUT-0001
+category: About ZiricAI
+sub_category: Introduction
+difficulty: Beginner
+keywords:
+  - AI Business Operating System
+audience:
+  - Customer
+  - Sales
+last_updated: 2026-07-24
+related:
+  - KB-ABOUT-0002
+---
 
 ## Q: What is ZiricAI?
-**A:** ZiricAI is an AI Business Operating System...
 
-## Q: Who created ZiricAI?
-**A:** ...
+**A:** ZiricAI is an AI Business Operating System...
 ```
+
+### ID Convention
+
+`KB-{CATEGORY_PREFIX}-{NNNN}` — e.g. `KB-PRICING-0042`, `KB-AIEMP-0121`
+
+## Phased Roadmap
+
+| Phase | Name | Target | Scope |
+| --- | --- | ---: | --- |
+| 1 | Core | ~2,000 | About, FAQ, Pricing, AI Employees, Features, Company |
+| 2 | Business Platform | ~3,000 | CRM, Automation, Marketplace, Analytics, WhatsApp, Integrations, API |
+| 3 | Sales & Growth | ~2,500 | Sales, Objections, Comparisons, Industries |
+| 4 | Technical & Compliance | ~3,000 | Documentation, Tutorials, Support, Security, POPIA, GDPR, Billing |
+| 5 | Content | ~5,000 | Blogs, Updates, Best Practices, Success Stories |
+
+**Long-term target:** 25,000–50,000 curated Q&A pairs
 
 ## Loader API
 
@@ -76,54 +86,67 @@ Every Q&A pair uses this parseable format:
 
 | Function | Description |
 |----------|-------------|
-| `loadAllKnowledgeFiles()` | Glob-read all `knowledge/*.md`, parse Q&A, dedupe |
-| `getPlatformKnowledgeSummary({ query, maxChars })` | Category manifest + smart retrieval for Sarah prompt |
-| `searchKnowledge(query, { limit, category })` | Keyword scoring search |
-| `getKnowledgeStats()` | File count, Q count, per-category breakdown |
+| `loadAllKnowledgeFiles()` | Read all `knowledge/NN_*.md`, parse YAML + Q&A, dedupe |
+| `parseFrontmatter(yaml)` | Parse YAML metadata block |
+| `getPlatformKnowledgeSummary({ query, audience })` | Category manifest + smart retrieval for Sarah |
+| `searchKnowledge(query, { category, subCategory, audience })` | Metadata-aware keyword search |
+| `getRelatedEntries(id)` | Follow-up questions via `related` links + same sub_category |
+| `getKnowledgeStats()` | Counts by category and phase with progress percentages |
 | `matchPlatformQuestion(text)` | Best single match (legacy compat) |
-| `getPlatformAnswer(topic)` | Answer by category or free-text |
 
 ### Smart Retrieval (Sarah)
 
-Sarah does **not** dump all 15k lines into every prompt. Instead:
+Sarah does **not** dump all entries into every prompt. Instead:
 
-1. **System prompt** includes category manifest + first Q per category + top 6 matches for the user's current message
-2. **`platformHelp` tool** calls `searchKnowledge()` for precise Q&A on demand
-3. Token budget: ~4,500 chars for knowledge summary (configurable)
+1. **System prompt** includes category manifest + top matches for the user's message, filtered by audience (Sales vs Customer)
+2. **`platformHelp` tool** calls `searchKnowledge()` with category/audience/sub_category filters
+3. **Related entries** surfaced via `getRelatedEntries()` for follow-up suggestions
+4. Token budget: ~4,500 chars for knowledge summary (configurable)
 
 ## Build Pipeline
 
 ```bash
-npm run seed:knowledge    # Regenerate starter markdown from seed script
+npm run seed:knowledge    # Regenerate starter markdown with metadata IDs
 npm run build:knowledge   # Parse markdown → browser bundles + stats
 ```
 
 **Outputs:**
-- `js/shared/platformKnowledgeData.js` — ES module for browser/Netlify
+- `js/shared/platformKnowledgeData.js` — ES module with full metadata
 - `js/shared/platformKnowledge.browser.js` — IIFE for landing Sarah
-- `knowledge/stats.json` — Q&A counts per file
-- Flat alias files (`about.md`, `pricing.md`, etc.)
+- Synced copies in `marketing/`, `admin/`, `app/` js/shared/
+- `knowledge/stats.json` — Q&A counts per file and phase
+
+## API
+
+`GET /api/sarah/knowledge` supports:
+
+| Param | Description |
+| --- | --- |
+| `q` | Search query |
+| `category` | Category ID filter (e.g. `pricing`, `about-ziricai`) |
+| `sub_category` | Sub-category filter (e.g. `Introduction`, `Plans`) |
+| `audience` | Audience filter (`Customer`, `Sales`, `Developer`, `Internal`) |
+| `related` / `id` | Get related entries for a KB ID |
+| `limit` | Max results (default 8, max 20) |
 
 ## Sarah Integration
 
 | Component | Role |
 |-----------|------|
-| `services/sarah/prompts/systemPrompt.js` | Injects `getPlatformKnowledgeSummary({ query: userMessage })` |
-| `services/sarah/tools/platformHelp.js` | Uses `searchKnowledge()` for on-demand lookup |
-| `services/sarah/sarahOrchestrator.js` | Passes `lastUserMessage` to prompt builder |
-| `api/app.js` | `GET /api/sarah/knowledge?q=...` public search endpoint |
+| `services/sarah/prompts/systemPrompt.js` | Injects metadata-aware summary with audience filter |
+| `services/sarah/tools/platformHelp.js` | Search + related entries with metadata in response |
+| `api/app.js` | Public knowledge search endpoint |
 
 ## Landing Page (Netlify)
 
 Static sites use the generated browser bundle:
 
-- `js/shared/platformKnowledge.browser.js` → `window.ZiricPlatformKnowledge`
-- `marketing/js/ziricai-landing.js` calls `matchPlatformQuestion()` locally
-- Falls back to `POST /api/sarah/chat` when API is available
+- `marketing/js/shared/platformKnowledge.browser.js` → `window.ZiricPlatformKnowledge`
+- Supports `searchKnowledge()`, `getRelatedEntries()`, audience filtering
 
 ## Pricing Accuracy
 
-Pricing Q&A in `05-pricing.md` and `21-billing.md` must match `services/platform/billingPlans.js`:
+Pricing Q&A in `02_Pricing.md` and `23_Billing.md` must match `services/platform/billingPlans.js`:
 
 - **Trial:** Free, 14 days
 - **Starter:** R999.99/month
@@ -133,14 +156,13 @@ Pricing Q&A in `05-pricing.md` and `21-billing.md` must match `services/platform
 
 Run `npm run build:knowledge` after any pricing plan changes.
 
-## Growth Path to 15,000 Q&A
+## Growth Workflow
 
-1. Add Q&A pairs to the appropriate category markdown file
-2. Run `npm run build:knowledge`
-3. Commit both markdown and generated bundles
-4. Monitor progress via `knowledge/stats.json` or `getKnowledgeStats()`
-
-Priority expansion areas: industries (per-vertical deep dives), objections, troubleshooting, tutorials.
+1. Add Q&A with full YAML frontmatter to the appropriate category file
+2. Link related entries via `related: [KB-XXX-NNNN]`
+3. Run `npm run build:knowledge`
+4. Commit both markdown and generated bundles
+5. Monitor progress via `knowledge/stats.json` or `getKnowledgeStats()`
 
 ## Related Docs
 
