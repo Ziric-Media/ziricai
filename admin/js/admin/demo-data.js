@@ -1,5 +1,5 @@
 /** Demo / fallback data when Firestore reads fail or return empty. */
-import { BILLING_PLANS } from '../../shared/billingPlans.js';
+import { BILLING_PLANS } from '../shared/billingPlans.js';
 
 /** Knowledge base registry — used in company form dropdowns. */
 export const DEMO_KNOWLEDGE = [
