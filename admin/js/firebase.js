@@ -5,11 +5,7 @@
  * Firebase console -> Project Settings -> General -> Your apps -> Web app
  */
 import { initializeApp } from 'firebase/app';
-import {
-  initializeFirestore,
-  memoryLocalCache,
-  enableNetwork,
-} from 'firebase/firestore';
+import { getFirestore, enableNetwork } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
@@ -26,16 +22,33 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 
-/** Memory cache avoids IndexedDB persistence leaving the client stuck offline on first read. */
-export const db = initializeFirestore(app, {
-  localCache: memoryLocalCache(),
-  experimentalForceLongPolling: true,
-});
+let dbInstance = null;
+
+/** Lazy Firestore — avoids "Component firestore has not been registered yet" on CDN/importmap loads. */
+export function getDb() {
+  if (!dbInstance) {
+    dbInstance = getFirestore(app);
+  }
+  return dbInstance;
+}
+
+/** Backward-compatible lazy proxy so auth-only pages do not touch Firestore at import time. */
+export const db = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      const instance = getDb();
+      const value = instance[prop];
+      return typeof value === 'function' ? value.bind(instance) : value;
+    },
+  }
+);
+
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
 async function ensureNetworkOnline() {
-  await enableNetwork(db);
+  await enableNetwork(getDb());
 }
 
 /** Wait for auth token + Firestore network before profile reads. */
