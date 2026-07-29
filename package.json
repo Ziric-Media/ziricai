@@ -18,6 +18,7 @@
         "migrate:tenants:dry": "node scripts/migrate-demo-to-tenants.js --dry-run",
         "verify:sprint1": "node scripts/verify-sprint1-flow.js",
         "verify:journey": "node scripts/verify-customer-journey.js",
+        "verify:firestore": "node scripts/verify-firestore.js",
         "build:knowledge": "node scripts/build-knowledge-bundle.js",
         "seed:knowledge": "node scripts/seed-knowledge-content.js"
     },
@@ -26,6 +27,7 @@
         "dotenv": "^17.4.2",
         "express": "^5.2.1",
         "firebase": "^12.15.0",
+        "firebase-admin": "^13.10.0",
         "mammoth": "^1.12.0",
         "multer": "^2.2.0",
         "openai": "^6.46.0",

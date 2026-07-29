@@ -51,7 +51,7 @@ export async function parseUploadedFile(buffer, mimetype, originalname) {
 
 export async function saveKnowledgeDocument({ companyId, title, type, content, url, fileName }) {
     const adapter = await getStorageAdapter();
-    if (adapter.saveKnowledgeDoc && (process.env.STORAGE_BACKEND || "auto").toLowerCase() === "memory") {
+    if (adapter.saveKnowledgeDoc && adapter.name === "memory") {
         return adapter.saveKnowledgeDoc({
             companyId,
             title,
@@ -95,7 +95,7 @@ export async function saveKnowledgeDocument({ companyId, title, type, content, u
 
 export async function listKnowledgeDocuments(companyId) {
     const adapter = await getStorageAdapter();
-    if (adapter.listKnowledgeDocs && (process.env.STORAGE_BACKEND || "auto").toLowerCase() === "memory") {
+    if (adapter.listKnowledgeDocs && adapter.name === "memory") {
         return adapter.listKnowledgeDocs({ companyId });
     }
 

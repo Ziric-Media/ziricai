@@ -76,7 +76,7 @@ Railway injects `RAILWAY_PUBLIC_DOMAIN` and `RAILWAY_ENVIRONMENT` — CORS allow
 5. Wait until the database shows **Active**
 6. On Railway, set `STORAGE_BACKEND=firestore` and redeploy
 
-Ensure Firebase web config in `js/firebase.js` matches project **ziricai**. No `firebase-admin` package is required for the current adapter (client SDK + REST token verify).
+Ensure Firebase web config via `js/firebase-config.js` (env / `__ZIRICAI_CONFIG__`). Server uses Firebase Admin SDK — see [FIRESTORE_PRODUCTION.md](./FIRESTORE_PRODUCTION.md).
 
 ## 3. Custom domain `api.ziricai.com` (optional)
 

@@ -17,6 +17,7 @@ import {
     where,
     orderBy,
     limit,
+    startAfter,
     serverTimestamp,
 } from "./firestoreClient.js";
 import { ROOT } from "./schema.js";

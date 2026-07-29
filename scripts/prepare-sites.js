@@ -46,6 +46,19 @@ const FIREBASE_IMPORTMAP_CDN = `"firebase/": "https://esm.sh/firebase@12.15.0/"`
 
 const useCdnFirebase = process.env.NETLIFY === 'true' || process.env.USE_CDN_FIREBASE === 'true';
 
+function firebaseConfigFromEnv() {
+  const projectId = process.env.FIREBASE_PROJECT_ID || 'ziricai';
+  return {
+    apiKey: process.env.FIREBASE_API_KEY || '',
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN || `${projectId}.firebaseapp.com`,
+    projectId,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`,
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: process.env.FIREBASE_APP_ID || '',
+    measurementId: process.env.FIREBASE_MEASUREMENT_ID || '',
+  };
+}
+
 /** Production API host (Railway). Override with PRODUCTION_API_URL env at build time. */
 const PRODUCTION_API_URL =
   process.env.PRODUCTION_API_URL || 'https://ziricai-production.up.railway.app';
@@ -64,7 +77,8 @@ function siteConfigBlock(site) {
   const admin = process.env.ADMIN_BASE_URL || 'https://admin.ziricai.com';
   return `<script>window.__ZIRICAI_CONFIG__=${JSON.stringify({
     apiBase,
-    sites: { marketing, app, admin, api: apiBase },
+    sites: { marketing, app, admin, api: apiBase || PRODUCTION_API_URL },
+    firebase: firebaseConfigFromEnv(),
   })};</script>`;
 }
 
@@ -236,7 +250,7 @@ function prepareMarketing() {
   copyDir(path.join(ROOT, 'js/onboarding'), path.join(dir, 'js/onboarding'));
   copyDir(path.join(ROOT, 'js/landing'), path.join(dir, 'js/landing'));
   copyDir(path.join(ROOT, 'js/shared'), path.join(dir, 'js/shared'));
-  for (const f of ['auth.js', 'firebase.js', 'users.js', 'ziricai-landing.js']) {
+  for (const f of ['auth.js', 'firebase-config.js', 'firebase.js', 'users.js', 'ziricai-landing.js']) {
     copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
   }
 
@@ -283,7 +297,7 @@ function prepareApp() {
   copyFile(path.join(ROOT, 'js/admin/ui.js'), path.join(dir, 'js/admin/ui.js'));
   copyFile(path.join(ROOT, 'js/admin/utils.js'), path.join(dir, 'js/admin/utils.js'));
   copyFile(path.join(ROOT, 'js/admin/demo-data.js'), path.join(dir, 'js/admin/demo-data.js'));
-  for (const f of ['auth.js', 'firebase.js', 'users.js']) {
+  for (const f of ['auth.js', 'firebase-config.js', 'firebase.js', 'users.js']) {
     copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
   }
 
@@ -312,7 +326,7 @@ function prepareAdmin() {
 
   copyDir(path.join(ROOT, 'js/admin'), path.join(dir, 'js/admin'));
   copyDir(path.join(ROOT, 'js/shared'), path.join(dir, 'js/shared'));
-  for (const f of ['auth.js', 'firebase.js', 'users.js']) {
+  for (const f of ['auth.js', 'firebase-config.js', 'firebase.js', 'users.js']) {
     copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
   }
 

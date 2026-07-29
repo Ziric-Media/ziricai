@@ -1,24 +1,14 @@
 ﻿/**
  * Firebase connection module for Ziric Media AI.
- *
- * Paste your Firebase web app configuration below.
- * Firebase console -> Project Settings -> General -> Your apps -> Web app
+ * Config lives in firebase-config.js (env / __ZIRICAI_CONFIG__).
  */
 import { initializeApp } from 'firebase/app';
 import { getFirestore, enableNetwork } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
+import { getFirebaseConfig } from './firebase-config.js';
 
-// Paste your Firebase config object here (from the Firebase console)
-const firebaseConfig = {
-  apiKey: "AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8",
-  authDomain: "ziricai.firebaseapp.com",
-  projectId: "ziricai",
-  storageBucket: "ziricai.firebasestorage.app",
-  messagingSenderId: "482382497730",
-  appId: "1:482382497730:web:6bc2f8668a1598fa13f85b",
-  measurementId: "G-92ZVT0731S"
-};
+const firebaseConfig = getFirebaseConfig();
 
 export const app = initializeApp(firebaseConfig);
 
@@ -60,3 +50,5 @@ export async function ensureFirestoreReady() {
   }
   await ensureNetworkOnline();
 }
+
+export { getFirebaseConfig };

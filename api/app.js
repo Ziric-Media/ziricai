@@ -21,7 +21,7 @@ import {
     getConversation,
     listConversations,
 } from "../services/conversationService.js";
-import { getStorageAdapter, getConfiguredStorageBackend } from "../services/storage/storageAdapter.js";
+import { getStorageAdapter, getConfiguredStorageBackend, getStorageFallbackReason, hasAdminCredentials } from "../services/storage/storageAdapter.js";
 import { seedDemoCustomersIfEmpty } from "../services/storage/seedDemoCustomers.js";
 import { seedCustomerOpsDemoIfEmpty } from "../services/storage/seedCustomerOpsDemo.js";
 import {
@@ -162,11 +162,16 @@ const upload = multer({
 async function healthHandler(req, res) {
     try {
         const adapter = await getStorageAdapter();
+        const configured = process.env.STORAGE_BACKEND || getConfiguredStorageBackend();
         res.json({
             status: "ok",
             whatsapp: Boolean(process.env.PHONE_NUMBER_ID && process.env.WHATSAPP_TOKEN),
             openai: Boolean(process.env.OPENAI_API_KEY),
             storage: adapter.name,
+            storageConfigured: configured,
+            firestoreAdmin: hasAdminCredentials(),
+            storageFallback: getStorageFallbackReason() || null,
+            firebaseProjectId: process.env.FIREBASE_PROJECT_ID || "ziricai",
             queue: getQueueStats(),
             tenantScopeEnforcement: (process.env.TENANT_SCOPE_ENFORCEMENT || "lax").toLowerCase(),
             timestamp: new Date().toISOString(),
