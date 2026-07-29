@@ -773,7 +773,201 @@
         });
     }
 
-    // ===== MARKETPLACE GRID =====
+    // ===== WORKFORCE JOURNEY =====
+    function initWorkforceJourney() {
+        const track = document.getElementById('journeyTrack');
+        if (!track) return;
+
+        const journey = globalThis.ZiricAiEmployees?.WORKFORCE_JOURNEY || [];
+        if (!journey.length) return;
+
+        track.innerHTML = journey
+            .map(
+                (step, i) => `
+            <div class="journey-step">
+                <div class="journey-step-num">Step ${i + 1}</div>
+                <div class="journey-step-icon"><i class="fa-solid ${step.icon}"></i></div>
+                <h4>${escapeHtml(step.step)}</h4>
+                <p>${escapeHtml(step.description)}</p>
+            </div>`
+            )
+            .join('');
+    }
+
+    // ===== HIRE AI EMPLOYEES =====
+    let activeHireDept = 'all';
+
+    function renderHireEmployeeCard(emp) {
+        const price = globalThis.ZiricAiEmployees?.formatEmployeePrice?.(emp.monthlyPrice) || 'Included in plan';
+        const skillsTags = (emp.skills || []).slice(0, 4).map((s) => `<span class="hire-tag">${escapeHtml(s)}</span>`).join('');
+        const respTags = (emp.responsibilities || []).slice(0, 3).map((r) => `<span class="hire-tag">${escapeHtml(r)}</span>`).join('');
+        const langTags = (emp.languages || []).slice(0, 4).map((l) => `<span class="hire-tag">${escapeHtml(l)}</span>`).join('');
+        const intTags = (emp.integrations || []).slice(0, 4).map((i) => `<span class="hire-tag">${escapeHtml(i)}</span>`).join('');
+        const indCount = (emp.industries || []).length;
+
+        return `
+            <div class="hire-employee-card" data-employee-id="${escapeHtml(emp.id)}">
+                <div class="hire-card-header">
+                    <div class="hire-card-icon">${emp.icon || '🤖'}</div>
+                    <div class="hire-card-title-wrap">
+                        <h4>${escapeHtml(emp.title)}</h4>
+                        <span class="hire-card-dept">${escapeHtml(emp.departmentLabel || emp.department)}</span>
+                    </div>
+                </div>
+                <p class="hire-card-desc">${escapeHtml(emp.shortDescription)}</p>
+                <div class="hire-card-meta">
+                    <div class="hire-meta-row">
+                        <span class="hire-meta-label">Skills</span>
+                        <div class="hire-meta-tags">${skillsTags}</div>
+                    </div>
+                    <div class="hire-meta-row">
+                        <span class="hire-meta-label">Responsibilities</span>
+                        <div class="hire-meta-tags">${respTags}</div>
+                    </div>
+                    <div class="hire-meta-row">
+                        <span class="hire-meta-label">Languages</span>
+                        <div class="hire-meta-tags">${langTags}</div>
+                    </div>
+                    <div class="hire-meta-row">
+                        <span class="hire-meta-label">Integrations</span>
+                        <div class="hire-meta-tags">${intTags}</div>
+                    </div>
+                    <div class="hire-meta-row">
+                        <span class="hire-meta-label">Experience</span>
+                        <div class="hire-meta-tags"><span class="hire-tag level">${escapeHtml(emp.experienceLevel || 'Mid')}</span></div>
+                    </div>
+                    <div class="hire-meta-row">
+                        <span class="hire-meta-label">Industries</span>
+                        <div class="hire-meta-tags"><span class="hire-tag">${indCount}+ sectors</span></div>
+                    </div>
+                </div>
+                <div class="hire-card-footer">
+                    <div class="hire-card-price"><strong>Monthly</strong>${escapeHtml(price)}</div>
+                    <button class="btn btn-hire" data-hire-id="${escapeHtml(emp.id)}"><i class="fa-solid fa-user-plus"></i> Hire Now</button>
+                </div>
+            </div>`;
+    }
+
+    function renderHireEmployees(deptId) {
+        const grid = document.getElementById('hireEmployeesGrid');
+        if (!grid) return;
+
+        const catalog = globalThis.ZiricAiEmployees?.getAiEmployeesCatalog?.() || [];
+        const filtered = deptId === 'all' ? catalog : catalog.filter((e) => e.department === deptId);
+
+        grid.innerHTML = filtered.map(renderHireEmployeeCard).join('');
+
+        grid.querySelectorAll('[data-hire-id]').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.hireId;
+                const emp = catalog.find((c) => c.id === id);
+                if (typeof launchWizard === 'function') {
+                    launchWizard();
+                } else if (typeof showToast === 'function') {
+                    showToast(`Hiring ${emp?.title || 'AI Employee'} — start your free trial to onboard`, 'info');
+                }
+            });
+        });
+    }
+
+    function initHireEmployees() {
+        const tabsEl = document.getElementById('hireDeptTabs');
+        if (!tabsEl) return;
+
+        const deptRoles = globalThis.ZiricAiEmployees?.getDepartmentRoles?.() || [];
+        const departments = globalThis.ZiricAiEmployees?.DEPARTMENTS || {};
+
+        const tabs = [{ id: 'all', label: 'All Departments', icon: '🏢' }];
+        deptRoles.forEach((group) => {
+            const dept = departments[group.department];
+            if (dept) tabs.push({ id: dept.id, label: dept.label, icon: dept.icon });
+        });
+
+        tabsEl.innerHTML = tabs
+            .map(
+                (tab) =>
+                    `<button type="button" class="hire-dept-tab${tab.id === activeHireDept ? ' active' : ''}" role="tab" data-dept="${tab.id}" aria-selected="${tab.id === activeHireDept}">${tab.icon} ${escapeHtml(tab.label)}</button>`
+            )
+            .join('');
+
+        tabsEl.querySelectorAll('.hire-dept-tab').forEach((tab) => {
+            tab.addEventListener('click', () => {
+                activeHireDept = tab.dataset.dept;
+                tabsEl.querySelectorAll('.hire-dept-tab').forEach((t) => {
+                    t.classList.toggle('active', t.dataset.dept === activeHireDept);
+                    t.setAttribute('aria-selected', t.dataset.dept === activeHireDept);
+                });
+                renderHireEmployees(activeHireDept);
+            });
+        });
+
+        renderHireEmployees(activeHireDept);
+    }
+
+    // ===== AI EMPLOYEES CATALOG =====
+    function initCatalog() {
+        const grid = document.getElementById('catalogGrid');
+        if (!grid) return;
+
+        const catalog = globalThis.ZiricAiEmployees?.getAiEmployeesCatalog?.() || [];
+        if (!catalog.length) return;
+
+        grid.innerHTML = catalog
+            .map(
+                (emp) => `
+            <div class="catalog-card" data-employee-id="${escapeHtml(emp.id)}">
+                <div class="catalog-card-icon">${emp.icon || '🤖'}</div>
+                <span class="catalog-card-dept">${escapeHtml(emp.departmentLabel || emp.department)}</span>
+                <h4>${escapeHtml(emp.title)}</h4>
+                <p>${escapeHtml(emp.shortDescription)}</p>
+                <button class="btn btn-sm btn-hire" data-hire-id="${escapeHtml(emp.id)}"><i class="fa-solid fa-user-plus"></i> Hire Now</button>
+            </div>`
+            )
+            .join('');
+
+        grid.querySelectorAll('[data-hire-id]').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.hireId;
+                const emp = catalog.find((c) => c.id === id);
+                if (typeof launchWizard === 'function') {
+                    launchWizard();
+                } else if (typeof showToast === 'function') {
+                    showToast(`Hiring ${emp?.title || 'AI Employee'} — start your free trial`, 'info');
+                }
+            });
+        });
+
+        grid.querySelectorAll('.catalog-card').forEach((card) => {
+            card.addEventListener('click', () => {
+                const btn = card.querySelector('[data-hire-id]');
+                btn?.click();
+            });
+        });
+    }
+
+    // ===== INDUSTRIES GRID =====
+    function initIndustries() {
+        const grid = document.getElementById('industriesGrid');
+        if (!grid) return;
+
+        const industries = globalThis.ZiricIndustryTemplates?.getIndustryTemplates?.() || [];
+        if (!industries.length) return;
+
+        grid.innerHTML = industries
+            .map((ind) => {
+                const hasPage = ind.hasPage && ind.page;
+                const tag = hasPage ? 'a' : 'div';
+                const href = hasPage ? ` href="${escapeHtml(ind.page)}"` : '';
+                const pageClass = hasPage ? ' has-page' : '';
+                const linkIcon = hasPage ? '<i class="fa-solid fa-arrow-up-right-from-square industry-link-icon"></i>' : '';
+                return `<${tag} class="industry-chip${pageClass}"${href}><span>${ind.icon}</span> ${escapeHtml(ind.name)}${linkIcon}</${tag}>`;
+            })
+            .join('');
+    }
+
+    // ===== MARKETPLACE GRID (legacy fallback) =====
     function escapeHtml(text) {
         return String(text)
             .replace(/&/g, '&amp;')
@@ -822,6 +1016,10 @@
         initWatchAiLive();
         initProductTour();
         initDashboardPreview();
+        initWorkforceJourney();
+        initHireEmployees();
+        initCatalog();
+        initIndustries();
         initMarketplace();
 
         document.getElementById('watchDemoBtn')?.addEventListener('click', () => openDemo('sales'));
