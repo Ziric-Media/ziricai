@@ -23,6 +23,7 @@ import {
 } from "../services/conversationService.js";
 import { getStorageAdapter, getConfiguredStorageBackend, getStorageFallbackReason, hasAdminCredentials } from "../services/storage/storageAdapter.js";
 import { seedDemoCustomersIfEmpty } from "../services/storage/seedDemoCustomers.js";
+import { seedDemoAgentsIfEmpty } from "../services/storage/seedDemoAgents.js";
 import { seedCustomerOpsDemoIfEmpty } from "../services/storage/seedCustomerOpsDemo.js";
 import {
     listCustomers,
@@ -137,8 +138,9 @@ import {
 import {
     initIntegrationHub,
     mountIntegrationRoutes,
-    handleLegacyWhatsAppWebhook,
+    handleWhatsAppWebhook,
 } from "../services/integrations/integrationHub.js";
+import { isMetaWebhookPath, normalizeWebhookPath } from "../services/integrations/metaWebhook.js";
 import { initEventSystem } from "../services/events/index.js";
 import { applyApiVersionHeader } from "../services/api/routeRegistry.js";
 import { mountCustomerOpsRoutes } from "../services/api/customerOpsRoutes.js";
@@ -219,7 +221,38 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.json());
+/** Capture raw Meta webhook bytes before JSON parsing (required for HMAC signature). */
+app.use((req, res, next) => {
+    const path = normalizeWebhookPath(req);
+    if (!isMetaWebhookPath(path) || req.method !== "POST") {
+        return next();
+    }
+
+    express.raw({
+        type: "application/json",
+        limit: "2mb",
+        verify: (_req, _res, buf) => {
+            _req.rawBody = Buffer.from(buf);
+        },
+    })(req, res, (err) => {
+        if (err) return next(err);
+        const raw = req.rawBody || (Buffer.isBuffer(req.body) ? req.body : null);
+        if (raw) {
+            req.rawBody = Buffer.isBuffer(raw) ? raw : Buffer.from(String(raw));
+            try {
+                req.body = JSON.parse(req.rawBody.toString("utf8"));
+            } catch {
+                req.body = {};
+            }
+        }
+        next();
+    });
+});
+
+app.use((req, res, next) => {
+    if (req.rawBody) return next();
+    express.json()(req, res, next);
+});
 
 /** Cache static assets in production (HTML stays fresh). */
 app.use((req, res, next) => {
@@ -1405,9 +1438,9 @@ app.get("/api/customers/:phone/timeline", requireTenantScope({ optional: true })
     }
 });
 
-/** Legacy Meta/WhatsApp webhook — delegates to whatsappAdapter via Integration Hub */
-app.get("/webhook", (req, res) => handleLegacyWhatsAppWebhook(req, res));
-app.post("/webhook", (req, res) => handleLegacyWhatsAppWebhook(req, res));
+/** Canonical Meta WhatsApp webhook — GET verify + POST inbound */
+app.get("/webhook", (req, res) => handleWhatsAppWebhook(req, res));
+app.post("/webhook", (req, res) => handleWhatsAppWebhook(req, res));
 
 /** Unified integration webhooks + monitoring API */
 mountIntegrationRoutes(app);
@@ -1429,6 +1462,9 @@ export async function runBackgroundInit() {
     try {
         const adapter = await getStorageAdapter();
         await seedDemoCustomersIfEmpty(adapter);
+        await seedDemoAgentsIfEmpty().catch((err) => {
+            console.error("[startup] Demo agent seed skipped:", err.message);
+        });
         await seedCustomerOpsDemoIfEmpty();
         try {
             await seedPackVersions();

@@ -3,6 +3,7 @@
  */
 
 import { logError, logInfo, logWarn } from "./integrationLogger.js";
+import { isRetryableOutboundError } from "./metaWhatsAppErrors.js";
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
@@ -61,6 +62,15 @@ async function executeRetry(job) {
         await job.fn(job.ctx, job.payload);
         logInfo(job.channel, job.companyId, "Retry succeeded", { to: job.payload?.to });
     } catch (err) {
+        if (!isRetryableOutboundError(err)) {
+            logError(job.channel, job.companyId, "Retry aborted — non-retryable error", {
+                to: job.payload?.to,
+                error: err.message,
+                metaCode: err.metaCode ?? null,
+            });
+            return;
+        }
+
         const nextAttempt = job.attempt + 1;
         if (nextAttempt < job.maxRetries) {
             scheduleRetry({ ...job, attempt: nextAttempt });

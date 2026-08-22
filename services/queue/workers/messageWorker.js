@@ -17,6 +17,12 @@ import { storeMemory } from "../../memory/aiMemoryService.js";
 import { processInboundCustomerPipeline } from "../../platform/provisioningService.js";
 
 import { retrieveAgentKnowledgeContext } from "../../ai-core/aiCoreBridge.js";
+import {
+    buildWhatsAppSystemPrompt,
+    isGreetingMessage,
+} from "../../ai-core/whatsappConversationPrompt.js";
+import { getCompany } from "../../tenants/companyService.js";
+import { getDefaultAiEmployee } from "../../tenants/aiEmployeeService.js";
 
 import { captureLeadFromMessage } from "../../tenants/crmService.js";
 
@@ -31,9 +37,20 @@ const NON_TEXT_REPLY = "Please send a text message so I can help you.";
 
 
 async function sendViaIntegration(channel, companyId, to, text) {
-
     return integrationSend(channel || "whatsapp", { companyId }, { to, text });
+}
 
+async function trySendOutbound(channel, companyId, to, text) {
+    try {
+        await sendViaIntegration(channel, companyId, to, text);
+    } catch (err) {
+        console.warn("[worker] Outbound send failed (inbound processing continues):", {
+            to,
+            code: err.metaCode ?? err.code ?? null,
+            retryable: err.retryable !== false,
+            message: err.message,
+        });
+    }
 }
 
 
@@ -52,7 +69,7 @@ async function processInboundMessage(job) {
 
         await saveOutboundMessage(sender, NON_TEXT_REPLY);
 
-        await sendViaIntegration(outboundChannel, companyId, sender, NON_TEXT_REPLY);
+        await trySendOutbound(outboundChannel, companyId, sender, NON_TEXT_REPLY);
 
         return;
 
@@ -66,15 +83,17 @@ async function processInboundMessage(job) {
 
 
 
-    const knowledgeBundle = resolvedCompanyId
+    const knowledgeBundle =
+        resolvedCompanyId && !isGreetingMessage(text)
+            ? await retrieveAgentKnowledgeContext(resolvedCompanyId, text)
+            : { agent: null, context: "", sources: [] };
 
-        ? await retrieveAgentKnowledgeContext(resolvedCompanyId, text)
+    let agent = knowledgeBundle.agent;
+    if (resolvedCompanyId && !agent) {
+        agent = await getDefaultAiEmployee(resolvedCompanyId);
+    }
 
-        : { agent: null, context: "", sources: [] };
-
-
-
-    const agent = knowledgeBundle.agent;
+    const companyRecord = resolvedCompanyId ? await getCompany(resolvedCompanyId).catch(() => null) : null;
 
     const history = await getConversation(sender, 20);
 
@@ -98,21 +117,25 @@ async function processInboundMessage(job) {
 
 
 
-    const knowledgeContext = knowledgeBundle.context || "";
+    const systemPrompt = buildWhatsAppSystemPrompt({
+        agent,
+        companyId: resolvedCompanyId,
+        companyName: companyRecord?.name || customer.companyName,
+        customer,
+        contactName,
+    });
 
-    const systemContext = agent?.systemPrompt
-
-        ? `${agent.systemPrompt}\n\n${knowledgeContext}`
-
-        : knowledgeContext;
-
-    const reply = await askAI(text, { history, context: systemContext });
+    const reply = await askAI(text, {
+        history,
+        systemPrompt,
+        knowledgeContext: knowledgeBundle.context || "",
+    });
 
 
 
     await saveOutboundMessage(sender, reply);
 
-    await sendViaIntegration(outboundChannel, resolvedCompanyId, sender, reply);
+    await trySendOutbound(outboundChannel, resolvedCompanyId, sender, reply);
 
 
 

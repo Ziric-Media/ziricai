@@ -7,11 +7,16 @@ import { checkRateLimit } from "./rateLimiter.js";
 import { scheduleRetry, getRetryQueueStats } from "./retryQueue.js";
 import { logInfo, logError, getIntegrationLogs } from "./integrationLogger.js";
 import { IntegrationError, RateLimitError, AdapterNotConfiguredError } from "./errors.js";
-import { handleWebhookRequest, handleLegacyWhatsAppWebhook } from "./webhookRouter.js";
+import { isRetryableOutboundError } from "./metaWhatsAppErrors.js";
+import { handleWebhookRequest, handleWhatsAppWebhook, handleLegacyWhatsAppWebhook } from "./webhookRouter.js";
 import { ingest, ingestBatch } from "./conversationPipeline.js";
 import { requireTenantScope } from "../core/tenantContext.js";
 
 let initialized = false;
+
+function isOutboundRetryable(err) {
+    return isRetryableOutboundError(err);
+}
 
 export function initIntegrationHub() {
     if (initialized) return;
@@ -54,14 +59,27 @@ export async function sendMessage(channel, ctx, payload) {
         logInfo(channel, companyId, "Outbound send", { to: payload?.to });
         return await adapter.sendMessage({ ...ctx, companyId }, payload);
     } catch (err) {
-        logError(channel, companyId, "Send failed — scheduling retry", { error: err.message });
-        scheduleRetry({
-            channel,
-            companyId,
-            fn: (retryCtx, retryPayload) => adapter.sendMessage(retryCtx, retryPayload),
-            ctx: { ...ctx, companyId },
-            payload,
-        });
+        const retryable = isOutboundRetryable(err);
+        const metaCode = err.metaCode ?? null;
+
+        if (retryable) {
+            logError(channel, companyId, "Send failed — scheduling retry", {
+                error: err.message,
+                metaCode,
+            });
+            scheduleRetry({
+                channel,
+                companyId,
+                fn: (retryCtx, retryPayload) => adapter.sendMessage(retryCtx, retryPayload),
+                ctx: { ...ctx, companyId },
+                payload,
+            });
+        } else {
+            logError(channel, companyId, "Send failed — not retryable (config/recipient error)", {
+                error: err.message,
+                metaCode,
+            });
+        }
         throw err;
     }
 }
@@ -126,6 +144,7 @@ export function mountIntegrationRoutes(app) {
 }
 
 export {
+    handleWhatsAppWebhook,
     handleLegacyWhatsAppWebhook,
     ingest,
     ingestBatch,

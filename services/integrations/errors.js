@@ -37,3 +37,18 @@ export class AdapterNotConfiguredError extends IntegrationError {
         this.name = "AdapterNotConfiguredError";
     }
 }
+
+export class WhatsAppApiError extends IntegrationError {
+    constructor(message, { metaCode = null, httpStatus = null, retryable = false, channel = "whatsapp", companyId = null, cause = null } = {}) {
+        super(message, {
+            code: metaCode != null ? `WHATSAPP_${metaCode}` : "WHATSAPP_API_ERROR",
+            channel,
+            companyId,
+            cause,
+        });
+        this.name = "WhatsAppApiError";
+        this.metaCode = metaCode;
+        this.httpStatus = httpStatus;
+        this.retryable = retryable;
+    }
+}

@@ -105,6 +105,11 @@ export async function searchKnowledgeForQuery(companyId, queryText, options = {}
         );
     }
 
+    // Short greetings ("Hi", "Hello") produce no search terms — skip irrelevant KB injection.
+    if (!terms.length) {
+        return { context: "", sources: [], documents: [] };
+    }
+
     const scored = docs
         .map((doc) => {
             const hay = `${doc.title || ""} ${doc.content || ""}`.toLowerCase();
@@ -115,7 +120,7 @@ export async function searchKnowledgeForQuery(companyId, queryText, options = {}
         .sort((a, b) => b.score - a.score)
         .slice(0, options.limit || 3);
 
-    const picks = scored.length ? scored.map((r) => r.doc) : docs.slice(0, 1);
+    const picks = scored.map((r) => r.doc);
     const context = picks
         .map((d) => `### ${d.title || "Document"}\n${(d.content || "").slice(0, 1500)}`)
         .join("\n\n");

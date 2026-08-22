@@ -1,5 +1,11 @@
 import axios from "axios";
 import dotenv from "dotenv";
+import { WhatsAppApiError } from "./integrations/errors.js";
+import {
+    parseMetaWhatsAppError,
+    getActionableHint,
+    isWhatsAppDevMode,
+} from "./integrations/metaWhatsAppErrors.js";
 
 dotenv.config();
 
@@ -8,6 +14,14 @@ export async function sendWhatsAppMessage(to, text) {
         const err = new Error("PHONE_NUMBER_ID or WHATSAPP_TOKEN is not set");
         console.error("[whatsapp]", err.message);
         throw err;
+    }
+
+    if (isWhatsAppDevMode()) {
+        console.log("[whatsapp] WHATSAPP_DEV_MODE: skipping outbound send", {
+            to,
+            textLen: text?.length ?? 0,
+        });
+        return { devMode: true, skipped: true, to };
     }
 
     try {
@@ -31,12 +45,17 @@ export async function sendWhatsAppMessage(to, text) {
         console.log("[whatsapp] Message sent, id:", response.data?.messages?.[0]?.id);
         return response.data;
     } catch (error) {
-        console.error("[whatsapp] Meta API error:", error.response?.status, JSON.stringify(error.response?.data));
-        if (error.response?.data?.error?.code === 131030) {
-            console.error(
-                "[whatsapp] Dev allowlist: add the sender's number (E.164 digits only, e.g. 27821234567) under Meta -> WhatsApp -> API Setup -> To list, then message again."
-            );
+        const info = parseMetaWhatsAppError(error);
+        console.error("[whatsapp] Meta API error:", info.httpStatus, JSON.stringify(error.response?.data));
+        const hint = getActionableHint(info.code);
+        if (hint) {
+            console.error("[whatsapp]", hint);
         }
-        throw error;
+        throw new WhatsAppApiError(info.message, {
+            metaCode: info.code,
+            httpStatus: info.httpStatus,
+            retryable: info.retryable,
+            cause: error,
+        });
     }
 }

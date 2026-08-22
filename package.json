@@ -19,6 +19,7 @@
         "verify:sprint1": "node scripts/verify-sprint1-flow.js",
         "verify:journey": "node scripts/verify-customer-journey.js",
         "verify:firestore": "node scripts/verify-firestore.js",
+        "verify:webhook": "node scripts/verify-webhook.js",
         "build:knowledge": "node scripts/build-knowledge-bundle.js",
         "seed:knowledge": "node scripts/seed-knowledge-content.js"
     },

@@ -13,7 +13,8 @@ if (process.env.OPENAI_API_KEY) {
     console.warn("OPENAI_API_KEY is not configured.");
 }
 
-const SYSTEM_PROMPT = `You are ZiricAI, the AI assistant for Ziric Media. You are intelligent, friendly and professional. Always answer politely. Keep replies concise unless the user asks for detail.`;
+const FALLBACK_SYSTEM_PROMPT = `You are a professional customer service assistant on WhatsApp.
+Be friendly, helpful, and concise. Never mention webhooks, verification, testing, or platform setup.`;
 
 export async function askAI(message, options = {}) {
     const userText = (message || "").trim();
@@ -26,10 +27,13 @@ export async function askAI(message, options = {}) {
         return "Sorry, I'm not configured to respond right now.";
     }
 
-    const { context = "", history = [] } = options;
-    const systemContent = context
-        ? `${SYSTEM_PROMPT}\n\nRelevant knowledge:\n${context}`
-        : SYSTEM_PROMPT;
+    const { systemPrompt = "", knowledgeContext = "", history = [], context } = options;
+    const resolvedKnowledge = knowledgeContext || context || "";
+    const systemParts = [(systemPrompt || FALLBACK_SYSTEM_PROMPT).trim()];
+    if (resolvedKnowledge.trim()) {
+        systemParts.push(`Relevant knowledge:\n${resolvedKnowledge.trim()}`);
+    }
+    const systemContent = systemParts.join("\n\n");
 
     const chatMessages = [{ role: "system", content: systemContent }];
     for (const turn of history) {
