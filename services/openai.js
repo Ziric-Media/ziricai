@@ -1,7 +1,7 @@
 import OpenAI from "openai";
-import dotenv from "dotenv";
+import { bootstrapEnv } from "./env/startupEnv.js";
 
-dotenv.config();
+bootstrapEnv();
 
 let openai = null;
 

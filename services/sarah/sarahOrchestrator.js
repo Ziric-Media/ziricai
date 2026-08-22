@@ -2,7 +2,7 @@
  * Sarah orchestrator — OpenAI function-calling conversation loop + demo fallback.
  */
 import OpenAI from "openai";
-import dotenv from "dotenv";
+import { bootstrapEnv } from "../env/startupEnv.js";
 import { buildSarahSystemPrompt } from "./prompts/systemPrompt.js";
 import { getOpenAIToolDefinitions, executeTool } from "./toolRegistry.js";
 import { initSarahTools } from "./tools/index.js";
@@ -20,7 +20,7 @@ import {
     PLATFORM_DEFAULT_REPLY,
 } from "./platformKnowledge.js";
 
-dotenv.config();
+bootstrapEnv();
 
 initSarahTools();
 
@@ -283,4 +283,4 @@ function dedupeUiHints(hints) {
 }
 
 export { initSarahTools };
-
+

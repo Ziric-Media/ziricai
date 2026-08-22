@@ -39,6 +39,7 @@ import {
 import { getQueueStats } from "../services/queue/jobQueue.js";
 import { startMessageWorker } from "../services/queue/workers/messageWorker.js";
 import { isWhatsAppDevMode } from "../services/integrations/metaWhatsAppErrors.js";
+import { logRailwayEnvDiagnostics } from "../services/env/startupEnv.js";
 import {
     getPlatformMetrics,
     getPlatformActivity,
@@ -1466,6 +1467,7 @@ mountCustomerOpsRoutes(app);
 export async function runBackgroundInit() {
     initEventSystem();
     initIntegrationHub();
+    logRailwayEnvDiagnostics();
 
     const optional = ["VERIFY_TOKEN", "PHONE_NUMBER_ID", "WHATSAPP_TOKEN", "OPENAI_API_KEY"];
     const missing = optional.filter((k) => !process.env[k]);

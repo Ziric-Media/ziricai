@@ -2,15 +2,10 @@
  * Railway-safe entry: bind HTTP immediately, lazy-load routes after listen().
  */
 import express from "express";
-import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
+import { bootstrapEnv } from "../services/env/startupEnv.js";
 import { getConfiguredStorageBackend } from "../services/storage/storageAdapter.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, "..");
-
-dotenv.config({ path: path.join(ROOT, ".env") });
+bootstrapEnv();
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();

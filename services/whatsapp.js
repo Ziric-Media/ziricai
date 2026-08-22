@@ -1,5 +1,5 @@
 import axios from "axios";
-import dotenv from "dotenv";
+import { bootstrapEnv } from "./env/startupEnv.js";
 import { WhatsAppApiError } from "./integrations/errors.js";
 import {
     parseMetaWhatsAppError,
@@ -7,7 +7,7 @@ import {
     isWhatsAppDevMode,
 } from "./integrations/metaWhatsAppErrors.js";
 
-dotenv.config();
+bootstrapEnv();
 
 export async function sendWhatsAppMessage(to, text) {
     if (!process.env.PHONE_NUMBER_ID || !process.env.WHATSAPP_TOKEN) {
