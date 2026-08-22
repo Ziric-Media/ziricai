@@ -52,7 +52,8 @@ export function logError(channel, companyId, message, meta) {
 export function getIntegrationLogs(companyId, options = {}) {
     const limit = options.limit ?? 50;
     let filtered = events;
-    if (companyId) filtered = filtered.filter((e) => e.companyId === companyId);
+    const scopeAll = !companyId || companyId === "_global";
+    if (!scopeAll) filtered = filtered.filter((e) => e.companyId === companyId);
     if (options.channel) filtered = filtered.filter((e) => e.channel === options.channel);
     return filtered.slice(0, limit);
 }
