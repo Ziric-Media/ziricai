@@ -76,7 +76,12 @@ export function getWhatsAppConfig() {
     const configured = Boolean(phoneId && process.env.WHATSAPP_TOKEN);
     return {
         configured,
-        verifyTokenSet: Boolean(process.env.VERIFY_TOKEN),
+        verifyTokenSet: Boolean(
+            process.env.VERIFY_TOKEN ||
+                process.env.WHATSAPP_VERIFY_TOKEN ||
+                process.env.WEBHOOK_VERIFY_TOKEN
+        ),
+        metaAppSecretSet: Boolean(process.env.META_APP_SECRET || process.env.APP_SECRET),
         phoneNumberId: phoneId ? `***${phoneId.slice(-4)}` : null,
         webhookUrl: "/webhook",
         simulate: !configured,

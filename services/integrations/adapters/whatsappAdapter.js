@@ -74,7 +74,9 @@ export class WhatsAppAdapter extends BaseAdapter {
     validateWebhook(req) {
         const result = validateMetaWebhookSignature(req);
         if (!result.valid) {
-            logWarn(CHANNELS.WHATSAPP, null, result.reason || "Webhook signature validation failed");
+            logWarn(CHANNELS.WHATSAPP, null, "Webhook signature rejected", {
+                reason: result.reason || "Webhook signature validation failed",
+            });
         }
         return result.valid;
     }
@@ -87,17 +89,33 @@ export class WhatsAppAdapter extends BaseAdapter {
             const mode = req.query["hub.mode"];
             const token = req.query["hub.verify_token"];
             const challenge = req.query["hub.challenge"];
+            const verifyTokenConfigured = Boolean(getVerifyToken());
             const tokenMatch = verifyMetaWebhookToken(token);
 
             logInfo(CHANNELS.WHATSAPP, ctx?.companyId, "Verification request", {
                 mode,
                 tokenMatch,
-                verifyTokenConfigured: Boolean(getVerifyToken()),
+                verifyTokenConfigured,
             });
 
             if (mode === "subscribe" && tokenMatch) {
                 return res.status(200).type("text/plain").send(String(challenge));
             }
+
+            if (!mode && !token && !challenge) {
+                return res.status(403).json({
+                    error: "Forbidden",
+                    hint: "Meta webhook verify requires hub.mode=subscribe and matching hub.verify_token.",
+                    verifyTokenConfigured,
+                });
+            }
+
+            if (mode === "subscribe" && !verifyTokenConfigured) {
+                logWarn(CHANNELS.WHATSAPP, ctx?.companyId, "VERIFY_TOKEN not configured on server");
+            } else if (mode === "subscribe" && !tokenMatch) {
+                logWarn(CHANNELS.WHATSAPP, ctx?.companyId, "Verify token mismatch (check Railway VERIFY_TOKEN vs Meta Console)");
+            }
+
             return res.sendStatus(403);
         }
 

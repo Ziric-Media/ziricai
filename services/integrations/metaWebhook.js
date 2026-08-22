@@ -24,7 +24,12 @@ export function isMetaWebhookPath(path) {
 }
 
 export function getVerifyToken() {
-    return String(process.env.VERIFY_TOKEN || "").trim();
+    return String(
+        process.env.VERIFY_TOKEN ||
+            process.env.WHATSAPP_VERIFY_TOKEN ||
+            process.env.WEBHOOK_VERIFY_TOKEN ||
+            ""
+    ).trim();
 }
 
 export function getMetaAppSecret() {

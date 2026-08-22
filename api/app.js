@@ -168,6 +168,12 @@ async function healthHandler(req, res) {
         res.json({
             status: "ok",
             whatsapp: Boolean(process.env.PHONE_NUMBER_ID && process.env.WHATSAPP_TOKEN),
+            verifyTokenSet: Boolean(
+                process.env.VERIFY_TOKEN ||
+                    process.env.WHATSAPP_VERIFY_TOKEN ||
+                    process.env.WEBHOOK_VERIFY_TOKEN
+            ),
+            metaAppSecretSet: Boolean(process.env.META_APP_SECRET || process.env.APP_SECRET),
             openai: Boolean(process.env.OPENAI_API_KEY),
             storage: adapter.name,
             storageConfigured: configured,
@@ -1457,6 +1463,9 @@ export async function runBackgroundInit() {
     const missing = optional.filter((k) => !process.env[k]);
     if (missing.length) {
         console.error("[startup] Missing optional env vars:", missing.join(", "));
+    }
+    if (!process.env.META_APP_SECRET && !process.env.APP_SECRET) {
+        console.error("[startup] META_APP_SECRET not set — inbound WhatsApp POST /webhook will return 401");
     }
 
     try {
