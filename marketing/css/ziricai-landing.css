@@ -2688,6 +2688,102 @@ body {
 }
 .footer-bottom-links a:hover { color: #fff; }
 
+/* ===== Legal pages (Privacy, Terms) ===== */
+.legal-page {
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+.legal-header {
+    background: var(--hero-dark);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 16px 0;
+}
+.legal-header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+.legal-header .logo-img { height: 36px; }
+.legal-back { box-shadow: none; }
+.legal-main { flex: 1; padding: 48px 0 72px; }
+.legal-content { max-width: 760px; }
+.legal-eyebrow {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--primary);
+    margin-bottom: 12px;
+}
+.legal-content h1 {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-bottom: 12px;
+}
+.legal-meta {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    margin-bottom: 24px;
+}
+.legal-lead {
+    font-size: 1.08rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 40px;
+}
+.legal-content section {
+    margin-bottom: 36px;
+}
+.legal-content h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--text);
+}
+.legal-content p,
+.legal-content li {
+    color: var(--text-secondary);
+    line-height: 1.75;
+    font-size: 0.98rem;
+}
+.legal-content p { margin-bottom: 12px; }
+.legal-content ul {
+    margin: 8px 0 12px 1.25rem;
+}
+.legal-content li { margin-bottom: 8px; }
+.legal-content a {
+    color: var(--primary);
+    text-decoration: none;
+}
+.legal-content a:hover { text-decoration: underline; }
+.legal-footer {
+    background: var(--hero-dark);
+    color: rgba(255, 255, 255, 0.55);
+    padding: 24px 0;
+    font-size: 0.88rem;
+}
+.legal-footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.legal-footer-links {
+    display: flex;
+    gap: 20px;
+}
+.legal-footer-links a {
+    color: rgba(255, 255, 255, 0.55);
+    text-decoration: none;
+}
+.legal-footer-links a:hover { color: #fff; }
+
 /* ===== Demo Modal ===== */
 .demo-overlay {
     position: fixed;

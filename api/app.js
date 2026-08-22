@@ -297,6 +297,8 @@ app.use((req, res, next) => {
 /** Legacy HTML entry points → new site structure */
 app.get("/ziricai.html", (req, res) => res.redirect(301, "/"));
 app.get("/index.html", (req, res) => res.redirect(301, "/"));
+app.get("/privacy", (req, res) => res.sendFile(path.join(ROOT, "marketing", "privacy.html")));
+app.get("/privacy-policy", (req, res) => res.redirect(301, "/privacy"));
 app.get("/company-portal.html", (req, res) => {
     const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
     res.redirect(301, `/app/${qs}`);
