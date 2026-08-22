@@ -2745,6 +2745,15 @@ body {
     margin-bottom: 12px;
     color: var(--text);
 }
+.legal-content h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 20px 0 8px;
+    color: var(--text);
+}
+.legal-content ol {
+    margin: 8px 0 12px 1.25rem;
+}
 .legal-content p,
 .legal-content li {
     color: var(--text-secondary);
