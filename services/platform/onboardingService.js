@@ -15,6 +15,7 @@ import { finalizeTenantOnboarding, syncWhatsAppIntegrationStatus } from "./tenan
 import { getWorkspaceSnapshot } from "../portal/workspaceService.js";
 import { listAiEmployees } from "../tenants/aiEmployeeService.js";
 import { listKnowledgeDocuments } from "../tenants/knowledgeService.js";
+import { isWhatsAppDevMode } from "../integrations/metaWhatsAppErrors.js";
 
 /** In-memory onboarding sessions (dev/demo; persist to Firestore in production). */
 const sessions = new Map();
@@ -82,6 +83,8 @@ export function getWhatsAppConfig() {
                 process.env.WEBHOOK_VERIFY_TOKEN
         ),
         metaAppSecretSet: Boolean(process.env.META_APP_SECRET || process.env.APP_SECRET),
+        whatsappDevMode: isWhatsAppDevMode(),
+        defaultCompanyIdSet: Boolean(process.env.DEFAULT_COMPANY_ID),
         phoneNumberId: phoneId ? `***${phoneId.slice(-4)}` : null,
         webhookUrl: "/webhook",
         simulate: !configured,

@@ -38,6 +38,7 @@ import {
 } from "../services/customerService.js";
 import { getQueueStats } from "../services/queue/jobQueue.js";
 import { startMessageWorker } from "../services/queue/workers/messageWorker.js";
+import { isWhatsAppDevMode } from "../services/integrations/metaWhatsAppErrors.js";
 import {
     getPlatformMetrics,
     getPlatformActivity,
@@ -174,6 +175,11 @@ async function healthHandler(req, res) {
                     process.env.WEBHOOK_VERIFY_TOKEN
             ),
             metaAppSecretSet: Boolean(process.env.META_APP_SECRET || process.env.APP_SECRET),
+            whatsappDevMode: isWhatsAppDevMode(),
+            defaultCompanyIdSet: Boolean(process.env.DEFAULT_COMPANY_ID),
+            phoneNumberIdSuffix: process.env.PHONE_NUMBER_ID
+                ? `***${String(process.env.PHONE_NUMBER_ID).slice(-4)}`
+                : null,
             openai: Boolean(process.env.OPENAI_API_KEY),
             storage: adapter.name,
             storageConfigured: configured,
