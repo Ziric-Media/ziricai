@@ -4,6 +4,8 @@
 import {
     saveInboundMessage,
     upsertCustomerFromWhatsApp,
+    isInboundMessageProcessed,
+    markInboundMessageProcessed,
 } from "../conversationService.js";
 import { enqueue, JOB_TYPES } from "../queue/jobQueue.js";
 import { isValidUnifiedMessage } from "./types/unifiedMessage.js";
@@ -20,11 +22,31 @@ export async function ingest(message) {
         throw new Error("Invalid UnifiedMessage — missing channel or from");
     }
 
-    const { companyId, channel, from, text, metadata } = message;
+    const { companyId, channel, from, text, metadata, externalId } = message;
     const contactName = metadata?.contactName || null;
     const messageType = metadata?.messageType || "text";
 
+    if (externalId && (await isInboundMessageProcessed(externalId))) {
+        console.log("[whatsapp] Duplicate inbound skipped", {
+            companyId,
+            from,
+            externalIdPrefix: String(externalId).slice(0, 24),
+        });
+        logInfo(channel, companyId, "Duplicate inbound skipped (idempotent)", {
+            from,
+            externalIdPrefix: String(externalId).slice(0, 24),
+        });
+        return { success: true, duplicate: true, from, channel, companyId };
+    }
+
     logInfo(channel, companyId, "Pipeline ingest", {
+        from,
+        messageType,
+        textLen: text?.length ?? 0,
+        externalIdPrefix: externalId ? String(externalId).slice(0, 24) : null,
+    });
+    console.log("[whatsapp] Pipeline ingest", {
+        companyId,
         from,
         messageType,
         textLen: text?.length ?? 0,
@@ -32,7 +54,12 @@ export async function ingest(message) {
 
     try {
         if (messageType === "text" && String(text || "").trim()) {
-            await saveInboundMessage(from, text, { channel, companyId, contactName });
+            await saveInboundMessage(from, text, {
+                channel,
+                companyId,
+                contactName,
+                externalId,
+            });
             await upsertCustomerFromWhatsApp(from, {
                 contactName,
                 companyId,
@@ -63,7 +90,12 @@ export async function ingest(message) {
             channel,
             timestamp: message.timestamp || new Date().toISOString(),
             companyId,
+            externalId: externalId || null,
         });
+
+        if (externalId) {
+            await markInboundMessageProcessed(externalId, { from, companyId, channel });
+        }
 
         if (companyId && messageType === "text" && String(text || "").trim()) {
             await publish(companyId, EventTypes.MESSAGE_RECEIVED, {
@@ -77,6 +109,7 @@ export async function ingest(message) {
         return { success: true, from, channel, companyId };
     } catch (err) {
         logError(channel, companyId, "Pipeline ingest failed", { error: err.message });
+        console.error("[whatsapp] Pipeline ingest failed", { companyId, from, error: err.message });
         throw err;
     }
 }

@@ -26,6 +26,8 @@ const supervisorReviews = new Map();
 const crmTemplateStore = new Map();
 const reportTemplateStore = new Map();
 const analyticsRollups = new Map();
+/** @type {Set<string>} Processed provider message ids (wamid) for webhook idempotency */
+const processedInbound = new Set();
 
 function now() {
     return new Date().toISOString();
@@ -46,13 +48,26 @@ export const memoryAdapter = {
         return true;
     },
 
+    async isMessageProcessed(externalId) {
+        return processedInbound.has(String(externalId));
+    },
+
+    async markMessageProcessed(externalId, meta = {}) {
+        processedInbound.add(String(externalId));
+        return { externalId: String(externalId), processedAt: now(), ...meta };
+    },
+
     async saveMessage(phone, role, message, options = {}) {
         if (!messages.has(phone)) messages.set(phone, []);
-        messages.get(phone).push({
+        const entry = {
             role,
             message,
             createdAt: now(),
-        });
+        };
+        if (options.externalId) entry.externalId = options.externalId;
+        if (options.channel) entry.channel = options.channel;
+        if (options.companyId) entry.companyId = options.companyId;
+        messages.get(phone).push(entry);
 
         const existing = customers.get(phone) || {};
         const patch = {

@@ -21,6 +21,25 @@ export async function saveOutboundMessage(phone, text, options = {}) {
     return store.saveMessage(phone, "assistant", text, options);
 }
 
+/** Idempotency — skip duplicate Meta webhook deliveries (wamid). */
+export async function isInboundMessageProcessed(externalId) {
+    if (!externalId) return false;
+    const store = await adapter();
+    if (typeof store.isMessageProcessed === "function") {
+        return store.isMessageProcessed(externalId);
+    }
+    return false;
+}
+
+export async function markInboundMessageProcessed(externalId, meta = {}) {
+    if (!externalId) return null;
+    const store = await adapter();
+    if (typeof store.markMessageProcessed === "function") {
+        return store.markMessageProcessed(externalId, meta);
+    }
+    return null;
+}
+
 /** @deprecated use saveInboundMessage / saveOutboundMessage */
 export async function saveMessage(phone, role, message, options = {}) {
     const store = await adapter();

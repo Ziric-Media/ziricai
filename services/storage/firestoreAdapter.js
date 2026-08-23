@@ -19,6 +19,7 @@ import {
     limit,
     serverTimestamp,
 } from "firebase/firestore";
+import crypto from "crypto";
 import { db } from "../../js/firebase.js";
 import { getAdminFirestore, isServerSide, adminServerTimestamp } from "../database/firestoreAdmin.js";
 import { LEGACY_COLLECTIONS } from "../database/schema.js";
@@ -70,6 +71,21 @@ async function adminQuery(collectionPath, orderField, orderDir, max) {
     return snap.docs.map((d) => ({ id: d.id, data: () => d.data() }));
 }
 
+function processedInboundDocId(externalId) {
+    return crypto.createHash("sha256").update(String(externalId)).digest("hex");
+}
+
+const PROCESSED_INBOUND_COLLECTION = "_processedInbound";
+
+function buildMessagePayload(role, message, options, ts) {
+    const payload = { role, message, createdAt: ts };
+    if (options.externalId) payload.externalId = options.externalId;
+    if (options.channel) payload.channel = options.channel;
+    if (options.companyId) payload.companyId = options.companyId;
+    if (options.name) payload.name = options.name;
+    return payload;
+}
+
 export const firestoreAdapter = {
     name: "firestore",
 
@@ -95,16 +111,42 @@ export const firestoreAdapter = {
         }
     },
 
+    async isMessageProcessed(externalId) {
+        if (!externalId) return false;
+        const docId = processedInboundDocId(externalId);
+        const admin = adminDb();
+        if (admin) {
+            const snap = await adminGetDoc(`${PROCESSED_INBOUND_COLLECTION}/${docId}`);
+            return snap.exists;
+        }
+        const snap = await getDoc(doc(db, PROCESSED_INBOUND_COLLECTION, docId));
+        return snap.exists();
+    },
+
+    async markMessageProcessed(externalId, meta = {}) {
+        if (!externalId) return null;
+        const docId = processedInboundDocId(externalId);
+        const payload = {
+            externalId: String(externalId),
+            processedAt: new Date().toISOString(),
+            ...meta,
+        };
+        const admin = adminDb();
+        if (admin) {
+            await adminSetDoc(`${PROCESSED_INBOUND_COLLECTION}/${docId}`, payload, false);
+            return payload;
+        }
+        await setDoc(doc(db, PROCESSED_INBOUND_COLLECTION, docId), payload);
+        return payload;
+    },
+
     async saveMessage(phone, role, message, options = {}) {
         const adminFirestore = adminDb();
         const ts = adminFirestore ? adminServerTimestamp() : serverTimestamp();
+        const msgPayload = buildMessagePayload(role, message, options, ts);
 
         if (adminFirestore) {
-            await adminAddDoc(`${LEGACY_COLLECTIONS.CUSTOMERS}/${phone}/messages`, {
-                role,
-                message,
-                createdAt: ts,
-            });
+            await adminAddDoc(`${LEGACY_COLLECTIONS.CUSTOMERS}/${phone}/messages`, msgPayload);
             const existing = await adminGetDoc(`${LEGACY_COLLECTIONS.CUSTOMERS}/${phone}`);
             const prev = existing.exists ? existing.data() : {};
             const customerPatch = {
@@ -121,11 +163,7 @@ export const firestoreAdapter = {
             return { phone, role };
         }
 
-        await addDoc(collection(db, "customers", phone, "messages"), {
-            role,
-            message,
-            createdAt: serverTimestamp(),
-        });
+        await addDoc(collection(db, "customers", phone, "messages"), msgPayload);
 
         const customerPatch = {
             phone,

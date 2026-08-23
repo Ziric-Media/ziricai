@@ -103,8 +103,21 @@ export function resolveCompanyFromPhoneNumberId(phoneNumberId) {
     return phoneNumberIdMap.get(String(phoneNumberId)) || process.env.DEFAULT_COMPANY_ID || null;
 }
 
-/** Bootstrap default mapping from env */
+/**
+ * Known phone_number_id → companyId mappings (demo / bootstrap).
+ * Production: extend via tenant integrations collection (integrationService).
+ */
+const DEMO_PHONE_NUMBER_MAPPINGS = [
+    // ZiricAI Meta sandbox — Central Motors + Sarah
+    ["1209265748933699", "demo-central-motors"],
+];
+
+/** Bootstrap default mapping from env + demo seeds */
 export function bootstrapIntegrationConfig() {
+    for (const [phoneId, companyId] of DEMO_PHONE_NUMBER_MAPPINGS) {
+        registerPhoneNumberMapping(phoneId, companyId);
+    }
+
     const phoneId = process.env.PHONE_NUMBER_ID;
     const companyId = process.env.DEFAULT_COMPANY_ID;
     if (phoneId && companyId) {
