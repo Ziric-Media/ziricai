@@ -6,6 +6,24 @@ import { ingestBatch } from "./conversationPipeline.js";
 import { WebhookValidationError, IntegrationError } from "./errors.js";
 import { logInfo, logError, logWarn } from "./integrationLogger.js";
 import { CANONICAL_WHATSAPP_WEBHOOK_PATH, validateMetaWebhookSignature } from "./metaWebhook.js";
+import {
+    resolveCompanyFromPhoneNumberId,
+    maskPhoneNumberId,
+} from "./types/integrationConfig.js";
+
+function isProduction() {
+    return process.env.NODE_ENV === "production";
+}
+
+function extractPhoneNumberId(body) {
+    return body?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id || null;
+}
+
+function resolveWebhookCompanyId(explicitCompanyId, phoneNumberId) {
+    if (explicitCompanyId) return explicitCompanyId;
+    if (isProduction()) return null;
+    return process.env.DEFAULT_COMPANY_ID || null;
+}
 
 /**
  * Canonical WhatsApp webhook handler (GET verify + POST inbound).
@@ -13,7 +31,7 @@ import { CANONICAL_WHATSAPP_WEBHOOK_PATH, validateMetaWebhookSignature } from ".
  */
 export async function handleWhatsAppWebhook(req, res, companyId = null) {
     const adapter = getAdapter("whatsapp");
-    const ctx = { companyId: companyId || process.env.DEFAULT_COMPANY_ID || null };
+    let ctx = { companyId: resolveWebhookCompanyId(companyId, null) };
 
     try {
         if (req.method === "GET") {
@@ -35,6 +53,11 @@ export async function handleWhatsAppWebhook(req, res, companyId = null) {
                 });
             }
 
+            const phoneNumberId = extractPhoneNumberId(req.body);
+            const resolvedCompanyId =
+                companyId || (phoneNumberId ? await resolveCompanyFromPhoneNumberId(phoneNumberId) : null);
+            ctx = { companyId: resolvedCompanyId };
+
             const summary = summarizeWebhookBody(req.body);
             logInfo("whatsapp", ctx.companyId, `Incoming POST (${CANONICAL_WHATSAPP_WEBHOOK_PATH})`, summary);
 
@@ -42,6 +65,16 @@ export async function handleWhatsAppWebhook(req, res, companyId = null) {
             if (res.headersSent) return;
 
             const body = handlerResult?.body ?? req.body;
+            const hasInboundMessage = Boolean(body?.entry?.[0]?.changes?.[0]?.value?.messages?.length);
+
+            if (hasInboundMessage && !resolvedCompanyId) {
+                console.warn("[whatsapp] Unknown phone_number_id — skipping pipeline (200 to Meta)", {
+                    phoneNumberId: maskPhoneNumberId(phoneNumberId),
+                });
+                if (!res.headersSent) return res.sendStatus(200);
+                return;
+            }
+
             const messages = await adapter.receiveMessage(ctx, body);
 
             if (messages) {
@@ -149,6 +182,6 @@ function summarizeWebhookBody(body) {
         hasMessages: Boolean(value?.messages?.length),
         hasStatuses: Boolean(value?.statuses?.length),
         messageCount: value?.messages?.length ?? 0,
-        phoneNumberId: value?.metadata?.phone_number_id,
+        phoneNumberId: maskPhoneNumberId(value?.metadata?.phone_number_id),
     };
 }

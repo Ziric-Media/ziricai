@@ -4,7 +4,9 @@
 import { BaseAdapter } from "./baseAdapter.js";
 import { sendWhatsAppMessage } from "../../whatsapp.js";
 import { createUnifiedMessage, CHANNELS } from "../types/unifiedMessage.js";
-import { resolveCompanyFromPhoneNumberId } from "../types/integrationConfig.js";
+import {
+    resolveCompanyFromPhoneNumberId,
+} from "../types/integrationConfig.js";
 import { WebhookValidationError } from "../errors.js";
 import { logInfo, logWarn } from "../integrationLogger.js";
 import {
@@ -12,6 +14,7 @@ import {
     validateMetaWebhookSignature,
     verifyMetaWebhookToken,
 } from "../metaWebhook.js";
+import { getDefaultAiEmployee } from "../../tenants/aiEmployeeService.js";
 
 export class WhatsAppAdapter extends BaseAdapter {
     getChannelType() {
@@ -40,8 +43,17 @@ export class WhatsAppAdapter extends BaseAdapter {
         if (!message) return null;
 
         const phoneNumberId = value?.metadata?.phone_number_id;
-        const companyId =
-            ctx?.companyId || resolveCompanyFromPhoneNumberId(phoneNumberId);
+        const companyId = ctx?.companyId || (await resolveCompanyFromPhoneNumberId(phoneNumberId));
+
+        if (companyId) {
+            const agent = await getDefaultAiEmployee(companyId).catch(() => null);
+            console.log("[whatsapp] AI employee resolved", {
+                companyId,
+                agentId: agent?.id || null,
+                agentName: agent?.name || null,
+            });
+        }
+
         const contactName = value?.contacts?.[0]?.profile?.name || null;
         const from = message.from;
         const text = message.text?.body || "";
@@ -113,7 +125,11 @@ export class WhatsAppAdapter extends BaseAdapter {
             if (mode === "subscribe" && !verifyTokenConfigured) {
                 logWarn(CHANNELS.WHATSAPP, ctx?.companyId, "VERIFY_TOKEN not configured on server");
             } else if (mode === "subscribe" && !tokenMatch) {
-                logWarn(CHANNELS.WHATSAPP, ctx?.companyId, "Verify token mismatch (check Railway VERIFY_TOKEN vs Meta Console)");
+                logWarn(
+                    CHANNELS.WHATSAPP,
+                    ctx?.companyId,
+                    "Verify token mismatch (check Railway VERIFY_TOKEN vs Meta Console)"
+                );
             }
 
             return res.sendStatus(403);

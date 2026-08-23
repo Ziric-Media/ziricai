@@ -39,8 +39,10 @@ export const CONNECTORS = {
  * @returns {UnifiedMessage}
  */
 export function createUnifiedMessage(fields) {
+    const devFallback =
+        process.env.NODE_ENV !== "production" ? process.env.DEFAULT_COMPANY_ID || null : null;
     return {
-        companyId: fields.companyId || process.env.DEFAULT_COMPANY_ID || null,
+        companyId: fields.companyId ?? devFallback,
         channel: fields.channel,
         externalId: fields.externalId || `${fields.channel}-${Date.now()}`,
         from: String(fields.from || ""),

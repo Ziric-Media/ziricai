@@ -167,6 +167,14 @@
         { "fieldPath": "knowledgeBaseId", "order": "ASCENDING" },
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "integrations",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "phoneNumberId", "order": "ASCENDING" },
+        { "fieldPath": "provider", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

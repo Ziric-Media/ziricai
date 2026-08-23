@@ -24,6 +24,7 @@ import {
 import { getStorageAdapter, getConfiguredStorageBackend, getStorageFallbackReason, hasAdminCredentials } from "../services/storage/storageAdapter.js";
 import { seedDemoCustomersIfEmpty } from "../services/storage/seedDemoCustomers.js";
 import { seedDemoAgentsIfEmpty } from "../services/storage/seedDemoAgents.js";
+import { seedDemoWhatsAppIntegrationIfMissing } from "../services/storage/seedDemoWhatsAppIntegration.js";
 import { seedCustomerOpsDemoIfEmpty } from "../services/storage/seedCustomerOpsDemo.js";
 import {
     listCustomers,
@@ -1483,6 +1484,9 @@ export async function runBackgroundInit() {
         await seedDemoCustomersIfEmpty(adapter);
         await seedDemoAgentsIfEmpty().catch((err) => {
             console.error("[startup] Demo agent seed skipped:", err.message);
+        });
+        await seedDemoWhatsAppIntegrationIfMissing().catch((err) => {
+            console.error("[startup] Demo WhatsApp integration seed skipped:", err.message);
         });
         await seedCustomerOpsDemoIfEmpty();
         try {

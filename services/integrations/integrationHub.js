@@ -11,6 +11,7 @@ import { isRetryableOutboundError } from "./metaWhatsAppErrors.js";
 import { handleWebhookRequest, handleWhatsAppWebhook, handleLegacyWhatsAppWebhook } from "./webhookRouter.js";
 import { ingest, ingestBatch } from "./conversationPipeline.js";
 import { requireTenantScope } from "../core/tenantContext.js";
+import { listChannelIntegrations } from "../tenants/integrationService.js";
 
 let initialized = false;
 
@@ -135,10 +136,13 @@ export function mountIntegrationRoutes(app) {
         res.json({ items: logs, count: logs.length });
     });
 
-    app.get("/api/integrations/channels/:companyId", requireTenantScope({ optional: true }), (req, res) => {
+    app.get("/api/integrations/channels/:companyId", requireTenantScope({ optional: true }), async (req, res) => {
+        const companyId = req.params.companyId;
+        const integrations = await listChannelIntegrations(companyId, "whatsapp");
         res.json({
-            companyId: req.params.companyId,
-            channels: getChannelStatus(req.params.companyId),
+            companyId,
+            channels: getChannelStatus(companyId),
+            integrations,
         });
     });
 }

@@ -1,4 +1,8 @@
 import { CHANNELS, CONNECTORS } from "./unifiedMessage.js";
+import {
+    findActiveWhatsAppIntegrationByPhoneNumberId,
+    maskPhoneNumberId,
+} from "../../tenants/integrationService.js";
 
 /**
  * Default integration metadata per channel/connector.
@@ -87,32 +91,88 @@ export function getDefaultIntegrationConfig(channel) {
 }
 
 /**
- * In-memory phone_number_id → companyId mapping (demo / single-tenant).
- * Production: load from Firestore integrations collection.
+ * @deprecated Dev-only in-memory phone_number_id → companyId mapping.
+ * Firestore integrations collection takes precedence in production.
  */
 const phoneNumberIdMap = new Map();
 
+/** @deprecated Register dev-only phone mapping — prefer Firestore seed/integrationService. */
 export function registerPhoneNumberMapping(phoneNumberId, companyId) {
     if (phoneNumberId && companyId) {
         phoneNumberIdMap.set(String(phoneNumberId), companyId);
     }
 }
 
-export function resolveCompanyFromPhoneNumberId(phoneNumberId) {
-    if (!phoneNumberId) return process.env.DEFAULT_COMPANY_ID || null;
-    return phoneNumberIdMap.get(String(phoneNumberId)) || process.env.DEFAULT_COMPANY_ID || null;
+function isProduction() {
+    return process.env.NODE_ENV === "production";
+}
+
+function deprecatedDevDefaultCompanyId() {
+    if (isProduction()) return null;
+    const fallback = process.env.DEFAULT_COMPANY_ID || null;
+    if (fallback) {
+        console.warn(
+            "[whatsapp] DEPRECATED: DEFAULT_COMPANY_ID fallback used — set Firestore integration instead"
+        );
+    }
+    return fallback;
 }
 
 /**
- * Known phone_number_id → companyId mappings (demo / bootstrap).
- * Production: extend via tenant integrations collection (integrationService).
+ * Resolve tenant from Meta phone_number_id.
+ * 1. Firestore active WhatsApp integration (primary)
+ * 2. @deprecated in-memory DEMO_PHONE_NUMBER_MAPPINGS (dev)
+ * 3. @deprecated DEFAULT_COMPANY_ID (dev only, never production)
+ *
+ * @param {string} phoneNumberId
+ * @returns {Promise<string|null>}
+ */
+export async function resolveCompanyFromPhoneNumberId(phoneNumberId) {
+    if (!phoneNumberId) {
+        return deprecatedDevDefaultCompanyId();
+    }
+
+    const key = String(phoneNumberId);
+    console.log("[whatsapp] Phone Number ID received", {
+        phoneNumberId: maskPhoneNumberId(key),
+    });
+
+    const integration = await findActiveWhatsAppIntegrationByPhoneNumberId(key);
+    if (integration?.companyId) {
+        console.log("[whatsapp] Integration resolved", {
+            integrationId: integration.id,
+            phoneNumberId: maskPhoneNumberId(key),
+            status: integration.status,
+        });
+        console.log("[whatsapp] Company resolved", { companyId: integration.companyId });
+        return integration.companyId;
+    }
+
+    const mapped = phoneNumberIdMap.get(key);
+    if (mapped) {
+        console.warn("[whatsapp] DEPRECATED: in-memory phone mapping used", {
+            phoneNumberId: maskPhoneNumberId(key),
+            companyId: mapped,
+        });
+        console.log("[whatsapp] Company resolved", { companyId: mapped });
+        return mapped;
+    }
+
+    console.warn("[whatsapp] No integration for phone_number_id — companyId=null", {
+        phoneNumberId: maskPhoneNumberId(key),
+    });
+    return deprecatedDevDefaultCompanyId();
+}
+
+/**
+ * @deprecated Known phone_number_id → companyId mappings (dev bootstrap only).
+ * Production routing uses Firestore companies/{companyId}/integrations.
  */
 const DEMO_PHONE_NUMBER_MAPPINGS = [
-    // ZiricAI Meta sandbox — Central Motors + Sarah
     ["1209265748933699", "demo-central-motors"],
 ];
 
-/** Bootstrap default mapping from env + demo seeds */
+/** @deprecated Bootstrap dev-only in-memory mappings from env + demo seeds. */
 export function bootstrapIntegrationConfig() {
     for (const [phoneId, companyId] of DEMO_PHONE_NUMBER_MAPPINGS) {
         registerPhoneNumberMapping(phoneId, companyId);
@@ -124,3 +184,5 @@ export function bootstrapIntegrationConfig() {
         registerPhoneNumberMapping(phoneId, companyId);
     }
 }
+
+export { maskPhoneNumberId };

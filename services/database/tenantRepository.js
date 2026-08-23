@@ -251,3 +251,26 @@ export function resetMemoryTenantStore() {
 export function getMemoryTenantStoreSize() {
     return memoryTenantStore.size;
 }
+
+/**
+ * Scan in-memory tenant store for documents matching filters (cross-tenant).
+ * @param {string} collectionName
+ * @param {Record<string, unknown>} filters
+ * @returns {object[]}
+ */
+export function memoryFindAll(collectionName, filters = {}) {
+    const suffix = `::${collectionName}::`;
+    const results = [];
+    for (const [key, record] of memoryTenantStore.entries()) {
+        if (!key.includes(suffix) || !record) continue;
+        let match = true;
+        for (const [field, value] of Object.entries(filters)) {
+            if (record[field] !== value) {
+                match = false;
+                break;
+            }
+        }
+        if (match) results.push(record);
+    }
+    return results;
+}
