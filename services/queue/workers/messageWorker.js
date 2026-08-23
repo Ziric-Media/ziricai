@@ -1,5 +1,7 @@
 import { askAI } from "../../openai.js";
 
+import { sendWhatsAppTypingIndicator } from "../../whatsapp.js";
+
 import { sendMessage as integrationSend } from "../../integrations/integrationHub.js";
 
 import { saveOutboundMessage, getConversation } from "../../conversationService.js";
@@ -81,6 +83,10 @@ async function processInboundMessage(job) {
             externalId: metaMessageId,
         });
         return;
+    }
+
+    if (outboundChannel === "whatsapp" && externalId) {
+        await sendWhatsAppTypingIndicator(externalId);
     }
 
     const customer = (await getCustomer(sender)) || { phone: sender, companyId: job.companyId || null };
