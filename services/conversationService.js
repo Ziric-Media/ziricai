@@ -1,22 +1,30 @@
 /**
- * ZiricAI Conversation Service — legacy storageAdapter pipeline.
- * @deprecated Use services/tenants/conversationService.js for tenant-scoped conversations.
- *
- * Flow: server.js → conversationService → storageAdapter → (Firestore | memory)
- * The webhook and admin API read/write conversations through this layer only.
+ * ZiricAI Conversation Service — bridges legacy storageAdapter and tenant-scoped storage.
+ * When companyId is provided, reads/writes go through tenantStorage (multi-tenant isolation).
  */
 import { getStorageAdapter } from "./storage/storageAdapter.js";
+import {
+    saveTenantMessage,
+    getTenantConversationHistory,
+    listTenantConversations,
+} from "./storage/tenantStorage.js";
 
 async function adapter() {
     return getStorageAdapter();
 }
 
 export async function saveInboundMessage(phone, text, options = {}) {
+    if (options.companyId) {
+        return saveTenantMessage(options.companyId, phone, "user", text, options);
+    }
     const store = await adapter();
     return store.saveMessage(phone, "user", text, options);
 }
 
 export async function saveOutboundMessage(phone, text, options = {}) {
+    if (options.companyId) {
+        return saveTenantMessage(options.companyId, phone, "assistant", text, options);
+    }
     const store = await adapter();
     return store.saveMessage(phone, "assistant", text, options);
 }
@@ -46,12 +54,34 @@ export async function saveMessage(phone, role, message, options = {}) {
     return store.saveMessage(phone, role, message, options);
 }
 
-export async function getConversation(phone, max = 20) {
+export async function getConversation(phone, max = 20, options = {}) {
+    const companyId = options.companyId || null;
+    const channel = options.channel || "whatsapp";
+    if (companyId) {
+        return getTenantConversationHistory(companyId, phone, channel, max);
+    }
     const store = await adapter();
     return store.getConversation(phone, max);
 }
 
 export async function listConversations(options = {}) {
+    const { companyId, limit = 50, channel } = options;
+    if (companyId) {
+        const items = await listTenantConversations(companyId, { limit, channel });
+        return items.map((c) => ({
+            id: c.conversationId || c.id,
+            phone: c.customerId,
+            name: c.customerName || c.customerId,
+            customerName: c.customerName || c.customerId,
+            companyId,
+            lastMessage: c.lastMessage || "",
+            preview: c.preview || c.lastMessage || "",
+            status: c.status || "in_progress",
+            mode: c.mode || "ai",
+            channel: c.channel || "whatsapp",
+            time: c.updatedAt || null,
+        }));
+    }
     const store = await adapter();
     return store.listConversations(options);
 }

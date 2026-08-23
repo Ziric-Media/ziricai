@@ -1,9 +1,14 @@
 /**
- * Server-side Customer CRM — backed by storageAdapter (legacy flat collections).
- * @deprecated Use services/tenants/crmService.js for new tenant-scoped CRM writes.
- * WhatsApp webhook and /api/customers still route here during Phase 2 migration.
+ * Server-side Customer CRM — bridges legacy storageAdapter and tenant-scoped storage.
+ * When companyId is provided, customer records are isolated per company (not global phone keys).
  */
 import { getStorageAdapter } from "./storage/storageAdapter.js";
+import {
+    getTenantCustomer,
+    upsertTenantCustomer,
+    listTenantCustomers,
+    updateTenantCustomer,
+} from "./storage/tenantStorage.js";
 
 const DEFAULT_FIELDS = {
     tags: [],
@@ -39,11 +44,19 @@ async function store() {
     return getStorageAdapter();
 }
 
-export async function getCustomer(phone) {
+export async function getCustomer(phone, options = {}) {
+    const { companyId } = options;
+    if (companyId) {
+        return getTenantCustomer(companyId, phone);
+    }
     return (await store()).getCustomer(normalizePhone(phone));
 }
 
 export async function listCustomers(options = {}) {
+    const { companyId } = options;
+    if (companyId) {
+        return listTenantCustomers(companyId, { limit: options.limit || 100 });
+    }
     const adapter = await store();
     if (adapter.listCustomers) {
         return adapter.listCustomers(options);
@@ -120,8 +133,39 @@ export function calculateLeadScore(customer = {}, analysis = {}) {
 }
 
 export async function upsertCustomerFromWhatsApp(phone, { contactName, companyId, messagePreview } = {}) {
-    const adapter = await store();
     const key = normalizePhone(phone);
+    const resolvedCompanyId =
+        companyId ||
+        (process.env.NODE_ENV !== "production" ? process.env.DEFAULT_COMPANY_ID : null) ||
+        null;
+
+    if (resolvedCompanyId) {
+        const existing = (await getTenantCustomer(resolvedCompanyId, key)) || {};
+        const now = new Date().toISOString();
+        const patch = {
+            channel: "whatsapp",
+            status: existing.status || "in_progress",
+            mode: existing.mode || "ai",
+            tags: existing.tags || [],
+            leadScore: existing.leadScore ?? 50,
+            notesList: existing.notesList || [],
+            tasks: existing.tasks || [],
+            timeline: existing.timeline || [],
+            totalMessages: (existing.totalMessages || 0) + (messagePreview ? 1 : 0),
+            lastSeen: now,
+            online: true,
+        };
+        if (contactName) patch.name = contactName;
+        else if (!existing.name) patch.name = formatPhoneDisplay(key);
+        if (messagePreview) patch.lastMessage = messagePreview;
+        if (!existing.createdAt) {
+            patch.createdAt = now;
+            patch.customerSince = now;
+        }
+        return upsertTenantCustomer(resolvedCompanyId, key, patch);
+    }
+
+    const adapter = await store();
     const existing = (await adapter.getCustomer(key)) || {};
     const now = new Date().toISOString();
 
@@ -131,7 +175,7 @@ export async function upsertCustomerFromWhatsApp(phone, { contactName, companyId
         channel: "whatsapp",
         status: existing.status || "in_progress",
         mode: existing.mode || "ai",
-        companyId: companyId || existing.companyId || process.env.DEFAULT_COMPANY_ID || null,
+        companyId: companyId || existing.companyId || null,
         tags: existing.tags || [],
         leadScore: existing.leadScore ?? 50,
         notesList: existing.notesList || [],

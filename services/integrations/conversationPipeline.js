@@ -12,6 +12,7 @@ import { isValidUnifiedMessage } from "./types/unifiedMessage.js";
 import { logInfo, logError } from "./integrationLogger.js";
 import { publish, EventTypes } from "../events/index.js";
 import { upsertConversationMeta } from "../tenants/conversationService.js";
+import { getOrCreateConversation } from "../storage/tenantStorage.js";
 
 /**
  * Ingest a normalized UnifiedMessage into the existing conversation + queue pipeline.
@@ -66,6 +67,14 @@ export async function ingest(message) {
                 messagePreview: text.slice(0, 120),
             });
             if (companyId) {
+                await getOrCreateConversation(companyId, from, channel, {
+                    lastMessage: text.slice(0, 120),
+                    preview: text.slice(0, 120),
+                    customerName: contactName || from,
+                    status: "in_progress",
+                    unread: true,
+                    updatedAt: message.timestamp || new Date().toISOString(),
+                });
                 await upsertConversationMeta(companyId, from, {
                     channel,
                     lastMessage: text.slice(0, 120),

@@ -11,12 +11,13 @@ process.env.NODE_ENV = process.env.NODE_ENV || "development";
 import { resetMemoryTenantStore } from "../services/database/tenantRepository.js";
 import { clearPhoneResolutionCache } from "../services/tenants/integrationService.js";
 import { bootstrapIntegrationConfig } from "../services/integrations/types/integrationConfig.js";
-import { seedDemoAgentsIfEmpty } from "../services/storage/seedDemoAgents.js";
+import { seedDemoTenantsIfMissing } from "../services/storage/seedDemoTenants.js";
 import {
-    seedDemoWhatsAppIntegrationIfMissing,
     CENTRAL_MOTORS_PHONE_NUMBER_ID,
     CENTRAL_MOTORS_COMPANY_ID,
-} from "../services/storage/seedDemoWhatsAppIntegration.js";
+    ECONO_FUNERALS_PHONE_NUMBER_ID,
+    ECONO_FUNERALS_COMPANY_ID,
+} from "../services/storage/seedDemoTenants.js";
 import { getDefaultAiEmployee } from "../services/tenants/aiEmployeeService.js";
 
 function assert(condition, message) {
@@ -31,9 +32,7 @@ async function main() {
     clearPhoneResolutionCache();
     bootstrapIntegrationConfig();
 
-    await seedDemoAgentsIfEmpty();
-    const seedResult = await seedDemoWhatsAppIntegrationIfMissing();
-    console.log("Seed:", seedResult);
+    await seedDemoTenantsIfMissing();
 
     const { resolveCompanyFromPhoneNumberId } = await import(
         "../services/integrations/types/integrationConfig.js"
@@ -45,6 +44,13 @@ async function main() {
         `Expected ${CENTRAL_MOTORS_COMPANY_ID}, got ${companyId}`
     );
     console.log("✓ 1209265748933699 → demo-central-motors");
+
+    const econoId = await resolveCompanyFromPhoneNumberId(ECONO_FUNERALS_PHONE_NUMBER_ID);
+    assert(
+        econoId === ECONO_FUNERALS_COMPANY_ID,
+        `Expected ${ECONO_FUNERALS_COMPANY_ID}, got ${econoId}`
+    );
+    console.log("✓ 1209265748933700 → demo-econo-funerals");
 
     const agent = await getDefaultAiEmployee(companyId);
     assert(agent?.name === "Sarah", `Expected Sarah, got ${agent?.name || "null"}`);
@@ -63,7 +69,7 @@ async function main() {
     if (prevDefault !== undefined) process.env.DEFAULT_COMPANY_ID = prevDefault;
 
     clearPhoneResolutionCache();
-    await seedDemoWhatsAppIntegrationIfMissing();
+    await seedDemoTenantsIfMissing();
     const persisted = await resolveCompanyFromPhoneNumberId(CENTRAL_MOTORS_PHONE_NUMBER_ID);
     assert(
         persisted === CENTRAL_MOTORS_COMPANY_ID,

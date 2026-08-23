@@ -172,8 +172,10 @@ const DEMO_PHONE_NUMBER_MAPPINGS = [
     ["1209265748933699", "demo-central-motors"],
 ];
 
-/** @deprecated Bootstrap dev-only in-memory mappings from env + demo seeds. */
+/** @deprecated Bootstrap dev-only in-memory mappings from env + demo seeds. Never runs in production. */
 export function bootstrapIntegrationConfig() {
+    if (isProduction()) return;
+
     for (const [phoneId, companyId] of DEMO_PHONE_NUMBER_MAPPINGS) {
         registerPhoneNumberMapping(phoneId, companyId);
     }

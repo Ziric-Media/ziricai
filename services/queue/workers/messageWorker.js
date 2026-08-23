@@ -14,7 +14,7 @@ import { publish, EventTypes } from "../../events/index.js";
 
 import { extractMemoryFacts } from "../../intelligence/conversationIntelligence.js";
 
-import { storeMemory } from "../../memory/aiMemoryService.js";
+import { storeMemory, getMemoryContext } from "../../memory/aiMemoryService.js";
 
 import { processInboundCustomerPipeline } from "../../platform/provisioningService.js";
 
@@ -89,8 +89,11 @@ async function processInboundMessage(job) {
         await sendWhatsAppTypingIndicator(externalId);
     }
 
-    const customer = (await getCustomer(sender)) || { phone: sender, companyId: job.companyId || null };
-    const resolvedCompanyId = customer.companyId || companyId || process.env.DEFAULT_COMPANY_ID || null;
+    const resolvedCompanyId = companyId || job.companyId || null;
+    const customer =
+        (resolvedCompanyId
+            ? await getCustomer(sender, { companyId: resolvedCompanyId })
+            : await getCustomer(sender)) || { phone: sender, companyId: resolvedCompanyId };
 
     const knowledgeBundle =
         resolvedCompanyId && !isGreetingMessage(text)
@@ -110,8 +113,15 @@ async function processInboundMessage(job) {
 
     const companyRecord = resolvedCompanyId ? await getCompany(resolvedCompanyId).catch(() => null) : null;
 
-    const history = await getConversation(sender, 20);
+    const history = resolvedCompanyId
+        ? await getConversation(sender, 20, { companyId: resolvedCompanyId, channel: outboundChannel })
+        : await getConversation(sender, 20);
     const isNewConversation = history.length <= 1;
+
+    const memoryContext =
+        resolvedCompanyId && agent?.memory !== false
+            ? await getMemoryContext(sender, agent?.id || "default", { companyId: resolvedCompanyId })
+            : await getMemoryContext(sender, agent?.id || "default");
 
     if (resolvedCompanyId && isNewConversation) {
         await publish(resolvedCompanyId, EventTypes.CONVERSATION_STARTED, {
@@ -129,10 +139,11 @@ async function processInboundMessage(job) {
         contactName,
     });
 
+    const knowledgeParts = [knowledgeBundle.context || "", memoryContext || ""].filter(Boolean);
     const reply = await askAI(text, {
         history,
         systemPrompt,
-        knowledgeContext: knowledgeBundle.context || "",
+        knowledgeContext: knowledgeParts.join("\n\n"),
     });
 
     const metaMessageId = await trySendOutbound(outboundChannel, resolvedCompanyId, sender, reply);
@@ -194,7 +205,7 @@ async function processInboundMessage(job) {
 
     const facts = extractMemoryFacts(text);
     for (const fact of facts) {
-        await storeMemory(sender, agent?.id || "default", fact);
+        await storeMemory(sender, agent?.id || "default", fact, { companyId: resolvedCompanyId });
     }
 
     await recordEvent("message_processed", {

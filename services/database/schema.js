@@ -29,6 +29,8 @@ export const TENANT_COLLECTIONS = {
     BILLING: "billing",
     SUBSCRIPTIONS: "subscriptions",
     INTEGRATIONS: "integrations",
+    MESSAGES: "messages",
+    MEMORIES: "memories",
     NOTIFICATIONS: "notifications",
     DOCUMENTS: "documents",
     FILES: "files",

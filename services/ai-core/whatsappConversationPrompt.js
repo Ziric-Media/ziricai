@@ -12,7 +12,7 @@ You represent the business to the customer, not the technology platform.
 Keep replies concise and helpful unless the customer asks for detail.
 `.trim();
 
-/** Fallback identity when no AI employee is provisioned yet. */
+/** Dev-only fallback identity when no AI employee is provisioned yet. */
 const DEMO_TENANT_AGENTS = {
     "demo-central-motors": {
         name: "Sarah",
@@ -23,7 +23,20 @@ const DEMO_TENANT_AGENTS = {
         greetingMessage:
             "Hi there! I'm Sarah from Central Motors. Looking for your next vehicle? I'd love to help you find the perfect match.",
     },
+    "demo-econo-funerals": {
+        name: "Grace",
+        companyName: "Econo Funerals",
+        roleLabel: "Compassion Counselor",
+        systemPrompt:
+            "You are Grace, a compassionate counselor at Econo Funerals in South Africa. You support families with care and sensitivity regarding funeral packages and arrangements.",
+        greetingMessage:
+            "Hello, I'm Grace from Econo Funerals. I'm here to support you with care and compassion. How may I assist you?",
+    },
 };
+
+function isProduction() {
+    return process.env.NODE_ENV === "production";
+}
 
 /**
  * @param {{
@@ -41,7 +54,7 @@ export function buildWhatsAppSystemPrompt({
     customer = null,
     contactName = null,
 } = {}) {
-    const demoFallback = companyId ? DEMO_TENANT_AGENTS[companyId] : null;
+    const demoFallback = !isProduction() && companyId ? DEMO_TENANT_AGENTS[companyId] : null;
     const resolvedAgent = agent || demoFallback;
     const resolvedCompanyName =
         companyName || customer?.companyName || demoFallback?.companyName || companyId || "the business";

@@ -449,7 +449,7 @@ export async function processInboundCustomerPipeline(phone, context = {}) {
     const store = await adapter();
     const companyId =
         ctxCompanyId ||
-        process.env.DEFAULT_COMPANY_ID ||
+        (process.env.NODE_ENV !== "production" ? process.env.DEFAULT_COMPANY_ID : null) ||
         null;
 
     await upsertCustomerFromWhatsApp(phone, {
@@ -458,7 +458,9 @@ export async function processInboundCustomerPipeline(phone, context = {}) {
         messagePreview: text.slice(0, 120),
     });
 
-    const customer = (await getCustomer(phone)) || {};
+    const customer = companyId
+        ? (await getCustomer(phone, { companyId })) || {}
+        : (await getCustomer(phone)) || {};
     const resolvedCompanyId = customer.companyId || companyId;
     const agent =
         (ctxAgentId && (await store.getAgent?.(ctxAgentId))) ||

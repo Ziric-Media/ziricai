@@ -21,6 +21,8 @@
         "verify:firestore": "node scripts/verify-firestore.js",
         "verify:webhook": "node scripts/verify-webhook.js",
         "verify:whatsapp-integration": "node scripts/verify-whatsapp-integration.js",
+        "verify:tenant-isolation": "node scripts/verify-tenant-isolation.js",
+        "test": "node scripts/verify-tenant-isolation.js && node scripts/verify-whatsapp-integration.js",
         "build:knowledge": "node scripts/build-knowledge-bundle.js",
         "seed:knowledge": "node scripts/seed-knowledge-content.js"
     },
