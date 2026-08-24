@@ -15,7 +15,7 @@ export const BUILTIN_TEMPLATES = [
         builtin: true,
         status: "active",
         trigger: { eventType: EventTypes.MESSAGE_RECEIVED, match: { keywords: ["price", "pricing", "quote", "cost", "how much"] } },
-        actions: [{ type: "send_message", config: { template: "quotation_followup" } }, { type: "send_notification", config: { title: "Quotation requested" } }],
+        actions: [{ type: "send_notification", config: { title: "Quotation requested", message: "Customer asked about pricing — AI agent is handling the reply." } }],
     },
     {
         id: "tpl-appointment-notify",

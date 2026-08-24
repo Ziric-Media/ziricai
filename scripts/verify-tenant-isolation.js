@@ -30,6 +30,9 @@ import {
 } from "../services/conversationService.js";
 import { storeMemory, getMemoryContext } from "../services/memory/aiMemoryService.js";
 import { buildWhatsAppSystemPrompt } from "../services/ai-core/whatsappConversationPrompt.js";
+import { extractMemoryFacts } from "../services/intelligence/conversationIntelligence.js";
+import { executeAction } from "../services/automation/actionExecutor.js";
+import { EventTypes } from "../services/events/eventTypes.js";
 
 const TEST_PHONE = "27821234567";
 
@@ -135,6 +138,32 @@ async function main() {
     assert(funeralsMemory.includes("funeral"), `Funerals memory missing: ${funeralsMemory}`);
     assert(!motorsMemory.includes("funeral packages"), "Memory leaked across tenants");
     console.log("✓ Memory retrieval is tenant-scoped");
+
+    /* ── Budget memory extraction ── */
+    const budgetFacts = extractMemoryFacts("I'm working with a budget of R500,000");
+    assert(
+        budgetFacts.some((f) => /R500,?000/i.test(f)),
+        `Budget amount not captured: ${budgetFacts.join(", ")}`
+    );
+    const followUpFacts = extractMemoryFacts("Ok so that budget can get me a great vehicle?");
+    assert(
+        followUpFacts.some((f) => /budget/i.test(f)),
+        `Follow-up budget reference not captured: ${followUpFacts.join(", ")}`
+    );
+    console.log("✓ extractMemoryFacts captures budget amounts");
+
+    /* ── Automation auto-reply gating ── */
+    const skipped = await executeAction(
+        { type: "send_message", config: { template: "quotation_followup" } },
+        {
+            companyId: CENTRAL_MOTORS_COMPANY_ID,
+            type: EventTypes.MESSAGE_RECEIVED,
+            payload: { phone: TEST_PHONE, text: "What price range are the Fortuners?", aiReplyPending: true },
+        },
+        { id: "tpl-pricing-quotation", name: "Pricing enquiry → Send quotation" }
+    );
+    assert(skipped.skipped === true, "Automation must skip send_message when AI reply is pending");
+    console.log("✓ Pricing automation skips duplicate WhatsApp auto-reply");
 
     /* ── Production prompt gating ── */
     process.env.NODE_ENV = "production";

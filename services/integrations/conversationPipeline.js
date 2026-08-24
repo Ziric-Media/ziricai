@@ -112,6 +112,7 @@ export async function ingest(message) {
                 text,
                 channel,
                 contactName,
+                aiReplyPending: true,
             });
         }
 

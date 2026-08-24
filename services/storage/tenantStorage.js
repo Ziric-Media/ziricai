@@ -180,7 +180,11 @@ export async function saveTenantMemory(companyId, phone, agentId, fact) {
         agentId: agentId || "default",
         facts: [],
     };
-    const facts = [...(existing.facts || []), { fact, createdAt: now() }];
+    const prior = existing.facts || [];
+    if (prior.some((entry) => entry.fact === fact)) {
+        return existing;
+    }
+    const facts = [...prior, { fact, createdAt: now() }];
     return memoriesRepo.set(companyId, docId, {
         customerId,
         agentId: agentId || "default",
@@ -199,7 +203,14 @@ export async function getTenantMemories(companyId, phone, agentId) {
 export async function formatTenantMemoriesForPrompt(companyId, phone, agentId) {
     const facts = await getTenantMemories(companyId, phone, agentId);
     if (!facts.length) return "";
-    return `Customer memories:\n${facts.map((m) => `- ${m.fact}`).join("\n")}`;
+    const ranked = [...facts].sort((a, b) => {
+        const aBudget = /budget:/i.test(a.fact || "") ? 0 : 1;
+        const bBudget = /budget:/i.test(b.fact || "") ? 0 : 1;
+        if (aBudget !== bBudget) return aBudget - bBudget;
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+    const recent = ranked.slice(0, 20);
+    return `Customer memories:\n${recent.map((m) => `- ${m.fact}`).join("\n")}`;
 }
 
 /* ── Registry passthrough (same interface as integrationService) ── */

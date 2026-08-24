@@ -36,14 +36,37 @@ export async function executeAction(action, event, workflow) {
             if (!phone) {
                 return { ok: false, action: "send_message", error: "No recipient phone" };
             }
+            if (event.payload?.aiReplyPending || event.payload?.skipAutoReply) {
+                console.log("[automation] Skipping send_message — AI reply handles inbound", {
+                    companyId,
+                    phone,
+                    workflowId: workflow.id,
+                    eventType: event.type,
+                    responseSource: "automation_skipped",
+                });
+                return {
+                    ok: true,
+                    action: "send_message",
+                    skipped: true,
+                    reason: "ai_reply_pending",
+                };
+            }
             const channel = event.payload?.channel || "whatsapp";
             const text =
                 config.text ||
                 messageFromTemplate(config.template, event) ||
                 "Thank you for contacting us. A team member will follow up shortly.";
+            const responseSource = config.template === "quotation_followup" ? "quotation_workflow" : "automation";
             try {
                 await integrationSend(channel, { companyId }, { to: phone, text });
-                return { ok: true, action: "send_message", text: text.slice(0, 80) };
+                console.log("[automation] Outbound sent", {
+                    companyId,
+                    phone,
+                    workflowId: workflow.id,
+                    responseSource,
+                    template: config.template || null,
+                });
+                return { ok: true, action: "send_message", text: text.slice(0, 80), responseSource };
             } catch (err) {
                 return { ok: false, action: "send_message", error: err.message };
             }

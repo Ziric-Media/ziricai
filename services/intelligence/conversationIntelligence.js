@@ -164,15 +164,33 @@ export function analyzeMessage(phone, message, reply) {
     };
 }
 
-/** Stub fact extraction for future OpenAI memory pipeline. */
+function normalizeZarAmount(raw) {
+    return String(raw || "")
+        .replace(/\s+/g, "")
+        .replace(/,(?=\d{3}\b)/g, ",")
+        .toUpperCase();
+}
+
+/** Extract durable customer facts for memory storage (keyword heuristics). */
 export function extractMemoryFacts(text) {
     const facts = [];
-    const lower = String(text || "").toLowerCase();
+    const raw = String(text || "");
+    const lower = raw.toLowerCase();
+
+    const budgetWithAmount = raw.match(
+        /\b(?:budget|afford(?:able)?|price\s*range|up\s*to|spending|working\s+with\s+a\s+budget)\s*(?:of|is|:)?\s*(R\s?[\d][\d,]*(?:\.\d{2})?)/i
+    );
+    const zarAmount = raw.match(/\bR\s?[\d][\d,]*(?:\.\d{2})?\b/i);
+    if (budgetWithAmount?.[1]) {
+        facts.push(`Customer budget: ${normalizeZarAmount(budgetWithAmount[1])}`);
+    } else if (zarAmount && /\b(budget|afford|spend|finance|vehicle|car|fortuner|hilux|price|quotation|quote)\b/i.test(lower)) {
+        facts.push(`Customer budget: ${normalizeZarAmount(zarAmount[0])}`);
+    } else if (/\b(budget|afford|price range)\b/.test(lower)) {
+        facts.push("Customer discussed budget (amount not specified)");
+    }
+
     if (/\b(child|children|kid|son|daughter)\b/.test(lower)) {
         facts.push("Customer mentioned children");
-    }
-    if (/\b(budget|afford|price range|r\d)\b/.test(lower)) {
-        facts.push("Customer discussed budget or pricing");
     }
     if (/\b(finance|financing|deposit|loan)\b/.test(lower)) {
         facts.push("Customer asked about vehicle finance");
@@ -180,8 +198,9 @@ export function extractMemoryFacts(text) {
     if (/\b(trade.?in|trade in)\b/.test(lower)) {
         facts.push("Customer mentioned trade-in");
     }
-    if (/\b(hilux|corolla|swift|toyota|suzuki)\b/.test(lower)) {
-        facts.push("Customer enquired about specific vehicle model");
+    const vehicleMatch = lower.match(/\b(hilux|corolla|swift|fortuner|toyota|suzuki|bmw|mercedes|audi)\b/i);
+    if (vehicleMatch) {
+        facts.push(`Customer enquired about ${vehicleMatch[0]}`);
     }
     if (/\b(company|business|startup|enterprise)\b/.test(lower)) {
         facts.push("Customer mentioned their business");

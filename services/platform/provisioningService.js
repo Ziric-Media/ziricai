@@ -34,7 +34,7 @@ import {
     getCustomer,
     addTask,
 } from "../customerService.js";
-import { analyzeMessage } from "../intelligence/conversationIntelligence.js";
+import { analyzeMessage, extractMemoryFacts } from "../intelligence/conversationIntelligence.js";
 import { storeMemory } from "../memory/aiMemoryService.js";
 import {
     bootstrapTenantPlatform,
@@ -500,12 +500,9 @@ export async function processInboundCustomerPipeline(phone, context = {}) {
         });
     }
 
-    const facts = [];
-    if (/\b(budget|finance|hilux|vehicle|trade.?in)\b/i.test(text)) {
-        facts.push(`Inbound interest: ${analysis.topic || "general"}`);
-    }
+    const facts = extractMemoryFacts(text);
     for (const fact of facts) {
-        await storeMemory(phone, agent?.id || "default", fact);
+        await storeMemory(phone, agent?.id || "default", fact, { companyId: resolvedCompanyId });
     }
 
     if (resolvedCompanyId) {

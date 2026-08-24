@@ -14,7 +14,7 @@ import { publish, EventTypes } from "../../events/index.js";
 
 import { extractMemoryFacts } from "../../intelligence/conversationIntelligence.js";
 
-import { storeMemory, getMemoryContext } from "../../memory/aiMemoryService.js";
+import { storeMemory, getMemoryContext, getMemories } from "../../memory/aiMemoryService.js";
 
 import { processInboundCustomerPipeline } from "../../platform/provisioningService.js";
 
@@ -25,6 +25,7 @@ import {
 } from "../../ai-core/whatsappConversationPrompt.js";
 import { getCompany } from "../../tenants/companyService.js";
 import { getDefaultAiEmployee } from "../../tenants/aiEmployeeService.js";
+import { customerDocId, conversationDocId } from "../../storage/tenantStorage.js";
 
 import { captureLeadFromMessage } from "../../tenants/crmService.js";
 
@@ -38,7 +39,7 @@ async function sendViaIntegration(channel, companyId, to, text) {
     return integrationSend(channel || "whatsapp", { companyId }, { to, text });
 }
 
-async function trySendOutbound(channel, companyId, to, text) {
+async function trySendOutbound(channel, companyId, to, text, responseSource = "ai") {
     try {
         const result = await sendViaIntegration(channel, companyId, to, text);
         const metaMessageId = result?.messages?.[0]?.id || null;
@@ -46,6 +47,7 @@ async function trySendOutbound(channel, companyId, to, text) {
             console.log("[whatsapp] Outbound sent", {
                 companyId,
                 to,
+                responseSource,
                 metaMessageIdPrefix: String(metaMessageId).slice(0, 24),
             });
         }
@@ -54,6 +56,7 @@ async function trySendOutbound(channel, companyId, to, text) {
         console.warn("[whatsapp] Outbound send failed (inbound processing continues):", {
             companyId,
             to,
+            responseSource,
             code: err.metaCode ?? err.code ?? null,
             retryable: err.retryable !== false,
             message: err.message,
@@ -76,7 +79,7 @@ async function processInboundMessage(job) {
     });
 
     if (messageType !== "text" || !String(text || "").trim()) {
-        const metaMessageId = await trySendOutbound(outboundChannel, companyId, sender, NON_TEXT_REPLY);
+        const metaMessageId = await trySendOutbound(outboundChannel, companyId, sender, NON_TEXT_REPLY, "fallback");
         await saveOutboundMessage(sender, NON_TEXT_REPLY, {
             channel: outboundChannel,
             companyId,
@@ -118,10 +121,34 @@ async function processInboundMessage(job) {
         : await getConversation(sender, 20);
     const isNewConversation = history.length <= 1;
 
-    const memoryContext =
-        resolvedCompanyId && agent?.memory !== false
+    const customerId = customerDocId(sender);
+    const conversationId = resolvedCompanyId
+        ? conversationDocId(customerId, outboundChannel)
+        : null;
+
+    const memoryEnabled = agent?.memory !== false;
+    const memoryRecords =
+        resolvedCompanyId && memoryEnabled
+            ? await getMemories(sender, agent?.id || "default", { companyId: resolvedCompanyId })
+            : memoryEnabled
+              ? await getMemories(sender, agent?.id || "default")
+              : [];
+    const memoryContext = memoryEnabled
+        ? resolvedCompanyId
             ? await getMemoryContext(sender, agent?.id || "default", { companyId: resolvedCompanyId })
-            : await getMemoryContext(sender, agent?.id || "default");
+            : await getMemoryContext(sender, agent?.id || "default")
+        : "";
+
+    console.log("[whatsapp] Context resolved", {
+        companyId: resolvedCompanyId,
+        customerId,
+        conversationId,
+        agentId: agent?.id || null,
+        memoriesRetrieved: memoryRecords.length,
+        recentMessagesRetrieved: history.length,
+        knowledgeSkipped: isGreetingMessage(text),
+        hasAiSummary: Boolean(customer?.aiSummary),
+    });
 
     if (resolvedCompanyId && isNewConversation) {
         await publish(resolvedCompanyId, EventTypes.CONVERSATION_STARTED, {
@@ -146,7 +173,7 @@ async function processInboundMessage(job) {
         knowledgeContext: knowledgeParts.join("\n\n"),
     });
 
-    const metaMessageId = await trySendOutbound(outboundChannel, resolvedCompanyId, sender, reply);
+    const metaMessageId = await trySendOutbound(outboundChannel, resolvedCompanyId, sender, reply, "ai");
     await saveOutboundMessage(sender, reply, {
         channel: outboundChannel,
         companyId: resolvedCompanyId,
