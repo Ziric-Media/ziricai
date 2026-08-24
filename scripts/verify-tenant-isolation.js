@@ -183,8 +183,8 @@ async function main() {
     assert(devPrompt.includes("Sarah"), "Dev fallback should include Sarah when no agent");
     assert(devPrompt.includes("NEVER promise"), "Dev prompt must include inventory honesty rules");
     console.log("✓ DEMO_TENANT_AGENTS gated to non-production");
-    assert(WHATSAPP_INVENTORY_RULES.includes("knowledge context"), "Platform inventory rules must reference knowledge context");
-    console.log("✓ WhatsApp inventory rules require knowledge-context vehicles");
+    assert(WHATSAPP_INVENTORY_RULES.includes("searchInventory"), "Platform inventory rules must reference searchInventory tool");
+    console.log("✓ WhatsApp inventory rules require searchInventory tool");
 
     /* ── Demo inventory knowledge seeded ── */
     const kbDocs = await listKnowledgeDocuments(CENTRAL_MOTORS_COMPANY_ID);
@@ -217,6 +217,14 @@ async function main() {
         `Fortuner sources missing: ${fortunerKb.sources.join(", ")}`
     );
     console.log("✓ Knowledge retrieval: Fortuner price query returns inventory");
+
+    const { searchInventory, getVehicleByStockNumber } = await import("../services/inventory/inventoryService.js");
+    const canonical = await searchInventory(CENTRAL_MOTORS_COMPANY_ID, "Hilux");
+    assert(canonical.length >= 1, "Canonical inventory must include Hilux vehicles");
+    const hlx003 = await getVehicleByStockNumber(CENTRAL_MOTORS_COMPANY_ID, "CM-HLX-003");
+    assert(hlx003?.vehicleId, "CM-HLX-003 must resolve in canonical inventory");
+    assert(hlx003?.stockNumber === "CM-HLX-003", "Stock number normalized consistently");
+    console.log(`✓ Canonical inventory seeded (${canonical.length}+ Hilux matches, CM-HLX-003 resolvable)`);
 
     console.log("\nAll tenant isolation checks passed.");
     console.log("\nRestart limitation: STORAGE_BACKEND=memory loses all tenant data on process exit.");

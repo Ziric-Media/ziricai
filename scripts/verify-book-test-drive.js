@@ -22,17 +22,18 @@ function futureSlotIso(daysAhead = 2, hour = 10) {
 }
 
 async function seedInventory(companyId) {
-    const { saveKnowledgeDocument } = await import("../services/tenants/knowledgeService.js");
-    await saveKnowledgeDocument({
-        companyId,
-        title: "2021 Demo Vehicle",
-        type: "inventory",
-        content: `Year: 2021
-Model: Demo Vehicle
-Stock Number: TEST-STK-001
-Availability: In stock — available for test drive`,
-        source: "verify-script",
-    });
+    const { seedVehicles } = await import("../services/inventory/inventoryService.js");
+    await seedVehicles(companyId, [
+        {
+            vehicleId: "veh-verify-001",
+            stockNumber: "TEST-STK-001",
+            make: "Demo",
+            model: "Vehicle",
+            year: 2021,
+            availability: "available",
+            title: "2021 Demo Vehicle",
+        },
+    ]);
 }
 
 async function main() {
@@ -40,10 +41,12 @@ async function main() {
         _resetMemoryAppointmentsForTests,
         getAppointmentBackendName,
     } = await import("../services/database/appointmentRepository.js");
+    const { _resetMemoryInventoryForTests } = await import("../services/inventory/inventoryService.js");
     const { initAiTools, runTool } = await import("../services/tools/index.js");
     const { getMaxConcurrentPerSlot } = await import("../services/tools/availability.js");
 
     _resetMemoryAppointmentsForTests();
+    _resetMemoryInventoryForTests();
     initAiTools();
 
     const companyId = "verify-test-drive-co";
@@ -109,7 +112,7 @@ async function main() {
         scheduledAt: futureSlotIso(4, 14),
     });
     assert(badStock.ok === false, "Invalid stock should fail");
-    assert(badStock.code === "INVALID_STOCK", `Expected INVALID_STOCK, got ${badStock.code}`);
+    assert(badStock.code === "INVALID_VEHICLE", `Expected INVALID_VEHICLE, got ${badStock.code}`);
     console.log("✓ Invalid stock number rejected");
 
     const { getOpenAIToolDefinitions } = await import("../services/tools/index.js");

@@ -9,16 +9,24 @@ import { normalizeToSlotStart } from "./availability.js";
  * @param {object} params
  * @param {string} params.companyId
  * @param {string} params.customerId
+ * @param {string} [params.vehicleId]
  * @param {string} [params.vehicleStockNumber]
  * @param {Date|string} params.scheduledAt
  * @param {string} [params.clientKey]
  */
-export function buildIdempotencyKey({ companyId, customerId, vehicleStockNumber, scheduledAt, clientKey }) {
+export function buildIdempotencyKey({
+    companyId,
+    customerId,
+    vehicleId,
+    vehicleStockNumber,
+    scheduledAt,
+    clientKey,
+}) {
     if (clientKey) return String(clientKey).slice(0, 128);
 
     const slot = normalizeToSlotStart(scheduledAt).toISOString();
-    const stock = (vehicleStockNumber || "").toUpperCase().trim();
-    const raw = `${companyId}|${customerId}|${stock}|${slot}`;
+    const vehicleKey = (vehicleId || vehicleStockNumber || "").toUpperCase().trim();
+    const raw = `${companyId}|${customerId}|${vehicleKey}|${slot}`;
     return createHash("sha256").update(raw).digest("hex");
 }
 
@@ -42,8 +50,25 @@ export async function runTool(name, ctx, args = {}) {
         };
     }
 
+    let enrichedCtx = ctx;
+    if (ctx.customerPhone && !ctx.lastRecommendedVehicles) {
+        try {
+            const { getRecommendedVehicles } = await import("../conversation/recommendedVehicles.js");
+            const recommended = await getRecommendedVehicles(
+                ctx.companyId,
+                ctx.customerPhone,
+                ctx.channel || "whatsapp"
+            );
+            if (recommended.length) {
+                enrichedCtx = { ...ctx, lastRecommendedVehicles: recommended };
+            }
+        } catch {
+            /* conversation meta optional */
+        }
+    }
+
     try {
-        const result = await tool.execute(ctx, args);
+        const result = await tool.execute(enrichedCtx, args);
         const ok = result.ok !== false && result.success !== false;
         return { success: ok, ok, tool: name, ...result };
     } catch (err) {

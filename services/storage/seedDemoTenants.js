@@ -9,6 +9,7 @@ import { getCompany, createCompany } from "../tenants/companyService.js";
 import { createAiEmployee, listAiEmployees } from "../tenants/aiEmployeeService.js";
 import { saveKnowledgeDocument, listKnowledgeDocuments } from "../tenants/knowledgeService.js";
 import { CENTRAL_MOTORS_INVENTORY_DOCS } from "./demoCentralMotorsInventory.js";
+import { seedDemoInventoryFromDocs } from "../inventory/demoInventorySeed.js";
 import {
     findActiveWhatsAppIntegrationByPhoneNumberId,
     upsertWhatsAppIntegration,
@@ -158,6 +159,11 @@ async function seedTenant(tenant) {
         agentRecord.id,
         knowledge
     );
+
+    const inventoryDocs = knowledge.filter((d) => d.type === "inventory" && String(d.content || "").includes("Stock Number:"));
+    if (inventoryDocs.length) {
+        await seedDemoInventoryFromDocs(companyId, inventoryDocs);
+    }
 
     const existingIntegration = await findActiveWhatsAppIntegrationByPhoneNumberId(phoneNumberId);
     if (existingIntegration?.companyId !== companyId) {

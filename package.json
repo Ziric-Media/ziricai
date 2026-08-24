@@ -23,7 +23,8 @@
         "verify:whatsapp-integration": "node scripts/verify-whatsapp-integration.js",
         "verify:tenant-isolation": "node scripts/verify-tenant-isolation.js",
         "verify:book-test-drive": "node scripts/verify-book-test-drive.js",
-        "test": "node scripts/verify-tenant-isolation.js && node scripts/verify-whatsapp-integration.js && node scripts/verify-queue-durable.js && node scripts/verify-book-test-drive.js",
+        "verify:inventory-booking": "node scripts/verify-inventory-booking.js",
+        "test": "node scripts/verify-tenant-isolation.js && node scripts/verify-whatsapp-integration.js && node scripts/verify-queue-durable.js && node scripts/verify-book-test-drive.js && node scripts/verify-inventory-booking.js",
         "test:queue": "node scripts/verify-queue-durable.js",
         "build:knowledge": "node scripts/build-knowledge-bundle.js",
         "seed:knowledge": "node scripts/seed-knowledge-content.js"

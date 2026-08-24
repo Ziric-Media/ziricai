@@ -6,6 +6,7 @@
  * @property {string} [customerName]
  * @property {string} [agentId]
  * @property {string} [channel]
+ * @property {object[]} [lastRecommendedVehicles] — from conversation meta / searchInventory
  */
 
 /**
