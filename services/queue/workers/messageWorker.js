@@ -33,6 +33,10 @@ import {
     getSchedulingContext,
     saveSchedulingContext,
 } from "../../conversation/schedulingContext.js";
+import {
+    isBookingRecapIntent,
+    formatAuthoritativeBookingBlock,
+} from "../../conversation/bookingRecapIntent.js";
 
 import { captureLeadFromMessage } from "../../tenants/crmService.js";
 
@@ -228,7 +232,34 @@ async function processInboundMessage(job) {
     }
 
     const schedulingPrompt = formatSchedulingContextForPrompt(schedulingContext);
-    const knowledgeParts = [knowledgeBundle.context || "", memoryContext || "", schedulingPrompt].filter(Boolean);
+
+    let authoritativeBookingContext = "";
+    let preloadedBookingResult = null;
+    if (resolvedCompanyId && isBookingRecapIntent(text)) {
+        preloadedBookingResult = await runTool("getCustomerBookings", {
+            companyId: resolvedCompanyId,
+            customerId,
+            customerPhone: sender,
+            customerName: customerDisplayName,
+            agentId: agent?.id || null,
+            channel: outboundChannel,
+            inboundMessage: text,
+            schedulingContext,
+        }, { statusFilter: "all" });
+        authoritativeBookingContext = formatAuthoritativeBookingBlock(preloadedBookingResult);
+        console.log("[whatsapp] Booking recap intent — pre-loaded getCustomerBookings", {
+            companyId: resolvedCompanyId,
+            customerId,
+            count: preloadedBookingResult?.count ?? 0,
+        });
+    }
+
+    const knowledgeParts = [
+        knowledgeBundle.context || "",
+        memoryContext || "",
+        schedulingPrompt,
+        authoritativeBookingContext,
+    ].filter(Boolean);
 
     const toolCtx = {
         companyId: resolvedCompanyId,
@@ -252,6 +283,8 @@ async function processInboundMessage(job) {
             knowledgeContext: knowledgeParts.join("\n\n"),
             tools: aiTools,
             executeTool: (name, args) => runTool(name, toolCtx, args),
+            authoritativeBookingData: Boolean(authoritativeBookingContext),
+            preloadedBookingResult,
         });
         reply = aiResult.reply;
         toolResults = aiResult.toolResults || [];

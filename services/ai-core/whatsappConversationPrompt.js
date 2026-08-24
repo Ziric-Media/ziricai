@@ -14,6 +14,17 @@ Keep replies concise and helpful unless the customer asks for detail.
 `.trim();
 
 /** Platform rules — inventory via searchInventory tool; bookings via bookTestDrive. */
+export const WHATSAPP_AUTHORITATIVE_DATA_RULES = `
+AUTHORITATIVE DATA RULE:
+- Customer identity, bookings, inventory listings, and prices MUST come from tools or the database only.
+- The AI may explain database results, but must NOT invent authoritative business records.
+- NEVER state booking details (vehicle, date, time, location, stock number) from conversation memory or prior turns alone.
+- For booking recap questions ("what did I book?", "remind me", "my appointment", "what am I test driving?") use ONLY getCustomerBookings results or AUTHORITATIVE BOOKING DATA injected below.
+- For inventory questions use ONLY searchInventory / checkTestDriveAvailability results.
+- Customer name comes from the Customer name line in this prompt — never guess from business or tenant names.
+`.trim();
+
+/** Platform rules — inventory via searchInventory tool; bookings via bookTestDrive. */
 export const WHATSAPP_INVENTORY_RULES = `
 INVENTORY & STOCK RULES:
 - searchInventory = what vehicles are in stock / for sale (listings, prices, specs). Use when the customer asks what you have, browse options, or compare models in inventory.
@@ -105,6 +116,7 @@ export function buildWhatsAppSystemPrompt({
     const parts = [
         identity,
         WHATSAPP_CHANNEL_RULES,
+        WHATSAPP_AUTHORITATIVE_DATA_RULES,
         WHATSAPP_INVENTORY_RULES,
         WHATSAPP_ACTION_TOOL_RULES,
         `Business: ${resolvedCompanyName}.`,

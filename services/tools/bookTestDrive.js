@@ -2,7 +2,7 @@
  * bookTestDrive — real test drive booking with availability, idempotency, and Postgres persistence.
  * Resolves vehicles via canonical inventoryService (vehicleId primary, stockNumber fallback).
  */
-import { createAppointmentRecord } from "../database/appointmentRepository.js";
+import { createAppointmentRecord, enrichAppointmentRecord } from "../database/appointmentRepository.js";
 import {
     resolveVehicle,
     normalizeStockNumber,
@@ -10,7 +10,7 @@ import {
 } from "../inventory/inventoryService.js";
 import { getRecommendedVehicles, pickFromRecommended } from "../conversation/recommendedVehicles.js";
 import { publish, EventTypes } from "../events/index.js";
-import { addTimelineEvent } from "../customerService.js";
+import { addTimelineEvent, persistExplicitCustomerName } from "../customerService.js";
 import { buildIdempotencyKey } from "./toolRunner.js";
 import { formatSlotLabel, parseScheduledAt } from "./availability.js";
 import { evaluateTestDriveAvailability } from "./testDriveAvailability.js";
@@ -150,8 +150,17 @@ export default {
         });
 
         const customerName = args.customerName || ctxCustomerName || null;
+        if (customerName && customerPhone && companyId) {
+            await persistExplicitCustomerName(customerPhone, customerName, { companyId }).catch(() => {});
+        }
+
+        const vehicle = vehicleCheck.vehicle;
         const metadata = {
             vehicleId: vehicleCheck.vehicleId,
+            vehicleMake: vehicle?.make || null,
+            vehicleModel: vehicle?.model || null,
+            vehicleDescription: vehicleCheck.vehicleLabel,
+            location: vehicle?.location || null,
             vehicleLabel: vehicleCheck.vehicleLabel,
             customerName,
             notes: args.notes || "",
@@ -164,17 +173,21 @@ export default {
             vehicleStockNumber: vehicleCheck.stockNumber,
             appointmentType: "test_drive",
             scheduledAt: slotStart,
+            status: "confirmed",
             idempotencyKey,
             createdByAgentId: agentId || null,
             metadata,
         });
 
+        const enrichedAppointment = await enrichAppointmentRecord(companyId, appointment);
+
         if (duplicate) {
             return {
                 ok: true,
                 duplicate: true,
-                message: `Test drive already booked for ${formatSlotLabel(new Date(appointment.scheduledAt))} (stock ${appointment.vehicleStockNumber}).`,
-                appointment,
+                message: `Test drive already booked for ${formatSlotLabel(new Date(enrichedAppointment.scheduledAt))} — ${enrichedAppointment.vehicleDescription || vehicleCheck.vehicleLabel} (stock ${enrichedAppointment.stockNumber || appointment.vehicleStockNumber}).`,
+                appointment: enrichedAppointment,
+                booking: enrichedAppointment,
             };
         }
 
@@ -202,12 +215,13 @@ export default {
             }).catch(() => {});
         }
 
-        const slotLabel = formatSlotLabel(new Date(appointment.scheduledAt));
+        const slotLabel = formatSlotLabel(new Date(enrichedAppointment.scheduledAt));
         return {
             ok: true,
             duplicate: false,
-            message: `Test drive confirmed for ${customerName || "customer"} — ${vehicleCheck.vehicleLabel} (${vehicleCheck.stockNumber}) on ${slotLabel}.`,
-            appointment,
+            message: `Test drive confirmed for ${customerName || "customer"} — ${enrichedAppointment.vehicleDescription || vehicleCheck.vehicleLabel} (${vehicleCheck.stockNumber}) on ${slotLabel}${enrichedAppointment.location ? ` at ${enrichedAppointment.location}` : ""}.`,
+            appointment: enrichedAppointment,
+            booking: enrichedAppointment,
             vehicleId: vehicleCheck.vehicleId,
         };
     },

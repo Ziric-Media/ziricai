@@ -1,7 +1,7 @@
 /**
  * searchInventory — tenant-scoped vehicle search via canonical inventoryService.
  */
-import { searchInventory as searchInventoryRecords } from "../inventory/inventoryService.js";
+import { searchInventory as searchInventoryRecords, detectBrandHintsFromQuery } from "../inventory/inventoryService.js";
 import { storeRecommendedVehicles } from "../conversation/recommendedVehicles.js";
 
 export default {
@@ -18,6 +18,14 @@ export default {
             make: {
                 type: "string",
                 description: "Optional make filter",
+            },
+            brand: {
+                type: "string",
+                description: "Optional brand/make filter (alias for make)",
+            },
+            excludeMake: {
+                type: "string",
+                description: "Exclude vehicles from this make/brand (e.g. Toyota when customer wants other brands)",
             },
             model: {
                 type: "string",
@@ -44,8 +52,11 @@ export default {
             return { ok: false, error: "companyId is required", code: "MISSING_COMPANY" };
         }
 
+        const brandHints = detectBrandHintsFromQuery(args.query || "");
         const vehicles = await searchInventoryRecords(companyId, args.query || "", {
-            make: args.make,
+            make: args.make || args.brand || brandHints.make,
+            makes: brandHints.makes,
+            excludeMake: args.excludeMake || brandHints.excludeMake,
             model: args.model,
             maxPrice: args.maxPrice,
             minPrice: args.minPrice,

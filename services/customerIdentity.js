@@ -80,7 +80,7 @@ export function isLikelyCompanyName(name, { companyName } = {}) {
  * @returns {string|null}
  */
 export function getCustomerDisplayName(customer, { contactName = null, companyName = null } = {}) {
-    const explicit = customer?.displayName || customer?.firstName || null;
+    const explicit = customer?.displayName || customer?.explicitName || customer?.firstName || null;
     if (explicit && !isLikelyCompanyName(explicit, { companyName })) {
         return explicit;
     }

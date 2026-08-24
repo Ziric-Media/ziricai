@@ -7,6 +7,7 @@ import { TenantRepository } from "../database/tenantRepository.js";
 import { TENANT_COLLECTIONS } from "../database/schema.js";
 import { normalizePhone } from "../customerService.js";
 import { isLikelyCompanyName } from "../customerIdentity.js";
+import { getDurableCustomer, upsertDurableCustomer } from "../database/customerRepository.js";
 
 const customersRepo = new TenantRepository(TENANT_COLLECTIONS.CUSTOMERS);
 const conversationsRepo = new TenantRepository(TENANT_COLLECTIONS.CONVERSATIONS);
@@ -41,10 +42,26 @@ function assertCompanyId(companyId) {
 
 /* ── Customers ── */
 
+function mergeDurableIdentity(tenantRecord, durableRecord) {
+    if (!durableRecord) return tenantRecord;
+    if (!tenantRecord) return durableRecord;
+    return {
+        ...tenantRecord,
+        displayName: durableRecord.displayName || tenantRecord.displayName || null,
+        explicitName: durableRecord.explicitName || tenantRecord.explicitName || null,
+        whatsappContactName: durableRecord.whatsappContactName || tenantRecord.whatsappContactName || null,
+        name: durableRecord.displayName || durableRecord.name || tenantRecord.displayName || tenantRecord.name || null,
+    };
+}
+
 export async function getTenantCustomer(companyId, phone) {
     assertCompanyId(companyId);
     const id = customerDocId(phone);
-    return customersRepo.get(companyId, id);
+    const [tenantRecord, durableRecord] = await Promise.all([
+        customersRepo.get(companyId, id),
+        getDurableCustomer(companyId, id).catch(() => null),
+    ]);
+    return mergeDurableIdentity(tenantRecord, durableRecord);
 }
 
 export async function upsertTenantCustomer(companyId, phone, patch = {}) {
@@ -61,6 +78,18 @@ export async function upsertTenantCustomer(companyId, phone, patch = {}) {
         updatedAt: now(),
         createdAt: existing.createdAt || patch.createdAt || now(),
     };
+
+    const identityPatch = {};
+    if (patch.displayName != null) identityPatch.displayName = patch.displayName;
+    if (patch.explicitName != null) identityPatch.explicitName = patch.explicitName;
+    if (patch.name != null) identityPatch.name = patch.name;
+    if (patch.whatsappContactName != null) identityPatch.whatsappContactName = patch.whatsappContactName;
+    if (Object.keys(identityPatch).length) {
+        await upsertDurableCustomer(companyId, id, identityPatch).catch((err) => {
+            console.warn("[tenantStorage] durable customer upsert failed:", err.message);
+        });
+    }
+
     return customersRepo.set(companyId, id, record);
 }
 

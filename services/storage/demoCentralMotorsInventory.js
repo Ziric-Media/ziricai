@@ -15,9 +15,41 @@ export const CENTRAL_MOTORS_INVENTORY_DOCS = [
         type: "inventory",
         content: `Central Motors used stock (Gauteng). Budget-friendly Hilux and Fortuner listings typically R350,000–R500,000.
 
-Keywords: Hilux, Fortuner, Toyota, used, inventory, stock, budget, price range, diesel, automatic, manual.
+Keywords: Hilux, Fortuner, Toyota, Ford, BMW, Everest, X5, used, inventory, stock, budget, price range, diesel, automatic, manual.
 
 When a customer asks about Hilux or Fortuner in their budget, list matching vehicles from this inventory with year, model, mileage, price, transmission, fuel, location, stock number, finance estimate, and availability.`,
+    },
+    {
+        id: "demo-kn-inv-frd-001",
+        title: "2021 Ford Everest 2.0 Bi-Turbo XLT",
+        type: "inventory",
+        content: `Year: 2021
+Model: Ford Everest 2.0 Bi-Turbo XLT
+Mileage: 62,300 km
+Price: R449,900
+Transmission: Automatic
+Fuel: Diesel
+Location: Central Motors Sandton, 42 Main Road
+Stock Number: CM-FRD-001
+Finance Estimate: from R11,350/month (72 months, 10% deposit, subject to approval)
+Images: Available on request via WhatsApp
+Availability: In stock — available for test drive`,
+    },
+    {
+        id: "demo-kn-inv-bmw-001",
+        title: "2019 BMW X5 xDrive30d M Sport",
+        type: "inventory",
+        content: `Year: 2019
+Model: BMW X5 xDrive30d M Sport
+Mileage: 78,500 km
+Price: R699,900
+Transmission: Automatic
+Fuel: Diesel
+Location: Central Motors Sandton, 42 Main Road
+Stock Number: CM-BMW-001
+Finance Estimate: from R17,650/month (72 months, 10% deposit, subject to approval)
+Images: Available on request via WhatsApp
+Availability: In stock — available for test drive`,
     },
     {
         id: "demo-kn-inv-hlx-001",

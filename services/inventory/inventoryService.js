@@ -276,10 +276,119 @@ function scoreVehicle(vehicle, terms) {
     return terms.reduce((n, t) => n + (hay.includes(t) ? 1 : 0), 0);
 }
 
+function normalizeMake(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/s$/, "");
+}
+
+/** Model keywords → brand/make for inventory search. */
+const MODEL_BRAND_HINTS = {
+    hilux: "Toyota",
+    fortuner: "Toyota",
+    corolla: "Toyota",
+    rav4: "Toyota",
+    everest: "Ford",
+    ranger: "Ford",
+    figo: "Ford",
+    x5: "BMW",
+    x3: "BMW",
+    "3 series": "BMW",
+    "5 series": "BMW",
+    polo: "Volkswagen",
+    golf: "Volkswagen",
+    tiguan: "Volkswagen",
+};
+
+const BRAND_CANONICAL = {
+    toyota: "Toyota",
+    ford: "Ford",
+    bmw: "BMW",
+    vw: "Volkswagen",
+    volkswagen: "Volkswagen",
+    mercedes: "Mercedes-Benz",
+    "mercedes-benz": "Mercedes-Benz",
+    audi: "Audi",
+    nissan: "Nissan",
+    isuzu: "Isuzu",
+    mazda: "Mazda",
+    hyundai: "Hyundai",
+    kia: "Kia",
+    mg: "MG",
+};
+
+/**
+ * Detect make / excludeMake hints from a natural-language inventory query.
+ * @param {string} query
+ * @returns {{ make?: string, makes?: string[], excludeMake?: string }}
+ */
+export function detectBrandHintsFromQuery(query = "") {
+    const raw = String(query || "").toLowerCase();
+    const hints = {};
+    const makes = new Set();
+
+    const excludeMatch = raw.match(
+        /\b(?:different|other|another|non|besides|except|excluding)\s+(?:brand[s]?|make[s]?)?\s*(?:besides|except|from|than)?\s*([a-z][a-z\s-]{1,20})\b/i
+    );
+    if (excludeMatch?.[1]) {
+        const excluded = normalizeMake(excludeMatch[1]);
+        hints.excludeMake = BRAND_CANONICAL[excluded] || capitalizeMake(excluded);
+    }
+
+    const excludedNormalized = hints.excludeMake ? normalizeMake(hints.excludeMake) : null;
+
+    for (const [model, make] of Object.entries(MODEL_BRAND_HINTS)) {
+        if (raw.includes(model)) {
+            if (!excludedNormalized || normalizeMake(make) !== excludedNormalized) {
+                makes.add(make);
+            }
+        }
+    }
+
+    if (!makes.size) {
+        for (const [alias, make] of Object.entries(BRAND_CANONICAL)) {
+            if (raw.includes(alias)) {
+                if (!excludedNormalized || normalizeMake(make) !== excludedNormalized) {
+                    makes.add(make);
+                }
+            }
+        }
+    }
+
+    if (makes.size === 1) {
+        hints.make = [...makes][0];
+    } else if (makes.size > 1) {
+        hints.makes = [...makes];
+    }
+
+    return hints;
+}
+
+function capitalizeMake(value) {
+    if (!value) return null;
+    return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function extractSearchTerms(query) {
     const raw = String(query || "").toLowerCase();
-    const terms = raw.split(/\W+/).filter((w) => w.length > 2);
-    for (const kw of ["hilux", "fortuner", "toyota", "diesel", "automatic", "manual", "budget"]) {
+    const terms = raw.split(/\W+/).filter((w) => w.length >= 2 || w === "x5" || w === "x3" || w === "vw" || w === "mg");
+    for (const kw of [
+        "hilux",
+        "fortuner",
+        "toyota",
+        "everest",
+        "ford",
+        "bmw",
+        "x5",
+        "x3",
+        "diesel",
+        "automatic",
+        "manual",
+        "budget",
+        "vw",
+        "mg",
+    ]) {
         if (raw.includes(kw) && !terms.includes(kw)) terms.push(kw);
     }
     return terms;
@@ -287,8 +396,24 @@ function extractSearchTerms(query) {
 
 function matchesFilters(vehicle, filters = {}) {
     if (filters.availabilityOnly && !isVehicleAvailable(vehicle)) return false;
-    if (filters.make && !String(vehicle.make || "").toLowerCase().includes(String(filters.make).toLowerCase())) {
-        return false;
+    if (filters.excludeMake) {
+        const exclude = normalizeMake(filters.excludeMake);
+        const vehicleMake = normalizeMake(vehicle.make);
+        if (vehicleMake && (vehicleMake === exclude || vehicleMake.includes(exclude) || exclude.includes(vehicleMake))) {
+            return false;
+        }
+    }
+    if (filters.make) {
+        const mk = normalizeMake(filters.make);
+        const vehicleMake = normalizeMake(vehicle.make);
+        if (!vehicleMake || (!vehicleMake.includes(mk) && !mk.includes(vehicleMake))) return false;
+    }
+    if (Array.isArray(filters.makes) && filters.makes.length) {
+        const allowed = filters.makes.map((m) => normalizeMake(m));
+        const vehicleMake = normalizeMake(vehicle.make);
+        if (!vehicleMake || !allowed.some((mk) => vehicleMake.includes(mk) || mk.includes(vehicleMake))) {
+            return false;
+        }
     }
     if (filters.model && !String(vehicle.model || "").toLowerCase().includes(String(filters.model).toLowerCase())) {
         return false;
@@ -318,21 +443,34 @@ async function listAllVehicles(companyId) {
  * @param {object} [filters]
  */
 export async function searchInventory(companyId, query = "", filters = {}) {
+    const brandHints = detectBrandHintsFromQuery(query);
+    const mergedFilters = {
+        ...filters,
+        make: filters.make || brandHints.make,
+        makes: filters.makes || brandHints.makes,
+        excludeMake: filters.excludeMake || brandHints.excludeMake,
+    };
+
     const all = await listAllVehicles(companyId);
     const terms = extractSearchTerms(query);
-    let results = all.filter((v) => matchesFilters(v, filters));
+    let results = all.filter((v) => matchesFilters(v, mergedFilters));
 
     if (terms.length) {
-        results = results
+        const scored = results
             .map((v) => ({ vehicle: v, score: scoreVehicle(v, terms) }))
             .filter((r) => r.score > 0)
             .sort((a, b) => b.score - a.score)
             .map((r) => r.vehicle);
+        if (scored.length || !mergedFilters.excludeMake) {
+            results = scored;
+        }
     }
 
     const limit = filters.limit || 10;
     return results.slice(0, limit).map(vehicleToPublic);
 }
+
+export { detectBrandHintsFromQuery as detectBrandHints };
 
 /**
  * Suggest available alternatives when requested vehicle is unavailable or not found.

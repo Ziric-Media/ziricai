@@ -67,6 +67,7 @@ export async function persistExplicitCustomerName(phone, name, { companyId, comp
         phone,
         {
             displayName: trimmed,
+            explicitName: trimmed,
             name: trimmed,
         },
         { companyId }
@@ -195,6 +196,7 @@ export async function upsertCustomerFromWhatsApp(
 
         if (explicitName && !isLikelyCompanyName(explicitName, { companyName })) {
             patch.displayName = explicitName;
+            patch.explicitName = explicitName;
             patch.name = explicitName;
         } else if (contactName) {
             patch.whatsappContactName = contactName;
@@ -250,6 +252,7 @@ export async function upsertCustomerFromWhatsApp(
 
     if (explicitName && !isLikelyCompanyName(explicitName, { companyName })) {
         patch.displayName = explicitName;
+        patch.explicitName = explicitName;
         patch.name = explicitName;
     } else if (contactName) {
         patch.whatsappContactName = contactName;

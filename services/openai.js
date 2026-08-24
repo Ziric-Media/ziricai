@@ -17,9 +17,24 @@ const FALLBACK_SYSTEM_PROMPT = `You are a professional customer service assistan
 Be friendly, helpful, and concise. Never mention webhooks, verification, testing, or platform setup.`;
 
 function buildChatMessages(userText, options = {}) {
-    const { systemPrompt = "", knowledgeContext = "", history = [], context } = options;
+    const {
+        systemPrompt = "",
+        knowledgeContext = "",
+        history = [],
+        context,
+        authoritativeBookingData = false,
+    } = options;
     const resolvedKnowledge = knowledgeContext || context || "";
     const systemParts = [(systemPrompt || FALLBACK_SYSTEM_PROMPT).trim()];
+
+    if (authoritativeBookingData) {
+        systemParts.push(
+            "BOOKING RECAP RULE: Authoritative booking data is injected below. " +
+                "Use ONLY those vehicle, date, time, location, and stock fields for your reply. " +
+                "Do NOT substitute vehicles or dates from conversation memory."
+        );
+    }
+
     if (resolvedKnowledge.trim()) {
         systemParts.push(`Relevant knowledge:\n${resolvedKnowledge.trim()}`);
     }
@@ -96,10 +111,15 @@ export async function askAIWithTools(message, options = {}) {
         tools = [],
         executeTool,
         maxToolRounds = 3,
+        authoritativeBookingData = false,
+        preloadedBookingResult = null,
     } = options;
 
-    let currentMessages = buildChatMessages(userText, options);
+    let currentMessages = buildChatMessages(userText, { ...options, authoritativeBookingData });
     const toolResults = [];
+    if (preloadedBookingResult?.ok) {
+        toolResults.push({ tool: "getCustomerBookings", ...preloadedBookingResult });
+    }
     let reply = "";
 
     try {
@@ -152,18 +172,32 @@ export async function askAIWithTools(message, options = {}) {
                 /^Found \d+ vehicles?\.?$/.test(m) ||
                 /^Inventory search returned \d+ vehicle/.test(m);
 
-            const lastOk = [...toolResults]
+            const bookingRecap = [...toolResults]
                 .reverse()
-                .find((r) => (r.ok || r.success) && r.message && !skipFallbackMessage(r.message));
+                .find((r) => r.tool === "getCustomerBookings" && r.ok && r.message);
 
-            if (lastOk?.message) {
-                reply = lastOk.message;
+            if (bookingRecap?.message) {
+                reply = bookingRecap.message;
             } else {
-                const needTime = toolResults.find((r) => r.code === "NEED_TIME");
-                if (needTime?.reason) {
-                    reply = needTime.reason;
+                const lastOk = [...toolResults]
+                    .reverse()
+                    .find(
+                        (r) =>
+                            (r.ok || r.success) &&
+                            r.message &&
+                            !skipFallbackMessage(r.message) &&
+                            r.tool !== "bookTestDrive"
+                    );
+
+                if (lastOk?.message) {
+                    reply = lastOk.message;
                 } else {
-                    reply = toolResults.map((r) => r.message || r.error).filter(Boolean).join("\n\n");
+                    const needTime = toolResults.find((r) => r.code === "NEED_TIME");
+                    if (needTime?.reason) {
+                        reply = needTime.reason;
+                    } else {
+                        reply = toolResults.map((r) => r.message || r.error).filter(Boolean).join("\n\n");
+                    }
                 }
             }
         }

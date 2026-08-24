@@ -80,6 +80,7 @@ export function getAppointmentBackendName() {
  * @param {string} input.idempotencyKey
  * @param {string} [input.createdByAgentId]
  * @param {object} [input.metadata]
+ * @param {string} [input.status]
  */
 export async function createAppointmentRecord(input) {
     await ensureSchema();
@@ -99,7 +100,7 @@ export async function createAppointmentRecord(input) {
         vehicleStockNumber: input.vehicleStockNumber || null,
         appointmentType: input.appointmentType || "test_drive",
         scheduledAt: scheduledAt.toISOString(),
-        status: "scheduled",
+        status: input.status || "confirmed",
         idempotencyKey: input.idempotencyKey,
         createdByAgentId: input.createdByAgentId || null,
         metadata: input.metadata || {},
@@ -221,17 +222,28 @@ async function enrichAppointment(companyId, appointment) {
 
     const publicVehicle = vehicle ? vehicleToPublic(vehicle) : null;
 
+    const vehicleDescription =
+        meta.vehicleDescription ||
+        meta.vehicleLabel ||
+        publicVehicle?.label ||
+        publicVehicle?.title ||
+        (meta.vehicleMake && meta.vehicleModel
+            ? [meta.vehicleYear, meta.vehicleMake, meta.vehicleModel].filter(Boolean).join(" ")
+            : null);
+
     return {
+        id: appointment.id,
         bookingId: appointment.id,
         companyId: appointment.companyId,
         customerId: appointment.customerId,
         vehicleId: vehicleId || publicVehicle?.vehicleId || null,
         stockNumber: stockNumber || publicVehicle?.stockNumber || null,
-        vehicleDescription:
-            meta.vehicleLabel || publicVehicle?.label || publicVehicle?.title || null,
+        vehicleMake: meta.vehicleMake || publicVehicle?.make || null,
+        vehicleModel: meta.vehicleModel || publicVehicle?.model || null,
+        vehicleDescription,
         scheduledAt: appointment.scheduledAt,
         dateTime: appointment.scheduledAt,
-        location: publicVehicle?.location || meta.location || null,
+        location: meta.location || publicVehicle?.location || null,
         status: appointment.status,
         appointmentType: appointment.appointmentType,
         idempotencyKey: appointment.idempotencyKey,
@@ -240,6 +252,11 @@ async function enrichAppointment(companyId, appointment) {
         metadata: appointment.metadata,
         vehicle: publicVehicle,
     };
+}
+
+/** Public alias for tools that need enriched appointment payloads. */
+export async function enrichAppointmentRecord(companyId, appointment) {
+    return enrichAppointment(companyId, appointment);
 }
 
 /**
