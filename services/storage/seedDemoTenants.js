@@ -7,7 +7,8 @@
  */
 import { getCompany, createCompany } from "../tenants/companyService.js";
 import { createAiEmployee, listAiEmployees } from "../tenants/aiEmployeeService.js";
-import { saveKnowledgeDocument } from "../tenants/knowledgeService.js";
+import { saveKnowledgeDocument, listKnowledgeDocuments } from "../tenants/knowledgeService.js";
+import { CENTRAL_MOTORS_INVENTORY_DOCS } from "./demoCentralMotorsInventory.js";
 import {
     findActiveWhatsAppIntegrationByPhoneNumberId,
     upsertWhatsAppIntegration,
@@ -62,6 +63,7 @@ const DEMO_TENANTS = [
                     "Book a test drive via WhatsApp, call +27 11 555 0100, or visit 42 Main Road, Sandton. Bring a valid driver's licence.",
                 type: "faq",
             },
+            ...CENTRAL_MOTORS_INVENTORY_DOCS,
         ],
     },
     {
@@ -109,6 +111,28 @@ const DEMO_TENANTS = [
     },
 ];
 
+async function upsertDemoKnowledgeDocs(companyId, knowledgeBaseId, agentId, knowledge) {
+    const existing = await listKnowledgeDocuments(companyId, { knowledgeBaseId });
+    const existingById = new Map(existing.filter((d) => d.id).map((d) => [d.id, d]));
+    let upserted = 0;
+
+    for (const doc of knowledge) {
+        const prior = doc.id ? existingById.get(doc.id) : null;
+        if (prior && prior.source !== "demo-seed") continue;
+
+        await saveKnowledgeDocument({
+            companyId,
+            knowledgeBaseId,
+            agentId,
+            ...doc,
+            source: "demo-seed",
+        });
+        upserted += 1;
+    }
+
+    return upserted;
+}
+
 async function seedTenant(tenant) {
     const { companyId, phoneNumberId, company, agent, knowledge } = tenant;
     let seeded = { company: false, agent: false, integration: false, knowledge: 0 };
@@ -120,20 +144,20 @@ async function seedTenant(tenant) {
     }
 
     const existingAgents = await listAiEmployees(companyId);
-    if (existingAgents.length === 0) {
-        const created = await createAiEmployee(companyId, agent);
+    let agentRecord = existingAgents.find((a) => a.isDefault) || existingAgents[0] || null;
+
+    if (!agentRecord) {
+        agentRecord = await createAiEmployee(companyId, agent);
         seeded.agent = true;
-        for (const doc of knowledge) {
-            await saveKnowledgeDocument({
-                companyId,
-                knowledgeBaseId: created.knowledgeBaseId,
-                agentId: created.id,
-                ...doc,
-                source: "demo-seed",
-            });
-            seeded.knowledge += 1;
-        }
     }
+
+    const knowledgeBaseId = agentRecord.knowledgeBaseId || agent.knowledgeBaseId;
+    seeded.knowledge = await upsertDemoKnowledgeDocs(
+        companyId,
+        knowledgeBaseId,
+        agentRecord.id,
+        knowledge
+    );
 
     const existingIntegration = await findActiveWhatsAppIntegrationByPhoneNumberId(phoneNumberId);
     if (existingIntegration?.companyId !== companyId) {

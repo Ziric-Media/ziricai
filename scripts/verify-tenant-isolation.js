@@ -29,10 +29,12 @@ import {
     getConversation,
 } from "../services/conversationService.js";
 import { storeMemory, getMemoryContext } from "../services/memory/aiMemoryService.js";
-import { buildWhatsAppSystemPrompt } from "../services/ai-core/whatsappConversationPrompt.js";
+import { buildWhatsAppSystemPrompt, WHATSAPP_INVENTORY_RULES } from "../services/ai-core/whatsappConversationPrompt.js";
 import { extractMemoryFacts } from "../services/intelligence/conversationIntelligence.js";
 import { executeAction } from "../services/automation/actionExecutor.js";
 import { EventTypes } from "../services/events/eventTypes.js";
+import { searchKnowledgeForQuery, listKnowledgeDocuments } from "../services/tenants/knowledgeService.js";
+import { CENTRAL_MOTORS_INVENTORY_DOCS } from "../services/storage/demoCentralMotorsInventory.js";
 
 const TEST_PHONE = "27821234567";
 
@@ -179,7 +181,42 @@ async function main() {
         agent: null,
     });
     assert(devPrompt.includes("Sarah"), "Dev fallback should include Sarah when no agent");
+    assert(devPrompt.includes("NEVER promise"), "Dev prompt must include inventory honesty rules");
     console.log("✓ DEMO_TENANT_AGENTS gated to non-production");
+    assert(WHATSAPP_INVENTORY_RULES.includes("knowledge context"), "Platform inventory rules must reference knowledge context");
+    console.log("✓ WhatsApp inventory rules require knowledge-context vehicles");
+
+    /* ── Demo inventory knowledge seeded ── */
+    const kbDocs = await listKnowledgeDocuments(CENTRAL_MOTORS_COMPANY_ID);
+    const inventoryDocs = kbDocs.filter((d) => d.type === "inventory");
+    assert(
+        inventoryDocs.length >= CENTRAL_MOTORS_INVENTORY_DOCS.length,
+        `Expected ${CENTRAL_MOTORS_INVENTORY_DOCS.length} inventory docs, got ${inventoryDocs.length}`
+    );
+    assert(
+        inventoryDocs.some((d) => /hilux/i.test(`${d.title} ${d.content}`)),
+        "Inventory must include Hilux listings"
+    );
+    console.log(`✓ Central Motors inventory seeded (${inventoryDocs.length} docs)`);
+
+    const hiluxKb = await searchKnowledgeForQuery(CENTRAL_MOTORS_COMPANY_ID, "Hilux in my budget R450k");
+    assert(hiluxKb.context.length > 0, "Hilux budget query must retrieve inventory context");
+    assert(
+        hiluxKb.sources.some((s) => /hilux/i.test(s)),
+        `Hilux sources missing: ${hiluxKb.sources.join(", ")}`
+    );
+    console.log("✓ Knowledge retrieval: Hilux budget query returns inventory");
+
+    const fortunerKb = await searchKnowledgeForQuery(
+        CENTRAL_MOTORS_COMPANY_ID,
+        "What price range are the Fortuners?"
+    );
+    assert(fortunerKb.context.length > 0, "Fortuner price query must retrieve inventory context");
+    assert(
+        fortunerKb.sources.some((s) => /fortuner/i.test(s)),
+        `Fortuner sources missing: ${fortunerKb.sources.join(", ")}`
+    );
+    console.log("✓ Knowledge retrieval: Fortuner price query returns inventory");
 
     console.log("\nAll tenant isolation checks passed.");
     console.log("\nRestart limitation: STORAGE_BACKEND=memory loses all tenant data on process exit.");

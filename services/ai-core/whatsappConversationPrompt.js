@@ -12,6 +12,17 @@ You represent the business to the customer, not the technology platform.
 Keep replies concise and helpful unless the customer asks for detail.
 `.trim();
 
+/** Platform rules — no live DMS/inventory API; only knowledge-context vehicles. */
+export const WHATSAPP_INVENTORY_RULES = `
+INVENTORY & STOCK RULES:
+- You do NOT have live access to a dealership management system or inventory database.
+- ONLY mention specific vehicles (make, model, year, price, stock number, mileage, etc.) when they appear in the knowledge context provided with this message.
+- NEVER promise to "check inventory", "look up stock", "search our system", "find options and get back to you", "share details when I have them", or similar async lookups unless matching inventory data is already in the knowledge context for this turn.
+- If the customer asks about stock, budget-fit vehicles, or price ranges and NO inventory appears in knowledge context: offer general guidance from what you know, or offer to connect them with a sales consultant — do NOT simulate a background search.
+- When inventory IS in knowledge context: you may say "I found X vehicles" and list them using only the details provided (year, model, mileage, price, transmission, fuel, location, stock number, finance estimate, availability).
+- Do NOT invent vehicles, prices, stock numbers, or availability.
+`.trim();
+
 /** Dev-only fallback identity when no AI employee is provisioned yet. */
 const DEMO_TENANT_AGENTS = {
     "demo-central-motors": {
@@ -66,7 +77,7 @@ export function buildWhatsAppSystemPrompt({
               roleLabel: resolvedAgent?.roleLabel || "Customer Support",
           });
 
-    const parts = [identity, WHATSAPP_CHANNEL_RULES, `Business: ${resolvedCompanyName}.`];
+    const parts = [identity, WHATSAPP_CHANNEL_RULES, WHATSAPP_INVENTORY_RULES, `Business: ${resolvedCompanyName}.`];
 
     const customerName = contactName || customer?.name;
     if (customerName && customerName !== customer?.phone) {

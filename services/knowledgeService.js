@@ -49,11 +49,22 @@ export async function parseUploadedFile(buffer, mimetype, originalname) {
     throw new Error(`Unsupported file type: ${mimetype || ext || "unknown"}`);
 }
 
-export async function saveKnowledgeDocument({ companyId, title, type, content, url, fileName }) {
+export async function saveKnowledgeDocument({
+    companyId,
+    title,
+    type,
+    content,
+    url,
+    fileName,
+    id = null,
+    knowledgeBaseId = null,
+}) {
     const adapter = await getStorageAdapter();
     if (adapter.saveKnowledgeDoc && adapter.name === "memory") {
         return adapter.saveKnowledgeDoc({
+            id,
             companyId,
+            knowledgeBaseId,
             title,
             type,
             content: content || "",
@@ -66,6 +77,7 @@ export async function saveKnowledgeDocument({ companyId, title, type, content, u
     try {
         const ref = await addDoc(collection(db, "knowledge"), {
             companyId,
+            knowledgeBaseId,
             title,
             type,
             content: content || "",
@@ -80,7 +92,9 @@ export async function saveKnowledgeDocument({ companyId, title, type, content, u
         if (adapter.saveKnowledgeDoc) {
             console.warn("[knowledge] Firestore save failed, using memory adapter:", err.message);
             return adapter.saveKnowledgeDoc({
+                id,
                 companyId,
+                knowledgeBaseId,
                 title,
                 type,
                 content: content || "",

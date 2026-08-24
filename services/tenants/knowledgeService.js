@@ -87,12 +87,57 @@ export async function deleteKnowledgeDocument(companyId, docId) {
 
 /**
  * Keyword search for RAG-lite — filters by knowledgeBaseId when provided.
+ *
+ * Inventory documents use type: "inventory" with structured listing content
+ * (Year, Model, Mileage, Price, Transmission, Fuel, Location, Stock Number,
+ * Finance Estimate, Images, Availability). See demoCentralMotorsInventory.js.
  */
+
+/** Short keywords included even when under the default 4-char term length. */
+const INVENTORY_SEARCH_KEYWORDS = new Set([
+    "hilux",
+    "fortuner",
+    "toyota",
+    "inventory",
+    "stock",
+    "vehicle",
+    "vehicles",
+    "used",
+    "budget",
+    "price",
+    "pricing",
+    "mileage",
+    "transmission",
+    "diesel",
+    "petrol",
+    "finance",
+    "available",
+    "availability",
+    "fortuners",
+]);
+
+function extractSearchTerms(queryText) {
+    const raw = String(queryText || "").toLowerCase();
+    const terms = raw.split(/\W+/).filter((w) => w.length > 3);
+
+    for (const kw of INVENTORY_SEARCH_KEYWORDS) {
+        if (raw.includes(kw) && !terms.includes(kw)) {
+            terms.push(kw);
+        }
+    }
+
+    return terms;
+}
+
+function hasInventoryIntent(terms, rawQuery) {
+    if (terms.some((t) => INVENTORY_SEARCH_KEYWORDS.has(t))) return true;
+    return /\b(r\s?\d[\d,.\s]*k?)\b/i.test(rawQuery);
+}
+
 export async function searchKnowledgeForQuery(companyId, queryText, options = {}) {
-    const terms = String(queryText || "")
-        .toLowerCase()
-        .split(/\W+/)
-        .filter((w) => w.length > 3);
+    const rawQuery = String(queryText || "");
+    const terms = extractSearchTerms(rawQuery);
+    const inventoryIntent = hasInventoryIntent(terms, rawQuery);
 
     let docs = await listKnowledgeDocuments(companyId, {
         knowledgeBaseId: options.knowledgeBaseId,
@@ -112,8 +157,11 @@ export async function searchKnowledgeForQuery(companyId, queryText, options = {}
 
     const scored = docs
         .map((doc) => {
-            const hay = `${doc.title || ""} ${doc.content || ""}`.toLowerCase();
-            const score = terms.reduce((n, t) => n + (hay.includes(t) ? 1 : 0), 0);
+            const hay = `${doc.title || ""} ${doc.content || ""} ${doc.type || ""}`.toLowerCase();
+            let score = terms.reduce((n, t) => n + (hay.includes(t) ? 1 : 0), 0);
+            if (inventoryIntent && doc.type === "inventory") {
+                score += 2;
+            }
             return { doc, score };
         })
         .filter((row) => row.score > 0)
