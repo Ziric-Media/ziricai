@@ -21,6 +21,14 @@ function futureSlotIso(daysAhead = 2, hour = 10) {
     return d.toISOString();
 }
 
+function pastSlotIso(daysAgo = 3, hour = 10) {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    while (d.getDay() === 0) d.setDate(d.getDate() - 1);
+    d.setHours(hour, 0, 0, 0);
+    return d.toISOString();
+}
+
 async function seedInventory(companyId) {
     const { seedVehicles } = await import("../services/inventory/inventoryService.js");
     await seedVehicles(companyId, [
@@ -42,6 +50,7 @@ async function main() {
         _resetMemoryAppointmentsForTests,
         _reinitAppointmentRepositoryForTests,
         getAppointmentBackendName,
+        createAppointmentRecord,
     } = await import("../services/database/appointmentRepository.js");
     const { _resetMemoryInventoryForTests } = await import("../services/inventory/inventoryService.js");
     const { initAiTools, runTool, getOpenAIToolDefinitions } = await import("../services/tools/index.js");
@@ -72,7 +81,9 @@ async function main() {
     const empty = await runTool("getCustomerBookings", ctx, { statusFilter: "all" });
     assert(empty.ok === true, "Empty lookup should succeed");
     assert(empty.count === 0, "No bookings before create");
-    assert(/no .*bookings found/i.test(empty.message), "Explicit empty message");
+    assert(/upcoming test drive/i.test(empty.message), "Upcoming section present when empty");
+    assert(/previous bookings/i.test(empty.message), "Previous bookings section present");
+    assert(!/central motors/i.test(empty.message), "Booking message must not use company as customer name");
     console.log("✓ getCustomerBookings returns empty list with explicit message");
 
     const booked = await runTool("bookTestDrive", ctx, {
@@ -93,7 +104,31 @@ async function main() {
     assert(afterRestart.bookings[0].stockNumber === "GCB-STK-001", "Stock number enriched");
     assert(afterRestart.bookings[0].vehicleDescription, "Vehicle description present");
     assert(afterRestart.bookings[0].location === "Sandton Showroom", "Location from inventory");
+    assert(/upcoming test drive/i.test(afterRestart.message), "Message includes upcoming section");
+    assert(/stock:/i.test(afterRestart.message), "Message includes stock number");
     console.log("✓ getCustomerBookings survives repository re-init (persistence)");
+
+    await createAppointmentRecord({
+        companyId: companyA,
+        customerId,
+        vehicleStockNumber: "GCB-STK-001",
+        appointmentType: "test_drive",
+        scheduledAt: pastSlotIso(5, 11),
+        idempotencyKey: `verify-past-${customerId}-${Date.now()}`,
+        metadata: {
+            vehicleId: "veh-gcb-001",
+            vehicleLabel: "2022 Demo Bookings",
+            location: "Sandton Showroom",
+        },
+    });
+
+    const split = await runTool("getCustomerBookings", ctx, { statusFilter: "all" });
+    assert(split.upcoming.length >= 1, "Upcoming section has active booking");
+    assert(split.past.length >= 1, "Past section has prior booking");
+    assert(/upcoming test drive/i.test(split.message), "Combined message has upcoming section");
+    assert(/previous bookings/i.test(split.message), "Combined message has previous section");
+    assert(split.message.includes("GCB-STK-001"), "Stock number in formatted message");
+    console.log("✓ getCustomerBookings splits upcoming vs previous sections");
 
     const wrongCompany = await runTool("getCustomerBookings", { ...ctx, companyId: companyB }, {
         statusFilter: "all",
@@ -120,7 +155,7 @@ async function main() {
     const byPhone = await runTool("getCustomerBookings", { ...ctx, customerId: undefined }, {
         statusFilter: "all",
     });
-    assert(byPhone.count === 1, "Lookup by customerPhone works");
+    assert(byPhone.count >= 1, "Lookup by customerPhone works");
     console.log("✓ getCustomerBookings resolves via customerPhone");
 
     const cancelled = await runTool("cancelTestDrive", ctx, { bookingId });

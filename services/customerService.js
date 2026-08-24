@@ -9,6 +9,14 @@ import {
     listTenantCustomers,
     updateTenantCustomer,
 } from "./storage/tenantStorage.js";
+import {
+    parseExplicitCustomerName,
+    isLikelyCompanyName,
+    getCustomerDisplayName,
+    capitalizeCustomerName,
+} from "./customerIdentity.js";
+
+export { parseExplicitCustomerName, isLikelyCompanyName, getCustomerDisplayName } from "./customerIdentity.js";
 
 const DEFAULT_FIELDS = {
     tags: [],
@@ -38,6 +46,32 @@ const DEFAULT_FIELDS = {
 
 function uid(prefix = "id") {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export async function updateCustomerProfile(phone, patch = {}, { companyId } = {}) {
+    const key = normalizePhone(phone);
+    if (companyId) {
+        return upsertTenantCustomer(companyId, key, patch);
+    }
+    return updateCustomer(key, patch);
+}
+
+/**
+ * Persist a customer-stated name (tenant-scoped). Explicit names beat WhatsApp contact names.
+ */
+export async function persistExplicitCustomerName(phone, name, { companyId, companyName } = {}) {
+    const trimmed = capitalizeCustomerName(name);
+    if (!trimmed || isLikelyCompanyName(trimmed, { companyName })) return null;
+
+    await updateCustomerProfile(
+        phone,
+        {
+            displayName: trimmed,
+            name: trimmed,
+        },
+        { companyId }
+    );
+    return trimmed;
 }
 
 async function store() {
@@ -132,7 +166,10 @@ export function calculateLeadScore(customer = {}, analysis = {}) {
     return { score, breakdown };
 }
 
-export async function upsertCustomerFromWhatsApp(phone, { contactName, companyId, messagePreview } = {}) {
+export async function upsertCustomerFromWhatsApp(
+    phone,
+    { contactName, companyId, companyName, messagePreview, explicitName } = {}
+) {
     const key = normalizePhone(phone);
     const resolvedCompanyId =
         companyId ||
@@ -155,8 +192,22 @@ export async function upsertCustomerFromWhatsApp(phone, { contactName, companyId
             lastSeen: now,
             online: true,
         };
-        if (contactName) patch.name = contactName;
-        else if (!existing.name) patch.name = formatPhoneDisplay(key);
+
+        if (explicitName && !isLikelyCompanyName(explicitName, { companyName })) {
+            patch.displayName = explicitName;
+            patch.name = explicitName;
+        } else if (contactName) {
+            patch.whatsappContactName = contactName;
+            if (
+                !existing.displayName &&
+                !isLikelyCompanyName(contactName, { companyName })
+            ) {
+                patch.name = contactName;
+            }
+        } else if (!existing.displayName && !existing.name) {
+            patch.name = formatPhoneDisplay(key);
+        }
+
         if (messagePreview) patch.lastMessage = messagePreview;
         if (!existing.createdAt) {
             patch.createdAt = now;
@@ -197,8 +248,17 @@ export async function upsertCustomerFromWhatsApp(phone, { contactName, companyId
         online: true,
     };
 
-    if (contactName) patch.name = contactName;
-    else if (!existing.name) patch.name = formatPhoneDisplay(key);
+    if (explicitName && !isLikelyCompanyName(explicitName, { companyName })) {
+        patch.displayName = explicitName;
+        patch.name = explicitName;
+    } else if (contactName) {
+        patch.whatsappContactName = contactName;
+        if (!existing.displayName && !isLikelyCompanyName(contactName, { companyName })) {
+            patch.name = contactName;
+        }
+    } else if (!existing.displayName && !existing.name) {
+        patch.name = formatPhoneDisplay(key);
+    }
 
     if (messagePreview) patch.lastMessage = messagePreview;
 

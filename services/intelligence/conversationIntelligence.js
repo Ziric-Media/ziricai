@@ -205,5 +205,18 @@ export function extractMemoryFacts(text) {
     if (/\b(company|business|startup|enterprise)\b/.test(lower)) {
         facts.push("Customer mentioned their business");
     }
+
+    const nameMatch = raw.match(
+        /\b(?:my name is|i am|i'm|im|call me|this is|you can call me|please call me|name'?s)\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i
+    );
+    const parsedName = nameMatch?.[1]?.trim();
+    if (
+        parsedName &&
+        parsedName.length >= 2 &&
+        !/^(here|there|good|fine|well|back|interested|looking|calling|messaging)$/i.test(parsedName)
+    ) {
+        facts.push(`Customer name: ${parsedName.split(/\s+/).map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ")}`);
+    }
+
     return facts;
 }

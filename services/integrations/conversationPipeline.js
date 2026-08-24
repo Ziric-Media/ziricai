@@ -7,6 +7,7 @@ import {
     isInboundMessageProcessed,
     tryClaimInboundMessage,
 } from "../conversationService.js";
+import { parseExplicitCustomerName } from "../customerService.js";
 import { enqueue, JOB_TYPES } from "../queue/jobQueue.js";
 import { isValidUnifiedMessage } from "./types/unifiedMessage.js";
 import { logInfo, logError } from "./integrationLogger.js";
@@ -63,6 +64,11 @@ export async function ingest(message) {
     });
 
     try {
+        const explicitName =
+            messageType === "text" && String(text || "").trim()
+                ? parseExplicitCustomerName(text)
+                : null;
+
         if (messageType === "text" && String(text || "").trim()) {
             await saveInboundMessage(from, text, {
                 channel,
@@ -74,12 +80,14 @@ export async function ingest(message) {
                 contactName,
                 companyId,
                 messagePreview: text.slice(0, 120),
+                explicitName,
             });
             if (companyId) {
+                const resolvedCustomerName = explicitName || contactName || from;
                 await getOrCreateConversation(companyId, from, channel, {
                     lastMessage: text.slice(0, 120),
                     preview: text.slice(0, 120),
-                    customerName: contactName || from,
+                    customerName: resolvedCustomerName,
                     status: "in_progress",
                     unread: true,
                     updatedAt: message.timestamp || new Date().toISOString(),
@@ -88,14 +96,14 @@ export async function ingest(message) {
                     channel,
                     lastMessage: text.slice(0, 120),
                     preview: text.slice(0, 120),
-                    customerName: contactName || from,
+                    customerName: resolvedCustomerName,
                     status: "in_progress",
                     unread: true,
                     updatedAt: message.timestamp || new Date().toISOString(),
                 });
             }
         } else {
-            await upsertCustomerFromWhatsApp(from, { contactName, companyId });
+            await upsertCustomerFromWhatsApp(from, { contactName, companyId, explicitName });
         }
 
         const customerId = customerDocId(from);

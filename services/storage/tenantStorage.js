@@ -6,6 +6,7 @@
 import { TenantRepository } from "../database/tenantRepository.js";
 import { TENANT_COLLECTIONS } from "../database/schema.js";
 import { normalizePhone } from "../customerService.js";
+import { isLikelyCompanyName } from "../customerIdentity.js";
 
 const customersRepo = new TenantRepository(TENANT_COLLECTIONS.CUSTOMERS);
 const conversationsRepo = new TenantRepository(TENANT_COLLECTIONS.CONVERSATIONS);
@@ -143,14 +144,31 @@ export async function saveTenantMessage(companyId, phone, role, content, options
 
     await messagesRepo.set(companyId, messageId, entry);
 
-    await upsertTenantCustomer(companyId, phone, {
+    const existingCustomer = (await getTenantCustomer(companyId, phone)) || {};
+    const customerPatch = {
         lastMessage: String(content).slice(0, 120),
         lastSeen: now(),
         status: "in_progress",
         channel,
-        name: options.contactName || options.name,
-        totalMessages: ((await getTenantCustomer(companyId, phone))?.totalMessages || 0) + 1,
-    });
+        totalMessages: (existingCustomer.totalMessages || 0) + 1,
+    };
+
+    if (options.explicitDisplayName) {
+        customerPatch.displayName = options.explicitDisplayName;
+        customerPatch.name = options.explicitDisplayName;
+    } else if (options.contactName) {
+        customerPatch.whatsappContactName = options.contactName;
+        if (
+            !existingCustomer.displayName &&
+            !isLikelyCompanyName(options.contactName, { companyName: options.companyName })
+        ) {
+            customerPatch.name = options.contactName;
+        }
+    } else if (options.name && !existingCustomer.displayName) {
+        customerPatch.name = options.name;
+    }
+
+    await upsertTenantCustomer(companyId, phone, customerPatch);
 
     return { conversationId, messageId, role, customerId };
 }

@@ -2,6 +2,7 @@
  * WhatsApp customer-facing system prompt assembly for inbound message replies.
  */
 import { buildEmployeeSystemPrompt } from "./employeePrompts.js";
+import { getCustomerDisplayName } from "../customerIdentity.js";
 
 const WHATSAPP_CHANNEL_RULES = `
 You are replying to a customer on WhatsApp as a business representative.
@@ -109,9 +110,13 @@ export function buildWhatsAppSystemPrompt({
         `Business: ${resolvedCompanyName}.`,
     ];
 
-    const customerName = contactName || customer?.name;
-    if (customerName && customerName !== customer?.phone) {
+    const customerName = getCustomerDisplayName(customer, { contactName, companyName: resolvedCompanyName });
+    if (customerName) {
         parts.push(`Customer name: ${customerName}.`);
+    } else {
+        parts.push(
+            "Customer name is unknown — do not guess from the business name, tenant name, WhatsApp business profile, or company name. Ask politely if needed."
+        );
     }
 
     if (customer?.aiSummary) {

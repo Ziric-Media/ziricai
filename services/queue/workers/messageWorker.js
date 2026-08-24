@@ -6,7 +6,7 @@ import { sendMessage as integrationSend } from "../../integrations/integrationHu
 
 import { saveOutboundMessage, getConversation } from "../../conversationService.js";
 
-import { getCustomer, addTimelineEvent } from "../../customerService.js";
+import { getCustomer, addTimelineEvent, parseExplicitCustomerName, persistExplicitCustomerName, getCustomerDisplayName } from "../../customerService.js";
 
 import { recordEvent } from "../../analytics/analyticsService.js";
 
@@ -140,6 +140,27 @@ async function processInboundMessage(job) {
     });
 
     const companyRecord = resolvedCompanyId ? await getCompany(resolvedCompanyId).catch(() => null) : null;
+    const companyName = companyRecord?.name || customer.companyName || null;
+
+    const explicitName = parseExplicitCustomerName(text);
+    if (explicitName && resolvedCompanyId) {
+        await persistExplicitCustomerName(sender, explicitName, {
+            companyId: resolvedCompanyId,
+            companyName,
+        });
+    }
+
+    const refreshedCustomer =
+        resolvedCompanyId
+            ? (await getCustomer(sender, { companyId: resolvedCompanyId })) || customer
+            : explicitName
+              ? { ...customer, displayName: explicitName, name: explicitName }
+              : customer;
+
+    const customerDisplayName = getCustomerDisplayName(refreshedCustomer, {
+        contactName,
+        companyName,
+    });
 
     const history = resolvedCompanyId
         ? await getConversation(sender, 20, { companyId: resolvedCompanyId, channel: outboundChannel })
@@ -172,7 +193,8 @@ async function processInboundMessage(job) {
         memoriesRetrieved: memoryRecords.length,
         recentMessagesRetrieved: history.length,
         knowledgeSkipped: isGreetingMessage(text),
-        hasAiSummary: Boolean(customer?.aiSummary),
+        hasAiSummary: Boolean(refreshedCustomer?.aiSummary),
+        customerDisplayName: customerDisplayName || null,
     });
 
     if (resolvedCompanyId && isNewConversation) {
@@ -186,8 +208,8 @@ async function processInboundMessage(job) {
     const systemPrompt = buildWhatsAppSystemPrompt({
         agent,
         companyId: resolvedCompanyId,
-        companyName: companyRecord?.name || customer.companyName,
-        customer,
+        companyName,
+        customer: refreshedCustomer,
         contactName,
     });
 
@@ -212,7 +234,7 @@ async function processInboundMessage(job) {
         companyId: resolvedCompanyId,
         customerId,
         customerPhone: sender,
-        customerName: contactName || customer?.name,
+        customerName: customerDisplayName,
         agentId: agent?.id || null,
         channel: outboundChannel,
         inboundMessage: text,

@@ -33,6 +33,8 @@ import {
     updateAiSummary,
     getCustomer,
     addTask,
+    parseExplicitCustomerName,
+    getCustomerDisplayName,
 } from "../customerService.js";
 import { analyzeMessage, extractMemoryFacts } from "../intelligence/conversationIntelligence.js";
 import { storeMemory } from "../memory/aiMemoryService.js";
@@ -456,12 +458,14 @@ export async function processInboundCustomerPipeline(phone, context = {}) {
         contactName,
         companyId,
         messagePreview: text.slice(0, 120),
+        explicitName: parseExplicitCustomerName(text),
     });
 
     const customer = companyId
         ? (await getCustomer(phone, { companyId })) || {}
         : (await getCustomer(phone)) || {};
     const resolvedCompanyId = customer.companyId || companyId;
+    const customerDisplayName = getCustomerDisplayName(customer, { contactName });
     const agent =
         (ctxAgentId && (await store.getAgent?.(ctxAgentId))) ||
         (resolvedCompanyId ? await getDefaultAgentForCompany(resolvedCompanyId) : null);
@@ -526,7 +530,7 @@ export async function processInboundCustomerPipeline(phone, context = {}) {
             icon: analysis.escalationNeeded ? "fa-user-shield" : "fa-user-plus",
             color: analysis.escalationNeeded ? "red" : "blue",
             title: analysis.escalationNeeded ? "Escalation needed" : "High-intent customer",
-            message: `${contactName || phone}: ${analysis.recommendedAction || text.slice(0, 80)}`,
+            message: `${customerDisplayName || phone}: ${analysis.recommendedAction || text.slice(0, 80)}`,
             time: "Just now",
             meta: { phone, leadQuality: analysis.leadQuality, sentiment: analysis.sentiment },
         });
