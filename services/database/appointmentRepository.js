@@ -3,6 +3,8 @@
  */
 import { randomUUID } from "crypto";
 import { getPostgresPool, isPostgresConfigured } from "./postgresClient.js";
+import { normalizePhone } from "../customerService.js";
+import { resolveVehicle, vehicleToPublic } from "../inventory/inventoryService.js";
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS ziricai_appointments (
@@ -26,6 +28,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_ziricai_appointments_idempotency
 CREATE INDEX IF NOT EXISTS idx_ziricai_appointments_slot
     ON ziricai_appointments (company_id, scheduled_at)
     WHERE status NOT IN ('cancelled');
+
+CREATE INDEX IF NOT EXISTS idx_ziricai_appointments_customer
+    ON ziricai_appointments (company_id, customer_id, scheduled_at DESC);
 `;
 
 /** @type {Map<string, object>} */
@@ -183,9 +188,232 @@ export async function countAppointmentsInSlot(companyId, slotStart, slotEnd) {
     }).length;
 }
 
+function matchesStatusFilter(appointment, statusFilter) {
+    const filter = statusFilter || "all";
+    const scheduledMs = new Date(appointment.scheduledAt).getTime();
+    const nowMs = Date.now();
+    const cancelled = appointment.status === "cancelled";
+
+    if (filter === "upcoming") {
+        return !cancelled && scheduledMs >= nowMs;
+    }
+    if (filter === "past") {
+        return cancelled || scheduledMs < nowMs;
+    }
+    return true;
+}
+
+function sortAppointmentsDesc(rows) {
+    return rows.sort(
+        (a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()
+    );
+}
+
+async function enrichAppointment(companyId, appointment) {
+    const meta = appointment.metadata || {};
+    const vehicleId = meta.vehicleId || null;
+    const stockNumber = appointment.vehicleStockNumber;
+
+    let vehicle = null;
+    if (vehicleId || stockNumber) {
+        vehicle = await resolveVehicle(companyId, { vehicleId, stockNumber });
+    }
+
+    const publicVehicle = vehicle ? vehicleToPublic(vehicle) : null;
+
+    return {
+        bookingId: appointment.id,
+        companyId: appointment.companyId,
+        customerId: appointment.customerId,
+        vehicleId: vehicleId || publicVehicle?.vehicleId || null,
+        stockNumber: stockNumber || publicVehicle?.stockNumber || null,
+        vehicleDescription:
+            meta.vehicleLabel || publicVehicle?.label || publicVehicle?.title || null,
+        scheduledAt: appointment.scheduledAt,
+        dateTime: appointment.scheduledAt,
+        location: publicVehicle?.location || meta.location || null,
+        status: appointment.status,
+        appointmentType: appointment.appointmentType,
+        idempotencyKey: appointment.idempotencyKey,
+        createdAt: appointment.createdAt,
+        updatedAt: appointment.updatedAt,
+        metadata: appointment.metadata,
+        vehicle: publicVehicle,
+    };
+}
+
+/**
+ * List appointments for a tenant customer (customerId = normalized phone doc id).
+ * @param {object} input
+ * @param {string} input.companyId
+ * @param {string} input.customerId
+ * @param {string} [input.appointmentType]
+ * @param {"upcoming"|"past"|"all"} [input.statusFilter]
+ * @param {number} [input.limit]
+ */
+export async function listAppointmentsByCustomer({
+    companyId,
+    customerId,
+    appointmentType = "test_drive",
+    statusFilter = "all",
+    limit = 20,
+} = {}) {
+    await ensureSchema();
+
+    if (!companyId || !customerId) return [];
+
+    const max = Math.min(Math.max(parseInt(String(limit || 20), 10) || 20, 1), 50);
+    const pool = await getPostgresPool();
+
+    if (pool) {
+        const conditions = ["company_id = $1", "customer_id = $2"];
+        const params = [companyId, customerId];
+        let paramIdx = 3;
+
+        if (appointmentType) {
+            conditions.push(`appointment_type = $${paramIdx++}`);
+            params.push(appointmentType);
+        }
+
+        if (statusFilter === "upcoming") {
+            conditions.push(`status NOT IN ('cancelled')`);
+            conditions.push(`scheduled_at >= NOW()`);
+        } else if (statusFilter === "past") {
+            conditions.push(`(status = 'cancelled' OR scheduled_at < NOW())`);
+        }
+
+        params.push(max);
+
+        const result = await pool.query(
+            `SELECT * FROM ziricai_appointments
+             WHERE ${conditions.join(" AND ")}
+             ORDER BY scheduled_at DESC
+             LIMIT $${paramIdx}`,
+            params
+        );
+
+        const enriched = [];
+        for (const row of result.rows) {
+            enriched.push(await enrichAppointment(companyId, rowToAppointment(row)));
+        }
+        return enriched;
+    }
+
+    let rows = memoryAll.filter(
+        (a) =>
+            a.companyId === companyId &&
+            a.customerId === customerId &&
+            (!appointmentType || a.appointmentType === appointmentType)
+    );
+    rows = rows.filter((a) => matchesStatusFilter(a, statusFilter));
+    rows = sortAppointmentsDesc(rows).slice(0, max);
+
+    const enriched = [];
+    for (const row of rows) {
+        enriched.push(await enrichAppointment(companyId, row));
+    }
+    return enriched;
+}
+
+/**
+ * List appointments by customer phone — tenant-scoped (company_id + normalized phone).
+ * @param {object} input
+ * @param {string} input.companyId
+ * @param {string} input.phone
+ * @param {string} [input.appointmentType]
+ * @param {"upcoming"|"past"|"all"} [input.statusFilter]
+ * @param {number} [input.limit]
+ */
+export async function listAppointmentsByCustomerPhone({
+    companyId,
+    phone,
+    appointmentType = "test_drive",
+    statusFilter = "all",
+    limit = 20,
+} = {}) {
+    const normalized = normalizePhone(phone);
+    if (!companyId || !normalized) return [];
+
+    return listAppointmentsByCustomer({
+        companyId,
+        customerId: normalized,
+        appointmentType,
+        statusFilter,
+        limit,
+    });
+}
+
+export async function findAppointmentById(companyId, appointmentId) {
+    await ensureSchema();
+
+    if (!companyId || !appointmentId) return null;
+
+    const pool = await getPostgresPool();
+    if (pool) {
+        const result = await pool.query(
+            `SELECT * FROM ziricai_appointments WHERE id = $1 AND company_id = $2 LIMIT 1`,
+            [appointmentId, companyId]
+        );
+        return result.rows[0] ? rowToAppointment(result.rows[0]) : null;
+    }
+
+    return (
+        memoryAll.find((a) => a.id === appointmentId && a.companyId === companyId) || null
+    );
+}
+
+/**
+ * Cancel an appointment — tenant-scoped; optional customerId verifies ownership.
+ */
+export async function cancelAppointmentRecord({ companyId, appointmentId, customerId } = {}) {
+    await ensureSchema();
+
+    if (!companyId || !appointmentId) {
+        return { ok: false, error: "companyId and appointmentId are required", code: "INVALID_INPUT" };
+    }
+
+    const existing = await findAppointmentById(companyId, appointmentId);
+    if (!existing) {
+        return { ok: false, error: "Booking not found", code: "NOT_FOUND" };
+    }
+
+    if (customerId && existing.customerId !== customerId) {
+        return { ok: false, error: "Booking not found", code: "NOT_FOUND" };
+    }
+
+    if (existing.status === "cancelled") {
+        const enriched = await enrichAppointment(companyId, existing);
+        return { ok: true, duplicate: true, appointment: enriched, booking: enriched };
+    }
+
+    const pool = await getPostgresPool();
+    if (pool) {
+        const result = await pool.query(
+            `UPDATE ziricai_appointments
+             SET status = 'cancelled', updated_at = NOW()
+             WHERE id = $1 AND company_id = $2
+             RETURNING *`,
+            [appointmentId, companyId]
+        );
+        const updated = rowToAppointment(result.rows[0]);
+        const enriched = await enrichAppointment(companyId, updated);
+        return { ok: true, duplicate: false, appointment: enriched, booking: enriched };
+    }
+
+    existing.status = "cancelled";
+    existing.updatedAt = new Date().toISOString();
+    const enriched = await enrichAppointment(companyId, existing);
+    return { ok: true, duplicate: false, appointment: enriched, booking: enriched };
+}
+
 /** Test helper — reset in-memory store. */
 export function _resetMemoryAppointmentsForTests() {
     memoryByIdempotency.clear();
     memoryAll.length = 0;
+    schemaReady = false;
+}
+
+/** Test helper — simulate process restart (re-init schema, keep durable data). */
+export function _reinitAppointmentRepositoryForTests() {
     schemaReady = false;
 }
