@@ -45,12 +45,15 @@ function assertCompanyId(companyId) {
 function mergeDurableIdentity(tenantRecord, durableRecord) {
     if (!durableRecord) return tenantRecord;
     if (!tenantRecord) return durableRecord;
+    const salesContext = tenantRecord.salesContext || durableRecord.metadata?.salesContext || null;
     return {
         ...tenantRecord,
         displayName: durableRecord.displayName || tenantRecord.displayName || null,
         explicitName: durableRecord.explicitName || tenantRecord.explicitName || null,
         whatsappContactName: durableRecord.whatsappContactName || tenantRecord.whatsappContactName || null,
         name: durableRecord.displayName || durableRecord.name || tenantRecord.displayName || tenantRecord.name || null,
+        salesContext: salesContext || undefined,
+        metadata: { ...(tenantRecord.metadata || {}), ...(durableRecord.metadata || {}) },
     };
 }
 

@@ -28,7 +28,8 @@
         "verify:get-customer-bookings": "node scripts/verify-get-customer-bookings.js",
         "verify:customer-identity": "node scripts/verify-customer-identity.js",
         "verify:authoritative-state": "node scripts/verify-authoritative-state.js",
-        "test": "node scripts/verify-tenant-isolation.js && node scripts/verify-whatsapp-integration.js && node scripts/verify-queue-durable.js && node scripts/verify-book-test-drive.js && node scripts/verify-inventory-booking.js && node scripts/verify-test-drive-availability.js && node scripts/verify-get-customer-bookings.js && node scripts/verify-customer-identity.js && node scripts/verify-authoritative-state.js",
+        "verify:sales-family-journey": "node scripts/verify-sales-family-decision-journey.js",
+        "test": "node scripts/verify-tenant-isolation.js && node scripts/verify-whatsapp-integration.js && node scripts/verify-queue-durable.js && node scripts/verify-book-test-drive.js && node scripts/verify-inventory-booking.js && node scripts/verify-test-drive-availability.js && node scripts/verify-get-customer-bookings.js && node scripts/verify-customer-identity.js && node scripts/verify-authoritative-state.js && node scripts/verify-sales-family-decision-journey.js",
         "test:queue": "node scripts/verify-queue-durable.js",
         "build:knowledge": "node scripts/build-knowledge-bundle.js",
         "seed:knowledge": "node scripts/seed-knowledge-content.js"

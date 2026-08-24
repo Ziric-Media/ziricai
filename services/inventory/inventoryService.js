@@ -4,6 +4,7 @@
  */
 import { randomUUID } from "crypto";
 import { getPostgresPool, isPostgresConfigured } from "../database/postgresClient.js";
+import { getVehicleSeatingCapacity, withSeatingCapacity } from "./seatingCapacity.js";
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS ziricai_inventory_vehicles (
@@ -107,7 +108,7 @@ function normalizeVehicleInput(input) {
 
 function vehicleToPublic(vehicle) {
     if (!vehicle) return null;
-    return {
+    const base = {
         vehicleId: vehicle.vehicleId,
         stockNumber: vehicle.stockNumber,
         make: vehicle.make,
@@ -125,6 +126,7 @@ function vehicleToPublic(vehicle) {
         title: vehicle.title,
         label: vehicle.title || [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" "),
     };
+    return withSeatingCapacity(base);
 }
 
 async function ensureSchema() {
@@ -420,6 +422,10 @@ function matchesFilters(vehicle, filters = {}) {
     }
     if (filters.maxPrice != null && vehicle.price != null && vehicle.price > filters.maxPrice) return false;
     if (filters.minPrice != null && vehicle.price != null && vehicle.price < filters.minPrice) return false;
+    if (filters.minSeats != null) {
+        const seats = getVehicleSeatingCapacity(vehicle);
+        if (seats == null || seats < filters.minSeats) return false;
+    }
     return true;
 }
 

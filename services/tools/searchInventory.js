@@ -3,6 +3,7 @@
  */
 import { searchInventory as searchInventoryRecords, detectBrandHintsFromQuery } from "../inventory/inventoryService.js";
 import { storeRecommendedVehicles } from "../conversation/recommendedVehicles.js";
+import { evaluateSeatingFit, getVehicleSeatingCapacity } from "../inventory/seatingCapacity.js";
 
 export default {
     name: "searchInventory",
@@ -43,16 +44,21 @@ export default {
                 type: "number",
                 description: "Max results to return (default 10)",
             },
+            minSeats: {
+                type: "number",
+                description: "Minimum seating capacity required (e.g. 8 for a family of 8)",
+            },
         },
     },
 
     async execute(ctx, args = {}) {
-        const { companyId, customerPhone, channel } = ctx;
+        const { companyId, customerPhone, channel, salesContext } = ctx;
         if (!companyId) {
             return { ok: false, error: "companyId is required", code: "MISSING_COMPANY" };
         }
 
         const brandHints = detectBrandHintsFromQuery(args.query || "");
+        const minSeats = args.minSeats ?? null;
         const vehicles = await searchInventoryRecords(companyId, args.query || "", {
             make: args.make || args.brand || brandHints.make,
             makes: brandHints.makes,
@@ -60,22 +66,36 @@ export default {
             model: args.model,
             maxPrice: args.maxPrice,
             minPrice: args.minPrice,
+            minSeats,
             limit: args.limit || 10,
             availabilityOnly: false,
         });
 
+        const passengerCount = salesContext?.familySize ?? minSeats ?? null;
+        const vehiclesWithFit = vehicles.map((vehicle) => {
+            if (passengerCount == null) return vehicle;
+            const fit = evaluateSeatingFit(passengerCount, vehicle);
+            return {
+                ...vehicle,
+                seatingCapacity: vehicle.seatingCapacity ?? getVehicleSeatingCapacity(vehicle),
+                seatingFit: fit.fits ? "ok" : "insufficient",
+                seatingWarning: fit.warning,
+            };
+        });
+
         if (customerPhone) {
-            await storeRecommendedVehicles(companyId, customerPhone, channel || "whatsapp", vehicles);
+            await storeRecommendedVehicles(companyId, customerPhone, channel || "whatsapp", vehiclesWithFit);
         }
 
         return {
             ok: true,
-            count: vehicles.length,
-            vehicles,
+            count: vehiclesWithFit.length,
+            vehicles: vehiclesWithFit,
+            passengerCount,
             message:
-                vehicles.length === 0
+                vehiclesWithFit.length === 0
                     ? "No vehicles matched that search. Try broader terms or ask about alternatives."
-                    : `Inventory search returned ${vehicles.length} vehicle${vehicles.length === 1 ? "" : "s"}. Describe matches using vehicle details below.`,
+                    : `Inventory search returned ${vehiclesWithFit.length} vehicle${vehiclesWithFit.length === 1 ? "" : "s"}. Describe matches using vehicle details below. Always compare seatingCapacity to passenger count — warn if seatingFit is insufficient.`,
         };
     },
 };

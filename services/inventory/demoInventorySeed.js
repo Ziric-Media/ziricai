@@ -51,6 +51,9 @@ export function inventoryDocToVehicle(doc, companyId) {
     const { make, model } = parseModelLine(modelLine);
     const stockNumber = parseField(content, "Stock Number");
 
+    const seatingRaw = parseField(content, "Seating");
+    const seatingCapacity = seatingRaw ? Number(String(seatingRaw).replace(/[^\d]/g, "")) : null;
+
     return {
         vehicleId: doc.id || `veh-${stockNumber}`,
         companyId,
@@ -68,7 +71,10 @@ export function inventoryDocToVehicle(doc, companyId) {
         images: [],
         availability: parseAvailability(parseField(content, "Availability")),
         title: doc.title || modelLine,
-        metadata: { sourceDocId: doc.id || null },
+        metadata: {
+            sourceDocId: doc.id || null,
+            ...(seatingCapacity ? { seatingCapacity } : {}),
+        },
     };
 }
 

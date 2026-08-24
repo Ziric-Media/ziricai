@@ -89,6 +89,12 @@ export default {
                 type: "string",
                 description: "Optional notes for the sales team",
             },
+            attendees: {
+                type: "array",
+                items: { type: "string" },
+                description:
+                    "Names of people who will physically attend the test drive — only include if the customer explicitly confirmed they are coming",
+            },
             idempotencyKey: {
                 type: "string",
                 description: "Optional client idempotency key to prevent duplicate bookings",
@@ -154,6 +160,11 @@ export default {
             await persistExplicitCustomerName(customerPhone, customerName, { companyId }).catch(() => {});
         }
 
+        const attendees = Array.isArray(args.attendees)
+            ? args.attendees.map((a) => String(a).trim()).filter(Boolean)
+            : [];
+        const decisionMakers = ctx.salesContext?.decisionMakers || [];
+
         const vehicle = vehicleCheck.vehicle;
         const metadata = {
             vehicleId: vehicleCheck.vehicleId,
@@ -163,6 +174,9 @@ export default {
             location: vehicle?.location || null,
             vehicleLabel: vehicleCheck.vehicleLabel,
             customerName,
+            bookedCustomer: customerName,
+            attendees,
+            decisionMakers,
             notes: args.notes || "",
             channel: ctx.channel || "whatsapp",
         };

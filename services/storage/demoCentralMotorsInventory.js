@@ -5,7 +5,7 @@
  * Inventory document schema (type: "inventory"):
  * - title: short listing headline
  * - content: structured text with Year, Model, Mileage, Price, Transmission,
- *   Fuel, Location, Stock Number, Finance Estimate, Images, Availability
+ *   Fuel, Seating, Location, Stock Number, Finance Estimate, Images, Availability
  */
 
 export const CENTRAL_MOTORS_INVENTORY_DOCS = [
@@ -15,9 +15,9 @@ export const CENTRAL_MOTORS_INVENTORY_DOCS = [
         type: "inventory",
         content: `Central Motors used stock (Gauteng). Budget-friendly Hilux and Fortuner listings typically R350,000–R500,000.
 
-Keywords: Hilux, Fortuner, Toyota, Ford, BMW, Everest, X5, used, inventory, stock, budget, price range, diesel, automatic, manual.
+Keywords: Hilux, Fortuner, Toyota, Ford, BMW, Everest, X5, Land Cruiser, used, inventory, stock, budget, price range, diesel, automatic, manual.
 
-When a customer asks about Hilux or Fortuner in their budget, list matching vehicles from this inventory with year, model, mileage, price, transmission, fuel, location, stock number, finance estimate, and availability.`,
+When a customer asks about Hilux or Fortuner in their budget, list matching vehicles from this inventory with year, model, mileage, price, transmission, fuel, seating, location, stock number, finance estimate, and availability.`,
     },
     {
         id: "demo-kn-inv-frd-001",
@@ -29,6 +29,7 @@ Mileage: 62,300 km
 Price: R449,900
 Transmission: Automatic
 Fuel: Diesel
+Seating: 7
 Location: Central Motors Sandton, 42 Main Road
 Stock Number: CM-FRD-001
 Finance Estimate: from R11,350/month (72 months, 10% deposit, subject to approval)
@@ -45,6 +46,7 @@ Mileage: 78,500 km
 Price: R699,900
 Transmission: Automatic
 Fuel: Diesel
+Seating: 5
 Location: Central Motors Sandton, 42 Main Road
 Stock Number: CM-BMW-001
 Finance Estimate: from R17,650/month (72 months, 10% deposit, subject to approval)
@@ -61,6 +63,7 @@ Mileage: 68,400 km
 Price: R389,900
 Transmission: Manual
 Fuel: Diesel
+Seating: 5
 Location: Central Motors Sandton, 42 Main Road
 Stock Number: CM-HLX-001
 Finance Estimate: from R9,850/month (72 months, 10% deposit, subject to approval)
@@ -77,6 +80,7 @@ Mileage: 82,100 km
 Price: R425,000
 Transmission: Automatic
 Fuel: Diesel
+Seating: 5
 Location: Central Motors Sandton, 42 Main Road
 Stock Number: CM-HLX-002
 Finance Estimate: from R10,720/month (72 months, 10% deposit, subject to approval)
@@ -93,6 +97,7 @@ Mileage: 95,200 km
 Price: R365,000
 Transmission: Manual
 Fuel: Diesel
+Seating: 5
 Location: Central Motors Centurion
 Stock Number: CM-HLX-003
 Finance Estimate: from R9,220/month (72 months, 10% deposit, subject to approval)
@@ -109,6 +114,7 @@ Mileage: 45,300 km
 Price: R489,900
 Transmission: Automatic
 Fuel: Diesel
+Seating: 5
 Location: Central Motors Sandton, 42 Main Road
 Stock Number: CM-HLX-004
 Finance Estimate: from R12,350/month (72 months, 10% deposit, subject to approval)
@@ -125,6 +131,7 @@ Mileage: 71,000 km
 Price: R399,900
 Transmission: Automatic
 Fuel: Diesel
+Seating: 7
 Location: Central Motors Sandton, 42 Main Road
 Stock Number: CM-FTN-001
 Finance Estimate: from R10,100/month (72 months, 10% deposit, subject to approval)
@@ -141,10 +148,28 @@ Mileage: 88,500 km
 Price: R459,000
 Transmission: Automatic
 Fuel: Diesel
+Seating: 7
 Location: Central Motors Centurion
 Stock Number: CM-FTN-002
 Finance Estimate: from R11,580/month (72 months, 10% deposit, subject to approval)
 Images: Available on request via WhatsApp
 Availability: In stock`,
+    },
+    {
+        id: "demo-kn-inv-lc-001",
+        title: "2020 Toyota Land Cruiser 200 VX",
+        type: "inventory",
+        content: `Year: 2020
+Model: Toyota Land Cruiser 200 VX
+Mileage: 54,200 km
+Price: R899,900
+Transmission: Automatic
+Fuel: Diesel
+Seating: 8
+Location: Central Motors Sandton, 42 Main Road
+Stock Number: CM-LC-001
+Finance Estimate: from R22,650/month (72 months, 10% deposit, subject to approval)
+Images: Available on request via WhatsApp
+Availability: In stock — available for test drive`,
     },
 ];

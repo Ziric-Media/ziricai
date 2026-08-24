@@ -2,6 +2,8 @@
  * Conversation intelligence — keyword heuristics stub.
  * Replace analyzeMessage internals with OpenAI structured output later.
  */
+import { countPassengersFromText } from "../inventory/seatingCapacity.js";
+import { parseIntroducedPerson } from "../customerIdentity.js";
 
 const TOPIC_KEYWORDS = {
     pricing: /\b(price|cost|quote|budget|how much|rate|fee|deposit|finance|financing)\b/i,
@@ -189,16 +191,30 @@ export function extractMemoryFacts(text) {
         facts.push("Customer discussed budget (amount not specified)");
     }
 
-    if (/\b(child|children|kid|son|daughter)\b/.test(lower)) {
+    const familySize = countPassengersFromText(raw);
+    if (familySize != null) {
+        facts.push(`Family / passenger count: ${familySize}`);
+    } else if (/\b(child|children|kid|son|daughter)\b/.test(lower)) {
         facts.push("Customer mentioned children");
     }
+
+    const introduced = parseIntroducedPerson(raw);
+    if (introduced?.name) {
+        facts.push(`Household member: ${introduced.name} (${introduced.relationship || "co-decision-maker"})`);
+    }
+
+    if (/\b(too small|not enough seats|won't fit|need something bigger)\b/.test(lower)) {
+        const vehicle = lower.match(/\b(fortuner|hilux|everest|x5)\b/);
+        facts.push(vehicle ? `Objection: ${vehicle[0]} too small for family` : "Objection: vehicle too small for family");
+    }
+
     if (/\b(finance|financing|deposit|loan)\b/.test(lower)) {
         facts.push("Customer asked about vehicle finance");
     }
     if (/\b(trade.?in|trade in)\b/.test(lower)) {
         facts.push("Customer mentioned trade-in");
     }
-    const vehicleMatch = lower.match(/\b(hilux|corolla|swift|fortuner|toyota|suzuki|bmw|mercedes|audi)\b/i);
+    const vehicleMatch = lower.match(/\b(hilux|corolla|swift|fortuner|toyota|suzuki|bmw|mercedes|audi|everest|land cruiser)\b/i);
     if (vehicleMatch) {
         facts.push(`Customer enquired about ${vehicleMatch[0]}`);
     }

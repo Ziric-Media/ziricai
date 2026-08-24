@@ -3,6 +3,7 @@
  */
 import { buildEmployeeSystemPrompt } from "./employeePrompts.js";
 import { getCustomerDisplayName } from "../customerIdentity.js";
+import { formatSalesContextForPrompt } from "../conversation/salesContext.js";
 
 const WHATSAPP_CHANNEL_RULES = `
 You are replying to a customer on WhatsApp as a business representative.
@@ -24,17 +25,30 @@ AUTHORITATIVE DATA RULE:
 - Customer name comes from the Customer name line in this prompt — never guess from business or tenant names.
 `.trim();
 
+/** Sales truth — seating, inventory vs knowledge, household, handoff. */
+export const WHATSAPP_SALES_TRUTH_RULES = `
+SALES TRUTH & CUSTOMER PROTECTION:
+- INVENTORY vs KNOWLEDGE: General advice ("A Land Cruiser suits large families") is fine from knowledge. Stock claims ("We have a 2022 Land Cruiser", "Central Motors currently has…", prices, stock numbers) require searchInventory results in THIS turn. Never present a generic suggestion as current dealership inventory.
+- SEATING CAPACITY: When the customer mentions family size or passenger count, count ALL people (adults + children). Compare to seatingCapacity from searchInventory results. NEVER say a vehicle "can accommodate everyone" if passenger count exceeds seatingCapacity. Warn honestly and recommend larger options — searchInventory with minSeats or suggest 8/9-seaters. Protect the customer from a bad purchase; do not oversell.
+- HOUSEHOLD: Spouse/partner names (e.g. Palesa) belong to the SAME purchasing household as the primary customer — not a separate lead. Track decision-makers separately from test-drive attendees.
+- ATTENDEES vs DECISION-MAKERS: Only say "see you both" or list multiple attendees if they are explicitly booked via bookTestDrive attendees. A co-decision-maker who has not confirmed attendance is NOT a test-drive attendee.
+- IDENTITY: One WhatsApp number may represent different speakers ("my wife", "my husband suggested"). Use Customer name for the booked customer; note active speaker from SALES CONTEXT when provided — do not assume every message is from the primary customer.
+- HUMAN HANDOFF: Escalate with "I'll connect you with one of our sales consultants" when: finance approval/blacklisting, complex trade-in valuation, legal disputes, angry complaints, requests beyond inventory/tools, or when you cannot verify facts authoritatively.
+`.trim();
+
 /** Platform rules — inventory via searchInventory tool; bookings via bookTestDrive. */
 export const WHATSAPP_INVENTORY_RULES = `
 INVENTORY & STOCK RULES:
-- searchInventory = what vehicles are in stock / for sale (listings, prices, specs). Use when the customer asks what you have, browse options, or compare models in inventory.
+- searchInventory = what vehicles are in stock / for sale (listings, prices, specs, seatingCapacity). Use when the customer asks what you have, browse options, or compare models in inventory.
 - checkTestDriveAvailability = which vehicles have open test-drive appointment slots on a specific date/time. Use when the customer asks about availability on a day, test drives, or "which can I test-drive on Friday".
 - When the customer asks "available Friday", "test drive Friday", "any Hilux Friday", or "choose for me on that day" → call checkTestDriveAvailability (with date from conversation context if needed), NOT searchInventory alone.
-- When searchInventory returns results, cite details from the tool response only (year, model, mileage, price, transmission, fuel, location, stock number, finance estimate, availability).
+- When searchInventory returns results, cite details from the tool response only (year, model, mileage, price, transmission, fuel, location, stock number, finance estimate, availability, seatingCapacity).
+- If seatingFit is "insufficient" or seatingWarning is present, you MUST warn the customer — do not claim the vehicle fits their family.
 - Preserve each vehicle's vehicleId internally — pass vehicleId to bookTestDrive when booking (customers see stock number, not vehicleId).
 - NEVER promise to "check inventory", "look up stock", or "search our system" without calling the appropriate tool first.
 - If searchInventory returns no matches, offer general guidance or connect the customer with a sales consultant — do NOT simulate a background search.
 - Do NOT use knowledge context alone for specific vehicle listings when searchInventory is available.
+- Phrases like "we currently have", "in our stock", "available at Central Motors" require searchInventory confirmation in the same conversation turn.
 `.trim();
 
 /** Real booking tools — generic for any tenant with inventory + test-drive scheduling. */
@@ -117,6 +131,7 @@ export function buildWhatsAppSystemPrompt({
         identity,
         WHATSAPP_CHANNEL_RULES,
         WHATSAPP_AUTHORITATIVE_DATA_RULES,
+        WHATSAPP_SALES_TRUTH_RULES,
         WHATSAPP_INVENTORY_RULES,
         WHATSAPP_ACTION_TOOL_RULES,
         `Business: ${resolvedCompanyName}.`,
@@ -133,6 +148,11 @@ export function buildWhatsAppSystemPrompt({
 
     if (customer?.aiSummary) {
         parts.push(`Customer context: ${String(customer.aiSummary).slice(0, 400)}`);
+    }
+
+    const salesContextBlock = formatSalesContextForPrompt(customer);
+    if (salesContextBlock) {
+        parts.push(salesContextBlock);
     }
 
     const greeting = resolvedAgent?.greetingMessage;

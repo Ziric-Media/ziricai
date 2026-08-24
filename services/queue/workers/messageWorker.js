@@ -37,6 +37,11 @@ import {
     isBookingRecapIntent,
     formatAuthoritativeBookingBlock,
 } from "../../conversation/bookingRecapIntent.js";
+import {
+    extractSalesSignals,
+    persistSalesContext,
+    mergeSalesContext,
+} from "../../conversation/salesContext.js";
 
 import { captureLeadFromMessage } from "../../tenants/crmService.js";
 
@@ -154,12 +159,31 @@ async function processInboundMessage(job) {
         });
     }
 
-    const refreshedCustomer =
+    let salesContextForTurn = customer?.salesContext || null;
+    if (resolvedCompanyId) {
+        const salesSignals = extractSalesSignals(text, { customer });
+        if (Object.keys(salesSignals).length) {
+            if (salesSignals.leadStage === "IDENTIFIED" && explicitName) {
+                salesSignals.householdMembers = [
+                    ...(salesSignals.householdMembers || []),
+                    { name: explicitName, role: "primary", relationship: "customer" },
+                ];
+            }
+            salesContextForTurn = mergeSalesContext(customer?.salesContext, salesSignals);
+            await persistSalesContext(resolvedCompanyId, sender, salesSignals);
+        }
+    }
+
+    let refreshedCustomer =
         resolvedCompanyId
             ? (await getCustomer(sender, { companyId: resolvedCompanyId })) || customer
             : explicitName
               ? { ...customer, displayName: explicitName, name: explicitName }
               : customer;
+
+    if (salesContextForTurn) {
+        refreshedCustomer = { ...refreshedCustomer, salesContext: salesContextForTurn };
+    }
 
     const customerDisplayName = getCustomerDisplayName(refreshedCustomer, {
         contactName,
@@ -270,6 +294,7 @@ async function processInboundMessage(job) {
         channel: outboundChannel,
         inboundMessage: text,
         schedulingContext,
+        salesContext: salesContextForTurn,
     };
 
     const aiTools = resolvedCompanyId ? getOpenAIToolDefinitions() : [];

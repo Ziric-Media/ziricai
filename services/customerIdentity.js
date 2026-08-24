@@ -98,4 +98,84 @@ export function getCustomerDisplayName(customer, { contactName = null, companyNa
     return null;
 }
 
+const SPOUSE_INTRO_PATTERNS = [
+    /\b(?:her\s+name\s+is|his\s+name\s+is)\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i,
+    /\b(?:my\s+(?:wife|husband|spouse|partner)(?:'s)?\s+name\s+is)\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i,
+    /\b(?:my\s+(?:wife|husband|spouse|partner))\s+is\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i,
+];
+
+const RELATIONSHIP_SPEAKER_PATTERNS = [
+    { pattern: /\bmy\s+wife\b/i, speaker: "wife" },
+    { pattern: /\bmy\s+husband\b/i, speaker: "husband" },
+    { pattern: /\bmy\s+spouse\b/i, speaker: "spouse" },
+    { pattern: /\bmy\s+partner\b/i, speaker: "partner" },
+];
+
+/**
+ * Parse a third-party person introduced in conversation (spouse, co-decision-maker).
+ * Does NOT treat spouse introductions as the primary customer's self-name.
+ * @param {string} text
+ * @returns {{ name: string, role: string, relationship: string }|null}
+ */
+export function parseIntroducedPerson(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return null;
+
+    const lower = raw.toLowerCase();
+    const isSpouseContext = /\b(wife|husband|spouse|partner)\b/.test(lower);
+
+    for (const pattern of SPOUSE_INTRO_PATTERNS) {
+        const match = raw.match(pattern);
+        const candidate = match?.[1]?.trim();
+        if (!candidate || candidate.length < 2 || candidate.length > 48) continue;
+        if (/^(here|there|good|fine|well|talk|speak|wants|want)$/i.test(candidate)) continue;
+
+        const relationship = /\bhusband\b/i.test(lower)
+            ? "husband"
+            : /\bwife\b/i.test(lower)
+              ? "wife"
+              : /\bpartner\b/i.test(lower)
+                ? "partner"
+                : "spouse";
+
+        return {
+            name: capitalizeWords(candidate),
+            role: "co-decision-maker",
+            relationship,
+        };
+    }
+
+    if (isSpouseContext && /\b(wants to talk|will join|should be there|decide together)\b/i.test(lower)) {
+        return { name: null, role: "co-decision-maker", relationship: "spouse" };
+    }
+
+    return null;
+}
+
+/**
+ * Detect when the message may be from or about a different household member on the same phone.
+ * @param {string} text
+ * @returns {string|null} descriptive active speaker hint
+ */
+export function parseRelationshipSpeaker(text) {
+    const raw = String(text || "");
+    for (const { pattern, speaker } of RELATIONSHIP_SPEAKER_PATTERNS) {
+        if (pattern.test(raw)) {
+            const introduced = parseIntroducedPerson(raw);
+            if (introduced?.name) return introduced.name;
+            return speaker;
+        }
+    }
+    if (/\bmy\s+husband\s+suggested\b/i.test(raw)) return "husband";
+    return null;
+}
+
+/**
+ * True when text introduces someone else — do not overwrite primary customer displayName.
+ * @param {string} text
+ */
+export function isThirdPartyIntroduction(text) {
+    return Boolean(parseIntroducedPerson(text)?.name || parseRelationshipSpeaker(text));
+}
+
 export { capitalizeWords as capitalizeCustomerName };

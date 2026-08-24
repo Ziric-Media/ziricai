@@ -17,6 +17,7 @@ import {
 } from "./customerIdentity.js";
 
 export { parseExplicitCustomerName, isLikelyCompanyName, getCustomerDisplayName } from "./customerIdentity.js";
+export { parseIntroducedPerson, parseRelationshipSpeaker, isThirdPartyIntroduction } from "./customerIdentity.js";
 
 const DEFAULT_FIELDS = {
     tags: [],
