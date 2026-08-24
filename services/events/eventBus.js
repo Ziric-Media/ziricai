@@ -57,6 +57,8 @@ export async function publish(companyId, type, payload = {}, options = {}) {
         enqueue({
             type: JOB_TYPES.PROCESS_EVENT,
             event,
+        }).catch((err) => {
+            console.error("[eventBus] Failed to enqueue PROCESS_EVENT:", err.message);
         });
         return event;
     }

@@ -115,12 +115,71 @@ export const firestoreAdapter = {
         if (!externalId) return false;
         const docId = processedInboundDocId(externalId);
         const admin = adminDb();
+        let data = null;
         if (admin) {
             const snap = await adminGetDoc(`${PROCESSED_INBOUND_COLLECTION}/${docId}`);
-            return snap.exists;
+            if (!snap.exists) return false;
+            data = snap.data();
+        } else {
+            const snap = await getDoc(doc(db, PROCESSED_INBOUND_COLLECTION, docId));
+            if (!snap.exists()) return false;
+            data = snap.data();
         }
-        const snap = await getDoc(doc(db, PROCESSED_INBOUND_COLLECTION, docId));
-        return snap.exists();
+        return Boolean(data?.processedAt || data?.status === "completed");
+    },
+
+    async tryClaimInboundMessage(externalId) {
+        if (!externalId) return true;
+        if (await this.isMessageProcessed(externalId)) return false;
+        const docId = processedInboundDocId(externalId);
+        const payload = {
+            externalId: String(externalId),
+            status: "claimed",
+            claimedAt: new Date().toISOString(),
+        };
+        const admin = adminDb();
+        if (admin) {
+            const snap = await adminGetDoc(`${PROCESSED_INBOUND_COLLECTION}/${docId}`);
+            if (snap.exists) {
+                const data = snap.data();
+                if (data?.processedAt || data?.status === "completed" || data?.status === "claimed") {
+                    return false;
+                }
+            }
+            await adminSetDoc(`${PROCESSED_INBOUND_COLLECTION}/${docId}`, payload, true);
+            return true;
+        }
+        const ref = doc(db, PROCESSED_INBOUND_COLLECTION, docId);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+            const data = snap.data();
+            if (data?.processedAt || data?.status === "completed" || data?.status === "claimed") {
+                return false;
+            }
+        }
+        await setDoc(ref, payload, { merge: true });
+        return true;
+    },
+
+    async releaseInboundClaim(externalId) {
+        if (!externalId) return null;
+        const docId = processedInboundDocId(externalId);
+        const admin = adminDb();
+        if (admin) {
+            const snap = await adminGetDoc(`${PROCESSED_INBOUND_COLLECTION}/${docId}`);
+            if (!snap.exists) return null;
+            const data = snap.data();
+            if (data?.processedAt || data?.status === "completed") return null;
+            await adminSetDoc(`${PROCESSED_INBOUND_COLLECTION}/${docId}`, { status: "released" }, true);
+            return true;
+        }
+        const ref = doc(db, PROCESSED_INBOUND_COLLECTION, docId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) return null;
+        const data = snap.data();
+        if (data?.processedAt || data?.status === "completed") return null;
+        await setDoc(ref, { status: "released" }, { merge: true });
+        return true;
     },
 
     async markMessageProcessed(externalId, meta = {}) {
@@ -128,6 +187,7 @@ export const firestoreAdapter = {
         const docId = processedInboundDocId(externalId);
         const payload = {
             externalId: String(externalId),
+            status: "completed",
             processedAt: new Date().toISOString(),
             ...meta,
         };

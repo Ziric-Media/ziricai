@@ -145,7 +145,7 @@ export async function getPlatformMetrics() {
         Promise.resolve(listPlatformCompanies()),
     ]);
 
-    const queue = getQueueStats();
+    const queue = await getQueueStats();
     const live = hasLiveData(conversations, customers) || platformCompanies.length > 0;
 
     if (!live) {

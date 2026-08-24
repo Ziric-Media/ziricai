@@ -29,7 +29,7 @@ export async function saveOutboundMessage(phone, text, options = {}) {
     return store.saveMessage(phone, "assistant", text, options);
 }
 
-/** Idempotency — skip duplicate Meta webhook deliveries (wamid). */
+/** Idempotency — skip duplicate Meta webhook deliveries (wamid) after worker success. */
 export async function isInboundMessageProcessed(externalId) {
     if (!externalId) return false;
     const store = await adapter();
@@ -37,6 +37,27 @@ export async function isInboundMessageProcessed(externalId) {
         return store.isMessageProcessed(externalId);
     }
     return false;
+}
+
+/** Claim wamid at ingest — prevents duplicate enqueue while job is in-flight. */
+export async function tryClaimInboundMessage(externalId) {
+    if (!externalId) return true;
+    const store = await adapter();
+    if (typeof store.tryClaimInboundMessage === "function") {
+        return store.tryClaimInboundMessage(externalId);
+    }
+    if (await isInboundMessageProcessed(externalId)) return false;
+    return true;
+}
+
+/** Release claim after permanent job failure so Meta retry can re-ingest. */
+export async function releaseInboundClaim(externalId) {
+    if (!externalId) return null;
+    const store = await adapter();
+    if (typeof store.releaseInboundClaim === "function") {
+        return store.releaseInboundClaim(externalId);
+    }
+    return null;
 }
 
 export async function markInboundMessageProcessed(externalId, meta = {}) {

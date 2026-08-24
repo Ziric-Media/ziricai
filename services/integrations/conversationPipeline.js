@@ -5,14 +5,14 @@ import {
     saveInboundMessage,
     upsertCustomerFromWhatsApp,
     isInboundMessageProcessed,
-    markInboundMessageProcessed,
+    tryClaimInboundMessage,
 } from "../conversationService.js";
 import { enqueue, JOB_TYPES } from "../queue/jobQueue.js";
 import { isValidUnifiedMessage } from "./types/unifiedMessage.js";
 import { logInfo, logError } from "./integrationLogger.js";
 import { publish, EventTypes } from "../events/index.js";
 import { upsertConversationMeta } from "../tenants/conversationService.js";
-import { getOrCreateConversation } from "../storage/tenantStorage.js";
+import { getOrCreateConversation, customerDocId, conversationDocId } from "../storage/tenantStorage.js";
 
 /**
  * Ingest a normalized UnifiedMessage into the existing conversation + queue pipeline.
@@ -38,6 +38,15 @@ export async function ingest(message) {
             externalIdPrefix: String(externalId).slice(0, 24),
         });
         return { success: true, duplicate: true, from, channel, companyId };
+    }
+
+    if (externalId && !(await tryClaimInboundMessage(externalId))) {
+        console.log("[whatsapp] Duplicate inbound skipped (in-flight)", {
+            companyId,
+            from,
+            externalIdPrefix: String(externalId).slice(0, 24),
+        });
+        return { success: true, duplicate: true, from, channel, companyId, inFlight: true };
     }
 
     logInfo(channel, companyId, "Pipeline ingest", {
@@ -89,7 +98,10 @@ export async function ingest(message) {
             await upsertCustomerFromWhatsApp(from, { contactName, companyId });
         }
 
-        enqueue({
+        const customerId = customerDocId(from);
+        const resolvedConversationId = companyId ? conversationDocId(customerId, channel) : null;
+
+        await enqueue({
             type: JOB_TYPES.PROCESS_INBOUND_MESSAGE,
             phone: from,
             from,
@@ -99,12 +111,11 @@ export async function ingest(message) {
             channel,
             timestamp: message.timestamp || new Date().toISOString(),
             companyId,
+            customerId,
+            conversationId: resolvedConversationId,
+            externalMessageId: externalId || null,
             externalId: externalId || null,
         });
-
-        if (externalId) {
-            await markInboundMessageProcessed(externalId, { from, companyId, channel });
-        }
 
         if (companyId && messageType === "text" && String(text || "").trim()) {
             await publish(companyId, EventTypes.MESSAGE_RECEIVED, {

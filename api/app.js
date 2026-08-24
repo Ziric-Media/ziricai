@@ -36,7 +36,7 @@ import {
     getTimeline,
     normalizePhone,
 } from "../services/customerService.js";
-import { getQueueStats } from "../services/queue/jobQueue.js";
+import { getQueueStats, initQueue } from "../services/queue/jobQueue.js";
 import { startMessageWorker } from "../services/queue/workers/messageWorker.js";
 import { isWhatsAppDevMode } from "../services/integrations/metaWhatsAppErrors.js";
 import { logRailwayEnvDiagnostics } from "../services/env/startupEnv.js";
@@ -187,7 +187,7 @@ async function healthHandler(req, res) {
             firestoreAdmin: hasAdminCredentials(),
             storageFallback: getStorageFallbackReason() || null,
             firebaseProjectId: process.env.FIREBASE_PROJECT_ID || "ziricai",
-            queue: getQueueStats(),
+            queue: await getQueueStats(),
             tenantScopeEnforcement: (process.env.TENANT_SCOPE_ENFORCEMENT || "lax").toLowerCase(),
             timestamp: new Date().toISOString(),
         });
@@ -1505,6 +1505,7 @@ export async function runBackgroundInit() {
         }
 
         startMessageWorker();
+        await initQueue();
         console.error("[startup] Storage backend:", adapter.name);
     } catch (err) {
         console.error("[startup] Background init error:", err.message);

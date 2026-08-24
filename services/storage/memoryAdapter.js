@@ -26,8 +26,10 @@ const supervisorReviews = new Map();
 const crmTemplateStore = new Map();
 const reportTemplateStore = new Map();
 const analyticsRollups = new Map();
-/** @type {Set<string>} Processed provider message ids (wamid) for webhook idempotency */
+/** @type {Set<string>} Completed provider message ids (wamid) */
 const processedInbound = new Set();
+/** @type {Set<string>} In-flight wamid claims (cleared on complete or permanent failure) */
+const inboundClaims = new Set();
 
 function now() {
     return new Date().toISOString();
@@ -52,9 +54,23 @@ export const memoryAdapter = {
         return processedInbound.has(String(externalId));
     },
 
+    async tryClaimInboundMessage(externalId) {
+        const id = String(externalId);
+        if (processedInbound.has(id) || inboundClaims.has(id)) return false;
+        inboundClaims.add(id);
+        return true;
+    },
+
+    async releaseInboundClaim(externalId) {
+        inboundClaims.delete(String(externalId));
+        return true;
+    },
+
     async markMessageProcessed(externalId, meta = {}) {
-        processedInbound.add(String(externalId));
-        return { externalId: String(externalId), processedAt: now(), ...meta };
+        const id = String(externalId);
+        processedInbound.add(id);
+        inboundClaims.delete(id);
+        return { externalId: id, processedAt: now(), ...meta };
     },
 
     async saveMessage(phone, role, message, options = {}) {

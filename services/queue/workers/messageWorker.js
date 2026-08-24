@@ -31,7 +31,7 @@ import { captureLeadFromMessage } from "../../tenants/crmService.js";
 
 import { superviseReply } from "../../intelligence/aiSupervisor.js";
 
-import { JOB_TYPES, registerJobHandler } from "../jobQueue.js";
+import { JOB_TYPES, registerJobHandler, markJobOutboundSent } from "../jobQueue.js";
 
 const NON_TEXT_REPLY = "Please send a text message so I can help you.";
 
@@ -39,12 +39,27 @@ async function sendViaIntegration(channel, companyId, to, text) {
     return integrationSend(channel || "whatsapp", { companyId }, { to, text });
 }
 
-async function trySendOutbound(channel, companyId, to, text, responseSource = "ai") {
+async function trySendOutbound(job, channel, companyId, to, text, responseSource = "ai") {
+    if (job.outboundSent && job.outboundMetaMessageId) {
+        console.log("[whatsapp] Outbound already sent (idempotent skip)", {
+            jobId: job.id,
+            companyId,
+            to,
+            responseSource,
+            metaMessageIdPrefix: String(job.outboundMetaMessageId).slice(0, 24),
+        });
+        return job.outboundMetaMessageId;
+    }
+
     try {
         const result = await sendViaIntegration(channel, companyId, to, text);
         const metaMessageId = result?.messages?.[0]?.id || null;
         if (metaMessageId) {
+            await markJobOutboundSent(job.id, metaMessageId);
+            job.outboundSent = true;
+            job.outboundMetaMessageId = metaMessageId;
             console.log("[whatsapp] Outbound sent", {
+                jobId: job.id,
                 companyId,
                 to,
                 responseSource,
@@ -54,6 +69,7 @@ async function trySendOutbound(channel, companyId, to, text, responseSource = "a
         return metaMessageId;
     } catch (err) {
         console.warn("[whatsapp] Outbound send failed (inbound processing continues):", {
+            jobId: job.id,
             companyId,
             to,
             responseSource,
@@ -79,7 +95,7 @@ async function processInboundMessage(job) {
     });
 
     if (messageType !== "text" || !String(text || "").trim()) {
-        const metaMessageId = await trySendOutbound(outboundChannel, companyId, sender, NON_TEXT_REPLY, "fallback");
+        const metaMessageId = await trySendOutbound(job, outboundChannel, companyId, sender, NON_TEXT_REPLY, "fallback");
         await saveOutboundMessage(sender, NON_TEXT_REPLY, {
             channel: outboundChannel,
             companyId,
@@ -173,7 +189,7 @@ async function processInboundMessage(job) {
         knowledgeContext: knowledgeParts.join("\n\n"),
     });
 
-    const metaMessageId = await trySendOutbound(outboundChannel, resolvedCompanyId, sender, reply, "ai");
+    const metaMessageId = await trySendOutbound(job, outboundChannel, resolvedCompanyId, sender, reply, "ai");
     await saveOutboundMessage(sender, reply, {
         channel: outboundChannel,
         companyId: resolvedCompanyId,

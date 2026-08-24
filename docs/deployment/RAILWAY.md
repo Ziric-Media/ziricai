@@ -49,6 +49,7 @@ Copy from `.env.example`. **Minimum for a healthy deploy today:**
 | `ZIRICAI_ROOT_URL` | `https://ziricai.com` — apex CORS |
 | `DEFAULT_COMPANY_ID` | Auto-provision tenant on startup |
 | `QUEUE_CONCURRENCY` | Default `1` |
+| `DATABASE_URL` | Postgres plugin — enables durable job queue ([QUEUE.md](./QUEUE.md)) |
 | `OPENAI_MODEL` | Default `gpt-4o-mini` |
 | `MFA_ENFORCEMENT` | Default `off` |
 
