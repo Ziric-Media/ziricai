@@ -175,8 +175,8 @@ async function main() {
         scheduledAt: futureSlotIso(7, 11),
     });
     assert(unavailable.ok === false, "sold vehicle should fail");
-    assert(unavailable.code === "UNAVAILABLE", `Expected UNAVAILABLE, got ${unavailable.code}`);
-    assert(Array.isArray(unavailable.alternatives), "alternatives offered for unavailable vehicle");
+    assert(unavailable.code === "INVENTORY_UNAVAILABLE", `Expected INVENTORY_UNAVAILABLE, got ${unavailable.code}`);
+    assert(Array.isArray(unavailable.alternatives?.vehicles), "alternatives offered for unavailable vehicle");
     console.log("✓ unavailable vehicle rejected with alternatives");
 
     /* 6. invalid vehicle */
@@ -216,7 +216,8 @@ async function main() {
     const defs = getOpenAIToolDefinitions();
     assert(defs.some((d) => d.function.name === "searchInventory"), "searchInventory registered");
     assert(defs.some((d) => d.function.name === "bookTestDrive"), "bookTestDrive registered");
-    console.log("✓ both tools exposed for OpenAI function calling");
+    assert(defs.some((d) => d.function.name === "checkTestDriveAvailability"), "checkTestDriveAvailability registered");
+    console.log("✓ inventory + scheduling tools exposed for OpenAI function calling");
 
     console.log("\nAll inventory ↔ booking verification checks passed.");
 }

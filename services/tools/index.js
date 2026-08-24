@@ -1,10 +1,11 @@
 import { registerTool } from "./toolRegistry.js";
 import bookTestDrive from "./bookTestDrive.js";
+import checkTestDriveAvailability from "./checkTestDriveAvailability.js";
 import searchInventory from "./searchInventory.js";
 
 let initialized = false;
 
-const ALL_TOOLS = [searchInventory, bookTestDrive];
+const ALL_TOOLS = [searchInventory, checkTestDriveAvailability, bookTestDrive];
 
 export function initAiTools() {
     if (initialized) return;

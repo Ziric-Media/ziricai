@@ -23,15 +23,21 @@ INVENTORY & STOCK RULES:
 - Do NOT use knowledge context alone for specific vehicle listings when searchInventory is available.
 `.trim();
 
-/** Real booking tools — generic for any tenant with inventory + bookTestDrive. */
+/** Real booking tools — generic for any tenant with inventory + test-drive scheduling. */
 export const WHATSAPP_ACTION_TOOL_RULES = `
 ACTION TOOLS (real bookings):
 - When a customer asks about vehicles, call searchInventory first.
-- When a customer wants to book a test drive, use bookTestDrive with vehicleId from searchInventory (preferred) or stock number, plus their preferred date/time.
+- Test-drive flow: searchInventory → checkTestDriveAvailability → bookTestDrive. Use the same vehicleId throughout.
+- When a customer wants to book a test drive, call checkTestDriveAvailability BEFORE bookTestDrive.
+- If the customer gives a date but no time, call checkTestDriveAvailability with date only — it returns NEED_TIME. Ask for their preferred time; do NOT assume 10 AM or any default time unless they already said it in the conversation.
+- If the customer asks for "any Hilux on Friday" (or similar), call checkTestDriveAvailability with query/make/model + date — NOT searchInventory alone. Only offer vehicles that have open test-drive slots.
+- bookTestDrive requires both date AND time in scheduledAt. Never call bookTestDrive until the customer has chosen a time.
+- Prefer vehicleId from searchInventory when booking; stock number is a fallback only.
 - If the customer refers to a vehicle you recommended earlier ("book the Hilux"), use vehicleId from the prior search or vehicleHint to match conversation context.
-- NEVER tell the customer a test drive is booked unless bookTestDrive returns ok/success.
-- If the tool fails (slot full, outside hours, unavailable vehicle, invalid vehicle), explain politely and offer alternative times or vehicles from tool results.
-- Do not simulate or pretend a booking was made — only confirm after a successful tool result.
+- Distinguish inventory status (sold/in stock) from test-drive slot availability — use tool codes/reasons, do not conflate them in your reply.
+- NEVER tell the customer a test drive is booked unless bookTestDrive returns ok/success with an appointment.
+- If a tool fails (NEED_TIME, SLOT_FULL, OUTSIDE_HOURS, INVENTORY_UNAVAILABLE, INVALID_VEHICLE), explain politely and offer alternatives from tool results (suggestedSlots, alternatives.vehicles).
+- Do not simulate or pretend a booking was made — only confirm after a successful bookTestDrive result.
 `.trim();
 
 /** Dev-only fallback identity when no AI employee is provisioned yet. */

@@ -2,11 +2,9 @@
  * bookTestDrive — real test drive booking with availability, idempotency, and Postgres persistence.
  * Resolves vehicles via canonical inventoryService (vehicleId primary, stockNumber fallback).
  */
-import { createAppointmentRecord, countAppointmentsInSlot } from "../database/appointmentRepository.js";
+import { createAppointmentRecord } from "../database/appointmentRepository.js";
 import {
     resolveVehicle,
-    isVehicleAvailable,
-    listAlternatives,
     normalizeStockNumber,
     vehicleToPublic,
 } from "../inventory/inventoryService.js";
@@ -14,14 +12,8 @@ import { getRecommendedVehicles, pickFromRecommended } from "../conversation/rec
 import { publish, EventTypes } from "../events/index.js";
 import { addTimelineEvent } from "../customerService.js";
 import { buildIdempotencyKey } from "./toolRunner.js";
-import {
-    parseScheduledAt,
-    normalizeToSlotStart,
-    slotEnd,
-    isWithinBusinessHours,
-    formatSlotLabel,
-    getMaxConcurrentPerSlot,
-} from "./availability.js";
+import { formatSlotLabel, parseScheduledAt } from "./availability.js";
+import { evaluateTestDriveAvailability } from "./testDriveAvailability.js";
 
 async function resolveBookingVehicle(ctx, args) {
     const { companyId, customerPhone, channel } = ctx;
@@ -56,21 +48,6 @@ async function resolveBookingVehicle(ctx, args) {
         };
     }
 
-    if (!isVehicleAvailable(vehicle)) {
-        const alternatives = await listAlternatives(companyId, {
-            make: vehicle.make,
-            model: vehicle.model,
-            excludeVehicleId: vehicle.vehicleId,
-        });
-        return {
-            valid: false,
-            code: "UNAVAILABLE",
-            error: `Vehicle ${vehicle.title || vehicle.stockNumber} is no longer available for test drive.`,
-            vehicle: vehicleToPublic(vehicle),
-            alternatives,
-        };
-    }
-
     return {
         valid: true,
         vehicle,
@@ -83,7 +60,8 @@ async function resolveBookingVehicle(ctx, args) {
 export default {
     name: "bookTestDrive",
     description:
-        "Book a test drive for a customer. Prefer vehicleId from searchInventory results; stockNumber is a fallback. Only confirm booking after this tool returns success.",
+        "Book a test drive for a customer. Call checkTestDriveAvailability first. Prefer vehicleId from searchInventory. " +
+        "Only confirm booking after this tool returns ok/success with a persisted appointment.",
     parameters: {
         type: "object",
         properties: {
@@ -101,7 +79,7 @@ export default {
             },
             scheduledAt: {
                 type: "string",
-                description: "Preferred date and time — ISO 8601 (2026-08-25T14:00:00) or natural language (tomorrow 2pm)",
+                description: "Preferred date AND time — ISO 8601 (2026-08-25T14:00:00) or natural language (Friday 2pm). Time is required.",
             },
             customerName: {
                 type: "string",
@@ -132,7 +110,6 @@ export default {
                 ok: false,
                 error: vehicleCheck.error,
                 code: vehicleCheck.code,
-                alternatives: vehicleCheck.alternatives,
                 vehicle: vehicleCheck.vehicle,
             };
         }
@@ -144,30 +121,25 @@ export default {
             return { ok: false, error: err.message, code: "INVALID_DATETIME" };
         }
 
-        if (scheduledAt.getTime() < Date.now() - 5 * 60 * 1000) {
-            return { ok: false, error: "Cannot book a test drive in the past.", code: "PAST_SLOT" };
-        }
+        const availability = await evaluateTestDriveAvailability(companyId, {
+            vehicleId: vehicleCheck.vehicleId,
+            stockNumber: vehicleCheck.stockNumber,
+            scheduledAt: args.scheduledAt,
+        });
 
-        if (!isWithinBusinessHours(scheduledAt)) {
+        if (!availability.available) {
             return {
                 ok: false,
-                error: "That time is outside business hours (Mon–Sat, 9:00–17:00). Please choose another slot.",
-                code: "OUTSIDE_HOURS",
+                error: availability.reason,
+                code: availability.code,
+                needsTime: availability.needsTime === true,
+                vehicle: availability.vehicle || vehicleToPublic(vehicleCheck.vehicle),
+                alternatives: availability.alternatives,
+                suggestedSlots: availability.suggestedSlots,
             };
         }
 
-        const slotStart = normalizeToSlotStart(scheduledAt);
-        const slotEndTime = slotEnd(slotStart);
-        const concurrent = await countAppointmentsInSlot(companyId, slotStart, slotEndTime);
-
-        if (concurrent >= getMaxConcurrentPerSlot()) {
-            return {
-                ok: false,
-                error: `That time slot is fully booked. Please suggest another time around ${formatSlotLabel(slotStart)}.`,
-                code: "SLOT_FULL",
-            };
-        }
-
+        const slotStart = new Date(availability.slotStart);
         const idempotencyKey = buildIdempotencyKey({
             companyId,
             customerId,
