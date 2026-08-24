@@ -313,6 +313,48 @@ async function main() {
     assert(defs.some((d) => d.function.name === "searchInventory"), "searchInventory still registered");
     console.log("✓ checkTestDriveAvailability exposed for OpenAI function calling");
 
+    /* 13. "available Friday" must not use searchInventory (wrong tool guard) */
+    const { isTestDriveAvailabilityQuery } = await import("../services/conversation/schedulingContext.js");
+    assert(isTestDriveAvailabilityQuery("which vehicles can I test-drive on Friday"), "Friday test-drive query detected");
+    const wrongTool = await runTool("searchInventory", { ...ctx, inboundMessage: "which Hilux are available on Friday?" }, {
+        query: "Hilux",
+    });
+    assert(wrongTool.code === "WRONG_TOOL", `Expected WRONG_TOOL, got ${wrongTool.code}`);
+    assert(wrongTool.suggestedTool === "checkTestDriveAvailability", "suggests checkTestDriveAvailability");
+    const slotCheckFriday = await runTool("checkTestDriveAvailability", ctx, {
+        query: "Hilux",
+        date: nextWeekdayName(4),
+    });
+    assert(slotCheckFriday.code === "NEED_TIME", "Friday slot check returns NEED_TIME not inventory count");
+    console.log("✓ 13. available Friday uses slot check, not searchInventory");
+
+    /* 14. scheduling context preserves Friday across turns */
+    const {
+        extractSchedulingFromText,
+        getSchedulingContext,
+        saveSchedulingContext,
+        enrichToolArgsWithScheduling,
+    } = await import("../services/conversation/schedulingContext.js");
+    const fridayLabel = nextWeekdayName(4);
+    const fridayExtract = extractSchedulingFromText(`lets work on ${fridayLabel.toLowerCase()}`);
+    assert(fridayExtract.pendingDate, "Friday extracted from customer message");
+    await saveSchedulingContext(companyId, customerId, "whatsapp", fridayExtract);
+    const followUpCtx = {
+        ...ctx,
+        inboundMessage: "choose for me for any that can be available on that day",
+        schedulingContext: await getSchedulingContext(companyId, customerId, "whatsapp"),
+    };
+    const enriched = enrichToolArgsWithScheduling(
+        "checkTestDriveAvailability",
+        { query: "Hilux" },
+        followUpCtx.schedulingContext
+    );
+    assert(enriched.date, "Friday date injected from conversation context");
+    const contextCheck = await runTool("checkTestDriveAvailability", followUpCtx, enriched);
+    assert(contextCheck.code === "NEED_TIME", `context Friday check NEED_TIME, got ${contextCheck.code}`);
+    assert(contextCheck.needsTime === true, "asks for time, does not assume 10 AM");
+    console.log("✓ 14. Friday from context preserved — NEED_TIME without default time");
+
     console.log("\nAll test-drive availability checks passed.");
 }
 

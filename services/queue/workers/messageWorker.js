@@ -27,6 +27,12 @@ import { getCompany } from "../../tenants/companyService.js";
 import { getDefaultAiEmployee } from "../../tenants/aiEmployeeService.js";
 import { customerDocId, conversationDocId } from "../../storage/tenantStorage.js";
 import { initAiTools, getOpenAIToolDefinitions, runTool } from "../../tools/index.js";
+import {
+    extractSchedulingFromText,
+    formatSchedulingContextForPrompt,
+    getSchedulingContext,
+    saveSchedulingContext,
+} from "../../conversation/schedulingContext.js";
 
 import { captureLeadFromMessage } from "../../tenants/crmService.js";
 
@@ -185,7 +191,22 @@ async function processInboundMessage(job) {
         contactName,
     });
 
-    const knowledgeParts = [knowledgeBundle.context || "", memoryContext || ""].filter(Boolean);
+    let schedulingContext =
+        resolvedCompanyId && sender
+            ? await getSchedulingContext(resolvedCompanyId, sender, outboundChannel)
+            : {};
+    const extractedScheduling = extractSchedulingFromText(text);
+    if (resolvedCompanyId && sender && Object.keys(extractedScheduling).length) {
+        schedulingContext = await saveSchedulingContext(
+            resolvedCompanyId,
+            sender,
+            outboundChannel,
+            extractedScheduling
+        );
+    }
+
+    const schedulingPrompt = formatSchedulingContextForPrompt(schedulingContext);
+    const knowledgeParts = [knowledgeBundle.context || "", memoryContext || "", schedulingPrompt].filter(Boolean);
 
     const toolCtx = {
         companyId: resolvedCompanyId,
@@ -194,6 +215,8 @@ async function processInboundMessage(job) {
         customerName: contactName || customer?.name,
         agentId: agent?.id || null,
         channel: outboundChannel,
+        inboundMessage: text,
+        schedulingContext,
     };
 
     const aiTools = resolvedCompanyId ? getOpenAIToolDefinitions() : [];

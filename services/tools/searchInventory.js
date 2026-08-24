@@ -64,7 +64,7 @@ export default {
             message:
                 vehicles.length === 0
                     ? "No vehicles matched that search. Try broader terms or ask about alternatives."
-                    : `Found ${vehicles.length} vehicle${vehicles.length === 1 ? "" : "s"}.`,
+                    : `Inventory search returned ${vehicles.length} vehicle${vehicles.length === 1 ? "" : "s"}. Describe matches using vehicle details below.`,
         };
     },
 };

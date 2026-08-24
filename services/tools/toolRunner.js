@@ -4,6 +4,12 @@
 import { createHash } from "crypto";
 import { getTool } from "./toolRegistry.js";
 import { normalizeToSlotStart } from "./availability.js";
+import {
+    enrichToolArgsWithScheduling,
+    isTestDriveAvailabilityQuery,
+    schedulingUpdatesFromToolResult,
+    saveSchedulingContext,
+} from "../conversation/schedulingContext.js";
 
 /**
  * @param {object} params
@@ -67,10 +73,44 @@ export async function runTool(name, ctx, args = {}) {
         }
     }
 
+    if (name === "searchInventory" && isTestDriveAvailabilityQuery(ctx.inboundMessage)) {
+        return {
+            success: false,
+            ok: false,
+            tool: name,
+            code: "WRONG_TOOL",
+            error:
+                "Customer is asking about test-drive slot availability on a date, not inventory stock. " +
+                "Use checkTestDriveAvailability with date (and query/make/model if needed) instead of searchInventory.",
+            suggestedTool: "checkTestDriveAvailability",
+        };
+    }
+
+    const scheduling = ctx.schedulingContext || {};
+    const enrichedArgs = enrichToolArgsWithScheduling(name, args, scheduling);
+
     try {
-        const result = await tool.execute(enrichedCtx, args);
+        const result = await tool.execute(enrichedCtx, enrichedArgs);
         const ok = result.ok !== false && result.success !== false;
-        return { success: ok, ok, tool: name, ...result };
+        const payload = { success: ok, ok, tool: name, ...result };
+
+        if (ctx.customerPhone && (name === "checkTestDriveAvailability" || name === "bookTestDrive")) {
+            const schedUpdates = schedulingUpdatesFromToolResult(name, enrichedArgs, result);
+            if (Object.keys(schedUpdates).length) {
+                try {
+                    await saveSchedulingContext(
+                        ctx.companyId,
+                        ctx.customerPhone,
+                        ctx.channel || "whatsapp",
+                        schedUpdates
+                    );
+                } catch {
+                    /* scheduling meta optional */
+                }
+            }
+        }
+
+        return payload;
     } catch (err) {
         console.error(`[tools] ${name} failed:`, err.message);
         return {

@@ -7,6 +7,8 @@
  * @property {string} [agentId]
  * @property {string} [channel]
  * @property {object[]} [lastRecommendedVehicles] — from conversation meta / searchInventory
+ * @property {string} [inboundMessage] — current customer message (tool routing hints)
+ * @property {{ pendingDate?: string, pendingTime?: boolean, lastMentionedDate?: string, lastMentionedTime?: string }} [schedulingContext]
  */
 
 /**

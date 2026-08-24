@@ -147,11 +147,24 @@ export async function askAIWithTools(message, options = {}) {
         }
 
         if (!reply && toolResults.length) {
-            const lastOk = [...toolResults].reverse().find((r) => r.ok || r.success);
+            const skipFallbackMessage = (m) =>
+                !m ||
+                /^Found \d+ vehicles?\.?$/.test(m) ||
+                /^Inventory search returned \d+ vehicle/.test(m);
+
+            const lastOk = [...toolResults]
+                .reverse()
+                .find((r) => (r.ok || r.success) && r.message && !skipFallbackMessage(r.message));
+
             if (lastOk?.message) {
                 reply = lastOk.message;
             } else {
-                reply = toolResults.map((r) => r.message || r.error).filter(Boolean).join("\n\n");
+                const needTime = toolResults.find((r) => r.code === "NEED_TIME");
+                if (needTime?.reason) {
+                    reply = needTime.reason;
+                } else {
+                    reply = toolResults.map((r) => r.message || r.error).filter(Boolean).join("\n\n");
+                }
             }
         }
         if (!reply) reply = "Sorry, I couldn't generate a reply.";
