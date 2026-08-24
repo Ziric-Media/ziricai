@@ -22,7 +22,8 @@
         "verify:webhook": "node scripts/verify-webhook.js",
         "verify:whatsapp-integration": "node scripts/verify-whatsapp-integration.js",
         "verify:tenant-isolation": "node scripts/verify-tenant-isolation.js",
-        "test": "node scripts/verify-tenant-isolation.js && node scripts/verify-whatsapp-integration.js && node scripts/verify-queue-durable.js",
+        "verify:book-test-drive": "node scripts/verify-book-test-drive.js",
+        "test": "node scripts/verify-tenant-isolation.js && node scripts/verify-whatsapp-integration.js && node scripts/verify-queue-durable.js && node scripts/verify-book-test-drive.js",
         "test:queue": "node scripts/verify-queue-durable.js",
         "build:knowledge": "node scripts/build-knowledge-bundle.js",
         "seed:knowledge": "node scripts/seed-knowledge-content.js"

@@ -1,4 +1,4 @@
-import { askAI } from "../../openai.js";
+import { askAI, askAIWithTools } from "../../openai.js";
 
 import { sendWhatsAppTypingIndicator } from "../../whatsapp.js";
 
@@ -26,6 +26,7 @@ import {
 import { getCompany } from "../../tenants/companyService.js";
 import { getDefaultAiEmployee } from "../../tenants/aiEmployeeService.js";
 import { customerDocId, conversationDocId } from "../../storage/tenantStorage.js";
+import { initAiTools, getOpenAIToolDefinitions, runTool } from "../../tools/index.js";
 
 import { captureLeadFromMessage } from "../../tenants/crmService.js";
 
@@ -34,6 +35,8 @@ import { superviseReply } from "../../intelligence/aiSupervisor.js";
 import { JOB_TYPES, registerJobHandler, markJobOutboundSent } from "../jobQueue.js";
 
 const NON_TEXT_REPLY = "Please send a text message so I can help you.";
+
+initAiTools();
 
 async function sendViaIntegration(channel, companyId, to, text) {
     return integrationSend(channel || "whatsapp", { companyId }, { to, text });
@@ -183,11 +186,49 @@ async function processInboundMessage(job) {
     });
 
     const knowledgeParts = [knowledgeBundle.context || "", memoryContext || ""].filter(Boolean);
-    const reply = await askAI(text, {
-        history,
-        systemPrompt,
-        knowledgeContext: knowledgeParts.join("\n\n"),
-    });
+
+    const toolCtx = {
+        companyId: resolvedCompanyId,
+        customerId,
+        customerPhone: sender,
+        customerName: contactName || customer?.name,
+        agentId: agent?.id || null,
+        channel: outboundChannel,
+    };
+
+    const aiTools = resolvedCompanyId ? getOpenAIToolDefinitions() : [];
+    let reply;
+    let toolResults = [];
+
+    if (aiTools.length && resolvedCompanyId) {
+        const aiResult = await askAIWithTools(text, {
+            history,
+            systemPrompt,
+            knowledgeContext: knowledgeParts.join("\n\n"),
+            tools: aiTools,
+            executeTool: (name, args) => runTool(name, toolCtx, args),
+        });
+        reply = aiResult.reply;
+        toolResults = aiResult.toolResults || [];
+    } else {
+        reply = await askAI(text, {
+            history,
+            systemPrompt,
+            knowledgeContext: knowledgeParts.join("\n\n"),
+        });
+    }
+
+    if (toolResults.length) {
+        console.log("[whatsapp] AI tool results", {
+            companyId: resolvedCompanyId,
+            customerId,
+            tools: toolResults.map((r) => ({
+                tool: r.tool,
+                ok: r.ok ?? r.success,
+                code: r.code || null,
+            })),
+        });
+    }
 
     const metaMessageId = await trySendOutbound(job, outboundChannel, resolvedCompanyId, sender, reply, "ai");
     await saveOutboundMessage(sender, reply, {

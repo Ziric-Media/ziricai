@@ -16,17 +16,7 @@ if (process.env.OPENAI_API_KEY) {
 const FALLBACK_SYSTEM_PROMPT = `You are a professional customer service assistant on WhatsApp.
 Be friendly, helpful, and concise. Never mention webhooks, verification, testing, or platform setup.`;
 
-export async function askAI(message, options = {}) {
-    const userText = (message || "").trim();
-    if (!userText) {
-        return "I didn't catch that. Please send a text message.";
-    }
-
-    if (!openai) {
-        console.error("[openai] OPENAI_API_KEY is not set");
-        return "Sorry, I'm not configured to respond right now.";
-    }
-
+function buildChatMessages(userText, options = {}) {
     const { systemPrompt = "", knowledgeContext = "", history = [], context } = options;
     const resolvedKnowledge = knowledgeContext || context || "";
     const systemParts = [(systemPrompt || FALLBACK_SYSTEM_PROMPT).trim()];
@@ -44,6 +34,21 @@ export async function askAI(message, options = {}) {
         });
     }
     chatMessages.push({ role: "user", content: userText });
+    return chatMessages;
+}
+
+export async function askAI(message, options = {}) {
+    const userText = (message || "").trim();
+    if (!userText) {
+        return "I didn't catch that. Please send a text message.";
+    }
+
+    if (!openai) {
+        console.error("[openai] OPENAI_API_KEY is not set");
+        return "Sorry, I'm not configured to respond right now.";
+    }
+
+    const chatMessages = buildChatMessages(userText, options);
 
     try {
         const response = await openai.chat.completions.create({
@@ -64,5 +69,96 @@ export async function askAI(message, options = {}) {
             console.error("[openai] Response:", JSON.stringify(error.response.data));
         }
         return "Sorry, I'm having trouble responding right now.";
+    }
+}
+
+/**
+ * Chat completion with OpenAI tool calling — executes tools and returns final reply.
+ * @param {string} message
+ * @param {object} options
+ * @param {object[]} [options.tools] OpenAI tool definitions
+ * @param {(name: string, args: object) => Promise<object>} [options.executeTool]
+ * @param {number} [options.maxToolRounds]
+ * @returns {Promise<{ reply: string, toolResults: object[] }>}
+ */
+export async function askAIWithTools(message, options = {}) {
+    const userText = (message || "").trim();
+    if (!userText) {
+        return { reply: "I didn't catch that. Please send a text message.", toolResults: [] };
+    }
+
+    if (!openai) {
+        console.error("[openai] OPENAI_API_KEY is not set");
+        return { reply: "Sorry, I'm not configured to respond right now.", toolResults: [] };
+    }
+
+    const {
+        tools = [],
+        executeTool,
+        maxToolRounds = 3,
+    } = options;
+
+    let currentMessages = buildChatMessages(userText, options);
+    const toolResults = [];
+    let reply = "";
+
+    try {
+        let round = 0;
+        while (round < maxToolRounds) {
+            const response = await openai.chat.completions.create({
+                model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+                messages: currentMessages,
+                tools: tools.length ? tools : undefined,
+                tool_choice: tools.length ? "auto" : undefined,
+                max_tokens: 500,
+            });
+
+            const choice = response.choices[0]?.message;
+            if (!choice) break;
+
+            if (choice.tool_calls?.length && executeTool) {
+                currentMessages.push(choice);
+
+                for (const call of choice.tool_calls) {
+                    const fnName = call.function.name;
+                    let fnArgs = {};
+                    try {
+                        fnArgs = JSON.parse(call.function.arguments || "{}");
+                    } catch {
+                        fnArgs = {};
+                    }
+
+                    const result = await executeTool(fnName, fnArgs);
+                    toolResults.push(result);
+
+                    currentMessages.push({
+                        role: "tool",
+                        tool_call_id: call.id,
+                        content: JSON.stringify(result),
+                    });
+                }
+
+                round++;
+                continue;
+            }
+
+            reply = (choice.content || "").trim();
+            break;
+        }
+
+        if (!reply && toolResults.length) {
+            const lastOk = [...toolResults].reverse().find((r) => r.ok || r.success);
+            if (lastOk?.message) {
+                reply = lastOk.message;
+            } else {
+                reply = toolResults.map((r) => r.message || r.error).filter(Boolean).join("\n\n");
+            }
+        }
+        if (!reply) reply = "Sorry, I couldn't generate a reply.";
+
+        return { reply, toolResults };
+    } catch (error) {
+        console.error("[openai] API error (tools):", error.status || error.code, error.message);
+        return { reply: "Sorry, I'm having trouble responding right now.", toolResults };
     }
 }

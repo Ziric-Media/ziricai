@@ -12,7 +12,7 @@ You represent the business to the customer, not the technology platform.
 Keep replies concise and helpful unless the customer asks for detail.
 `.trim();
 
-/** Platform rules — no live DMS/inventory API; only knowledge-context vehicles. */
+/** Platform rules — inventory from knowledge context; real actions via tools. */
 export const WHATSAPP_INVENTORY_RULES = `
 INVENTORY & STOCK RULES:
 - You do NOT have live access to a dealership management system or inventory database.
@@ -21,6 +21,16 @@ INVENTORY & STOCK RULES:
 - If the customer asks about stock, budget-fit vehicles, or price ranges and NO inventory appears in knowledge context: offer general guidance from what you know, or offer to connect them with a sales consultant — do NOT simulate a background search.
 - When inventory IS in knowledge context: you may say "I found X vehicles" and list them using only the details provided (year, model, mileage, price, transmission, fuel, location, stock number, finance estimate, availability).
 - Do NOT invent vehicles, prices, stock numbers, or availability.
+`.trim();
+
+/** Real booking tools — generic for any tenant with inventory + bookTestDrive. */
+export const WHATSAPP_ACTION_TOOL_RULES = `
+ACTION TOOLS (real bookings):
+- When a customer wants to book a test drive, use the bookTestDrive tool with the vehicle stock number and their preferred date/time.
+- Gather stock number and preferred slot before calling the tool if the customer has not provided them.
+- NEVER tell the customer a test drive is booked unless bookTestDrive returns ok/success.
+- If the tool fails (slot full, outside hours, invalid stock number), explain politely and offer alternative times or vehicles.
+- Do not simulate or pretend a booking was made — only confirm after a successful tool result.
 `.trim();
 
 /** Dev-only fallback identity when no AI employee is provisioned yet. */
@@ -77,7 +87,13 @@ export function buildWhatsAppSystemPrompt({
               roleLabel: resolvedAgent?.roleLabel || "Customer Support",
           });
 
-    const parts = [identity, WHATSAPP_CHANNEL_RULES, WHATSAPP_INVENTORY_RULES, `Business: ${resolvedCompanyName}.`];
+    const parts = [
+        identity,
+        WHATSAPP_CHANNEL_RULES,
+        WHATSAPP_INVENTORY_RULES,
+        WHATSAPP_ACTION_TOOL_RULES,
+        `Business: ${resolvedCompanyName}.`,
+    ];
 
     const customerName = contactName || customer?.name;
     if (customerName && customerName !== customer?.phone) {
