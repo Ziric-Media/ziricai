@@ -229,6 +229,60 @@ function mergeHousehold(existing = [], incoming = []) {
  * @param {object[]} vehicles
  * @param {{ reason?: string, requirements?: string[] }} [meta]
  */
+export function buildInventoryRecommendationReason(vehicle) {
+    if (!vehicle) return null;
+    const parts = [];
+    const label = vehicle.year || vehicle.title || vehicle.label || "This vehicle";
+    if (vehicle.year) parts.push(`${vehicle.year} model`);
+    if (vehicle.mileage != null) parts.push(`${Number(vehicle.mileage).toLocaleString("en-ZA")} km`);
+    if (vehicle.price != null) parts.push(`R${Number(vehicle.price).toLocaleString("en-ZA")}`);
+    if (vehicle.location) parts.push(`at ${vehicle.location}`);
+    if (!parts.length) return null;
+    return `${label}: ${parts.join(", ")}`;
+}
+
+/**
+ * Compare locations across recommended/booked vehicles — warn when they differ.
+ * @param {object[]} vehicles
+ */
+export function compareRecommendedVehicleLocations(vehicles = []) {
+    const located = (vehicles || [])
+        .filter((v) => v?.location)
+        .map((v) => ({
+            vehicleId: v.vehicleId,
+            title: v.title || v.label || [v.year, v.make, v.model].filter(Boolean).join(" "),
+            year: v.year,
+            location: String(v.location).trim(),
+        }));
+
+    if (located.length < 2) {
+        return { sameLocation: true, locations: [...new Set(located.map((v) => v.location))], warning: null };
+    }
+
+    const unique = [...new Set(located.map((v) => v.location.toLowerCase()))];
+    if (unique.length <= 1) {
+        return { sameLocation: true, locations: unique, warning: null };
+    }
+
+    const detail = located.map((v) => `${v.year || v.title} is ${v.location}`).join("; ");
+    return {
+        sameLocation: false,
+        locations: unique,
+        warning: `These vehicles are at different locations — verify before agreeing they are at the same place: ${detail}.`,
+        details: located,
+    };
+}
+
+/**
+ * Format location mismatch guidance for prompt injection.
+ * @param {object[]} vehicles
+ */
+export function formatLocationComparisonForPrompt(vehicles = []) {
+    const cmp = compareRecommendedVehicleLocations(vehicles);
+    if (cmp.sameLocation || !cmp.warning) return "";
+    return `LOCATION VERIFICATION (from inventory): ${cmp.warning}`;
+}
+
 export function buildRecommendedVehicleRecords(vehicles = [], { reason, requirements } = {}) {
     const now = new Date().toISOString();
     return vehicles
@@ -239,8 +293,10 @@ export function buildRecommendedVehicleRecords(vehicles = [], { reason, requirem
             title: v.title || v.label || [v.year, v.make, v.model].filter(Boolean).join(" "),
             make: v.make,
             model: v.model,
+            year: v.year,
             price: v.price,
-            reason: reason || null,
+            location: v.location || null,
+            reason: reason || buildInventoryRecommendationReason(v),
             requirements: requirements?.length ? [...requirements] : undefined,
             recommendedAt: now,
             position: index + 1,
@@ -550,9 +606,11 @@ export function formatSalesContextForPrompt(customer) {
         lines.push("- Recently recommended (use these vehicleIds for follow-up — do NOT re-search by make/model):");
         for (const v of ctx.lastRecommendedVehicles.slice(0, 5)) {
             lines.push(
-                `  • ${v.position || "?"}. ${v.title || v.make || "vehicle"} — vehicleId: ${v.vehicleId}, stock: ${v.stockNumber}${v.reason ? ` (${v.reason})` : ""}`
+                `  • ${v.position || "?"}. ${v.title || v.make || "vehicle"} — vehicleId: ${v.vehicleId}, stock: ${v.stockNumber}${v.location ? `, location: ${v.location}` : ""}${v.reason ? ` (${v.reason})` : ""}`
             );
         }
+        const locationBlock = formatLocationComparisonForPrompt(ctx.lastRecommendedVehicles);
+        if (locationBlock) lines.push(`- ${locationBlock.replace(/^LOCATION VERIFICATION \(from inventory\): /, "")}`);
     }
     if (ctx.familySize) lines.push(`- Family / passenger count: ${ctx.familySize}`);
     if (ctx.household?.length) {

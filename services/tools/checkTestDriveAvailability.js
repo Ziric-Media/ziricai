@@ -78,6 +78,7 @@ export default {
             query: vehicleId || stockNumber ? undefined : args.query,
             make: vehicleId || stockNumber ? undefined : args.make,
             model: vehicleId || stockNumber ? undefined : args.model,
+            customerId: ctx.customerId,
         });
 
         return {

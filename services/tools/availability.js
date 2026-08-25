@@ -21,6 +21,48 @@ const DAY_NAMES = [
     "saturday",
 ];
 
+const MONTH_NAMES = [
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+];
+
+const MONTH_ALIASES = {
+    jan: 0,
+    january: 0,
+    feb: 1,
+    february: 1,
+    mar: 2,
+    march: 2,
+    apr: 3,
+    april: 3,
+    may: 4,
+    jun: 5,
+    june: 5,
+    jul: 6,
+    july: 6,
+    aug: 7,
+    august: 7,
+    sep: 8,
+    sept: 8,
+    september: 8,
+    oct: 9,
+    october: 9,
+    nov: 10,
+    november: 10,
+    dec: 11,
+    december: 11,
+};
+
 const SLOT_MINUTES = parseInt(process.env.APPOINTMENT_SLOT_MINUTES || "30", 10);
 const MAX_CONCURRENT = parseInt(process.env.APPOINTMENT_MAX_CONCURRENT || "2", 10);
 
@@ -96,22 +138,89 @@ function parseDayFromText(lower, base) {
 }
 
 /**
+ * Parse "28 August", "August 28", or "28 Aug" into a calendar date (year inferred).
+ * @param {string} lower
+ * @param {Date} now
+ */
+function parseMonthDayFromText(lower, now = new Date()) {
+    const patterns = [
+        /\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]+)\b(?:\s+(\d{4}))?/i,
+        /\b([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:\s+(\d{4}))?/i,
+    ];
+
+    for (const pattern of patterns) {
+        const match = lower.match(pattern);
+        if (!match) continue;
+
+        let day;
+        let monthToken;
+        let yearToken;
+
+        if (/^\d/.test(match[1])) {
+            day = parseInt(match[1], 10);
+            monthToken = match[2]?.toLowerCase();
+            yearToken = match[3];
+        } else {
+            monthToken = match[1]?.toLowerCase();
+            day = parseInt(match[2], 10);
+            yearToken = match[3];
+        }
+
+        const month = MONTH_ALIASES[monthToken];
+        if (month == null || day < 1 || day > 31) continue;
+
+        let year = yearToken ? parseInt(yearToken, 10) : now.getFullYear();
+        let candidate = new Date(year, month, day, 0, 0, 0, 0);
+        if (Number.isNaN(candidate.getTime())) continue;
+
+        if (!yearToken && candidate.getTime() < now.getTime() - 24 * 60 * 60 * 1000) {
+            candidate = new Date(year + 1, month, day, 0, 0, 0, 0);
+        }
+
+        return candidate;
+    }
+
+    return null;
+}
+
+/**
+ * Ensure parsed datetimes are not accidentally in the past (wrong year inference).
+ * @param {Date} dateTime
+ */
+function ensureFutureDateTime(dateTime) {
+    const now = new Date();
+    if (dateTime.getTime() >= now.getTime() - 5 * 60 * 1000) return dateTime;
+    const bumped = new Date(dateTime);
+    bumped.setFullYear(bumped.getFullYear() + 1);
+    return bumped;
+}
+
+/**
  * Parse a clock time from natural language and apply to base date.
  * @param {string} lower
  * @param {Date} base
  */
 function applyTimeFromText(lower, base) {
-    const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
-    if (!timeMatch) return null;
+    const ampmMatch = lower.match(/(?:\bat\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+    if (ampmMatch) {
+        const result = new Date(base);
+        let hour = parseInt(ampmMatch[1], 10);
+        const minute = ampmMatch[2] ? parseInt(ampmMatch[2], 10) : 0;
+        const meridiem = ampmMatch[3]?.toLowerCase();
+        if (meridiem === "pm" && hour < 12) hour += 12;
+        if (meridiem === "am" && hour === 12) hour = 0;
+        result.setHours(hour, minute, 0, 0);
+        return result;
+    }
 
-    const result = new Date(base);
-    let hour = parseInt(timeMatch[1], 10);
-    const minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-    const meridiem = timeMatch[3];
-    if (meridiem === "pm" && hour < 12) hour += 12;
-    if (meridiem === "am" && hour === 12) hour = 0;
-    result.setHours(hour, minute, 0, 0);
-    return result;
+    const colonMatch = lower.match(/\b(\d{1,2}):(\d{2})\b/);
+    if (colonMatch) {
+        const result = new Date(base);
+        result.setHours(parseInt(colonMatch[1], 10), parseInt(colonMatch[2], 10), 0, 0);
+        return result;
+    }
+
+    return null;
 }
 
 /**
@@ -151,31 +260,42 @@ export function parseScheduledInput(input = {}) {
         const weekday = parseDayFromText(lower, now);
         if (weekday) {
             base = weekday;
-        } else if (!Number.isNaN(iso.getTime())) {
-            const hasTime = hasExplicitTimeInString(raw);
-            return hasTime
-                ? { ok: true, dateTime: iso, hasExplicitTime: true }
-                : { ok: true, dateOnly: iso, hasExplicitTime: false };
-        } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
-            const dateOnly = new Date(`${raw.trim()}T00:00:00`);
-            if (Number.isNaN(dateOnly.getTime())) {
-                return { ok: false, error: `Could not parse date: "${raw}"` };
-            }
-            return { ok: true, dateOnly, hasExplicitTime: false };
         } else {
-            return { ok: false, error: `Could not parse date/time: "${raw}"` };
+            const monthDay = parseMonthDayFromText(lower, now);
+            if (monthDay) {
+                base = monthDay;
+            } else if (!Number.isNaN(iso.getTime())) {
+                const hasTime = hasExplicitTimeInString(raw);
+                return hasTime
+                    ? { ok: true, dateTime: iso, hasExplicitTime: true }
+                    : { ok: true, dateOnly: iso, hasExplicitTime: false };
+            } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
+                const dateOnly = new Date(`${raw.trim()}T00:00:00`);
+                if (Number.isNaN(dateOnly.getTime())) {
+                    return { ok: false, error: `Could not parse date: "${raw}"` };
+                }
+                return { ok: true, dateOnly, hasExplicitTime: false };
+            } else {
+                return { ok: false, error: `Could not parse date/time: "${raw}"` };
+            }
         }
     }
 
     const withTime = applyTimeFromText(lower, base);
     if (withTime) {
-        return { ok: true, dateTime: withTime, hasExplicitTime: true };
+        const fromMonthDay = parseMonthDayFromText(lower, now) != null;
+        const dateTime = fromMonthDay ? ensureFutureDateTime(withTime) : withTime;
+        return { ok: true, dateTime, hasExplicitTime: true };
     }
 
     if (input.time) {
         const timeApplied = applyTimeFromText(String(input.time).toLowerCase(), base);
         if (timeApplied) {
-            return { ok: true, dateTime: timeApplied, hasExplicitTime: true };
+            const fromMonthDay =
+                parseMonthDayFromText(lower, now) != null ||
+                (input.date && parseMonthDayFromText(String(input.date).toLowerCase(), now) != null);
+            const dateTime = fromMonthDay ? ensureFutureDateTime(timeApplied) : timeApplied;
+            return { ok: true, dateTime, hasExplicitTime: true };
         }
     }
 
@@ -195,6 +315,25 @@ export function parseScheduledAt(value) {
         );
     }
     return parsed.dateTime;
+}
+
+/**
+ * Find the next open slot on the same day, staggered by slot duration.
+ * @param {string} companyId
+ * @param {Date} fromSlot
+ * @param {number} [maxAttempts]
+ */
+export async function findNextStaggeredSlot(companyId, fromSlot, maxAttempts = 8) {
+    let candidate = normalizeToSlotStart(fromSlot);
+    for (let i = 0; i < maxAttempts; i++) {
+        candidate = new Date(candidate.getTime() + getSlotDurationMs());
+        if (!isWithinBusinessHours(candidate)) break;
+        const capacity = await checkSlotCapacity(companyId, candidate);
+        if (capacity.available) {
+            return { slotStart: capacity.slotStart, label: formatSlotLabel(capacity.slotStart) };
+        }
+    }
+    return null;
 }
 
 /**

@@ -16,7 +16,10 @@ import {
     findOpenSlotsForDate,
     formatSlotLabel,
     getBusinessHours,
+    findNextStaggeredSlot,
+    slotEnd,
 } from "./availability.js";
+import { listAppointmentsByCustomer } from "../database/appointmentRepository.js";
 
 /**
  * @param {string} companyId
@@ -30,6 +33,7 @@ import {
  * @param {string} [options.make]
  * @param {string} [options.model]
  * @param {boolean} [options.includeAlternatives]
+ * @param {string} [options.customerId]
  */
 export async function evaluateTestDriveAvailability(companyId, options = {}) {
     const includeAlternatives = options.includeAlternatives !== false;
@@ -166,6 +170,35 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
         };
     }
 
+    if (options.customerId) {
+        const customerConflict = await checkCustomerSlotConflict(
+            companyId,
+            options.customerId,
+            slotStart,
+            vehicle.vehicleId
+        );
+        if (customerConflict) {
+            const staggered = await findNextStaggeredSlot(companyId, slotStart);
+            return {
+                available: false,
+                code: "CUSTOMER_SLOT_CONFLICT",
+                reason: customerConflict.reason,
+                vehicle: vehicleToPublic(vehicle),
+                slotStart: slotStart.toISOString(),
+                conflictingBooking: customerConflict.booking,
+                suggestedSlots: staggered
+                    ? [{ slotStart: staggered.slotStart.toISOString(), label: staggered.label }]
+                    : [],
+                alternatives: {
+                    vehicles: [],
+                    slots: staggered
+                        ? [{ slotStart: staggered.slotStart.toISOString(), label: staggered.label }]
+                        : [],
+                },
+            };
+        }
+    }
+
     return {
         available: true,
         code: "AVAILABLE",
@@ -291,3 +324,34 @@ async function findVehiclesWithTestDriveAvailability(companyId, options) {
 }
 
 export { getBusinessHours };
+
+async function checkCustomerSlotConflict(companyId, customerId, slotStart, vehicleId) {
+    const upcoming = await listAppointmentsByCustomer({
+        companyId,
+        customerId,
+        appointmentType: "test_drive",
+        statusFilter: "upcoming",
+        limit: 20,
+    });
+
+    const startMs = slotStart.getTime();
+    const endMs = slotEnd(slotStart).getTime();
+
+    for (const booking of upcoming) {
+        const bookingStart = normalizeToSlotStart(new Date(booking.scheduledAt));
+        const bookingEnd = slotEnd(bookingStart);
+        const overlaps =
+            bookingStart.getTime() < endMs &&
+            bookingEnd.getTime() > startMs &&
+            booking.vehicleId !== vehicleId;
+
+        if (overlaps) {
+            return {
+                booking,
+                reason: `Customer already has a test drive at ${formatSlotLabel(bookingStart)} (${booking.vehicleDescription || "another vehicle"}). Book this vehicle at a staggered time (e.g. ${formatSlotLabel(new Date(startMs + 30 * 60 * 1000))}).`,
+            };
+        }
+    }
+
+    return null;
+}

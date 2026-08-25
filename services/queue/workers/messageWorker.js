@@ -275,7 +275,7 @@ async function processInboundMessage(job) {
             channel: outboundChannel,
             inboundMessage: text,
             schedulingContext,
-        }, { statusFilter: "all" });
+        }, { statusFilter: "upcoming" });
         authoritativeBookingContext = formatAuthoritativeBookingBlock(preloadedBookingResult);
         console.log("[whatsapp] Booking recap intent — pre-loaded getCustomerBookings", {
             companyId: resolvedCompanyId,

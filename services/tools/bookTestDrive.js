@@ -147,6 +147,7 @@ export default {
             vehicleId: vehicleCheck.vehicleId,
             stockNumber: vehicleCheck.stockNumber,
             scheduledAt: args.scheduledAt,
+            customerId,
         });
 
         if (!availability.available) {

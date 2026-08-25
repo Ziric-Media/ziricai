@@ -6,6 +6,8 @@ import { storeRecommendedVehicles } from "../conversation/recommendedVehicles.js
 import {
     getActivePurchaseBudgetFilter,
     persistRecommendedToSalesContext,
+    compareRecommendedVehicleLocations,
+    formatLocationComparisonForPrompt,
 } from "../conversation/salesContext.js";
 import { evaluateSeatingFit, getVehicleSeatingCapacity } from "../inventory/seatingCapacity.js";
 
@@ -107,11 +109,21 @@ export default {
             });
         }
 
+        const locationComparison = compareRecommendedVehicleLocations(vehiclesWithFit);
+        const locationNote = formatLocationComparisonForPrompt(vehiclesWithFit);
+
         return {
             ok: true,
             count: vehiclesWithFit.length,
             vehicles: vehiclesWithFit,
             passengerCount,
+            locationComparison: locationComparison.sameLocation
+                ? { sameLocation: true }
+                : {
+                      sameLocation: false,
+                      warning: locationComparison.warning,
+                      details: locationComparison.details,
+                  },
             activePurchaseBudget: budgetFilter.open
                 ? "no limit"
                 : budgetFilter.maxPrice ?? budgetFilter.minPrice ?? null,
@@ -121,7 +133,9 @@ export default {
                     : `Inventory search returned ${vehiclesWithFit.length} vehicle${vehiclesWithFit.length === 1 ? "" : "s"}. ` +
                       "Only recommend vehicles from this result — each has a stable vehicleId. " +
                       "Pass vehicleId to checkTestDriveAvailability and bookTestDrive for follow-up. " +
-                      "Always compare seatingCapacity to passenger count — warn if seatingFit is insufficient.",
+                      "Always compare seatingCapacity to passenger count — warn if seatingFit is insufficient. " +
+                      "Only claim 4x4/off-road when is4x4=true in results; use drive field for drive type." +
+                      (locationNote ? ` ${locationNote}` : ""),
         };
     },
 };

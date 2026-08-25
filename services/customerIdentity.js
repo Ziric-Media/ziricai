@@ -21,10 +21,18 @@ const NON_NAME_WORDS = new Set([
     "looking",
     "calling",
     "messaging",
+    "available",
+    "free",
+    "busy",
+    "ready",
     "a",
     "an",
     "the",
 ]);
+
+/** Reject availability/scheduling phrases misparsed as names ("I'm available on that day"). */
+const AVAILABILITY_NAME_PATTERN =
+    /\b(?:available|free|busy|ready)\b(?:\s+(?:on|at|for|from|until|tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|that|this|the))?/i;
 
 function capitalizeWords(value) {
     return String(value || "")
@@ -46,7 +54,10 @@ function cleanNameCandidate(candidate) {
 
     const firstWord = name.split(/\s+/)[0]?.toLowerCase();
     if (NON_NAME_WORDS.has(firstWord)) return null;
-    if (/^(here|there|good|fine|well|back|interested|looking|calling|messaging)$/i.test(name)) return null;
+    if (/^(here|there|good|fine|well|back|interested|looking|calling|messaging|available|free|busy|ready)$/i.test(name)) {
+        return null;
+    }
+    if (AVAILABILITY_NAME_PATTERN.test(name)) return null;
 
     return capitalizeWords(name);
 }

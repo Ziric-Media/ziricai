@@ -108,6 +108,12 @@ function normalizeVehicleInput(input) {
 
 function vehicleToPublic(vehicle) {
     if (!vehicle) return null;
+    const driveRaw =
+        vehicle.metadata?.driveType ||
+        vehicle.metadata?.drive ||
+        vehicle.metadata?.Drive ||
+        null;
+    const driveInfo = normalizeDriveType(driveRaw);
     const base = {
         vehicleId: vehicle.vehicleId,
         stockNumber: vehicle.stockNumber,
@@ -125,8 +131,40 @@ function vehicleToPublic(vehicle) {
         availability: vehicle.availability,
         title: vehicle.title,
         label: vehicle.title || [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" "),
+        drive: driveInfo.label,
+        driveType: driveInfo.driveType,
+        is4x4: driveInfo.is4x4,
+        canClaimOffRoad: driveInfo.canClaimOffRoad,
     };
     return withSeatingCapacity(base);
+}
+
+/**
+ * Map Central Motors / importer drive metadata to a safe public label.
+ * @param {string|null|undefined} raw
+ */
+export function normalizeDriveType(raw) {
+    const driveType = String(raw || "").trim();
+    if (!driveType) {
+        return { driveType: null, label: null, is4x4: false, canClaimOffRoad: false };
+    }
+
+    const lower = driveType.toLowerCase();
+    const is4x4 = /\b4x4\b|4wd|all[\s-]?wheel|four[\s-]?wheel/i.test(driveType);
+    const is2wd = /frontwheeldrive|front[\s-]?wheel|fwd|2wd|2x2|rearwheeldrive|rwd/i.test(lower);
+
+    let label = driveType;
+    if (is4x4) label = "4x4";
+    else if (/frontwheeldrive|front[\s-]?wheel|fwd/i.test(lower)) label = "2WD (Front Wheel Drive)";
+    else if (/rearwheeldrive|rear[\s-]?wheel|rwd/i.test(lower)) label = "RWD (Rear Wheel Drive)";
+    else if (is2wd) label = "2WD";
+
+    return {
+        driveType,
+        label,
+        is4x4,
+        canClaimOffRoad: is4x4,
+    };
 }
 
 async function ensureSchema() {

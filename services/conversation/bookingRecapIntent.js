@@ -47,8 +47,12 @@ export function formatAuthoritativeBookingBlock(bookingResult) {
     ];
 
     if (Array.isArray(bookingResult.bookings) && bookingResult.bookings.length) {
-        lines.push("", "Structured bookings (use exactly these values):");
-        for (const b of bookingResult.bookings) {
+        const active = bookingResult.bookings.filter((b) => b.status !== "cancelled");
+        lines.push("", "Structured bookings (use exactly these values — do NOT invent extra bookings):");
+        if (!active.length) {
+            lines.push("- No active bookings in database.");
+        }
+        for (const b of active) {
             lines.push(
                 `- bookingId: ${b.bookingId || "—"} | vehicle: ${b.vehicleDescription || "—"} | stock: ${b.stockNumber || "—"} | when: ${b.scheduledAt || "—"} | location: ${b.location || "—"} | status: ${b.status || "—"}`
             );

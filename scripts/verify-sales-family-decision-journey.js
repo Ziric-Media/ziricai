@@ -305,7 +305,7 @@ async function main() {
     });
     assert(prompt.includes("Customer name: Spencer"), "prompt uses Spencer");
     assert(prompt.includes("SEATING CAPACITY"), "prompt includes seating rules");
-    assert(prompt.includes("INVENTORY vs KNOWLEDGE"), "prompt includes inventory vs knowledge rules");
+    assert(prompt.includes("TRUTH HIERARCHY"), "prompt includes truth hierarchy rules");
     assert(WHATSAPP_SALES_TRUTH_RULES.includes("HUMAN HANDOFF"), "handoff rule exported");
     assert(formatSalesContextForPrompt({ salesContext }).includes("Family / passenger count: 8"), "sales context in prompt");
     console.log("✓ 12. Spencer identity + sales context survive restart; prompt rules present");
