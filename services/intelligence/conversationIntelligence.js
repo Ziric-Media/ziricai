@@ -3,7 +3,7 @@
  * Replace analyzeMessage internals with OpenAI structured output later.
  */
 import { countPassengersFromText } from "../inventory/seatingCapacity.js";
-import { parseIntroducedPerson } from "../customerIdentity.js";
+import { parseIntroducedPerson, parseExplicitCustomerName, parseOccupation } from "../customerIdentity.js";
 
 const TOPIC_KEYWORDS = {
     pricing: /\b(price|cost|quote|budget|how much|rate|fee|deposit|finance|financing)\b/i,
@@ -183,10 +183,16 @@ export function extractMemoryFacts(text) {
         /\b(?:budget|afford(?:able)?|price\s*range|up\s*to|spending|working\s+with\s+a\s+budget)\s*(?:of|is|:)?\s*(R\s?[\d][\d,]*(?:\.\d{2})?)/i
     );
     const zarAmount = raw.match(/\bR\s?[\d][\d,]*(?:\.\d{2})?\b/i);
-    if (budgetWithAmount?.[1]) {
-        facts.push(`Customer budget: ${normalizeZarAmount(budgetWithAmount[1])}`);
-    } else if (zarAmount && /\b(budget|afford|spend|finance|vehicle|car|fortuner|hilux|price|quotation|quote)\b/i.test(lower)) {
-        facts.push(`Customer budget: ${normalizeZarAmount(zarAmount[0])}`);
+    if (budgetWithAmount?.[1] && !/\b(?:per\s*month|\/\s*pm|monthly|salary|income|earn)\b/i.test(lower)) {
+        facts.push(`Customer purchase budget: ${normalizeZarAmount(budgetWithAmount[1])}`);
+    } else if (
+        zarAmount &&
+        /\b(budget|afford|spend|finance|vehicle|car|fortuner|hilux|price|quotation|quote)\b/i.test(lower) &&
+        !/\b(?:per\s*month|\/\s*pm|monthly|salary|income|earn)\b/i.test(lower)
+    ) {
+        facts.push(`Customer purchase budget: ${normalizeZarAmount(zarAmount[0])}`);
+    } else if (/\b(salary|income|earn)\b/.test(lower) && zarAmount) {
+        facts.push(`Customer income: ${normalizeZarAmount(zarAmount[0])}/month`);
     } else if (/\b(budget|afford|price range)\b/.test(lower)) {
         facts.push("Customer discussed budget (amount not specified)");
     }
@@ -222,16 +228,14 @@ export function extractMemoryFacts(text) {
         facts.push("Customer mentioned their business");
     }
 
-    const nameMatch = raw.match(
-        /\b(?:my name is|i am|i'm|im|call me|this is|you can call me|please call me|name'?s)\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i
-    );
-    const parsedName = nameMatch?.[1]?.trim();
-    if (
-        parsedName &&
-        parsedName.length >= 2 &&
-        !/^(here|there|good|fine|well|back|interested|looking|calling|messaging)$/i.test(parsedName)
-    ) {
-        facts.push(`Customer name: ${parsedName.split(/\s+/).map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ")}`);
+    const explicitName = parseExplicitCustomerName(raw);
+    if (explicitName) {
+        facts.push(`Customer name: ${explicitName}`);
+    }
+
+    const occupation = parseOccupation(raw);
+    if (occupation) {
+        facts.push(`Customer occupation: ${occupation}`);
     }
 
     return facts;

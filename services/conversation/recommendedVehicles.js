@@ -5,6 +5,7 @@ import {
     customerDocId,
     conversationDocId,
     getTenantConversation,
+    getOrCreateConversation,
     conversationsRepo,
 } from "../storage/tenantStorage.js";
 import { pickByHint, pickByOrdinal } from "./vehicleReference.js";
@@ -29,6 +30,7 @@ export async function storeRecommendedVehicles(companyId, phone, channel = "what
     }
 
     const trimmed = merged.slice(0, 20);
+    await getOrCreateConversation(companyId, phone, channel);
     await conversationsRepo.update(companyId, conversationId, {
         meta: { ...(existing.meta || {}), lastRecommendedVehicles: trimmed },
         lastRecommendedVehicles: trimmed,

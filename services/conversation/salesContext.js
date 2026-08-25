@@ -4,7 +4,7 @@
 import { upsertTenantCustomer } from "../storage/tenantStorage.js";
 import { upsertDurableCustomer } from "../database/customerRepository.js";
 import { countPassengersFromText } from "../inventory/seatingCapacity.js";
-import { parseIntroducedPerson, parseRelationshipSpeaker } from "../customerIdentity.js";
+import { parseIntroducedPerson, parseRelationshipSpeaker, parseOccupation } from "../customerIdentity.js";
 
 export const LEAD_STAGES = [
     "NEW_LEAD",
@@ -26,6 +26,8 @@ function normalizeZarAmount(raw) {
 
 function parseMonthlyBudget(text) {
     const raw = String(text || "");
+    if (/\b(?:salary|income|earn|earning|paid)\b/i.test(raw)) return null;
+
     const perMonth = raw.match(
         /\b(?:R\s?[\d][\d,]*(?:\.\d{2})?)\s*(?:per\s*month|\/\s*pm|p\.?\s*m\.?|monthly)\b/i
     );
@@ -34,8 +36,8 @@ function parseMonthlyBudget(text) {
         if (amountMatch) {
             const display = normalizeZarAmount(amountMatch[0]);
             return {
-                monthlyBudget: Number(display.replace(/[^\d]/g, "")),
-                monthlyBudgetDisplay: `${display}/pm`,
+                targetMonthlyPayment: Number(display.replace(/[^\d]/g, "")),
+                targetMonthlyPaymentDisplay: `${display}/pm`,
             };
         }
     }
@@ -45,8 +47,43 @@ function parseMonthlyBudget(text) {
     if (monthlyLead?.[1]) {
         const display = normalizeZarAmount(monthlyLead[1]);
         return {
-            monthlyBudget: Number(display.replace(/[^\d]/g, "")),
-            monthlyBudgetDisplay: `${display}/pm`,
+            targetMonthlyPayment: Number(display.replace(/[^\d]/g, "")),
+            targetMonthlyPaymentDisplay: `${display}/pm`,
+        };
+    }
+    const rangeMatch = raw.match(
+        /\b(?:R\s?[\d][\d,]*(?:\.\d{2})?|R?\s?[\d]+k)\s*(?:-|to)\s*(?:R\s?[\d][\d,]*(?:\.\d{2})?|R?\s?[\d]+k)\s*(?:per\s*month|\/\s*pm|p\.?\s*m\.?|monthly)\b/i
+    );
+    if (rangeMatch?.[0]) {
+        const display = normalizeZarAmount(rangeMatch[0].replace(/\s*(?:per\s*month|\/\s*pm|p\.?\s*m\.?|monthly)\b/i, ""));
+        return {
+            targetMonthlyPaymentDisplay: `${display}/pm`,
+        };
+    }
+    return null;
+}
+
+function parseIncome(text) {
+    const raw = String(text || "");
+    if (!/\b(?:salary|income|earn|earning|paid|make|making)\b/i.test(raw)) return null;
+
+    const direct = raw.match(
+        /\b(?:salary|income|earn(?:ing)?s?|paid|make|making)\s*(?:is|of|:)?\s*(R\s?[\d][\d,]*(?:\.\d{2})?)/i
+    );
+    if (direct?.[1]) {
+        const display = normalizeZarAmount(direct[1]);
+        return {
+            income: Number(display.replace(/[^\d]/g, "")),
+            incomeDisplay: `${display}/month`,
+        };
+    }
+
+    const trailing = raw.match(/\b(R\s?[\d][\d,]*(?:\.\d{2})?)\s*(?:per\s*month|\/\s*pm|p\.?\s*m\.?|monthly)\b/i);
+    if (trailing?.[1] && /\b(?:salary|income|earn|paid)\b/i.test(raw)) {
+        const display = normalizeZarAmount(trailing[1]);
+        return {
+            income: Number(display.replace(/[^\d]/g, "")),
+            incomeDisplay: `${display}/month`,
         };
     }
     return null;
@@ -54,20 +91,20 @@ function parseMonthlyBudget(text) {
 
 function parsePurchaseBudget(text) {
     const raw = String(text || "");
-    if (/\b(?:per\s*month|\/\s*pm|p\.?\s*m\.?|monthly)\b/i.test(raw)) return null;
+    if (/\b(?:per\s*month|\/\s*pm|p\.?\s*m\.?|monthly|salary|income|earn)\b/i.test(raw)) return null;
 
     const match = raw.match(/\b(?:budget|afford(?:able)?|up\s*to|spending)\s*(?:of|is|:)?\s*(R\s?[\d][\d,]*(?:\.\d{2})?)/i);
     if (match?.[1]) {
         const display = normalizeZarAmount(match[1]);
         const amount = Number(display.replace(/[^\d]/g, ""));
-        return { purchaseBudget: amount, purchaseBudgetDisplay: display };
+        return { confirmedPurchaseBudget: amount, confirmedPurchaseBudgetDisplay: display };
     }
     const loose = raw.match(/\bR\s?[\d][\d,]*(?:\.\d{2})?\b/i);
     if (loose && /\b(budget|afford|spend|vehicle|car|fortuner|hilux|price|quotation|quote)\b/i.test(raw)) {
         const display = normalizeZarAmount(loose[0]);
         return {
-            purchaseBudget: Number(display.replace(/[^\d]/g, "")),
-            purchaseBudgetDisplay: display,
+            confirmedPurchaseBudget: Number(display.replace(/[^\d]/g, "")),
+            confirmedPurchaseBudgetDisplay: display,
         };
     }
     return null;
@@ -75,20 +112,49 @@ function parsePurchaseBudget(text) {
 
 function parseNoBudgetLimit(text) {
     const raw = String(text || "").toLowerCase();
-    if (/\b(no\s+limit|no\s+budget|unlimited|open\s+budget|budget\s+is\s+open|any\s+price)\b/.test(raw)) {
-        return { purchaseBudget: null, purchaseBudgetDisplay: "no limit", budgetOpen: true };
+    if (
+        /\b(no\s+limit|no\s+budget|unlimited|open\s+budget|budget\s+is\s+open|any\s+price|any\s+budget|price\s+doesn'?t\s+matter|doesn'?t\s+matter\s+(?:what\s+)?price|what(?:'s|\s+is)\s+in\s+stock\s+any\s+price)\b/.test(
+            raw
+        )
+    ) {
+        return {
+            confirmedPurchaseBudget: null,
+            confirmedPurchaseBudgetDisplay: "no limit",
+            budgetOpen: true,
+        };
     }
     if (/\b(?:over|above|more\s+than|at\s+least)\s+R\s?[\d]/i.test(text)) {
         const match = String(text).match(/\b(?:over|above|more\s+than|at\s+least)\s+(R\s?[\d][\d,]*(?:\.\d{2})?)/i);
         if (match?.[1]) {
             const display = normalizeZarAmount(match[1]);
             return {
-                purchaseBudget: Number(display.replace(/[^\d]/g, "")),
-                purchaseBudgetDisplay: `${display}+`,
+                confirmedPurchaseBudget: Number(display.replace(/[^\d]/g, "")),
+                confirmedPurchaseBudgetDisplay: `${display}+`,
                 budgetOpen: false,
                 budgetMinOnly: true,
             };
         }
+    }
+    return null;
+}
+
+function parseActiveBodyType(text) {
+    const raw = String(text || "").toLowerCase();
+    if (/\b(?:show\s+me|looking\s+for|want|need|prefer|interested\s+in)\s+(?:an?\s+)?suvs?\b|\bsuvs?\s+only\b|\b(?:only|just)\s+suvs?\b/.test(raw)) {
+        return "SUV";
+    }
+    if (/\b(?:show\s+me|looking\s+for|want|need|prefer)\s+(?:an?\s+)?sedans?\b|\bsedans?\s+only\b/.test(raw)) {
+        return "sedan";
+    }
+    if (/\b(?:show\s+me|looking\s+for|want|need|prefer)\s+(?:an?\s+)?hatch(?:back)?s?\b/.test(raw)) {
+        return "hatchback";
+    }
+    if (
+        /\b(?:show\s+me|looking\s+for|want|need|prefer)\s+(?:an?\s+)?(?:bakkies?|pickups?|double\s+cabs?)\b|\bbakkies?\s+only\b/.test(
+            raw
+        )
+    ) {
+        return "bakkie";
     }
     return null;
 }
@@ -191,6 +257,9 @@ export function extractSalesSignals(text, { customer = null } = {}) {
     const raw = String(text || "");
     if (!raw.trim()) return signals;
 
+    const income = parseIncome(raw);
+    if (income) Object.assign(signals, income);
+
     const monthly = parseMonthlyBudget(raw);
     if (monthly) Object.assign(signals, monthly);
 
@@ -201,8 +270,14 @@ export function extractSalesSignals(text, { customer = null } = {}) {
         if (purchase) Object.assign(signals, purchase);
     }
 
+    const occupation = parseOccupation(raw);
+    if (occupation) signals.occupation = occupation;
+
     const familySize = countPassengersFromText(raw);
     if (familySize != null) signals.familySize = familySize;
+
+    const bodyType = parseActiveBodyType(raw);
+    if (bodyType) signals.bodyType = bodyType;
 
     const prefs = parseVehiclePreferences(raw);
     if (prefs) signals.vehiclePreferences = prefs;
@@ -242,38 +317,71 @@ export function extractSalesSignals(text, { customer = null } = {}) {
 export function mergeSalesContext(existing = {}, signals = {}) {
     const merged = { ...(existing || {}) };
 
-    if (signals.monthlyBudget != null) {
-        merged.monthlyBudget = signals.monthlyBudget;
-        merged.monthlyBudgetDisplay = signals.monthlyBudgetDisplay;
+    if (signals.income != null) {
+        merged.income = signals.income;
+        merged.incomeDisplay = signals.incomeDisplay;
     }
 
+    if (signals.targetMonthlyPayment != null) {
+        merged.targetMonthlyPayment = signals.targetMonthlyPayment;
+        merged.targetMonthlyPaymentDisplay = signals.targetMonthlyPaymentDisplay;
+        merged.monthlyBudget = signals.targetMonthlyPayment;
+        merged.monthlyBudgetDisplay = signals.targetMonthlyPaymentDisplay;
+    } else if (signals.targetMonthlyPaymentDisplay) {
+        merged.targetMonthlyPaymentDisplay = signals.targetMonthlyPaymentDisplay;
+        merged.monthlyBudgetDisplay = signals.targetMonthlyPaymentDisplay;
+    }
+
+    if (signals.occupation) merged.occupation = signals.occupation;
+
     if (signals.budgetOpen === true) {
-        if (merged.purchaseBudget != null) {
-            merged.previousPurchaseBudget = merged.purchaseBudget;
-            merged.previousPurchaseBudgetDisplay = merged.purchaseBudgetDisplay;
+        if (merged.confirmedPurchaseBudget != null || merged.purchaseBudget != null) {
+            merged.previousPurchaseBudget =
+                merged.confirmedPurchaseBudget ?? merged.purchaseBudget ?? merged.previousPurchaseBudget;
+            merged.previousPurchaseBudgetDisplay =
+                merged.confirmedPurchaseBudgetDisplay ??
+                merged.purchaseBudgetDisplay ??
+                merged.previousPurchaseBudgetDisplay;
         }
+        merged.confirmedPurchaseBudget = null;
+        merged.confirmedPurchaseBudgetDisplay = "no limit";
         merged.purchaseBudget = null;
         merged.purchaseBudgetDisplay = "no limit";
         merged.budgetOpen = true;
         merged.budget = null;
         merged.budgetDisplay = "no limit";
-    } else if (signals.purchaseBudget != null || signals.budgetMinOnly) {
-        if (merged.purchaseBudget != null && merged.purchaseBudget !== signals.purchaseBudget) {
-            merged.previousPurchaseBudget = merged.purchaseBudget;
-            merged.previousPurchaseBudgetDisplay = merged.purchaseBudgetDisplay;
+    } else if (signals.confirmedPurchaseBudget != null || signals.budgetMinOnly) {
+        const nextBudget = signals.confirmedPurchaseBudget;
+        const nextDisplay = signals.confirmedPurchaseBudgetDisplay;
+        const prior = merged.confirmedPurchaseBudget ?? merged.purchaseBudget;
+        if (prior != null && prior !== nextBudget) {
+            merged.previousPurchaseBudget = prior;
+            merged.previousPurchaseBudgetDisplay =
+                merged.confirmedPurchaseBudgetDisplay ?? merged.purchaseBudgetDisplay;
         }
-        merged.purchaseBudget = signals.purchaseBudget;
-        merged.purchaseBudgetDisplay = signals.purchaseBudgetDisplay;
+        merged.confirmedPurchaseBudget = nextBudget;
+        merged.confirmedPurchaseBudgetDisplay = nextDisplay;
+        merged.purchaseBudget = nextBudget;
+        merged.purchaseBudgetDisplay = nextDisplay;
         merged.budgetOpen = false;
-        merged.budget = signals.purchaseBudget;
-        merged.budgetDisplay = signals.purchaseBudgetDisplay;
+        merged.budget = nextBudget;
+        merged.budgetDisplay = nextDisplay;
     }
 
-    if (signals.budget != null && signals.purchaseBudget == null && !signals.budgetOpen) {
-        if (merged.purchaseBudget != null && merged.purchaseBudget !== signals.budget) {
-            merged.previousPurchaseBudget = merged.purchaseBudget;
-            merged.previousPurchaseBudgetDisplay = merged.purchaseBudgetDisplay;
+    if (signals.estimatedPurchaseBudget != null) {
+        merged.estimatedPurchaseBudget = signals.estimatedPurchaseBudget;
+        merged.estimatedPurchaseBudgetDisplay = signals.estimatedPurchaseBudgetDisplay;
+        merged.estimatedPurchaseBudgetIsEstimate = true;
+    }
+
+    if (signals.budget != null && signals.confirmedPurchaseBudget == null && !signals.budgetOpen) {
+        if (merged.confirmedPurchaseBudget != null && merged.confirmedPurchaseBudget !== signals.budget) {
+            merged.previousPurchaseBudget = merged.confirmedPurchaseBudget ?? merged.purchaseBudget;
+            merged.previousPurchaseBudgetDisplay =
+                merged.confirmedPurchaseBudgetDisplay ?? merged.purchaseBudgetDisplay;
         }
+        merged.confirmedPurchaseBudget = signals.budget;
+        merged.confirmedPurchaseBudgetDisplay = signals.budgetDisplay;
         merged.purchaseBudget = signals.budget;
         merged.purchaseBudgetDisplay = signals.budgetDisplay;
         merged.budget = signals.budget;
@@ -286,7 +394,13 @@ export function mergeSalesContext(existing = {}, signals = {}) {
     if (signals.leadStage) merged.leadStage = signals.leadStage;
     if (signals.activeSpeaker) merged.activeSpeaker = signals.activeSpeaker;
 
-    if (signals.vehiclePreferences?.length) {
+    if (signals.bodyType) {
+        merged.bodyType = signals.bodyType;
+        merged.vehiclePreferences = [
+            signals.bodyType,
+            ...(merged.vehiclePreferences || []).filter((p) => p !== signals.bodyType),
+        ];
+    } else if (signals.vehiclePreferences?.length) {
         merged.vehiclePreferences = [...new Set([...(merged.vehiclePreferences || []), ...signals.vehiclePreferences])];
     }
 
@@ -369,11 +483,16 @@ export async function persistSalesContext(companyId, phone, signals = {}) {
 export function getActivePurchaseBudgetFilter(salesContext) {
     if (!salesContext) return {};
     if (salesContext.budgetOpen) return { open: true };
-    if (salesContext.purchaseBudgetDisplay?.endsWith("+")) {
-        return { minPrice: salesContext.purchaseBudget };
+    const display =
+        salesContext.confirmedPurchaseBudgetDisplay ??
+        salesContext.purchaseBudgetDisplay ??
+        salesContext.budgetDisplay;
+    const amount =
+        salesContext.confirmedPurchaseBudget ?? salesContext.purchaseBudget ?? salesContext.budget;
+    if (display?.endsWith("+")) {
+        return { minPrice: amount };
     }
-    if (salesContext.purchaseBudget != null) return { maxPrice: salesContext.purchaseBudget };
-    if (salesContext.budget != null) return { maxPrice: salesContext.budget };
+    if (amount != null) return { maxPrice: amount };
     return {};
 }
 
@@ -387,19 +506,40 @@ export function formatSalesContextForPrompt(customer) {
 
     const lines = ["SALES CONTEXT (from customer record — use for guidance, not as inventory/booking truth):"];
     if (ctx.leadStage) lines.push(`- Lead stage: ${ctx.leadStage}`);
-    if (ctx.purchaseBudgetDisplay || ctx.purchaseBudget != null) {
+    if (ctx.occupation) lines.push(`- Occupation: ${ctx.occupation}`);
+    if (ctx.incomeDisplay || ctx.income != null) {
+        lines.push(`- Income: ${ctx.incomeDisplay || `R${ctx.income}/month`} — salary/income, NOT a vehicle purchase budget`);
+    }
+    if (
+        ctx.targetMonthlyPaymentDisplay ||
+        ctx.targetMonthlyPayment != null ||
+        ctx.monthlyBudgetDisplay ||
+        ctx.monthlyBudget != null
+    ) {
+        lines.push(
+            `- Monthly affordability: ${
+                ctx.targetMonthlyPaymentDisplay ||
+                ctx.monthlyBudgetDisplay ||
+                `R${ctx.targetMonthlyPayment ?? ctx.monthlyBudget}/pm`
+            } — NOT the same as purchase price; ask about deposit/finance terms before converting to a purchase budget`
+        );
+    }
+    if (ctx.confirmedPurchaseBudgetDisplay || ctx.confirmedPurchaseBudget != null) {
+        lines.push(`- Confirmed purchase budget: ${ctx.confirmedPurchaseBudgetDisplay || `R${ctx.confirmedPurchaseBudget}`}`);
+    } else if (ctx.purchaseBudgetDisplay || ctx.purchaseBudget != null) {
         lines.push(`- Purchase budget: ${ctx.purchaseBudgetDisplay || `R${ctx.purchaseBudget}`}`);
     } else if (ctx.budgetOpen) {
         lines.push("- Purchase budget: no limit");
     }
+    if (ctx.estimatedPurchaseBudgetDisplay || ctx.estimatedPurchaseBudget != null) {
+        lines.push(
+            `- Estimated purchase budget (estimate only): ${ctx.estimatedPurchaseBudgetDisplay || `R${ctx.estimatedPurchaseBudget}`} — confirm with customer before filtering inventory`
+        );
+    }
     if (ctx.previousPurchaseBudgetDisplay || ctx.previousPurchaseBudget != null) {
         lines.push(`- Previous purchase budget (superseded): ${ctx.previousPurchaseBudgetDisplay || `R${ctx.previousPurchaseBudget}`}`);
     }
-    if (ctx.monthlyBudgetDisplay || ctx.monthlyBudget != null) {
-        lines.push(
-            `- Monthly affordability: ${ctx.monthlyBudgetDisplay || `R${ctx.monthlyBudget}/pm`} — NOT the same as purchase price; ask about deposit/finance terms before converting to a purchase budget`
-        );
-    }
+    if (ctx.bodyType) lines.push(`- Active body type filter: ${ctx.bodyType}`);
     if (ctx.vehiclePreferences?.length) lines.push(`- Vehicle preferences: ${ctx.vehiclePreferences.join(", ")}`);
     if (ctx.customerRequirements?.length) {
         lines.push(`- Customer requirements: ${ctx.customerRequirements.join(", ")}`);

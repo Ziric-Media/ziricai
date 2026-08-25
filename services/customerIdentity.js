@@ -7,12 +7,48 @@ const EXPLICIT_NAME_PATTERNS = [
     /\b(?:you can call me|please call me|name'?s)\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i,
 ];
 
+/** Stop name capture at conjunctions before occupation clauses ("Spencer and I'm a …"). */
+const NAME_STOP_PATTERN = /\s+\band\b(?:\s+(?:i'?m|i am|im|also|my)\b)?/i;
+
+const NON_NAME_WORDS = new Set([
+    "here",
+    "there",
+    "good",
+    "fine",
+    "well",
+    "back",
+    "interested",
+    "looking",
+    "calling",
+    "messaging",
+    "a",
+    "an",
+    "the",
+]);
+
 function capitalizeWords(value) {
     return String(value || "")
         .trim()
         .split(/\s+/)
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
         .join(" ");
+}
+
+function cleanNameCandidate(candidate) {
+    let name = String(candidate || "").trim();
+    if (!name) return null;
+
+    const stopMatch = name.match(NAME_STOP_PATTERN);
+    if (stopMatch) name = name.slice(0, stopMatch.index).trim();
+    if (!name || name.length < 2 || name.length > 48) return null;
+    if (/^\d+$/.test(name)) return null;
+    if (/^(a|an)\s+/i.test(name)) return null;
+
+    const firstWord = name.split(/\s+/)[0]?.toLowerCase();
+    if (NON_NAME_WORDS.has(firstWord)) return null;
+    if (/^(here|there|good|fine|well|back|interested|looking|calling|messaging)$/i.test(name)) return null;
+
+    return capitalizeWords(name);
 }
 
 /**
@@ -26,11 +62,33 @@ export function parseExplicitCustomerName(text) {
 
     for (const pattern of EXPLICIT_NAME_PATTERNS) {
         const match = raw.match(pattern);
-        const candidate = match?.[1]?.trim();
-        if (!candidate || candidate.length < 2 || candidate.length > 48) continue;
-        if (/^\d+$/.test(candidate)) continue;
-        if (/^(here|there|good|fine|well|back|interested|looking|calling|messaging)$/i.test(candidate)) continue;
-        return capitalizeWords(candidate);
+        const candidate = cleanNameCandidate(match?.[1]);
+        if (candidate) return candidate;
+    }
+    return null;
+}
+
+const OCCUPATION_PATTERNS = [
+    /\b(?:i'?m|i am|im)\s+(?:a|an)\s+([a-z][a-z\s'-]{2,48})/i,
+    /\b(?:work(?:ing)?\s+as|employed\s+as|job\s+is|occupation\s+is|profession\s+is)\s+(?:a|an\s+)?([a-z][a-z\s'-]{2,48})/i,
+    /\band\s+(?:i'?m|i am|im)\s+(?:a|an)\s+([a-z][a-z\s'-]{2,48})/i,
+];
+
+/**
+ * Parse occupation / job title from self-introduction (e.g. "I'm a civil servant").
+ * @param {string} text
+ * @returns {string|null}
+ */
+export function parseOccupation(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return null;
+
+    for (const pattern of OCCUPATION_PATTERNS) {
+        const match = raw.match(pattern);
+        let occupation = match?.[1]?.trim();
+        if (!occupation || occupation.length < 2) continue;
+        occupation = occupation.replace(/\s+(?:and|but|looking|interested|i\s+).*/i, "").trim();
+        if (occupation.length >= 2) return capitalizeWords(occupation);
     }
     return null;
 }

@@ -269,13 +269,127 @@ function scoreVehicle(vehicle, terms) {
         vehicle.transmission,
         vehicle.fuel,
         vehicle.location,
+        vehicle.metadata?.bodyType,
         String(vehicle.year),
+        String(vehicle.mileage ?? ""),
     ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
     return terms.reduce((n, t) => n + (hay.includes(t) ? 1 : 0), 0);
+}
+
+const BODY_TYPE_ALIASES = {
+    SUV: ["suv", "sport utility", "crossover", "4x4"],
+    sedan: ["sedan", "saloon"],
+    hatchback: ["hatchback", "hatch"],
+    bakkie: ["bakkie", "pickup", "pick-up", "double cab", "single cab", "extra cab", "ldv", "truck"],
+};
+
+const BODY_TYPE_QUERY_PATTERNS = {
+    SUV: /\bsuvs?\b|\bsport\s+utilit(?:y|ies)\b|\bcrossovers?\b/i,
+    sedan: /\bsedans?\b|\bsaloon\b/i,
+    hatchback: /\bhatch(?:back)?s?\b/i,
+    bakkie: /\bbakkies?\b|\bpickups?\b|\bpick-ups?\b|\bdouble\s+cabs?\b|\bsingle\s+cabs?\b|\bextra\s+cabs?\b|\bldvs?\b/i,
+};
+
+const GENERIC_QUERY_TERMS = new Set([
+    "budget",
+    "vehicle",
+    "vehicles",
+    "car",
+    "cars",
+    "stock",
+    "inventory",
+    "available",
+    "price",
+    "mileage",
+    "low",
+    "what",
+    "have",
+    "you",
+    "show",
+    "me",
+    "any",
+]);
+
+function normalizeBodyType(value) {
+    const raw = String(value || "").toLowerCase();
+    if (!raw) return null;
+    for (const [canonical, aliases] of Object.entries(BODY_TYPE_ALIASES)) {
+        if (aliases.some((alias) => raw.includes(alias))) return canonical;
+    }
+    if (/suv/i.test(raw)) return "SUV";
+    return null;
+}
+
+function vehicleBodyHaystack(vehicle) {
+    return [vehicle.metadata?.bodyType, vehicle.title, vehicle.model, vehicle.trim]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+}
+
+const BODY_TYPE_MODEL_HINTS = {
+    fortuner: "SUV",
+    everest: "SUV",
+    "land cruiser": "SUV",
+    rav4: "SUV",
+    x5: "SUV",
+    x3: "SUV",
+    tiguan: "SUV",
+    corolla: "sedan",
+    polo: "hatchback",
+    golf: "hatchback",
+    hilux: "bakkie",
+    ranger: "bakkie",
+    "double cab": "bakkie",
+};
+
+function inferBodyTypeFromVehicle(vehicle) {
+    const meta = normalizeBodyType(vehicle.metadata?.bodyType);
+    if (meta) return meta;
+    const hay = vehicleBodyHaystack(vehicle);
+    for (const [model, bodyType] of Object.entries(BODY_TYPE_MODEL_HINTS)) {
+        if (hay.includes(model)) return bodyType;
+    }
+    return normalizeBodyType(hay);
+}
+
+function vehicleMatchesBodyType(vehicle, bodyType) {
+    const canonical = normalizeBodyType(bodyType);
+    if (!canonical) return true;
+    const inferred = inferBodyTypeFromVehicle(vehicle);
+    if (inferred && inferred === canonical) return true;
+    const hay = vehicleBodyHaystack(vehicle);
+    const aliases = BODY_TYPE_ALIASES[canonical] || [String(bodyType).toLowerCase()];
+    return aliases.some((alias) => hay.includes(alias));
+}
+
+/**
+ * Detect body-type filter hints from a natural-language inventory query.
+ * @param {string} query
+ * @returns {{ bodyType?: string }}
+ */
+export function detectBodyTypeFromQuery(query = "") {
+    const raw = String(query || "");
+    for (const [bodyType, pattern] of Object.entries(BODY_TYPE_QUERY_PATTERNS)) {
+        if (pattern.test(raw)) return { bodyType };
+    }
+    return {};
+}
+
+function hasStructuredFilters(filters = {}) {
+    return (
+        filters.maxPrice != null ||
+        filters.minPrice != null ||
+        Boolean(filters.make) ||
+        Boolean(filters.model) ||
+        Boolean(filters.bodyType) ||
+        filters.maxMileage != null ||
+        (Array.isArray(filters.makes) && filters.makes.length > 0)
+    );
 }
 
 function normalizeMake(value) {
@@ -426,6 +540,10 @@ function matchesFilters(vehicle, filters = {}) {
         const seats = getVehicleSeatingCapacity(vehicle);
         if (seats == null || seats < filters.minSeats) return false;
     }
+    if (filters.maxMileage != null && vehicle.mileage != null && vehicle.mileage > filters.maxMileage) {
+        return false;
+    }
+    if (filters.bodyType && !vehicleMatchesBodyType(vehicle, filters.bodyType)) return false;
     return true;
 }
 
@@ -450,26 +568,45 @@ async function listAllVehicles(companyId) {
  */
 export async function searchInventory(companyId, query = "", filters = {}) {
     const brandHints = detectBrandHintsFromQuery(query);
+    const bodyHints = detectBodyTypeFromQuery(query);
     const mergedFilters = {
         ...filters,
         make: filters.make || brandHints.make,
         makes: filters.makes || brandHints.makes,
         excludeMake: filters.excludeMake || brandHints.excludeMake,
+        bodyType: filters.bodyType || bodyHints.bodyType,
     };
 
     const all = await listAllVehicles(companyId);
     const terms = extractSearchTerms(query);
     let results = all.filter((v) => matchesFilters(v, mergedFilters));
 
-    if (terms.length) {
-        const scored = results
-            .map((v) => ({ vehicle: v, score: scoreVehicle(v, terms) }))
-            .filter((r) => r.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .map((r) => r.vehicle);
-        if (scored.length || !mergedFilters.excludeMake) {
-            results = scored;
+    const structured = hasStructuredFilters(mergedFilters);
+    const wantsLowMileage = /\blow\s+mileage\b/i.test(query);
+
+    if (terms.length && !wantsLowMileage) {
+        const meaningfulTerms = terms.filter((t) => !GENERIC_QUERY_TERMS.has(t));
+        if (structured && meaningfulTerms.length === 0) {
+            // Filter-only mode — structured filters already applied; generic query words must not zero results.
+        } else if (structured) {
+            results = results
+                .map((v) => ({ vehicle: v, score: scoreVehicle(v, meaningfulTerms.length ? meaningfulTerms : terms) }))
+                .sort((a, b) => b.score - a.score)
+                .map((r) => r.vehicle);
+        } else {
+            const scored = results
+                .map((v) => ({ vehicle: v, score: scoreVehicle(v, terms) }))
+                .filter((r) => r.score > 0)
+                .sort((a, b) => b.score - a.score)
+                .map((r) => r.vehicle);
+            if (scored.length || !mergedFilters.excludeMake) {
+                results = scored;
+            }
         }
+    }
+
+    if (wantsLowMileage) {
+        results.sort((a, b) => (a.mileage ?? Number.MAX_SAFE_INTEGER) - (b.mileage ?? Number.MAX_SAFE_INTEGER));
     }
 
     const limit = filters.limit || 10;

@@ -1,7 +1,7 @@
 /**
  * searchInventory — tenant-scoped vehicle search via canonical inventoryService.
  */
-import { searchInventory as searchInventoryRecords, detectBrandHintsFromQuery } from "../inventory/inventoryService.js";
+import { searchInventory as searchInventoryRecords, detectBrandHintsFromQuery, detectBodyTypeFromQuery } from "../inventory/inventoryService.js";
 import { storeRecommendedVehicles } from "../conversation/recommendedVehicles.js";
 import {
     getActivePurchaseBudgetFilter,
@@ -44,6 +44,14 @@ export default {
                 type: "number",
                 description: "Minimum price in local currency",
             },
+            maxMileage: {
+                type: "number",
+                description: "Maximum mileage in km",
+            },
+            bodyType: {
+                type: "string",
+                description: "Body type filter (SUV, sedan, hatchback, bakkie)",
+            },
             limit: {
                 type: "number",
                 description: "Max results to return (default 10)",
@@ -62,15 +70,19 @@ export default {
         }
 
         const brandHints = detectBrandHintsFromQuery(args.query || "");
+        const bodyHints = detectBodyTypeFromQuery(args.query || "");
         const minSeats = args.minSeats ?? null;
         const budgetFilter = getActivePurchaseBudgetFilter(salesContext);
+        const activeBodyType = args.bodyType || salesContext?.bodyType || bodyHints.bodyType;
         const vehicles = await searchInventoryRecords(companyId, args.query || "", {
             make: args.make || args.brand || brandHints.make,
             makes: brandHints.makes,
             excludeMake: args.excludeMake || brandHints.excludeMake,
             model: args.model,
+            bodyType: activeBodyType,
             maxPrice: args.maxPrice ?? (budgetFilter.open ? undefined : budgetFilter.maxPrice),
             minPrice: args.minPrice ?? budgetFilter.minPrice,
+            maxMileage: args.maxMileage,
             minSeats,
             limit: args.limit || 10,
             availabilityOnly: false,
