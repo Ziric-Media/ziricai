@@ -102,6 +102,18 @@ async function main() {
             metadata: { bodyType: "SUV", seatingCapacity: 7 },
         },
         {
+            vehicleId: "veh-suv-bmw",
+            stockNumber: "CM-SUV-BMW",
+            make: "BMW",
+            model: "X5 xDrive30d M Sport",
+            year: 2022,
+            price: 899900,
+            mileage: 38000,
+            availability: "available",
+            title: "2022 BMW X5 xDrive30d M Sport",
+            metadata: { bodyType: "SUV", seatingCapacity: 5 },
+        },
+        {
             vehicleId: "veh-bak-001",
             stockNumber: "CM-BAK-001",
             make: "Toyota",
@@ -225,7 +237,10 @@ async function main() {
     assert(salesContext.bodyType === "SUV", `active bodyType SUV, got ${salesContext.bodyType}`);
     const suvSearch = await runTool("searchInventory", { ...ctx, salesContext }, { query: "SUV", limit: 10 });
     assert(suvSearch.ok && suvSearch.count >= 1, "SUV search returns results");
-    assert(suvSearch.vehicles.every((v) => /suv|fortuner|everest/i.test(v.title + v.model)), "SUV results only");
+    assert(
+        suvSearch.vehicles.every((v) => /suv|fortuner|everest|x5|bmw/i.test(v.title + v.model)),
+        "SUV results only"
+    );
     assert(!suvSearch.vehicles.some((v) => v.stockNumber === "CM-SED-001"), "sedan excluded from SUV search");
     console.log("✓ 5. Show me SUVs updates bodyType and finds inventory");
 
@@ -277,6 +292,51 @@ async function main() {
     assert(!prompt.includes("Customer name: A Civil Servant"), "prompt must not use occupation as name");
     assert(formatSalesContextForPrompt({ salesContext }).includes("Occupation: Civil Servant"), "occupation in sales context");
     console.log("✓ 9. Name recall: Spencer not A Civil Servant");
+
+    /* 10. Forget my budget — hard clear + open filter */
+    salesContext = mergeSalesContext({}, { confirmedPurchaseBudget: 350000, confirmedPurchaseBudgetDisplay: "R350000" });
+    salesContext = await simulateTurn({
+        companyId: COMPANY_ID,
+        phone: PHONE,
+        text: "Forget my budget",
+        salesContext,
+        persistSalesContext,
+        extractSalesSignals,
+        mergeSalesContext,
+    });
+    assert(salesContext.confirmedPurchaseBudget == null, "forget budget clears confirmedPurchaseBudget");
+    assert(salesContext.budgetOpen === true, "forget budget sets budgetOpen");
+    assert(getActivePurchaseBudgetFilter(salesContext).open === true, "forget budget returns open filter");
+    assert(salesContext.leadStage !== "BUDGET_ESTABLISHED", "forget budget must not advance to BUDGET_ESTABLISHED");
+    console.log("✓ 10. Forget my budget clears budget and opens filter");
+
+    /* 11. Forget budget + search — stale LLM maxPrice ignored, BMW SUV not capped at 350k */
+    salesContext = mergeSalesContext(
+        { bodyType: "SUV", budgetOpen: true, confirmedPurchaseBudget: null },
+        {}
+    );
+    const forgetSearch = await runTool(
+        "searchInventory",
+        { ...ctx, salesContext },
+        { query: "SUV", maxPrice: 350000, limit: 10 }
+    );
+    assert(forgetSearch.ok && forgetSearch.count >= 1, "forget-budget search returns SUVs");
+    assert(
+        forgetSearch.vehicles.some((v) => v.stockNumber === "CM-SUV-BMW"),
+        "BMW SUV over 350k included when budget open despite stale LLM maxPrice"
+    );
+    console.log("✓ 11. budgetOpen strips stale LLM maxPrice — BMW SUV not filtered at 350k");
+
+    /* 12. Most expensive SUV returns highest-priced SUV */
+    const expensiveSuv = await searchInventory(COMPANY_ID, "most expensive SUV", { bodyType: "SUV", limit: 1 });
+    assert(expensiveSuv.length === 1, "most expensive SUV returns one result");
+    assert(expensiveSuv[0].stockNumber === "CM-SUV-BMW", `highest SUV is BMW X5, got ${expensiveSuv[0].stockNumber}`);
+    assert(expensiveSuv[0].price === 899900, `highest SUV price 899900, got ${expensiveSuv[0].price}`);
+
+    const cheapestSuv = await searchInventory(COMPANY_ID, "cheapest SUV", { bodyType: "SUV", limit: 1 });
+    assert(cheapestSuv.length === 1, "cheapest SUV returns one result");
+    assert(cheapestSuv[0].stockNumber === "CM-SUV-001", `cheapest SUV is Fortuner, got ${cheapestSuv[0].stockNumber}`);
+    console.log("✓ 12. Price-extreme sorting — most/cheapest expensive SUV");
 
     console.log("\nAll Spencer sales journey verification checks passed.");
 }

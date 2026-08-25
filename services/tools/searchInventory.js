@@ -82,7 +82,7 @@ export default {
             excludeMake: args.excludeMake || brandHints.excludeMake,
             model: args.model,
             bodyType: activeBodyType,
-            maxPrice: args.maxPrice ?? (budgetFilter.open ? undefined : budgetFilter.maxPrice),
+            maxPrice: budgetFilter.open ? undefined : (args.maxPrice ?? budgetFilter.maxPrice),
             minPrice: args.minPrice ?? budgetFilter.minPrice,
             maxMileage: args.maxMileage,
             minSeats,

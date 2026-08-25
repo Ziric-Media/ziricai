@@ -406,6 +406,22 @@ function vehicleMatchesBodyType(vehicle, bodyType) {
 }
 
 /**
+ * Detect price-extreme sort intent from a natural-language inventory query.
+ * @param {string} query
+ * @returns {"desc"|"asc"|null}
+ */
+export function detectPriceSortFromQuery(query = "") {
+    const raw = String(query || "").toLowerCase();
+    if (/\b(most\s+expensive|highest\s+price|top\s+price|priciest|dearest|premium(?:est)?)\b/.test(raw)) {
+        return "desc";
+    }
+    if (/\b(cheapest|lowest\s+price|most\s+affordable)\b/.test(raw)) {
+        return "asc";
+    }
+    return null;
+}
+
+/**
  * Detect body-type filter hints from a natural-language inventory query.
  * @param {string} query
  * @returns {{ bodyType?: string }}
@@ -621,8 +637,9 @@ export async function searchInventory(companyId, query = "", filters = {}) {
 
     const structured = hasStructuredFilters(mergedFilters);
     const wantsLowMileage = /\blow\s+mileage\b/i.test(query);
+    const priceSort = detectPriceSortFromQuery(query);
 
-    if (terms.length && !wantsLowMileage) {
+    if (terms.length && !wantsLowMileage && !priceSort) {
         const meaningfulTerms = terms.filter((t) => !GENERIC_QUERY_TERMS.has(t));
         if (structured && meaningfulTerms.length === 0) {
             // Filter-only mode — structured filters already applied; generic query words must not zero results.
@@ -643,7 +660,11 @@ export async function searchInventory(companyId, query = "", filters = {}) {
         }
     }
 
-    if (wantsLowMileage) {
+    if (priceSort === "desc") {
+        results.sort((a, b) => (b.price ?? -1) - (a.price ?? -1));
+    } else if (priceSort === "asc") {
+        results.sort((a, b) => (a.price ?? Number.MAX_SAFE_INTEGER) - (b.price ?? Number.MAX_SAFE_INTEGER));
+    } else if (wantsLowMileage) {
         results.sort((a, b) => (a.mileage ?? Number.MAX_SAFE_INTEGER) - (b.mileage ?? Number.MAX_SAFE_INTEGER));
     }
 

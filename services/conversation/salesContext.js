@@ -119,7 +119,32 @@ function parsePurchaseBudget(text) {
     return null;
 }
 
+function parseForgetBudget(text) {
+    const raw = String(text || "").toLowerCase();
+    if (
+        /\bforget\s+(?:my\s+)?budget\b/.test(raw) ||
+        /\bignore\s+(?:my\s+)?budget\b/.test(raw) ||
+        /\b(?:drop|clear|remove)\s+(?:my\s+)?budget\b/.test(raw) ||
+        /\bbudget\s+(?:doesn'?t|does\s+not)\s+matter\b/.test(raw) ||
+        /\bregardless\s+of\s+price\b/.test(raw)
+    ) {
+        return {
+            confirmedPurchaseBudget: null,
+            confirmedPurchaseBudgetDisplay: "no limit",
+            budgetOpen: true,
+        };
+    }
+    return null;
+}
+
+function isBudgetClearIntent(text) {
+    return parseForgetBudget(text) != null || parseNoBudgetLimit(text)?.budgetOpen === true;
+}
+
 function parseNoBudgetLimit(text) {
+    const forget = parseForgetBudget(text);
+    if (forget) return forget;
+
     const raw = String(text || "").toLowerCase();
     if (
         /\b(no\s+limit|no\s+budget|unlimited|open\s+budget|budget\s+is\s+open|any\s+price|any\s+budget|price\s+doesn'?t\s+matter|doesn'?t\s+matter\s+(?:what\s+)?price|what(?:'s|\s+is)\s+in\s+stock\s+any\s+price)\b/.test(
@@ -215,7 +240,9 @@ function parseObjection(text) {
 function inferStageAdvance(text, currentStage) {
     const lower = String(text || "").toLowerCase();
     if (/\b(my name is|i am|i'm|call me)\b/.test(lower) && currentStage === "NEW_LEAD") return "IDENTIFIED";
-    if (/\b(budget|afford|up to r|per month|\/pm)\b/.test(lower)) return "BUDGET_ESTABLISHED";
+    if (!isBudgetClearIntent(text) && /\b(budget|afford|up to r|per month|\/pm)\b/.test(lower)) {
+        return "BUDGET_ESTABLISHED";
+    }
     if (/\b(what do you have|show me|options|available|in stock|search)\b/.test(lower)) return "VEHICLE_SEARCH";
     if (/\b(recommend|suggest|which one|compare)\b/.test(lower)) return "OPTIONS_PRESENTED";
     if (/\b(prefer|keen on|like the|want the)\b/.test(lower)) return "PREFERRED_VEHICLE";
@@ -402,14 +429,6 @@ export function mergeSalesContext(existing = {}, signals = {}) {
     if (signals.occupation) merged.occupation = signals.occupation;
 
     if (signals.budgetOpen === true) {
-        if (merged.confirmedPurchaseBudget != null || merged.purchaseBudget != null) {
-            merged.previousPurchaseBudget =
-                merged.confirmedPurchaseBudget ?? merged.purchaseBudget ?? merged.previousPurchaseBudget;
-            merged.previousPurchaseBudgetDisplay =
-                merged.confirmedPurchaseBudgetDisplay ??
-                merged.purchaseBudgetDisplay ??
-                merged.previousPurchaseBudgetDisplay;
-        }
         merged.confirmedPurchaseBudget = null;
         merged.confirmedPurchaseBudgetDisplay = "no limit";
         merged.purchaseBudget = null;
@@ -417,6 +436,11 @@ export function mergeSalesContext(existing = {}, signals = {}) {
         merged.budgetOpen = true;
         merged.budget = null;
         merged.budgetDisplay = "no limit";
+        merged.estimatedPurchaseBudget = null;
+        merged.estimatedPurchaseBudgetDisplay = null;
+        merged.estimatedPurchaseBudgetIsEstimate = false;
+        merged.previousPurchaseBudget = null;
+        merged.previousPurchaseBudgetDisplay = null;
     } else if (signals.confirmedPurchaseBudget != null || signals.budgetMinOnly) {
         const nextBudget = signals.confirmedPurchaseBudget;
         const nextDisplay = signals.confirmedPurchaseBudgetDisplay;

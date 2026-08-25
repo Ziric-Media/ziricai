@@ -14,6 +14,14 @@ import { parseScheduledInput, hasExplicitTimeInString } from "../tools/availabil
 
 const DAY_REF = /\b(that day|same day|that date|on that day)\b/i;
 
+function toLocalDateString(dateObj) {
+    const d = dateObj instanceof Date ? dateObj : new Date(dateObj);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+
 /**
  * @param {string} companyId
  * @param {string} phone
@@ -70,7 +78,7 @@ export function extractSchedulingFromText(text) {
     const updates = {};
     const dateObj = parsed.dateOnly || parsed.dateTime;
     if (dateObj) {
-        const isoDate = dateObj.toISOString().slice(0, 10);
+        const isoDate = toLocalDateString(dateObj);
         updates.lastMentionedDate = isoDate;
         updates.pendingDate = isoDate;
     }
@@ -136,7 +144,7 @@ export function schedulingUpdatesFromToolResult(toolName, args = {}, result = {}
         const parsed = parseScheduledInput({ date: String(dateHint), scheduledAt: String(dateHint) });
         const dateObj = parsed.ok ? parsed.dateOnly || parsed.dateTime : null;
         if (dateObj) {
-            const isoDate = dateObj.toISOString().slice(0, 10);
+            const isoDate = toLocalDateString(dateObj);
             updates.lastMentionedDate = isoDate;
             updates.pendingDate = isoDate;
         }
