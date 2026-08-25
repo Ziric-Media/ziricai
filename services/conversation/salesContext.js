@@ -24,6 +24,14 @@ function normalizeZarAmount(raw) {
         .toUpperCase();
 }
 
+/** Matches R amounts with comma, space, or narrow-no-break-space thousands separators (en-ZA). */
+const ZAR_AMOUNT = String.raw`R\s?[\d][\d,\s\u00A0\u202F]*(?:\.\d{2})?`;
+
+function parseZarAmountToken(raw) {
+    const display = normalizeZarAmount(raw);
+    return { display, amount: Number(display.replace(/[^\d]/g, "")) };
+}
+
 function parseMonthlyBudget(text) {
     const raw = String(text || "");
     if (/\b(?:salary|income|earn|earning|paid)\b/i.test(raw)) return null;
@@ -93,17 +101,18 @@ function parsePurchaseBudget(text) {
     const raw = String(text || "");
     if (/\b(?:per\s*month|\/\s*pm|p\.?\s*m\.?|monthly|salary|income|earn)\b/i.test(raw)) return null;
 
-    const match = raw.match(/\b(?:budget|afford(?:able)?|up\s*to|spending)\s*(?:of|is|:)?\s*(R\s?[\d][\d,]*(?:\.\d{2})?)/i);
+    const match = raw.match(
+        new RegExp(String.raw`\b(?:budget|afford(?:able)?|up\s*to|spending)\s*(?:of|is|:)?\s*(${ZAR_AMOUNT})`, "i")
+    );
     if (match?.[1]) {
-        const display = normalizeZarAmount(match[1]);
-        const amount = Number(display.replace(/[^\d]/g, ""));
+        const { display, amount } = parseZarAmountToken(match[1]);
         return { confirmedPurchaseBudget: amount, confirmedPurchaseBudgetDisplay: display };
     }
-    const loose = raw.match(/\bR\s?[\d][\d,]*(?:\.\d{2})?\b/i);
+    const loose = raw.match(new RegExp(String.raw`\b(${ZAR_AMOUNT})\b`, "i"));
     if (loose && /\b(budget|afford|spend|vehicle|car|fortuner|hilux|price|quotation|quote)\b/i.test(raw)) {
-        const display = normalizeZarAmount(loose[0]);
+        const { display, amount } = parseZarAmountToken(loose[1]);
         return {
-            confirmedPurchaseBudget: Number(display.replace(/[^\d]/g, "")),
+            confirmedPurchaseBudget: amount,
             confirmedPurchaseBudgetDisplay: display,
         };
     }
@@ -124,11 +133,13 @@ function parseNoBudgetLimit(text) {
         };
     }
     if (/\b(?:over|above|more\s+than|at\s+least)\s+R\s?[\d]/i.test(text)) {
-        const match = String(text).match(/\b(?:over|above|more\s+than|at\s+least)\s+(R\s?[\d][\d,]*(?:\.\d{2})?)/i);
+        const match = String(text).match(
+            new RegExp(String.raw`\b(?:over|above|more\s+than|at\s+least)\s+(${ZAR_AMOUNT})`, "i")
+        );
         if (match?.[1]) {
-            const display = normalizeZarAmount(match[1]);
+            const { display, amount } = parseZarAmountToken(match[1]);
             return {
-                confirmedPurchaseBudget: Number(display.replace(/[^\d]/g, "")),
+                confirmedPurchaseBudget: amount,
                 confirmedPurchaseBudgetDisplay: `${display}+`,
                 budgetOpen: false,
                 budgetMinOnly: true,
@@ -544,7 +555,10 @@ export function getActivePurchaseBudgetFilter(salesContext) {
         salesContext.purchaseBudgetDisplay ??
         salesContext.budgetDisplay;
     const amount =
-        salesContext.confirmedPurchaseBudget ?? salesContext.purchaseBudget ?? salesContext.budget;
+        salesContext.confirmedPurchaseBudget ??
+        salesContext.purchaseBudget ??
+        salesContext.budget ??
+        salesContext.estimatedPurchaseBudget;
     if (display?.endsWith("+")) {
         return { minPrice: amount };
     }

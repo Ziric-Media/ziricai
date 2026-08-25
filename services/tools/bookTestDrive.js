@@ -219,6 +219,7 @@ export default {
                 message: `Test drive already booked for ${formatSlotLabel(new Date(enrichedAppointment.scheduledAt))} — ${enrichedAppointment.vehicleDescription || vehicleCheck.vehicleLabel} (stock ${enrichedAppointment.stockNumber || appointment.vehicleStockNumber}).`,
                 appointment: enrichedAppointment,
                 booking: enrichedAppointment,
+                vehicleId: enrichedAppointment.vehicleId || vehicleCheck.vehicleId,
             };
         }
 

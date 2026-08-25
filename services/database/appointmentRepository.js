@@ -236,7 +236,7 @@ async function enrichAppointment(companyId, appointment) {
         bookingId: appointment.id,
         companyId: appointment.companyId,
         customerId: appointment.customerId,
-        vehicleId: vehicleId || publicVehicle?.vehicleId || null,
+        vehicleId: vehicleId || publicVehicle?.vehicleId || vehicle?.vehicleId || null,
         stockNumber: stockNumber || publicVehicle?.stockNumber || null,
         vehicleMake: meta.vehicleMake || publicVehicle?.make || null,
         vehicleModel: meta.vehicleModel || publicVehicle?.model || null,
