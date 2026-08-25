@@ -516,3 +516,8 @@ export function _resetMemoryInventoryForTests() {
 }
 
 export { vehicleToPublic };
+
+/** List all vehicles for a tenant (import/sync scripts). */
+export async function listVehiclesByCompany(companyId) {
+    return listAllVehicles(companyId);
+}
