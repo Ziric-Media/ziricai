@@ -48,6 +48,7 @@ import {
     formatResolvedVehicleBlock,
 } from "../../conversation/vehicleReference.js";
 import { getRecommendedVehicles } from "../../conversation/recommendedVehicles.js";
+import { buildVehicleOutboundPlan } from "../../conversation/vehicleOutboundPlan.js";
 
 import { captureLeadFromMessage } from "../../tenants/crmService.js";
 
@@ -59,24 +60,27 @@ const NON_TEXT_REPLY = "Please send a text message so I can help you.";
 
 initAiTools();
 
-async function sendViaIntegration(channel, companyId, to, text) {
-    return integrationSend(channel || "whatsapp", { companyId }, { to, text });
+async function sendViaIntegration(channel, companyId, to, payload) {
+    return integrationSend(channel || "whatsapp", { companyId }, { to, ...payload });
 }
 
 async function trySendOutbound(job, channel, companyId, to, text, responseSource = "ai") {
-    if (job.outboundSent && job.outboundMetaMessageId) {
+    if (job.outboundPlanSent || (job.outboundSent && job.outboundMetaMessageId)) {
         console.log("[whatsapp] Outbound already sent (idempotent skip)", {
             jobId: job.id,
             companyId,
             to,
             responseSource,
-            metaMessageIdPrefix: String(job.outboundMetaMessageId).slice(0, 24),
+            outboundPlanSent: Boolean(job.outboundPlanSent),
+            metaMessageIdPrefix: job.outboundMetaMessageId
+                ? String(job.outboundMetaMessageId).slice(0, 24)
+                : null,
         });
         return job.outboundMetaMessageId;
     }
 
     try {
-        const result = await sendViaIntegration(channel, companyId, to, text);
+        const result = await sendViaIntegration(channel, companyId, to, { text });
         const metaMessageId = result?.messages?.[0]?.id || null;
         if (metaMessageId) {
             await markJobOutboundSent(job.id, metaMessageId);
@@ -103,6 +107,57 @@ async function trySendOutbound(job, channel, companyId, to, text, responseSource
         });
     }
     return null;
+}
+
+async function trySendOutboundPlan(job, channel, companyId, to, plan, responseSource = "ai") {
+    if (job.outboundPlanSent || (job.outboundSent && job.outboundMetaMessageIds?.length)) {
+        console.log("[whatsapp] Outbound plan already sent (idempotent skip)", {
+            jobId: job.id,
+            companyId,
+            to,
+            responseSource,
+            parts: job.outboundMetaMessageIds?.length || 0,
+        });
+        return job.outboundMetaMessageIds || [];
+    }
+
+    try {
+        const results = await sendViaIntegration(channel, companyId, to, { messages: plan.messages });
+        const wamids = (Array.isArray(results) ? results : [results])
+            .map((r) => r?.messages?.[0]?.id)
+            .filter(Boolean);
+
+        if (wamids.length) {
+            await markJobOutboundSent(job.id, wamids[0], {
+                outboundPlanSent: true,
+                outboundMetaMessageIds: wamids,
+            });
+            job.outboundSent = true;
+            job.outboundPlanSent = true;
+            job.outboundMetaMessageId = wamids[0];
+            job.outboundMetaMessageIds = wamids;
+            console.log("[whatsapp] Outbound plan sent", {
+                jobId: job.id,
+                companyId,
+                to,
+                responseSource,
+                parts: wamids.length,
+                metaMessageIdPrefix: String(wamids[0]).slice(0, 24),
+            });
+        }
+        return wamids;
+    } catch (err) {
+        console.warn("[whatsapp] Outbound plan send failed (inbound processing continues):", {
+            jobId: job.id,
+            companyId,
+            to,
+            responseSource,
+            code: err.metaCode ?? err.code ?? null,
+            retryable: err.retryable !== false,
+            message: err.message,
+        });
+    }
+    return [];
 }
 
 async function processInboundMessage(job) {
@@ -361,18 +416,61 @@ async function processInboundMessage(job) {
         });
     }
 
-    const metaMessageId = await trySendOutbound(job, outboundChannel, resolvedCompanyId, sender, reply, "ai");
-    await saveOutboundMessage(sender, reply, {
-        channel: outboundChannel,
-        companyId: resolvedCompanyId,
-        externalId: metaMessageId,
-    });
+    const outboundPlan =
+        outboundChannel === "whatsapp"
+            ? buildVehicleOutboundPlan({
+                  toolResults,
+                  llmReply: reply,
+                  channel: outboundChannel,
+              })
+            : null;
+
+    let savedReply = reply;
+    if (outboundPlan?.messages?.length) {
+        const wamids = await trySendOutboundPlan(
+            job,
+            outboundChannel,
+            resolvedCompanyId,
+            sender,
+            outboundPlan,
+            "ai_vehicle_media"
+        );
+
+        let wamidIndex = 0;
+        for (const part of outboundPlan.messages) {
+            const metaMessageId = wamids[wamidIndex] || null;
+            if (part.type === "image") {
+                await saveOutboundMessage(sender, part.caption || "[image]", {
+                    channel: outboundChannel,
+                    companyId: resolvedCompanyId,
+                    externalId: metaMessageId,
+                    mediaUrl: part.link,
+                });
+            } else {
+                await saveOutboundMessage(sender, part.text, {
+                    channel: outboundChannel,
+                    companyId: resolvedCompanyId,
+                    externalId: metaMessageId,
+                });
+            }
+            if (metaMessageId) wamidIndex++;
+        }
+        savedReply = outboundPlan.strippedReply || reply;
+    } else {
+        const metaMessageId = await trySendOutbound(job, outboundChannel, resolvedCompanyId, sender, reply, "ai");
+        await saveOutboundMessage(sender, reply, {
+            channel: outboundChannel,
+            companyId: resolvedCompanyId,
+            externalId: metaMessageId,
+        });
+    }
 
     if (resolvedCompanyId) {
         await publish(resolvedCompanyId, EventTypes.MESSAGE_SENT, {
             phone: sender,
-            text: reply,
+            text: savedReply,
             channel: outboundChannel,
+            vehicleMediaParts: outboundPlan?.messages?.length || 0,
         });
     }
 

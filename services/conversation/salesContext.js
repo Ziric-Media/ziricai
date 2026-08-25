@@ -334,6 +334,7 @@ export function buildRecommendedVehicleRecords(vehicles = [], { reason, requirem
             year: v.year,
             price: v.price,
             location: v.location || null,
+            primaryImageUrl: Array.isArray(v.images) ? v.images[0] || null : null,
             reason: reason || buildInventoryRecommendationReason(v),
             requirements: requirements?.length ? [...requirements] : undefined,
             recommendedAt: now,

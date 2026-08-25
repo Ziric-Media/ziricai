@@ -52,6 +52,15 @@ SALES TRUTH & CUSTOMER PROTECTION:
 `.trim();
 
 /** Platform rules — inventory via searchInventory tool; bookings via bookTestDrive. */
+export const WHATSAPP_MEDIA_RULES = `
+WHATSAPP MEDIA (vehicle photos):
+- NEVER use markdown image syntax on WhatsApp (no ![alt](url)).
+- NEVER paste vehicle photo URLs in your text reply — the platform sends photos as separate native WhatsApp image messages.
+- When presenting vehicles, use plain text specs only (year, make, model, price, km, location, stock number).
+- Do not tell the customer to "click the link" or "see image above" for vehicle photos — they will receive photos automatically.
+`.trim();
+
+/** Platform rules — inventory via searchInventory tool; bookings via bookTestDrive. */
 export const WHATSAPP_INVENTORY_RULES = `
 INVENTORY & STOCK RULES:
 - searchInventory = what vehicles are in stock / for sale (listings, prices, specs, seatingCapacity). Use when the customer asks what you have, browse options, or compare models in inventory.
@@ -161,6 +170,7 @@ export function buildWhatsAppSystemPrompt({
         WHATSAPP_CHANNEL_RULES,
         WHATSAPP_AUTHORITATIVE_DATA_RULES,
         WHATSAPP_SALES_TRUTH_RULES,
+        WHATSAPP_MEDIA_RULES,
         WHATSAPP_INVENTORY_RULES,
         WHATSAPP_ACTION_TOOL_RULES,
         `Business: ${resolvedCompanyName}.`,

@@ -191,14 +191,17 @@ export function createPostgresBackend(connectionString) {
         return rowToJob(retrying.rows[0]);
     }
 
-    async function markOutboundSent(id, metaMessageId) {
+    async function markOutboundSent(id, metaMessageId, extra = {}) {
         const result = await pool.query(
             `UPDATE ziricai_jobs
              SET outbound_sent = TRUE, outbound_meta_message_id = $2
              WHERE id = $1 RETURNING *`,
             [id, metaMessageId]
         );
-        return result.rows[0] ? rowToJob(result.rows[0]) : null;
+        const job = result.rows[0] ? rowToJob(result.rows[0]) : null;
+        if (job && extra.outboundPlanSent) job.outboundPlanSent = true;
+        if (job && extra.outboundMetaMessageIds) job.outboundMetaMessageIds = extra.outboundMetaMessageIds;
+        return job;
     }
 
     async function findActiveByExternalMessageId(externalMessageId) {

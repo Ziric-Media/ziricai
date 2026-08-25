@@ -51,6 +51,8 @@ async function runJob(job) {
         const completed = await backend.completeJob(job.id, {
             outboundSent: job.outboundSent,
             outboundMetaMessageId: job.outboundMetaMessageId,
+            outboundPlanSent: job.outboundPlanSent,
+            outboundMetaMessageIds: job.outboundMetaMessageIds,
         });
         if (completed) logJob("Completed", completed);
 
@@ -139,9 +141,9 @@ export async function enqueue(payload) {
     return job;
 }
 
-export async function markJobOutboundSent(jobId, metaMessageId) {
+export async function markJobOutboundSent(jobId, metaMessageId, extra = {}) {
     if (!backend) return null;
-    return backend.markOutboundSent(jobId, metaMessageId);
+    return backend.markOutboundSent(jobId, metaMessageId, extra);
 }
 
 export async function getQueueStats() {

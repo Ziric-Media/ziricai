@@ -31,6 +31,8 @@ export function createMemoryBackend() {
             externalMessageId: record.externalMessageId,
             outboundSent: record.outboundSent,
             outboundMetaMessageId: record.outboundMetaMessageId,
+            outboundPlanSent: record.outboundPlanSent,
+            outboundMetaMessageIds: record.outboundMetaMessageIds,
         };
     }
 
@@ -77,6 +79,8 @@ export function createMemoryBackend() {
             lastError: null,
             outboundSent: false,
             outboundMetaMessageId: null,
+            outboundPlanSent: false,
+            outboundMetaMessageIds: null,
         };
         jobs.set(id, record);
         ready.push(id);
@@ -117,6 +121,10 @@ export function createMemoryBackend() {
         if (patch.outboundMetaMessageId !== undefined) {
             record.outboundMetaMessageId = patch.outboundMetaMessageId;
         }
+        if (patch.outboundPlanSent !== undefined) record.outboundPlanSent = patch.outboundPlanSent;
+        if (patch.outboundMetaMessageIds !== undefined) {
+            record.outboundMetaMessageIds = patch.outboundMetaMessageIds;
+        }
         return normalizeJob(record);
     }
 
@@ -136,11 +144,13 @@ export function createMemoryBackend() {
         return normalizeJob(record);
     }
 
-    function markOutboundSent(id, metaMessageId) {
+    function markOutboundSent(id, metaMessageId, extra = {}) {
         const record = jobs.get(id);
         if (!record) return null;
         record.outboundSent = true;
         record.outboundMetaMessageId = metaMessageId;
+        if (extra.outboundPlanSent) record.outboundPlanSent = true;
+        if (extra.outboundMetaMessageIds) record.outboundMetaMessageIds = extra.outboundMetaMessageIds;
         return normalizeJob(record);
     }
 

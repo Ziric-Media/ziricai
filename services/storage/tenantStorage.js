@@ -171,6 +171,7 @@ export async function saveTenantMessage(companyId, phone, role, content, options
         message: content,
         content,
         externalId: options.externalId || null,
+        mediaUrl: options.mediaUrl || null,
         createdAt: now(),
     };
 

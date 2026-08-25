@@ -2,7 +2,7 @@
  * WhatsApp adapter — wraps existing services/whatsapp.js and Meta webhook format.
  */
 import { BaseAdapter } from "./baseAdapter.js";
-import { sendWhatsAppMessage } from "../../whatsapp.js";
+import { sendWhatsAppMessage, sendWhatsAppMessagesSequential } from "../../whatsapp.js";
 import { createUnifiedMessage, CHANNELS } from "../types/unifiedMessage.js";
 import {
     resolveCompanyFromPhoneNumberId,
@@ -26,8 +26,14 @@ export class WhatsAppAdapter extends BaseAdapter {
     }
 
     async sendMessage(ctx, payload) {
-        const { to, text } = payload;
-        logInfo(CHANNELS.WHATSAPP, ctx?.companyId, "Sending message", { to });
+        const { to, text, messages } = payload;
+        logInfo(CHANNELS.WHATSAPP, ctx?.companyId, "Sending message", {
+            to,
+            parts: messages?.length || (text ? 1 : 0),
+        });
+        if (Array.isArray(messages) && messages.length) {
+            return sendWhatsAppMessagesSequential(to, messages);
+        }
         return sendWhatsAppMessage(to, text);
     }
 
