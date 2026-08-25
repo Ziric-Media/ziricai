@@ -3,6 +3,9 @@ import {
     findActiveWhatsAppIntegrationByPhoneNumberId,
     maskPhoneNumberId,
 } from "../../tenants/integrationService.js";
+import { isCentralMotorsPilotMode } from "../../storage/centralMotorsPilot.js";
+import { CENTRAL_MOTORS_RTB_COMPANY_ID } from "../../inventory/adapters/centralMotorsRtbAdapter.js";
+import { CENTRAL_MOTORS_PHONE_NUMBER_ID, CENTRAL_MOTORS_COMPANY_ID } from "../../storage/seedDemoTenants.js";
 
 /**
  * Default integration metadata per channel/connector.
@@ -168,15 +171,18 @@ export async function resolveCompanyFromPhoneNumberId(phoneNumberId) {
  * @deprecated Known phone_number_id → companyId mappings (dev bootstrap only).
  * Production routing uses Firestore companies/{companyId}/integrations.
  */
-const DEMO_PHONE_NUMBER_MAPPINGS = [
-    ["1209265748933699", "demo-central-motors"],
-];
+function getDemoPhoneNumberMappings() {
+    const centralTarget = isCentralMotorsPilotMode()
+        ? CENTRAL_MOTORS_RTB_COMPANY_ID
+        : CENTRAL_MOTORS_COMPANY_ID;
+    return [[CENTRAL_MOTORS_PHONE_NUMBER_ID, centralTarget]];
+}
 
 /** @deprecated Bootstrap dev-only in-memory mappings from env + demo seeds. Never runs in production. */
 export function bootstrapIntegrationConfig() {
     if (isProduction()) return;
 
-    for (const [phoneId, companyId] of DEMO_PHONE_NUMBER_MAPPINGS) {
+    for (const [phoneId, companyId] of getDemoPhoneNumberMappings()) {
         registerPhoneNumberMapping(phoneId, companyId);
     }
 

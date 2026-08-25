@@ -17,6 +17,7 @@ import {
     CENTRAL_MOTORS_PHONE_NUMBER_ID,
     CENTRAL_MOTORS_COMPANY_ID,
 } from "../services/storage/seedDemoTenants.js";
+import { isCentralMotorsPilotMode } from "../services/storage/centralMotorsPilot.js";
 
 process.env.STORAGE_BACKEND = process.env.STORAGE_BACKEND || "memory";
 process.env.NODE_ENV = process.env.NODE_ENV || "development";
@@ -79,15 +80,21 @@ async function runAudit() {
             "dev-only DEFAULT_COMPANY_ID fallback when explicit companyId absent and NODE_ENV !== production."
     );
 
-    audit.push(
-        `Demo seed maps phone ${CENTRAL_MOTORS_PHONE_NUMBER_ID} → ${CENTRAL_MOTORS_COMPANY_ID} ` +
-            "(seedDemoTenants.js + DEMO_PHONE_NUMBER_MAPPINGS). Sarah AI employee is seeded for demo-central-motors."
-    );
-
-    audit.push(
-        `Real inventory tenant ${COMPANY_ID} is populated by import-central-motors-inventory.js; ` +
-            "no WhatsApp integration seed exists for central-motors-rtb in codebase."
-    );
+    if (isCentralMotorsPilotMode()) {
+        audit.push(
+            `Pilot mode ON: phone ${CENTRAL_MOTORS_PHONE_NUMBER_ID} → ${COMPANY_ID} ` +
+                "(seedCentralMotorsPilot.js). Sarah AI employee seeded for central-motors-rtb."
+        );
+    } else {
+        audit.push(
+            `Demo seed maps phone ${CENTRAL_MOTORS_PHONE_NUMBER_ID} → ${CENTRAL_MOTORS_COMPANY_ID} ` +
+                "(seedDemoTenants.js). Set CENTRAL_MOTORS_PILOT=true on Railway for production pilot."
+        );
+        audit.push(
+            `Real inventory tenant ${COMPANY_ID} is populated by import-central-motors-inventory.js; ` +
+                "WhatsApp wiring to RTB requires CENTRAL_MOTORS_PILOT=true (Phase 1)."
+        );
+    }
 
     audit.push(
         "searchInventory / bookTestDrive / getCustomerBookings are tenant-scoped by ctx.companyId → " +
@@ -122,9 +129,10 @@ async function runAudit() {
         );
         bootstrapIntegrationConfig();
         const resolved = await resolveCompanyFromPhoneNumberId(CENTRAL_MOTORS_PHONE_NUMBER_ID);
+        const expectedPilot = isCentralMotorsPilotMode() ? COMPANY_ID : CENTRAL_MOTORS_COMPANY_ID;
         audit.push(
             `Runtime WhatsApp resolve(${CENTRAL_MOTORS_PHONE_NUMBER_ID}) → ${resolved || "null"} ` +
-                `(expected demo-central-motors until Phase 1 wires central-motors-rtb)`
+                `(expected ${expectedPilot})`
         );
     } catch (err) {
         audit.push(`WhatsApp resolution runtime check skipped: ${err.message}`);

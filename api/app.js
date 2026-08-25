@@ -24,6 +24,7 @@ import {
 import { getStorageAdapter, getConfiguredStorageBackend, getStorageFallbackReason, hasAdminCredentials } from "../services/storage/storageAdapter.js";
 import { seedDemoCustomersIfEmpty } from "../services/storage/seedDemoCustomers.js";
 import { seedDemoTenantsIfMissing } from "../services/storage/seedDemoTenants.js";
+import { seedCentralMotorsPilotIfEnabled } from "../services/storage/seedCentralMotorsPilot.js";
 import { seedCustomerOpsDemoIfEmpty } from "../services/storage/seedCustomerOpsDemo.js";
 import {
     listCustomers,
@@ -1483,6 +1484,9 @@ export async function runBackgroundInit() {
         await seedDemoCustomersIfEmpty(adapter);
         await seedDemoTenantsIfMissing().catch((err) => {
             console.error("[startup] Demo tenant seed skipped:", err.message);
+        });
+        await seedCentralMotorsPilotIfEnabled().catch((err) => {
+            console.error("[startup] Central Motors pilot seed skipped:", err.message);
         });
         await seedCustomerOpsDemoIfEmpty();
         try {

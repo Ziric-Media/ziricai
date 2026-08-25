@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { isCentralMotorsPilotMode } from "../storage/centralMotorsPilot.js";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ENV_PATH = path.join(ROOT, ".env");
@@ -48,6 +49,7 @@ export function logRailwayEnvDiagnostics() {
         whatsappTokenSet: envSet("WHATSAPP_TOKEN"),
         phoneNumberIdSuffix: phoneNumberIdSuffix(),
         defaultCompanyId: process.env.DEFAULT_COMPANY_ID || null,
+        centralMotorsPilot: isCentralMotorsPilotMode(),
         openaiKeySet: envSet("OPENAI_API_KEY"),
         storageBackend: process.env.STORAGE_BACKEND || "(default)",
         nodeEnv: process.env.NODE_ENV || "development",

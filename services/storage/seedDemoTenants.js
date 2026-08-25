@@ -15,6 +15,7 @@ import {
     upsertWhatsAppIntegration,
     warmPhoneResolutionCache,
 } from "../tenants/integrationService.js";
+import { isCentralMotorsPilotMode } from "./centralMotorsPilot.js";
 
 export const CENTRAL_MOTORS_PHONE_NUMBER_ID = "1209265748933699";
 export const CENTRAL_MOTORS_COMPANY_ID = "demo-central-motors";
@@ -165,22 +166,31 @@ async function seedTenant(tenant) {
         await seedDemoInventoryFromDocs(companyId, inventoryDocs);
     }
 
-    const existingIntegration = await findActiveWhatsAppIntegrationByPhoneNumberId(phoneNumberId);
-    if (existingIntegration?.companyId !== companyId) {
-        const integration = await upsertWhatsAppIntegration(companyId, {
-            channel: "whatsapp",
-            provider: "whatsapp",
-            phoneNumberId,
-            businessAccountId: process.env.WABA_ID || null,
-            displayPhoneNumber: process.env.DISPLAY_PHONE_NUMBER || null,
-            status: "active",
-            credentialsSource: "env",
-        });
-        warmPhoneResolutionCache(phoneNumberId, integration);
-        seeded.integration = true;
-        console.log("[seed] Loaded WhatsApp integration", phoneNumberId, "→", companyId);
+    const skipWhatsAppForPilotDemo =
+        isCentralMotorsPilotMode() && companyId === CENTRAL_MOTORS_COMPANY_ID;
+
+    if (skipWhatsAppForPilotDemo) {
+        console.log(
+            "[seed] Pilot mode: skipping demo-central-motors WhatsApp integration (sandbox phone → central-motors-rtb)"
+        );
     } else {
-        warmPhoneResolutionCache(phoneNumberId, existingIntegration);
+        const existingIntegration = await findActiveWhatsAppIntegrationByPhoneNumberId(phoneNumberId);
+        if (existingIntegration?.companyId !== companyId) {
+            const integration = await upsertWhatsAppIntegration(companyId, {
+                channel: "whatsapp",
+                provider: "whatsapp",
+                phoneNumberId,
+                businessAccountId: process.env.WABA_ID || null,
+                displayPhoneNumber: process.env.DISPLAY_PHONE_NUMBER || null,
+                status: "active",
+                credentialsSource: "env",
+            });
+            warmPhoneResolutionCache(phoneNumberId, integration);
+            seeded.integration = true;
+            console.log("[seed] Loaded WhatsApp integration", phoneNumberId, "→", companyId);
+        } else {
+            warmPhoneResolutionCache(phoneNumberId, existingIntegration);
+        }
     }
 
     return seeded;

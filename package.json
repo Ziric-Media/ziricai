@@ -38,6 +38,7 @@
         "seed:knowledge": "node scripts/seed-knowledge-content.js",
         "import:central-motors": "node scripts/import-central-motors-inventory.js",
         "verify:central-motors-import": "node scripts/verify-central-motors-import.js",
+        "verify:central-motors-pilot": "node scripts/verify-central-motors-pilot.js",
         "verify:central-motors-uat": "node scripts/verify-central-motors-uat.js",
         "uat:central-motors": "node scripts/verify-central-motors-uat.js"
     },
