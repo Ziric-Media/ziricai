@@ -7,6 +7,7 @@ import {
     getTenantConversation,
     conversationsRepo,
 } from "../storage/tenantStorage.js";
+import { pickByHint, pickByOrdinal } from "./vehicleReference.js";
 
 export async function getRecommendedVehicles(companyId, phone, channel = "whatsapp") {
     if (!companyId || !phone) return [];
@@ -44,13 +45,7 @@ export function pickFromRecommended(recommended, hint) {
     if (!recommended?.length) return null;
     if (!hint) return recommended.length === 1 ? recommended[0] : null;
 
-    const h = String(hint).toLowerCase();
-    const matches = recommended.filter((v) => {
-        const label = [v.label, v.title, v.make, v.model, v.stockNumber].filter(Boolean).join(" ").toLowerCase();
-        return label.includes(h) || h.split(/\W+/).some((t) => t.length > 2 && label.includes(t));
-    });
-
-    if (matches.length === 1) return matches[0];
-    if (matches.length > 1) return matches[0];
-    return recommended.length === 1 ? recommended[0] : null;
+    const ordinal = pickByOrdinal(recommended, hint);
+    if (ordinal) return ordinal;
+    return pickByHint(recommended, hint);
 }

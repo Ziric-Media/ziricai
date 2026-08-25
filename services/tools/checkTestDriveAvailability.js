@@ -54,15 +54,30 @@ export default {
             return { ok: false, error: "companyId is required", code: "MISSING_COMPANY" };
         }
 
+        let vehicleId = args.vehicleId;
+        let stockNumber = args.vehicleStockNumber;
+
+        if (!vehicleId && !stockNumber) {
+            const resolved =
+                ctx.resolvedVehicleReference ||
+                (await import("../conversation/vehicleReference.js")).resolveVehicleReference(
+                    ctx.inboundMessage,
+                    ctx.salesContext,
+                    ctx.lastRecommendedVehicles
+                );
+            if (resolved?.vehicleId) vehicleId = resolved.vehicleId;
+            else if (resolved?.stockNumber) stockNumber = resolved.stockNumber;
+        }
+
         const result = await evaluateTestDriveAvailability(companyId, {
-            vehicleId: args.vehicleId,
-            stockNumber: args.vehicleStockNumber,
+            vehicleId,
+            stockNumber,
             date: args.date,
             time: args.time,
             scheduledAt: args.scheduledAt,
-            query: args.query,
-            make: args.make,
-            model: args.model,
+            query: vehicleId || stockNumber ? undefined : args.query,
+            make: vehicleId || stockNumber ? undefined : args.make,
+            model: vehicleId || stockNumber ? undefined : args.model,
         });
 
         return {

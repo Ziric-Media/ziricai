@@ -73,10 +73,13 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
                   scheduledAt: options.scheduledAt,
               })
             : [];
+        const label =
+            vehicle.title || [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "That vehicle";
+        const stockRef = vehicle.stockNumber ? `, stock ${vehicle.stockNumber}` : "";
         return {
             available: false,
             code: "INVENTORY_UNAVAILABLE",
-            reason: `${vehicle.title || vehicle.stockNumber} is sold or no longer in stock.`,
+            reason: `The ${label}${stockRef}, is no longer available.`,
             vehicle: vehicleToPublic(vehicle),
             alternatives: { vehicles: altVehicles, slots: [] },
         };

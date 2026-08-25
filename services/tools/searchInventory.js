@@ -3,6 +3,10 @@
  */
 import { searchInventory as searchInventoryRecords, detectBrandHintsFromQuery } from "../inventory/inventoryService.js";
 import { storeRecommendedVehicles } from "../conversation/recommendedVehicles.js";
+import {
+    getActivePurchaseBudgetFilter,
+    persistRecommendedToSalesContext,
+} from "../conversation/salesContext.js";
 import { evaluateSeatingFit, getVehicleSeatingCapacity } from "../inventory/seatingCapacity.js";
 
 export default {
@@ -59,13 +63,14 @@ export default {
 
         const brandHints = detectBrandHintsFromQuery(args.query || "");
         const minSeats = args.minSeats ?? null;
+        const budgetFilter = getActivePurchaseBudgetFilter(salesContext);
         const vehicles = await searchInventoryRecords(companyId, args.query || "", {
             make: args.make || args.brand || brandHints.make,
             makes: brandHints.makes,
             excludeMake: args.excludeMake || brandHints.excludeMake,
             model: args.model,
-            maxPrice: args.maxPrice,
-            minPrice: args.minPrice,
+            maxPrice: args.maxPrice ?? (budgetFilter.open ? undefined : budgetFilter.maxPrice),
+            minPrice: args.minPrice ?? budgetFilter.minPrice,
             minSeats,
             limit: args.limit || 10,
             availabilityOnly: false,
@@ -85,6 +90,9 @@ export default {
 
         if (customerPhone) {
             await storeRecommendedVehicles(companyId, customerPhone, channel || "whatsapp", vehiclesWithFit);
+            await persistRecommendedToSalesContext(companyId, customerPhone, vehiclesWithFit, {
+                requirements: salesContext?.customerRequirements,
+            });
         }
 
         return {
@@ -92,10 +100,16 @@ export default {
             count: vehiclesWithFit.length,
             vehicles: vehiclesWithFit,
             passengerCount,
+            activePurchaseBudget: budgetFilter.open
+                ? "no limit"
+                : budgetFilter.maxPrice ?? budgetFilter.minPrice ?? null,
             message:
                 vehiclesWithFit.length === 0
                     ? "No vehicles matched that search. Try broader terms or ask about alternatives."
-                    : `Inventory search returned ${vehiclesWithFit.length} vehicle${vehiclesWithFit.length === 1 ? "" : "s"}. Describe matches using vehicle details below. Always compare seatingCapacity to passenger count — warn if seatingFit is insufficient.`,
+                    : `Inventory search returned ${vehiclesWithFit.length} vehicle${vehiclesWithFit.length === 1 ? "" : "s"}. ` +
+                      "Only recommend vehicles from this result — each has a stable vehicleId. " +
+                      "Pass vehicleId to checkTestDriveAvailability and bookTestDrive for follow-up. " +
+                      "Always compare seatingCapacity to passenger count — warn if seatingFit is insufficient.",
         };
     },
 };

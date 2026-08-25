@@ -18,9 +18,25 @@ import { evaluateTestDriveAvailability } from "./testDriveAvailability.js";
 async function resolveBookingVehicle(ctx, args) {
     const { companyId, customerPhone, channel } = ctx;
 
+    let vehicleId = args.vehicleId;
+    let stockNumber = args.vehicleStockNumber;
+
+    if (!vehicleId && !stockNumber) {
+        const resolved = ctx.resolvedVehicleReference ||
+            (ctx.inboundMessage
+                ? (await import("../conversation/vehicleReference.js")).resolveVehicleReference(
+                      ctx.inboundMessage,
+                      ctx.salesContext,
+                      ctx.lastRecommendedVehicles
+                  )
+                : null);
+        if (resolved?.vehicleId) vehicleId = resolved.vehicleId;
+        else if (resolved?.stockNumber) stockNumber = resolved.stockNumber;
+    }
+
     let vehicle = await resolveVehicle(companyId, {
-        vehicleId: args.vehicleId,
-        stockNumber: args.vehicleStockNumber,
+        vehicleId,
+        stockNumber,
     });
 
     if (!vehicle && (args.vehicleHint || (!args.vehicleId && !args.vehicleStockNumber))) {

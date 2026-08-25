@@ -10,6 +10,7 @@ import {
     schedulingUpdatesFromToolResult,
     saveSchedulingContext,
 } from "../conversation/schedulingContext.js";
+import { resolveVehicleReference } from "../conversation/vehicleReference.js";
 
 /**
  * @param {object} params
@@ -87,7 +88,24 @@ export async function runTool(name, ctx, args = {}) {
     }
 
     const scheduling = ctx.schedulingContext || {};
-    const enrichedArgs = enrichToolArgsWithScheduling(name, args, scheduling);
+    let enrichedArgs = enrichToolArgsWithScheduling(name, args, scheduling);
+
+    if (
+        (name === "checkTestDriveAvailability" || name === "bookTestDrive") &&
+        !enrichedArgs.vehicleId &&
+        !enrichedArgs.vehicleStockNumber
+    ) {
+        const resolved =
+            enrichedCtx.resolvedVehicleReference ||
+            resolveVehicleReference(
+                ctx.inboundMessage,
+                ctx.salesContext,
+                enrichedCtx.lastRecommendedVehicles
+            );
+        if (resolved?.vehicleId) {
+            enrichedArgs = { ...enrichedArgs, vehicleId: resolved.vehicleId };
+        }
+    }
 
     try {
         const result = await tool.execute(enrichedCtx, enrichedArgs);

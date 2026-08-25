@@ -42,6 +42,12 @@ import {
     persistSalesContext,
     mergeSalesContext,
 } from "../../conversation/salesContext.js";
+import {
+    isVehicleReferenceIntent,
+    resolveVehicleReference,
+    formatResolvedVehicleBlock,
+} from "../../conversation/vehicleReference.js";
+import { getRecommendedVehicles } from "../../conversation/recommendedVehicles.js";
 
 import { captureLeadFromMessage } from "../../tenants/crmService.js";
 
@@ -278,11 +284,32 @@ async function processInboundMessage(job) {
         });
     }
 
+    let resolvedVehicleReference = null;
+    let authoritativeVehicleContext = "";
+    if (resolvedCompanyId && isVehicleReferenceIntent(text)) {
+        const conversationRecommended = await getRecommendedVehicles(resolvedCompanyId, sender, outboundChannel);
+        resolvedVehicleReference = resolveVehicleReference(
+            text,
+            salesContextForTurn,
+            conversationRecommended
+        );
+        if (resolvedVehicleReference?.vehicleId) {
+            authoritativeVehicleContext = formatResolvedVehicleBlock(resolvedVehicleReference);
+            console.log("[whatsapp] Vehicle reference resolved", {
+                companyId: resolvedCompanyId,
+                customerId,
+                vehicleId: resolvedVehicleReference.vehicleId,
+                stockNumber: resolvedVehicleReference.stockNumber,
+            });
+        }
+    }
+
     const knowledgeParts = [
         knowledgeBundle.context || "",
         memoryContext || "",
         schedulingPrompt,
         authoritativeBookingContext,
+        authoritativeVehicleContext,
     ].filter(Boolean);
 
     const toolCtx = {
@@ -295,6 +322,7 @@ async function processInboundMessage(job) {
         inboundMessage: text,
         schedulingContext,
         salesContext: salesContextForTurn,
+        resolvedVehicleReference,
     };
 
     const aiTools = resolvedCompanyId ? getOpenAIToolDefinitions() : [];
