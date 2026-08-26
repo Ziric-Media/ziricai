@@ -12,13 +12,7 @@ function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
 
-function futureSlotIso(daysAhead = 5, hour = 11) {
-    const d = new Date();
-    d.setDate(d.getDate() + daysAhead);
-    while (d.getDay() === 0) d.setDate(d.getDate() + 1);
-    d.setHours(hour, 0, 0, 0);
-    return d.toISOString();
-}
+import { futureSlotIso } from "./testHelpers/scheduling.js";
 
 async function simulateTurn({ companyId, phone, text, ctx, salesContext, persistSalesContext, extractSalesSignals, mergeSalesContext, getCustomer }) {
     const customer = await getCustomer(phone, { companyId });

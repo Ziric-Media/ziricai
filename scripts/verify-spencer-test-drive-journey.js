@@ -13,13 +13,7 @@ function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
 
-function futureSlotIso(daysAhead = 5, hour = 10, minute = 0) {
-    const d = new Date();
-    d.setDate(d.getDate() + daysAhead);
-    while (d.getDay() === 0) d.setDate(d.getDate() + 1);
-    d.setHours(hour, minute, 0, 0);
-    return d.toISOString();
-}
+import { futureSlotIso } from "./testHelpers/scheduling.js";
 
 function futureAugust28() {
     const now = new Date();

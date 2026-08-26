@@ -3,6 +3,7 @@
  * Separates inventory status from appointment slot capacity.
  */
 import { evaluateTestDriveAvailability } from "./testDriveAvailability.js";
+import { isSchedulingDelegationIntent } from "../conversation/schedulingContext.js";
 
 export default {
     name: "checkTestDriveAvailability",
@@ -69,6 +70,11 @@ export default {
             else if (resolved?.stockNumber) stockNumber = resolved.stockNumber;
         }
 
+        const autoSelectNext =
+            args.autoSelectNext === true ||
+            ctx.autoSelectNext === true ||
+            isSchedulingDelegationIntent(ctx.inboundMessage);
+
         const result = await evaluateTestDriveAvailability(companyId, {
             vehicleId,
             stockNumber,
@@ -79,14 +85,17 @@ export default {
             make: vehicleId || stockNumber ? undefined : args.make,
             model: vehicleId || stockNumber ? undefined : args.model,
             customerId: ctx.customerId,
+            autoSelectNext,
         });
 
         return {
-            ok: result.available || result.code === "NEED_TIME",
+            ok: result.available || result.code === "NEED_TIME" || result.code === "NEED_DATE",
             available: result.available,
             code: result.code,
             reason: result.reason,
             needsTime: result.needsTime === true,
+            needsDate: result.needsDate === true,
+            autoSelected: result.autoSelected === true,
             vehicle: result.vehicle,
             vehicles: result.vehicles,
             slotStart: result.slotStart,

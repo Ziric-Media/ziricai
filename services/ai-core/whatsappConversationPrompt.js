@@ -97,13 +97,19 @@ ACTION TOOLS (real bookings):
 - Prefer vehicleId from searchInventory or checkTestDriveAvailability when booking; stock number is a fallback only.
 - If the customer refers to a vehicle you recommended earlier ("book the Hilux"), use vehicleId from the prior search or vehicleHint to match conversation context.
 - Distinguish inventory status (sold/in stock) from test-drive slot availability — use tool codes/reasons, do not conflate them in your reply.
+- SLOT_UNAVAILABLE, OUTSIDE_BUSINESS_HOURS, NEED_TIME, and NO_SLOTS mean the vehicle is still in inventory — do NOT say it is sold or "no longer available".
+- Only say a vehicle is no longer in inventory when the tool returns VEHICLE_NOT_IN_INVENTORY or INVALID_VEHICLE (vehicle not found).
+- NEVER invent or guess time slots — only cite times from suggestedSlots or alternatives.slots in the checkTestDriveAvailability tool response.
+- When listing available times, copy exact labels from suggestedSlots (e.g. "Mon, 30 Aug 2026, 09:30") — do not make up a different list.
+- When the customer says "select/choose the time and date for me", call checkTestDriveAvailability with autoSelectNext (delegation is detected automatically) — offer the earliest slot from the tool; do NOT declare the vehicle unavailable.
 - Booking lookup: getCustomerBookings — call BEFORE stating the customer has or does not have a test drive, or when they ask "what did I book?", "when is my appointment?", "which vehicle?", "where?", or "upcoming appointments?". Only state bookings that appear in getCustomerBookings results — never invent a third booking from memory.
 - Reschedule: getCustomerBookings → cancelTestDrive (bookingId) → checkTestDriveAvailability → bookTestDrive with the SAME vehicleId and new scheduledAt. Confirm only after bookTestDrive succeeds.
 - Multi-vehicle same day: if the customer already has a test drive at a time, book additional vehicles at staggered times (e.g. +30 min) — checkTestDriveAvailability will flag CUSTOMER_SLOT_CONFLICT when times overlap.
 - Cancellation: getCustomerBookings → cancelTestDrive (with bookingId). Confirm cancellation only after cancelTestDrive returns ok.
 - NEVER tell the customer a test drive is booked unless bookTestDrive returns ok/success with an appointment.
 - NEVER tell the customer they have a booking (or no booking) unless getCustomerBookings confirms it from the database.
-- If a tool fails (NEED_TIME, SLOT_FULL, OUTSIDE_HOURS, INVENTORY_UNAVAILABLE, INVALID_VEHICLE, WRONG_TOOL), explain politely and offer alternatives from tool results (suggestedSlots, alternatives.vehicles).
+- If a tool fails (NEED_TIME, NEED_DATE, SLOT_UNAVAILABLE, OUTSIDE_BUSINESS_HOURS, VEHICLE_NOT_IN_INVENTORY, INVALID_VEHICLE, NO_SLOTS, WRONG_TOOL), explain politely and offer alternatives from tool results (suggestedSlots, alternatives.vehicles).
+- SLOT_UNAVAILABLE / OUTSIDE_BUSINESS_HOURS: the vehicle is still available — suggest other times from suggestedSlots. Never say it left inventory.
 - Do not simulate or pretend a booking was made — only confirm after a successful bookTestDrive result.
 `.trim();
 

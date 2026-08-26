@@ -12,13 +12,7 @@ function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
 
-function futureSlotIso(daysAhead = 5, hour = 11) {
-    const d = new Date();
-    d.setDate(d.getDate() + daysAhead);
-    while (d.getDay() === 0) d.setDate(d.getDate() + 1);
-    d.setHours(hour, 0, 0, 0);
-    return d.toISOString();
-}
+import { futureSlotIso } from "./testHelpers/scheduling.js";
 
 async function simulateTurn({ companyId, phone, text, salesContext, persistSalesContext, extractSalesSignals, mergeSalesContext, getCustomer }) {
     const customer = await getCustomer(phone, { companyId });
@@ -284,7 +278,7 @@ async function main() {
         { vehicleId: "veh-bmw-001", scheduledAt: futureSlotIso(7, 10) }
     );
     assert(soldCheck.ok === false, "sold vehicle should fail availability");
-    assert(soldCheck.code === "INVENTORY_UNAVAILABLE", `code INVENTORY_UNAVAILABLE, got ${soldCheck.code}`);
+    assert(soldCheck.code === "VEHICLE_NOT_IN_INVENTORY", `code VEHICLE_NOT_IN_INVENTORY, got ${soldCheck.code}`);
     assert(/CM-BMW-001/i.test(soldCheck.reason || ""), `reason mentions stock: ${soldCheck.reason}`);
     assert(/no longer available/i.test(soldCheck.reason || ""), "reason says no longer available");
     console.log("✓ 11. sold vehicle returns explicit stock-number message with alternatives");

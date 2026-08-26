@@ -17,9 +17,18 @@ import {
     formatSlotLabel,
     getBusinessHours,
     findNextStaggeredSlot,
+    findFirstAvailableSlotForVehicle,
     slotEnd,
+    toBusinessDateString,
 } from "./availability.js";
 import { listAppointmentsByCustomer } from "../database/appointmentRepository.js";
+
+/** Map legacy codes for backward compatibility in older verify scripts */
+export const LEGACY_AVAILABILITY_CODES = {
+    INVENTORY_UNAVAILABLE: "VEHICLE_NOT_IN_INVENTORY",
+    SLOT_FULL: "SLOT_UNAVAILABLE",
+    OUTSIDE_HOURS: "OUTSIDE_BUSINESS_HOURS",
+};
 
 /**
  * @param {string} companyId
@@ -34,6 +43,7 @@ import { listAppointmentsByCustomer } from "../database/appointmentRepository.js
  * @param {string} [options.model]
  * @param {boolean} [options.includeAlternatives]
  * @param {string} [options.customerId]
+ * @param {boolean} [options.autoSelectNext]
  */
 export async function evaluateTestDriveAvailability(companyId, options = {}) {
     const includeAlternatives = options.includeAlternatives !== false;
@@ -82,10 +92,39 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
         const stockRef = vehicle.stockNumber ? `, stock ${vehicle.stockNumber}` : "";
         return {
             available: false,
-            code: "INVENTORY_UNAVAILABLE",
-            reason: `The ${label}${stockRef}, is no longer available.`,
+            code: "VEHICLE_NOT_IN_INVENTORY",
+            reason: `The ${label}${stockRef}, is no longer available in inventory.`,
             vehicle: vehicleToPublic(vehicle),
             alternatives: { vehicles: altVehicles, slots: [] },
+        };
+    }
+
+    if (options.autoSelectNext) {
+        const nextSlot = await findFirstAvailableSlotForVehicle(companyId, vehicle.vehicleId, {
+            daysAhead: 7,
+            customerId: options.customerId,
+            evaluate: evaluateTestDriveAvailability,
+        });
+        if (nextSlot) {
+            return {
+                available: true,
+                code: "AUTO_SELECT",
+                reason: `Earliest available slot: ${nextSlot.slotLabel}.`,
+                autoSelected: true,
+                vehicle: vehicleToPublic(vehicle),
+                slotStart: nextSlot.slotStart,
+                slotLabel: nextSlot.slotLabel,
+                date: nextSlot.date,
+                suggestedSlots: [{ slotStart: nextSlot.slotStart, label: nextSlot.slotLabel }],
+                alternatives: { vehicles: [], slots: [{ slotStart: nextSlot.slotStart, label: nextSlot.slotLabel }] },
+            };
+        }
+        return {
+            available: false,
+            code: "NO_SLOTS",
+            reason: "No test-drive slots available in the next 7 days for this vehicle.",
+            vehicle: vehicleToPublic(vehicle),
+            alternatives: { vehicles: [], slots: [] },
         };
     }
 
@@ -105,6 +144,17 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
         };
     }
 
+    if (!parsed.hasExplicitTime && !parsed.dateOnly && !options.date && !options.scheduledAt) {
+        return {
+            available: false,
+            code: "NEED_DATE",
+            reason: "Ask the customer which date they would like for the test drive.",
+            needsDate: true,
+            vehicle: vehicleToPublic(vehicle),
+            alternatives: { vehicles: [], slots: [] },
+        };
+    }
+
     if (!parsed.hasExplicitTime) {
         const dateBase = parsed.dateOnly || parsed.dateTime;
         const slots = await findOpenSlotsForDate(companyId, dateBase);
@@ -114,7 +164,7 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
             reason: "Date noted — ask the customer for their preferred time before booking.",
             needsTime: true,
             vehicle: vehicleToPublic(vehicle),
-            date: dateBase.toISOString().slice(0, 10),
+            date: toBusinessDateString(dateBase),
             suggestedSlots: slots.slice(0, 8),
             alternatives: { vehicles: [], slots: slots.slice(0, 8) },
         };
@@ -135,8 +185,8 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
         const daySlots = await findOpenSlotsForDate(companyId, scheduledAt);
         return {
             available: false,
-            code: "OUTSIDE_HOURS",
-            reason: "That time is outside business hours (Mon–Sat, 9:00–17:00).",
+            code: "OUTSIDE_BUSINESS_HOURS",
+            reason: "That time is outside business hours (Mon–Fri, 9:00–17:00 SAST).",
             vehicle: vehicleToPublic(vehicle),
             alternatives: { vehicles: [], slots: daySlots.slice(0, 8) },
         };
@@ -159,8 +209,8 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
             : [];
         return {
             available: false,
-            code: "SLOT_FULL",
-            reason: `That time slot is fully booked (${capacity.concurrent}/${capacity.max}).`,
+            code: "SLOT_UNAVAILABLE",
+            reason: `That test-drive time is fully booked (${capacity.concurrent}/${capacity.max}). The vehicle is still in inventory — choose another time.`,
             vehicle: vehicleToPublic(vehicle),
             slotStart: slotStart.toISOString(),
             alternatives: {
@@ -250,6 +300,16 @@ async function findVehiclesWithTestDriveAvailability(companyId, options) {
         };
     }
 
+    if (!parsed.hasExplicitTime && !parsed.dateOnly && !options.date && !options.scheduledAt) {
+        return {
+            available: false,
+            code: "NEED_DATE",
+            reason: "Ask the customer which date they would like for the test drive.",
+            needsDate: true,
+            alternatives: { vehicles: [], slots: [] },
+        };
+    }
+
     const vehicles = await searchInventory(companyId, options.query || "", {
         make: options.make,
         model: options.model,
@@ -262,6 +322,36 @@ async function findVehiclesWithTestDriveAvailability(companyId, options) {
             available: false,
             code: "NO_VEHICLES",
             reason: "No matching vehicles in inventory.",
+            alternatives: { vehicles: [], slots: [] },
+        };
+    }
+
+    if (options.autoSelectNext) {
+        for (const v of vehicles) {
+            const nextSlot = await findFirstAvailableSlotForVehicle(companyId, v.vehicleId, {
+                daysAhead: 7,
+                customerId: options.customerId,
+                evaluate: evaluateTestDriveAvailability,
+            });
+            if (nextSlot) {
+                return {
+                    available: true,
+                    code: "AUTO_SELECT",
+                    reason: `Earliest available: ${nextSlot.slotLabel} for ${v.title || v.make}.`,
+                    autoSelected: true,
+                    vehicle: v,
+                    slotStart: nextSlot.slotStart,
+                    slotLabel: nextSlot.slotLabel,
+                    date: nextSlot.date,
+                    suggestedSlots: [{ slotStart: nextSlot.slotStart, label: nextSlot.slotLabel }],
+                    alternatives: { vehicles: [v], slots: [{ slotStart: nextSlot.slotStart, label: nextSlot.slotLabel }] },
+                };
+            }
+        }
+        return {
+            available: false,
+            code: "NO_SLOTS",
+            reason: "No test-drive slots available in the next 7 days for matching vehicles.",
             alternatives: { vehicles: [], slots: [] },
         };
     }
@@ -286,7 +376,7 @@ async function findVehiclesWithTestDriveAvailability(companyId, options) {
                     ? `Found ${availableVehicles.length} vehicle(s) with open slots on that date — ask the customer for a preferred time.`
                     : "No test-drive slots available on that date.",
             needsTime: true,
-            date: dateBase.toISOString().slice(0, 10),
+            date: toBusinessDateString(dateBase),
             vehicles: availableVehicles,
             suggestedSlots: daySlots.slice(0, 8),
             alternatives: { vehicles: availableVehicles, slots: daySlots.slice(0, 8) },

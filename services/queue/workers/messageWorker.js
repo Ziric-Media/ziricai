@@ -32,6 +32,8 @@ import {
     formatSchedulingContextForPrompt,
     getSchedulingContext,
     saveSchedulingContext,
+    isSchedulingDelegationIntent,
+    enrichToolArgsWithScheduling,
 } from "../../conversation/schedulingContext.js";
 import {
     isBookingRecapIntent,
@@ -396,10 +398,67 @@ async function processInboundMessage(job) {
         }
     }
 
+    let authoritativeAvailabilityContext = "";
+    let preloadedAvailabilityResult = null;
+    if (resolvedCompanyId && isSchedulingDelegationIntent(text)) {
+        const preloadArgs = enrichToolArgsWithScheduling(
+            "checkTestDriveAvailability",
+            resolvedVehicleReference?.vehicleId
+                ? { vehicleId: resolvedVehicleReference.vehicleId }
+                : {},
+            schedulingContext
+        );
+        preloadedAvailabilityResult = await runTool(
+            "checkTestDriveAvailability",
+            {
+                companyId: resolvedCompanyId,
+                customerId,
+                customerPhone: sender,
+                customerName: customerDisplayName,
+                agentId: agent?.id || null,
+                channel: outboundChannel,
+                inboundMessage: text,
+                schedulingContext,
+                salesContext: salesContextForTurn,
+                resolvedVehicleReference,
+                autoSelectNext: true,
+            },
+            preloadArgs
+        );
+        if (preloadedAvailabilityResult?.slotLabel || preloadedAvailabilityResult?.suggestedSlots?.length) {
+            const slots = (preloadedAvailabilityResult.suggestedSlots || [])
+                .slice(0, 8)
+                .map((s) => s.label)
+                .filter(Boolean)
+                .join("; ");
+            authoritativeAvailabilityContext = [
+                "AUTHORITATIVE AVAILABILITY (from checkTestDriveAvailability — cite ONLY these slots):",
+                `- Code: ${preloadedAvailabilityResult.code}`,
+                preloadedAvailabilityResult.slotLabel
+                    ? `- Earliest slot: ${preloadedAvailabilityResult.slotLabel}`
+                    : null,
+                slots ? `- Open slots: ${slots}` : null,
+                preloadedAvailabilityResult.code === "SLOT_UNAVAILABLE" ||
+                preloadedAvailabilityResult.code === "OUTSIDE_BUSINESS_HOURS"
+                    ? "- Vehicle is still in inventory — slot/time issue only."
+                    : null,
+            ]
+                .filter(Boolean)
+                .join("\n");
+        }
+        console.log("[whatsapp] Scheduling delegation — pre-loaded checkTestDriveAvailability", {
+            companyId: resolvedCompanyId,
+            customerId,
+            code: preloadedAvailabilityResult?.code,
+            slotLabel: preloadedAvailabilityResult?.slotLabel || null,
+        });
+    }
+
     const knowledgeParts = [
         knowledgeBundle.context || "",
         memoryContext || "",
         schedulingPrompt,
+        authoritativeAvailabilityContext,
         authoritativeBookingContext,
         authoritativeVehicleContext,
         galleryOutboundContext,

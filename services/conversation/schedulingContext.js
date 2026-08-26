@@ -8,18 +8,14 @@ import {
     getTenantConversation,
     conversationsRepo,
 } from "../storage/tenantStorage.js";
-import { parseScheduledInput, hasExplicitTimeInString } from "../tools/availability.js";
+import { parseScheduledInput, hasExplicitTimeInString, toBusinessDateString } from "../tools/availability.js";
 
 /** @typedef {{ pendingDate?: string|null, pendingTime?: boolean|null, lastMentionedDate?: string|null, lastMentionedTime?: string|null }} SchedulingContext */
 
 const DAY_REF = /\b(that day|same day|that date|on that day)\b/i;
 
 function toLocalDateString(dateObj) {
-    const d = dateObj instanceof Date ? dateObj : new Date(dateObj);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    return toBusinessDateString(dateObj);
 }
 
 /**
@@ -182,6 +178,21 @@ export function formatSchedulingContextForPrompt(scheduling = {}) {
         parts.push(`- Time established: ${scheduling.lastMentionedTime}.`);
     }
     return parts.join("\n");
+}
+
+/**
+ * Detect when the customer delegates date/time selection to the agent.
+ * @param {string} text
+ */
+export function isSchedulingDelegationIntent(text) {
+    const t = String(text || "").toLowerCase();
+    if (/\b(select|choose|pick)\s+(?:the\s+)?(?:time|date|slot)\s+for\s+me\b/i.test(t)) return true;
+    if (/\bselect\s+the\s+time\s+and\s+date\s+for\s+me\b/i.test(t)) return true;
+    if (/\b(you|just)\s+(?:choose|pick|select)\s+(?:a\s+)?(?:time|date|slot)\b/i.test(t)) return true;
+    if (/\bnext\s+available\s+slot\b/i.test(t)) return true;
+    if (/\bearliest\s+available\b/i.test(t) && /\b(time|slot|book)\b/i.test(t)) return true;
+    if (/\bbook\s+(?:the\s+)?(?:earliest|next|first)\s+available\b/i.test(t)) return true;
+    return false;
 }
 
 /**

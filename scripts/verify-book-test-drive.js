@@ -13,13 +13,7 @@ function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
 
-function futureSlotIso(daysAhead = 2, hour = 10) {
-    const d = new Date();
-    d.setDate(d.getDate() + daysAhead);
-    while (d.getDay() === 0) d.setDate(d.getDate() + 1);
-    d.setHours(hour, 0, 0, 0);
-    return d.toISOString();
-}
+import { futureSlotIso } from "./testHelpers/scheduling.js";
 
 async function seedInventory(companyId) {
     const { seedVehicles } = await import("../services/inventory/inventoryService.js");
@@ -104,7 +98,7 @@ async function main() {
         customerName: "Conflict Customer",
     });
     assert(conflict.ok === false, "Slot conflict should fail");
-    assert(conflict.code === "SLOT_FULL", `Expected SLOT_FULL, got ${conflict.code}`);
+    assert(conflict.code === "SLOT_UNAVAILABLE", `Expected SLOT_UNAVAILABLE, got ${conflict.code}`);
     console.log("✓ Availability conflict rejected when slot is full");
 
     const badStock = await runTool("bookTestDrive", ctx, {

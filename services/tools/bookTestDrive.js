@@ -151,14 +151,26 @@ export default {
         });
 
         if (!availability.available) {
+            const slotCodes = new Set([
+                "SLOT_UNAVAILABLE",
+                "OUTSIDE_BUSINESS_HOURS",
+                "NEED_TIME",
+                "NEED_DATE",
+                "NO_SLOTS",
+                "PAST_SLOT",
+                "CUSTOMER_SLOT_CONFLICT",
+            ]);
+            const isSlotIssue = slotCodes.has(availability.code);
             return {
                 ok: false,
                 error: availability.reason,
                 code: availability.code,
                 needsTime: availability.needsTime === true,
+                needsDate: availability.needsDate === true,
                 vehicle: availability.vehicle || vehicleToPublic(vehicleCheck.vehicle),
                 alternatives: availability.alternatives,
                 suggestedSlots: availability.suggestedSlots,
+                slotIssue: isSlotIssue,
             };
         }
 

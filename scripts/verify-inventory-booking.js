@@ -13,13 +13,7 @@ function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
 
-function futureSlotIso(daysAhead = 2, hour = 10) {
-    const d = new Date();
-    d.setDate(d.getDate() + daysAhead);
-    while (d.getDay() === 0) d.setDate(d.getDate() + 1);
-    d.setHours(hour, 0, 0, 0);
-    return d.toISOString();
-}
+import { futureSlotIso } from "./testHelpers/scheduling.js";
 
 async function seedTestInventory(companyId) {
     const { seedVehicles } = await import("../services/inventory/inventoryService.js");
@@ -175,7 +169,7 @@ async function main() {
         scheduledAt: futureSlotIso(7, 11),
     });
     assert(unavailable.ok === false, "sold vehicle should fail");
-    assert(unavailable.code === "INVENTORY_UNAVAILABLE", `Expected INVENTORY_UNAVAILABLE, got ${unavailable.code}`);
+    assert(unavailable.code === "VEHICLE_NOT_IN_INVENTORY", `Expected VEHICLE_NOT_IN_INVENTORY, got ${unavailable.code}`);
     assert(Array.isArray(unavailable.alternatives?.vehicles), "alternatives offered for unavailable vehicle");
     console.log("✓ unavailable vehicle rejected with alternatives");
 

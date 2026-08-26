@@ -13,28 +13,7 @@ function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
 
-function futureSlotIso(daysAhead = 2, hour = 10) {
-    const d = new Date();
-    d.setDate(d.getDate() + daysAhead);
-    while (d.getDay() === 0) d.setDate(d.getDate() + 1);
-    d.setHours(hour, 0, 0, 0);
-    return d.toISOString();
-}
-
-function futureDateOnly(daysAhead = 3) {
-    const d = new Date();
-    d.setDate(d.getDate() + daysAhead);
-    while (d.getDay() === 0) d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
-}
-
-function nextWeekdayName(daysAhead = 3) {
-    const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const d = new Date();
-    d.setDate(d.getDate() + daysAhead);
-    while (d.getDay() === 0) d.setDate(d.getDate() + 1);
-    return names[d.getDay()];
-}
+import { futureSlotIso, futureDateOnly, nextWeekdayName } from "./testHelpers/scheduling.js";
 
 async function seedFleet(companyId) {
     const { seedVehicles } = await import("../services/inventory/inventoryService.js");
@@ -155,7 +134,7 @@ async function main() {
         scheduledAt: slotTime,
     });
     assert(slotFullCheck.available === false, "slot full should not be available");
-    assert(slotFullCheck.code === "SLOT_FULL", `Expected SLOT_FULL, got ${slotFullCheck.code}`);
+    assert(slotFullCheck.code === "SLOT_UNAVAILABLE", `Expected SLOT_UNAVAILABLE, got ${slotFullCheck.code}`);
     console.log("✓ 1. inventory available, test-drive slot full");
 
     _resetMemoryAppointmentsForTests();
@@ -247,7 +226,7 @@ async function main() {
         scheduledAt: conflictSlot,
     });
     assert(conflict.ok === false, "conflicting slot should fail");
-    assert(conflict.code === "SLOT_FULL", `Expected SLOT_FULL, got ${conflict.code}`);
+    assert(conflict.code === "SLOT_UNAVAILABLE", `Expected SLOT_UNAVAILABLE, got ${conflict.code}`);
     console.log("✓ 8. conflicting appointment rejected");
 
     /* 9. unavailable vehicle (inventory sold) */
@@ -256,13 +235,13 @@ async function main() {
         scheduledAt: futureSlotIso(9, 10),
     });
     assert(soldCheck.available === false, "sold vehicle not available");
-    assert(soldCheck.code === "INVENTORY_UNAVAILABLE", `Expected INVENTORY_UNAVAILABLE, got ${soldCheck.code}`);
+    assert(soldCheck.code === "VEHICLE_NOT_IN_INVENTORY", `Expected VEHICLE_NOT_IN_INVENTORY, got ${soldCheck.code}`);
     const soldBook = await runTool("bookTestDrive", ctx, {
         vehicleId: "veh-td-hlx-sold",
         scheduledAt: futureSlotIso(9, 10),
     });
     assert(soldBook.ok === false, "sold vehicle booking must fail");
-    assert(soldBook.code === "INVENTORY_UNAVAILABLE", `Expected INVENTORY_UNAVAILABLE, got ${soldBook.code}`);
+    assert(soldBook.code === "VEHICLE_NOT_IN_INVENTORY", `Expected VEHICLE_NOT_IN_INVENTORY, got ${soldBook.code}`);
     console.log("✓ 9. sold vehicle rejected (inventory unavailable)");
 
     /* 10. cross-tenant access fail */
