@@ -171,6 +171,7 @@ const SPOUSE_INTRO_PATTERNS = [
     /\b(?:her\s+name\s+is|his\s+name\s+is)\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i,
     /\b(?:my\s+(?:wife|husband|spouse|partner)(?:'s)?\s+name\s+is)\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i,
     /\b(?:my\s+(?:wife|husband|spouse|partner))\s+is\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i,
+    /\bmy\s+(?:wife|husband|spouse|partner)\s+([A-Z][a-zA-Z'\-]+)\b/,
 ];
 
 const RELATIONSHIP_SPEAKER_PATTERNS = [

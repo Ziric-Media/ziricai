@@ -17,6 +17,17 @@ const MODEL_SEATING_DEFAULTS = [
     { pattern: /\bsingle\s*cab\b/i, seats: 3 },
 ];
 
+const CURRENCY_AMOUNT_PATTERN =
+    /\bR\s?[\d][\d,\s\u00A0\u202F]*(?:\.\d{2})?(?:k|K)?(?:\s*(?:per\s*month|\/\s*pm|p\.?\s*m\.?|monthly))?/gi;
+
+/**
+ * Remove salary/currency tokens so digits in amounts are not counted as passengers.
+ * @param {string} text
+ */
+export function stripCurrencyFromPassengerText(text) {
+    return String(text || "").replace(CURRENCY_AMOUNT_PATTERN, " ");
+}
+
 /**
  * Resolve seating capacity for a vehicle record.
  * @param {object|null|undefined} vehicle
@@ -42,46 +53,67 @@ export function getVehicleSeatingCapacity(vehicle) {
 }
 
 /**
+ * Parse "N kids + spouse" style family — customer (1) + spouse (1) + N children.
+ * @param {string} lower
+ * @returns {number|null}
+ */
+function parseKidsWithSpouseCount(lower) {
+    const kidsThenSpouse = lower.match(
+        /\b(\d{1,2})\s*(?:kids|children|child)\b[\s\S]{0,80}\b(?:my\s+)?(?:wife|husband|spouse|partner)\b/
+    );
+    if (kidsThenSpouse?.[1]) {
+        const kids = Number(kidsThenSpouse[1]);
+        if (kids >= 1 && kids <= 15) return kids + 2;
+    }
+
+    const spouseThenKids = lower.match(
+        /\b(?:my\s+)?(?:wife|husband|spouse|partner)\b[\s\S]{0,80}\b(\d{1,2})\s*(?:kids|children|child)\b/
+    );
+    if (spouseThenKids?.[1]) {
+        const kids = Number(spouseThenKids[1]);
+        if (kids >= 1 && kids <= 15) return kids + 2;
+    }
+
+    return null;
+}
+
+/**
  * Parse total passenger count from natural language (adults + children).
  * @param {string} text
  * @returns {number|null}
  */
 export function countPassengersFromText(text) {
     const raw = String(text || "");
-    const lower = raw.toLowerCase();
+    const sanitized = stripCurrencyFromPassengerText(raw);
+    const lower = sanitized.toLowerCase();
 
-    const explicitTotal = lower.match(/\b(?:family\s*of|party\s*of|group\s*of|we\s*are|there\s*(?:are|is)\s*)\s*(\d{1,2})\b/);
+    const explicitTotal = lower.match(
+        /\b(?:family\s*of|party\s*of|group\s*of|we\s*are|there\s*(?:are|is)\s*)\s*(\d{1,2})\b/
+    );
     if (explicitTotal?.[1]) {
         const n = Number(explicitTotal[1]);
         if (n >= 1 && n <= 20) return n;
     }
 
-    const equationTotal = raw.match(/=\s*(\d{1,2})\s*(?:people|passengers|of\s*us)?\b/i);
+    const equationTotal = sanitized.match(/=\s*(\d{1,2})\s*(?:people|passengers|of\s*us)?\b/i);
     if (equationTotal?.[1]) {
         const n = Number(equationTotal[1]);
         if (n >= 1 && n <= 20) return n;
     }
 
-    const kidsPlusNames = raw.match(
+    const kidsPlusNames = sanitized.match(
         /\b(\d{1,2})\s*(?:kids|children)(?:\s*(?:\+|plus)\s*([a-z]+))?(?:\s*(?:\+|plus)\s*([a-z]+))?\s*=\s*(\d{1,2})/i
     );
     if (kidsPlusNames?.[4]) {
         return Number(kidsPlusNames[4]);
     }
 
-    if (/\b(\d{1,2})\s*(?:kids|children)\b/i.test(raw) && /\b(?:plus|and)\b/i.test(raw)) {
-        const kids = raw.match(/\b(\d{1,2})\s*(?:kids|children)\b/i);
-        const eq = raw.match(/=\s*(\d{1,2})/);
-        if (eq?.[1]) return Number(eq[1]);
-        if (kids?.[1]) {
-            const named = (raw.match(/\b[a-z]{3,}\b/gi) || []).filter(
-                (w) => !/^(kids|children|plus|and|people|have|we)$/i.test(w)
-            );
-            return Number(kids[1]) + named.length;
-        }
-    }
+    const kidsWithSpouse = parseKidsWithSpouseCount(lower);
+    if (kidsWithSpouse != null) return kidsWithSpouse;
 
-    const peopleTotal = lower.match(/\b(\d{1,2})\s*(?:people|passengers|of\s*us|in\s*(?:our|the|my)\s*(?:family|household))\b/);
+    const peopleTotal = lower.match(
+        /\b(\d{1,2})\s*(?:people|passengers|of\s*us|in\s*(?:our|the|my)\s*(?:family|household))\b/
+    );
     if (peopleTotal?.[1]) {
         const n = Number(peopleTotal[1]);
         if (n >= 1 && n <= 20) return n;
@@ -95,16 +127,12 @@ export function countPassengersFromText(text) {
     if (adultsMatch?.[1]) total += Number(adultsMatch[1]);
 
     if (total > 0) {
-        if (/\b(?:plus|and)\s+(?:me|myself|spouse|wife|husband|partner)\b/.test(lower)) total += 1;
-        if (/\bmyself\b/.test(lower) && !/\b(?:kids|children)\b/.test(lower)) total += 1;
+        const hasSpouse = /\b(?:my\s+)?(?:wife|husband|spouse|partner)\b/.test(lower);
+        const hasSelf = /\b(?:plus|and)\s+(?:me|myself)\b/.test(lower) || /\bmyself\b/.test(lower);
+        if (hasSpouse) total += 2;
+        else if (hasSelf) total += 1;
+        else if (/\b(?:plus|and)\s+(?:me|myself|spouse|wife|husband|partner)\b/.test(lower)) total += 1;
         return total;
-    }
-
-    const namedCount = (raw.match(/\b(?:me|myself|spencer|palesa|wife|husband|spouse|partner)\b/gi) || []).length;
-    const childWords = (lower.match(/\b(?:kids|children|child)\b/g) || []).length;
-    if (namedCount >= 2 || (namedCount >= 1 && childWords)) {
-        const childNum = lower.match(/\b(\d{1,2})\s*(?:kids|children)\b/);
-        if (childNum?.[1]) return namedCount + Number(childNum[1]) - 1;
     }
 
     return null;
@@ -127,7 +155,8 @@ export function evaluateSeatingFit(passengerCount, vehicle) {
             fits: true,
             capacity: null,
             passengerCount: count,
-            warning: "Seating capacity unknown — confirm passenger count with sales consultant before recommending.",
+            warning:
+                "This listing does not specify seating capacity — confirm with a sales consultant before recommending.",
         };
     }
 
@@ -138,6 +167,20 @@ export function evaluateSeatingFit(passengerCount, vehicle) {
         : `${label || "This vehicle"} seats ${capacity} — not enough for ${count} passengers. Recommend an ${count}-seater or larger from inventory (searchInventory with minSeats), or explain generally without claiming stock.`;
 
     return { fits, capacity, passengerCount: count, warning };
+}
+
+/**
+ * Sanitize LLM/tool minSeats — familySize is for warnings, not impossible inventory filters.
+ * @param {number|null|undefined} requestedMinSeats
+ * @param {number|null|undefined} familySize
+ * @returns {number|null}
+ */
+export function resolveMinSeatsFilter(requestedMinSeats, familySize = null) {
+    if (requestedMinSeats == null) return null;
+    const n = Number(requestedMinSeats);
+    if (!Number.isFinite(n) || n < 1 || n > 12) return null;
+    if (familySize != null && n > familySize + 1) return null;
+    return n;
 }
 
 /**

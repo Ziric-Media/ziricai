@@ -9,7 +9,7 @@ import {
     compareRecommendedVehicleLocations,
     formatLocationComparisonForPrompt,
 } from "../conversation/salesContext.js";
-import { evaluateSeatingFit, getVehicleSeatingCapacity } from "../inventory/seatingCapacity.js";
+import { evaluateSeatingFit, getVehicleSeatingCapacity, resolveMinSeatsFilter } from "../inventory/seatingCapacity.js";
 
 export default {
     name: "searchInventory",
@@ -73,7 +73,8 @@ export default {
 
         const brandHints = detectBrandHintsFromQuery(args.query || "");
         const bodyHints = detectBodyTypeFromQuery(args.query || "");
-        const minSeats = args.minSeats ?? null;
+        const familySize = salesContext?.familySize ?? null;
+        const minSeats = resolveMinSeatsFilter(args.minSeats, familySize);
         const budgetFilter = getActivePurchaseBudgetFilter(salesContext);
         const activeBodyType = args.bodyType || salesContext?.bodyType || bodyHints.bodyType;
         const vehicles = await searchInventoryRecords(companyId, args.query || "", {
@@ -82,15 +83,15 @@ export default {
             excludeMake: args.excludeMake || brandHints.excludeMake,
             model: args.model,
             bodyType: activeBodyType,
-            maxPrice: budgetFilter.open ? undefined : (args.maxPrice ?? budgetFilter.maxPrice),
-            minPrice: args.minPrice ?? budgetFilter.minPrice,
+            maxPrice: budgetFilter.open ? undefined : budgetFilter.maxPrice,
+            minPrice: budgetFilter.minPrice,
             maxMileage: args.maxMileage,
             minSeats,
             limit: args.limit || 10,
             availabilityOnly: false,
         });
 
-        const passengerCount = salesContext?.familySize ?? minSeats ?? null;
+        const passengerCount = familySize ?? minSeats ?? null;
         const vehiclesWithFit = vehicles.map((vehicle) => {
             if (passengerCount == null) return vehicle;
             const fit = evaluateSeatingFit(passengerCount, vehicle);

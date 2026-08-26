@@ -29,6 +29,12 @@ const ZAR_AMOUNT = String.raw`R\s?[\d][\d,\s\u00A0\u202F]*(?:\.\d{2})?`;
 
 function parseZarAmountToken(raw) {
     const display = normalizeZarAmount(raw);
+    const compact = display.replace(/\s+/g, "");
+    if (/k$/i.test(compact)) {
+        const base = Number(compact.replace(/[^\d.]/gi, ""));
+        const amount = Number.isFinite(base) ? Math.round(base * 1000) : NaN;
+        return { display: compact, amount };
+    }
     return { display, amount: Number(display.replace(/[^\d]/g, "")) };
 }
 
@@ -86,13 +92,21 @@ function parseIncome(text) {
         };
     }
 
-    const trailing = raw.match(/\b(R\s?[\d][\d,]*(?:\.\d{2})?)\s*(?:per\s*month|\/\s*pm|p\.?\s*m\.?|monthly)\b/i);
+    const trailing = raw.match(
+        /\b(R\s?[\d][\d,]*(?:\.\d{2})?|R\s?[\d]+k)\s*(?:per\s*month|\/\s*pm|p\.?\s*m\.?|monthly)\b/i
+    );
     if (trailing?.[1] && /\b(?:salary|income|earn|paid)\b/i.test(raw)) {
-        const display = normalizeZarAmount(trailing[1]);
+        const { display, amount } = parseZarAmountToken(trailing[1]);
         return {
-            income: Number(display.replace(/[^\d]/g, "")),
+            income: amount,
             incomeDisplay: `${display}/month`,
         };
+    }
+
+    const shorthand = raw.match(/\b(?:salary|income|earn(?:ing)?s?)\s*(?:is|of|:)?\s*(R\s?[\d]+k)\b/i);
+    if (shorthand?.[1]) {
+        const { display, amount } = parseZarAmountToken(shorthand[1]);
+        return { income: amount, incomeDisplay: `${display}/month` };
     }
     return null;
 }
@@ -580,15 +594,21 @@ export function getActivePurchaseBudgetFilter(salesContext) {
         salesContext.purchaseBudgetDisplay ??
         salesContext.budgetDisplay;
     const amount =
-        salesContext.confirmedPurchaseBudget ??
-        salesContext.purchaseBudget ??
-        salesContext.budget ??
-        salesContext.estimatedPurchaseBudget;
+        salesContext.confirmedPurchaseBudget ?? salesContext.purchaseBudget ?? salesContext.budget;
     if (display?.endsWith("+")) {
         return { minPrice: amount };
     }
     if (amount != null) return { maxPrice: amount };
     return {};
+}
+
+/**
+ * True when sales context has a customer-confirmed purchase budget (not salary/income alone).
+ * @param {object|null|undefined} salesContext
+ */
+export function hasConfirmedPurchaseBudget(salesContext) {
+    const filter = getActivePurchaseBudgetFilter(salesContext);
+    return filter.maxPrice != null || filter.minPrice != null;
 }
 
 /**
