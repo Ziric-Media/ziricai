@@ -14,6 +14,7 @@ import { addTimelineEvent, persistExplicitCustomerName } from "../customerServic
 import { buildIdempotencyKey } from "./toolRunner.js";
 import { formatSlotLabel, parseScheduledAt } from "./availability.js";
 import { evaluateTestDriveAvailability } from "./testDriveAvailability.js";
+import { resolveScheduledAtWithContext, findAlternativeSlotForVehicle } from "../conversation/testDrivePlan.js";
 
 async function resolveBookingVehicle(ctx, args) {
     const { companyId, customerPhone, channel } = ctx;
@@ -137,16 +138,26 @@ export default {
         }
 
         let scheduledAt;
-        try {
-            scheduledAt = parseScheduledAt(args.scheduledAt);
-        } catch (err) {
-            return { ok: false, error: err.message, code: "INVALID_DATETIME" };
+        const scheduling = ctx.schedulingContext || {};
+        const resolved = resolveScheduledAtWithContext(args, scheduling);
+        if (resolved.ok) {
+            scheduledAt = resolved.dateTime;
+        } else {
+            try {
+                scheduledAt = parseScheduledAt(args.scheduledAt);
+            } catch (err) {
+                return { ok: false, error: err.message, code: "INVALID_DATETIME" };
+            }
         }
+
+        const contextDate =
+            scheduling.pendingDate || scheduling.lastMentionedDate || scheduling.lastOfferedDate || resolved.date;
 
         const availability = await evaluateTestDriveAvailability(companyId, {
             vehicleId: vehicleCheck.vehicleId,
             stockNumber: vehicleCheck.stockNumber,
-            scheduledAt: args.scheduledAt,
+            scheduledAt: scheduledAt.toISOString(),
+            contextDate,
             customerId,
         });
 
@@ -161,6 +172,15 @@ export default {
                 "CUSTOMER_SLOT_CONFLICT",
             ]);
             const isSlotIssue = slotCodes.has(availability.code);
+
+            let nextAlternative = availability.nextAlternative || null;
+            if (isSlotIssue && !nextAlternative) {
+                nextAlternative = await findAlternativeSlotForVehicle(companyId, vehicleCheck.vehicleId, {
+                    fromSlot: availability.slotStart || scheduledAt.toISOString(),
+                    customerId,
+                });
+            }
+
             return {
                 ok: false,
                 error: availability.reason,
@@ -171,6 +191,7 @@ export default {
                 alternatives: availability.alternatives,
                 suggestedSlots: availability.suggestedSlots,
                 slotIssue: isSlotIssue,
+                nextAlternative,
             };
         }
 

@@ -10,6 +10,13 @@ import {
     schedulingUpdatesFromToolResult,
     saveSchedulingContext,
 } from "../conversation/schedulingContext.js";
+import {
+    getTestDrivePlan,
+    saveTestDrivePlan,
+    planUpdatesFromToolResult,
+    pendingEntryFromAvailability,
+    matchOfferedSlot,
+} from "../conversation/testDrivePlan.js";
 import { resolveVehicleReference } from "../conversation/vehicleReference.js";
 
 /**
@@ -92,6 +99,21 @@ export async function runTool(name, ctx, args = {}) {
 
     if (
         (name === "checkTestDriveAvailability" || name === "bookTestDrive") &&
+        ctx.inboundMessage &&
+        scheduling.lastOfferedSlots?.length
+    ) {
+        const matched = matchOfferedSlot(
+            ctx.inboundMessage,
+            scheduling.lastOfferedSlots,
+            scheduling.pendingDate || scheduling.lastOfferedDate
+        );
+        if (matched?.slotStart) {
+            enrichedArgs = { ...enrichedArgs, scheduledAt: matched.slotStart };
+        }
+    }
+
+    if (
+        (name === "checkTestDriveAvailability" || name === "bookTestDrive") &&
         !enrichedArgs.vehicleId &&
         !enrichedArgs.vehicleStockNumber
     ) {
@@ -108,7 +130,16 @@ export async function runTool(name, ctx, args = {}) {
     }
 
     try {
-        const result = await tool.execute(enrichedCtx, enrichedArgs);
+        let testDrivePlan = ctx.testDrivePlan || [];
+        if (ctx.customerPhone && !ctx.testDrivePlan) {
+            try {
+                testDrivePlan = await getTestDrivePlan(ctx.companyId, ctx.customerPhone, ctx.channel || "whatsapp");
+            } catch {
+                testDrivePlan = [];
+            }
+        }
+
+        const result = await tool.execute({ ...enrichedCtx, schedulingContext: scheduling, testDrivePlan }, enrichedArgs);
         const ok = result.ok !== false && result.success !== false;
         const payload = { success: ok, ok, tool: name, ...result };
 
@@ -124,6 +155,27 @@ export async function runTool(name, ctx, args = {}) {
                     );
                 } catch {
                     /* scheduling meta optional */
+                }
+            }
+
+            let planUpdates = testDrivePlan;
+            if (name === "bookTestDrive") {
+                planUpdates = planUpdatesFromToolResult(name, enrichedArgs, result, testDrivePlan);
+            } else if (name === "checkTestDriveAvailability" && result.available) {
+                planUpdates = pendingEntryFromAvailability(testDrivePlan, enrichedArgs, result);
+            }
+
+            if (planUpdates !== testDrivePlan) {
+                try {
+                    await saveTestDrivePlan(
+                        ctx.companyId,
+                        ctx.customerPhone,
+                        ctx.channel || "whatsapp",
+                        planUpdates
+                    );
+                    payload.testDrivePlan = planUpdates;
+                } catch {
+                    /* plan meta optional */
                 }
             }
         }

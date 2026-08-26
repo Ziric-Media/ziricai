@@ -36,6 +36,13 @@ import {
     enrichToolArgsWithScheduling,
 } from "../../conversation/schedulingContext.js";
 import {
+    getTestDrivePlan,
+    formatTestDrivePlanForPrompt,
+    isPlanConfirmationIntent,
+    finalizePendingPlanEntries,
+    saveTestDrivePlan,
+} from "../../conversation/testDrivePlan.js";
+import {
     isBookingRecapIntent,
     formatAuthoritativeBookingBlock,
 } from "../../conversation/bookingRecapIntent.js";
@@ -315,7 +322,7 @@ async function processInboundMessage(job) {
         resolvedCompanyId && sender
             ? await getSchedulingContext(resolvedCompanyId, sender, outboundChannel)
             : {};
-    const extractedScheduling = extractSchedulingFromText(text);
+    const extractedScheduling = extractSchedulingFromText(text, schedulingContext);
     if (resolvedCompanyId && sender && Object.keys(extractedScheduling).length) {
         schedulingContext = await saveSchedulingContext(
             resolvedCompanyId,
@@ -325,7 +332,13 @@ async function processInboundMessage(job) {
         );
     }
 
+    let testDrivePlan =
+        resolvedCompanyId && sender
+            ? await getTestDrivePlan(resolvedCompanyId, sender, outboundChannel)
+            : [];
+
     const schedulingPrompt = formatSchedulingContextForPrompt(schedulingContext);
+    const testDrivePlanPrompt = formatTestDrivePlanForPrompt(testDrivePlan);
 
     let authoritativeBookingContext = "";
     let preloadedBookingResult = null;
@@ -454,11 +467,58 @@ async function processInboundMessage(job) {
         });
     }
 
+    let authoritativePlanFinalizeContext = "";
+    let preloadedFinalizeResults = null;
+    if (resolvedCompanyId && sender && isPlanConfirmationIntent(text) && testDrivePlan.some((e) => e.status === "PENDING")) {
+        const finalize = await finalizePendingPlanEntries(
+            {
+                companyId: resolvedCompanyId,
+                customerId,
+                customerPhone: sender,
+                customerName: customerDisplayName,
+                agentId: agent?.id || null,
+                channel: outboundChannel,
+                schedulingContext,
+                testDrivePlan,
+            },
+            testDrivePlan
+        );
+        testDrivePlan = finalize.plan;
+        preloadedFinalizeResults = finalize.results;
+        await saveTestDrivePlan(resolvedCompanyId, sender, outboundChannel, testDrivePlan);
+
+        const lines = [
+            "AUTHORITATIVE PLAN FINALIZATION (bookTestDrive results — cite ONLY these):",
+        ];
+        for (const r of finalize.results) {
+            const entry = testDrivePlan.find((e) => e.vehicleId === r.vehicleId);
+            const label = entry?.title || entry?.stockNumber || r.vehicleId;
+            if (r.ok) {
+                lines.push(`- CONFIRMED: ${label} — ${entry?.slotLabel || "booked"}`);
+            } else {
+                lines.push(`- FAILED (slot issue): ${label} — ${r.error || r.reason || r.code}`);
+                lines.push("  • Vehicle may still be in inventory — offer nextAlternative/suggestedSlots, do NOT claim sold.");
+            }
+        }
+        const stillConfirmed = testDrivePlan.filter((e) => e.status === "CONFIRMED");
+        if (stillConfirmed.length) {
+            lines.push(`- ${stillConfirmed.length} appointment(s) already CONFIRMED in plan — preserve these; never undo.`);
+        }
+        authoritativePlanFinalizeContext = lines.join("\n");
+        console.log("[whatsapp] Plan confirmation — finalized pending entries", {
+            companyId: resolvedCompanyId,
+            customerId,
+            results: finalize.results.map((r) => ({ vehicleId: r.vehicleId, ok: r.ok, code: r.code })),
+        });
+    }
+
     const knowledgeParts = [
         knowledgeBundle.context || "",
         memoryContext || "",
         schedulingPrompt,
+        testDrivePlanPrompt,
         authoritativeAvailabilityContext,
+        authoritativePlanFinalizeContext,
         authoritativeBookingContext,
         authoritativeVehicleContext,
         galleryOutboundContext,
@@ -475,6 +535,7 @@ async function processInboundMessage(job) {
         schedulingContext,
         salesContext: salesContextForTurn,
         resolvedVehicleReference,
+        testDrivePlan,
     };
 
     const aiTools = resolvedCompanyId ? getOpenAIToolDefinitions() : [];

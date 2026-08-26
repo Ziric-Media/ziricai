@@ -75,12 +75,17 @@ export default {
             ctx.autoSelectNext === true ||
             isSchedulingDelegationIntent(ctx.inboundMessage);
 
+        const scheduling = ctx.schedulingContext || {};
+        const contextDate =
+            args.date || scheduling.pendingDate || scheduling.lastMentionedDate || scheduling.lastOfferedDate;
+
         const result = await evaluateTestDriveAvailability(companyId, {
             vehicleId,
             stockNumber,
             date: args.date,
             time: args.time,
             scheduledAt: args.scheduledAt,
+            contextDate,
             query: vehicleId || stockNumber ? undefined : args.query,
             make: vehicleId || stockNumber ? undefined : args.make,
             model: vehicleId || stockNumber ? undefined : args.model,

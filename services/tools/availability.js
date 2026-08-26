@@ -199,17 +199,41 @@ export function hasExplicitTimeInString(value) {
  */
 function parseDayFromText(lower, baseToday) {
     const currentDay = getDayOfWeekInBusinessTz(baseToday);
-    const baseParts = getDatePartsInBusinessTz(baseToday);
+    const wantsThisWeek = /\bthis\s+(?:week(?:'s|s)?\s+)?(?:coming\s+)?/i.test(lower);
 
     for (const [index, name] of DAY_NAMES.entries()) {
-        const re = new RegExp(`\\b${name}\\b|\\b${name.slice(0, 3)}\\b`);
+        const re = new RegExp(`\\b(?:this\\s+(?:week(?:'s|s)?\\s+)?(?:coming\\s+)?)?${name}\\b|\\b${name.slice(0, 3)}\\b`);
         if (!re.test(lower)) continue;
 
         let delta = index - currentDay;
-        if (delta <= 0) delta += 7;
+        if (wantsThisWeek) {
+            if (delta < 0) delta += 7;
+        } else if (delta <= 0) {
+            delta += 7;
+        }
         return addBusinessDays(baseToday, delta);
     }
     return null;
+}
+
+/**
+ * Whether input is time-only (no date component).
+ * @param {string} raw
+ */
+export function isTimeOnlyInput(raw) {
+    const value = String(raw || "").trim();
+    if (!value) return false;
+    if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return false;
+    if (/^\d{4}-\d{2}-\d{2}\s+\d/.test(value)) return false;
+    if (/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) return false;
+    if (/^\d{1,2}(:\d{2})?\s*(am|pm)?$/i.test(value)) return true;
+    if (/^\d{1,2}:\d{2}$/.test(value)) return true;
+    return (
+        hasExplicitTimeInString(value) &&
+        !/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|\d{4}-\d{2}-\d{2})\b/i.test(
+            value
+        )
+    );
 }
 
 /**
@@ -358,18 +382,65 @@ function applyTimeFromText(lower, baseDate) {
 
 /**
  * Parse scheduling input into date and optional time components.
- * @param {{ date?: string, time?: string, scheduledAt?: string }} input
+ * @param {{ date?: string, time?: string, scheduledAt?: string, contextDate?: string }} input
  */
 export function parseScheduledInput(input = {}) {
+    const contextDate =
+        input.contextDate && /^\d{4}-\d{2}-\d{2}$/.test(String(input.contextDate).trim())
+            ? String(input.contextDate).trim()
+            : null;
+
+    if (contextDate && input.scheduledAt && isTimeOnlyInput(input.scheduledAt)) {
+        const timeApplied = applyTimeFromText(
+            String(input.scheduledAt).toLowerCase(),
+            dateFromBusinessLocal(
+                parseInt(contextDate.slice(0, 4), 10),
+                parseInt(contextDate.slice(5, 7), 10),
+                parseInt(contextDate.slice(8, 10), 10),
+                0,
+                0
+            )
+        );
+        if (timeApplied) {
+            return { ok: true, dateTime: timeApplied, hasExplicitTime: true };
+        }
+    }
+
+    const scheduledOnly = input.scheduledAt ? String(input.scheduledAt).trim() : "";
+    if (scheduledOnly && /^\d{4}-\d{2}-\d{2}T/.test(scheduledOnly) && /(?:Z|[+-]\d{2}:\d{2})$/i.test(scheduledOnly)) {
+        const instant = new Date(scheduledOnly);
+        if (!Number.isNaN(instant.getTime())) {
+            return { ok: true, dateTime: instant, hasExplicitTime: true };
+        }
+    }
+
     const combined = [input.scheduledAt, input.date, input.time].filter(Boolean).join(" ").trim();
-    const raw = combined || String(input.date || "").trim();
+    const raw =
+        input.date && input.time && !input.scheduledAt
+            ? `${input.date} ${input.time}`.trim()
+            : combined || String(input.date || "").trim();
     if (!raw) {
         return { ok: false, error: "A date is required (date, time, or scheduledAt)." };
     }
 
     const lower = raw.toLowerCase();
     const now = new Date();
-    let base = getTodayStartInBusinessTz();
+    let base = contextDate
+        ? dateFromBusinessLocal(
+              parseInt(contextDate.slice(0, 4), 10),
+              parseInt(contextDate.slice(5, 7), 10),
+              parseInt(contextDate.slice(8, 10), 10),
+              0,
+              0
+          )
+        : getTodayStartInBusinessTz();
+
+    if (isTimeOnlyInput(raw) && contextDate) {
+        const timeApplied = applyTimeFromText(lower, base);
+        if (timeApplied) {
+            return { ok: true, dateTime: timeApplied, hasExplicitTime: true };
+        }
+    }
 
     const trimmedRaw = raw.trim();
     if (/^\d{4}-\d{2}-\d{2}T/.test(trimmedRaw) && /(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmedRaw)) {

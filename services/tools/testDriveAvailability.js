@@ -132,6 +132,7 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
         date: options.date,
         time: options.time,
         scheduledAt: options.scheduledAt,
+        contextDate: options.contextDate,
     });
 
     if (!parsed.ok) {
@@ -172,12 +173,35 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
 
     const scheduledAt = parsed.dateTime;
     if (scheduledAt.getTime() < Date.now() - 5 * 60 * 1000) {
+        if (options.contextDate && options.contextDate !== toBusinessDateString(scheduledAt)) {
+            const retry = parseScheduledInput({
+                date: options.contextDate,
+                time: options.time || `${String(scheduledAt.getHours()).padStart(2, "0")}:${String(scheduledAt.getMinutes()).padStart(2, "0")}`,
+                contextDate: options.contextDate,
+            });
+            if (retry.ok && retry.dateTime && retry.dateTime.getTime() >= Date.now() - 5 * 60 * 1000) {
+                return evaluateTestDriveAvailability(companyId, {
+                    ...options,
+                    date: options.contextDate,
+                    time: options.time,
+                    scheduledAt: retry.dateTime.toISOString(),
+                    contextDate: options.contextDate,
+                });
+            }
+        }
+
+        const nextSlot = await findNextStaggeredSlot(companyId, normalizeToSlotStart(scheduledAt));
+        const altSlots = nextSlot
+            ? [{ slotStart: nextSlot.slotStart.toISOString(), label: nextSlot.label }]
+            : [];
         return {
             available: false,
             code: "PAST_SLOT",
             reason: "That time is in the past.",
             vehicle: vehicleToPublic(vehicle),
-            alternatives: { vehicles: [], slots: [] },
+            slotIssue: true,
+            suggestedSlots: altSlots,
+            alternatives: { vehicles: [], slots: altSlots },
         };
     }
 
@@ -197,6 +221,7 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
 
     if (!capacity.available) {
         const daySlots = await findOpenSlotsForDate(companyId, slotStart);
+        const staggered = await findNextStaggeredSlot(companyId, slotStart);
         const altVehicles = includeAlternatives
             ? await listAlternativesWithSlots(companyId, {
                   make: vehicle.make,
@@ -207,15 +232,27 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
                   scheduledAt: options.scheduledAt,
               })
             : [];
+        const extraSlots = staggered
+            ? [{ slotStart: staggered.slotStart.toISOString(), label: staggered.label }]
+            : [];
+        const combinedSlots = [
+            ...extraSlots,
+            ...daySlots.filter((s) => s.slotStart !== slotStart.toISOString()),
+        ].slice(0, 8);
         return {
             available: false,
             code: "SLOT_UNAVAILABLE",
             reason: `That test-drive time is fully booked (${capacity.concurrent}/${capacity.max}). The vehicle is still in inventory — choose another time.`,
             vehicle: vehicleToPublic(vehicle),
             slotStart: slotStart.toISOString(),
+            slotIssue: true,
+            nextAlternative: staggered
+                ? { slotStart: staggered.slotStart.toISOString(), slotLabel: staggered.label }
+                : null,
+            suggestedSlots: combinedSlots,
             alternatives: {
                 vehicles: altVehicles,
-                slots: daySlots.filter((s) => s.slotStart !== slotStart.toISOString()).slice(0, 8),
+                slots: combinedSlots,
             },
         };
     }
