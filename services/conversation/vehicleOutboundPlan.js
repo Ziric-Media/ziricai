@@ -3,6 +3,7 @@
  */
 
 export const MAX_VEHICLE_IMAGES_PER_TURN = 3;
+export const MAX_GALLERY_IMAGES_PER_VEHICLE = 3;
 
 const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\([^)]+\)/g;
 const CENTRAL_MOTORS_IMAGE_URL_PATTERN =
@@ -87,10 +88,22 @@ export function formatVehicleTextBlock(vehicle) {
 
 /**
  * @param {object} vehicle
+ * @param {number} [max]
+ */
+export function pickGalleryImageUrls(vehicle, max = 1) {
+    const images = Array.isArray(vehicle?.images)
+        ? vehicle.images
+        : vehicle?.primaryImageUrl
+          ? [vehicle.primaryImageUrl]
+          : [];
+    return images.filter(isSupportedWhatsAppImageUrl).slice(0, max);
+}
+
+/**
+ * @param {object} vehicle
  */
 export function pickHeroImageUrl(vehicle) {
-    const images = Array.isArray(vehicle?.images) ? vehicle.images : [];
-    return images.find(isSupportedWhatsAppImageUrl) || null;
+    return pickGalleryImageUrls(vehicle, 1)[0] || null;
 }
 
 /**
@@ -161,5 +174,105 @@ export function buildVehicleOutboundPlan({ toolResults = [], llmReply = "", chan
         strippedReply,
         vehicleCount: vehicles.length,
         vehicleIds: vehicles.map((v) => v.vehicleId).filter(Boolean),
+        planType: "search",
     };
+}
+
+/**
+ * Build outbound plan for gallery/image-only requests (no searchInventory in same turn).
+ * @param {{ vehicles?: object[], llmReply?: string, channel?: string, fullGallery?: boolean }} params
+ * @returns {{ messages: object[], strippedReply: string, vehicleCount: number, vehicleIds: string[], imageCount: number, planType: string }|null}
+ */
+export function buildGalleryOutboundPlan({
+    vehicles = [],
+    llmReply = "",
+    channel = "whatsapp",
+    fullGallery = false,
+} = {}) {
+    if (channel !== "whatsapp") return null;
+
+    const deduped = dedupeRecommendedVehicles(vehicles);
+    if (!deduped.length) return null;
+
+    const imagesPerVehicle = fullGallery ? MAX_GALLERY_IMAGES_PER_VEHICLE : 1;
+    const messages = [];
+    const strippedReply = stripWhatsAppImageUrlsFromText(llmReply);
+    if (strippedReply) {
+        messages.push({ type: "text", text: strippedReply });
+    }
+
+    let imageCount = 0;
+    for (const vehicle of deduped) {
+        const imageUrls = pickGalleryImageUrls(vehicle, imagesPerVehicle);
+        const caption =
+            vehicle.title ||
+            vehicle.label ||
+            [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ");
+        for (const imageUrl of imageUrls) {
+            messages.push({
+                type: "image",
+                link: imageUrl,
+                caption: String(caption || "").slice(0, 1024),
+            });
+            imageCount++;
+        }
+    }
+
+    if (!imageCount) return null;
+
+    return {
+        messages,
+        strippedReply,
+        vehicleCount: deduped.length,
+        vehicleIds: deduped.map((v) => v.vehicleId).filter(Boolean),
+        imageCount,
+        planType: "gallery",
+    };
+}
+
+/** @deprecated alias — use buildGalleryOutboundPlan */
+export const buildImageOnlyOutboundPlan = buildGalleryOutboundPlan;
+
+/**
+ * Load full inventory records (with images) for recommended vehicle refs.
+ * @param {string} companyId
+ * @param {object[]} vehicleRefs
+ */
+export async function enrichRecommendedVehiclesForOutbound(companyId, vehicleRefs = []) {
+    if (!companyId || !vehicleRefs?.length) return [];
+    const { getVehicleById } = await import("../inventory/inventoryService.js");
+    const enriched = [];
+
+    for (const ref of vehicleRefs) {
+        if (!ref?.vehicleId) continue;
+        const full = await getVehicleById(companyId, ref.vehicleId);
+        if (full) {
+            enriched.push(full);
+        } else {
+            enriched.push({
+                ...ref,
+                images: ref.primaryImageUrl ? [ref.primaryImageUrl] : ref.images || [],
+            });
+        }
+    }
+
+    return dedupeRecommendedVehicles(enriched);
+}
+
+/**
+ * Adjust LLM reply when gallery image delivery failed — never claim success without send.
+ * @param {string} reply
+ * @param {{ expectedImages?: number, sentImages?: number }} stats
+ */
+export function formatGalleryDeliveryReply(reply, { expectedImages = 0, sentImages = 0 } = {}) {
+    const base = stripWhatsAppImageUrlsFromText(reply);
+    if (expectedImages > 0 && sentImages < expectedImages) {
+        const failureNote =
+            sentImages === 0
+                ? "I'm sorry — I wasn't able to deliver the photos right now. Please try again in a moment or ask a consultant to send them."
+                : "I was only able to send some of the photos — a few couldn't be delivered. Let me know if you'd like me to try again.";
+        if (sentImages === 0) return failureNote;
+        return base ? `${base}\n\n${failureNote}` : failureNote;
+    }
+    return base;
 }

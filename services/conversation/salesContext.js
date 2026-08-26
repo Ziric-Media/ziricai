@@ -276,21 +276,123 @@ function mergeHousehold(existing = [], incoming = []) {
     return [...byKey.values()];
 }
 
+/** Budget states for prompt injection — never conflate income with purchase budget. */
+export const BUDGET_STATES = {
+    UNSPECIFIED: "unspecified",
+    INCOME_ONLY: "income-only",
+    CONFIRMED_PURCHASE: "confirmed-purchase",
+    BUDGET_OPEN: "budget-open",
+};
+
+/**
+ * Resolve budget state from sales context.
+ * @param {object|null|undefined} ctx
+ * @returns {string}
+ */
+export function getBudgetState(ctx) {
+    if (!ctx || !Object.keys(ctx).length) return BUDGET_STATES.UNSPECIFIED;
+    if (ctx.budgetOpen === true) return BUDGET_STATES.BUDGET_OPEN;
+    const purchaseAmount =
+        ctx.confirmedPurchaseBudget ?? ctx.purchaseBudget ?? ctx.budget ?? null;
+    if (purchaseAmount != null || ctx.confirmedPurchaseBudgetDisplay?.endsWith("+")) {
+        return BUDGET_STATES.CONFIRMED_PURCHASE;
+    }
+    if (
+        ctx.income != null ||
+        ctx.targetMonthlyPayment != null ||
+        ctx.monthlyBudget != null ||
+        ctx.incomeDisplay ||
+        ctx.targetMonthlyPaymentDisplay ||
+        ctx.monthlyBudgetDisplay
+    ) {
+        return BUDGET_STATES.INCOME_ONLY;
+    }
+    return BUDGET_STATES.UNSPECIFIED;
+}
+
 /**
  * Build recommendation records from searchInventory results.
- * @param {object[]} vehicles
- * @param {{ reason?: string, requirements?: string[] }} [meta]
+ * @param {object} vehicle
+ * @param {{ familySize?: number|null }} [options]
  */
-export function buildInventoryRecommendationReason(vehicle) {
+export function buildInventoryRecommendationReason(vehicle, { familySize = null } = {}) {
     if (!vehicle) return null;
     const parts = [];
     const label = vehicle.year || vehicle.title || vehicle.label || "This vehicle";
+    const seating =
+        vehicle.seatingCapacity ??
+        vehicle.metadata?.seatingCapacity ??
+        null;
+    const bodyType = vehicle.bodyType ?? vehicle.metadata?.bodyType ?? null;
+
+    if (familySize != null && seating != null) {
+        parts.push(
+            seating >= familySize
+                ? `${seating}-seat capacity fits your family of ${familySize}`
+                : `${seating}-seat capacity — may not fit all ${familySize} passengers`
+        );
+    } else if (seating != null) {
+        parts.push(`${seating} seats`);
+    }
+    if (bodyType) parts.push(String(bodyType));
     if (vehicle.year) parts.push(`${vehicle.year} model`);
     if (vehicle.mileage != null) parts.push(`${Number(vehicle.mileage).toLocaleString("en-ZA")} km`);
     if (vehicle.price != null) parts.push(`R${Number(vehicle.price).toLocaleString("en-ZA")}`);
     if (vehicle.location) parts.push(`at ${vehicle.location}`);
     if (!parts.length) return null;
     return `${label}: ${parts.join(", ")}`;
+}
+
+/**
+ * Compare 2+ vehicles using verified inventory fields only.
+ * @param {object[]} vehicles
+ * @returns {string}
+ */
+export function formatVehicleComparison(vehicles = []) {
+    const list = (vehicles || []).filter((v) => v?.vehicleId || v?.title || v?.make);
+    if (list.length < 2) return "";
+
+    const lines = ["VEHICLE COMPARISON (from inventory — cite these trade-offs when presenting 2+ options):"];
+    for (const v of list.slice(0, 5)) {
+        const label = v.title || [v.year, v.make, v.model].filter(Boolean).join(" ") || v.vehicleId;
+        const specs = [];
+        if (v.price != null) specs.push(`R${Number(v.price).toLocaleString("en-ZA")}`);
+        if (v.mileage != null) specs.push(`${Number(v.mileage).toLocaleString("en-ZA")} km`);
+        const seats = v.seatingCapacity ?? v.metadata?.seatingCapacity;
+        if (seats != null) specs.push(`${seats} seats`);
+        if (v.fuel) specs.push(v.fuel);
+        if (v.transmission) specs.push(v.transmission);
+        if (v.bodyType ?? v.metadata?.bodyType) specs.push(v.bodyType ?? v.metadata?.bodyType);
+        lines.push(`- ${label}: ${specs.join(" · ") || "see inventory record"}`);
+    }
+
+    const priced = list.filter((v) => v.price != null);
+    if (priced.length >= 2) {
+        const sorted = [...priced].sort((a, b) => Number(a.price) - Number(b.price));
+        const cheapest = sorted[0];
+        const priciest = sorted[sorted.length - 1];
+        const cheapLabel = cheapest.title || cheapest.make || "Option A";
+        const priceyLabel = priciest.title || priciest.make || "Option B";
+        if (cheapest.vehicleId !== priciest.vehicleId) {
+            lines.push(
+                `- Price trade-off: ${cheapLabel} is lower at R${Number(cheapest.price).toLocaleString("en-ZA")}; ${priceyLabel} is R${Number(priciest.price).toLocaleString("en-ZA")}`
+            );
+        }
+    }
+
+    const withKm = list.filter((v) => v.mileage != null);
+    if (withKm.length >= 2) {
+        const sorted = [...withKm].sort((a, b) => Number(a.mileage) - Number(b.mileage));
+        const lowest = sorted[0];
+        const highest = sorted[sorted.length - 1];
+        if (lowest.vehicleId !== highest.vehicleId) {
+            lines.push(
+                `- Mileage trade-off: ${lowest.title || lowest.make} has lower km (${Number(lowest.mileage).toLocaleString("en-ZA")}); ${highest.title || highest.make} has ${Number(highest.mileage).toLocaleString("en-ZA")} km`
+            );
+        }
+    }
+
+    return lines.join("\n");
 }
 
 /**
@@ -335,7 +437,7 @@ export function formatLocationComparisonForPrompt(vehicles = []) {
     return `LOCATION VERIFICATION (from inventory): ${cmp.warning}`;
 }
 
-export function buildRecommendedVehicleRecords(vehicles = [], { reason, requirements } = {}) {
+export function buildRecommendedVehicleRecords(vehicles = [], { reason, requirements, familySize } = {}) {
     const now = new Date().toISOString();
     return vehicles
         .filter((v) => v?.vehicleId)
@@ -347,9 +449,14 @@ export function buildRecommendedVehicleRecords(vehicles = [], { reason, requirem
             model: v.model,
             year: v.year,
             price: v.price,
+            mileage: v.mileage,
+            fuel: v.fuel,
+            transmission: v.transmission,
+            bodyType: v.bodyType ?? v.metadata?.bodyType ?? null,
+            seatingCapacity: v.seatingCapacity ?? v.metadata?.seatingCapacity ?? null,
             location: v.location || null,
             primaryImageUrl: Array.isArray(v.images) ? v.images[0] || null : null,
-            reason: reason || buildInventoryRecommendationReason(v),
+            reason: reason || buildInventoryRecommendationReason(v, { familySize }),
             requirements: requirements?.length ? [...requirements] : undefined,
             recommendedAt: now,
             position: index + 1,
@@ -551,7 +658,10 @@ export function mergeSalesContext(existing = {}, signals = {}) {
  */
 export async function persistRecommendedToSalesContext(companyId, phone, vehicles = [], meta = {}) {
     if (!companyId || !phone || !vehicles?.length) return null;
-    const records = buildRecommendedVehicleRecords(vehicles, meta);
+    const records = buildRecommendedVehicleRecords(vehicles, {
+        ...meta,
+        familySize: meta.familySize ?? null,
+    });
     const requirements = meta.requirements || [];
     return persistSalesContext(companyId, phone, {
         lastRecommendedVehicles: records,
@@ -619,9 +729,13 @@ export function formatSalesContextForPrompt(customer) {
     const ctx = customer?.salesContext;
     if (!ctx || !Object.keys(ctx).length) return "";
 
+    const budgetState = getBudgetState(ctx);
     const lines = ["SALES CONTEXT (from customer record — use for guidance, not as inventory/booking truth):"];
     if (ctx.leadStage) lines.push(`- Lead stage: ${ctx.leadStage}`);
     if (ctx.occupation) lines.push(`- Occupation: ${ctx.occupation}`);
+
+    lines.push(`- Budget state: ${budgetState}`);
+
     if (ctx.incomeDisplay || ctx.income != null) {
         lines.push(`- Income: ${ctx.incomeDisplay || `R${ctx.income}/month`} — salary/income, NOT a vehicle purchase budget`);
     }
@@ -639,12 +753,22 @@ export function formatSalesContextForPrompt(customer) {
             } — NOT the same as purchase price; ask about deposit/finance terms before converting to a purchase budget`
         );
     }
-    if (ctx.confirmedPurchaseBudgetDisplay || ctx.confirmedPurchaseBudget != null) {
-        lines.push(`- Confirmed purchase budget: ${ctx.confirmedPurchaseBudgetDisplay || `R${ctx.confirmedPurchaseBudget}`}`);
-    } else if (ctx.purchaseBudgetDisplay || ctx.purchaseBudget != null) {
-        lines.push(`- Purchase budget: ${ctx.purchaseBudgetDisplay || `R${ctx.purchaseBudget}`}`);
-    } else if (ctx.budgetOpen) {
-        lines.push("- Purchase budget: no limit");
+
+    if (budgetState === BUDGET_STATES.BUDGET_OPEN) {
+        lines.push("- Purchase budget: open (customer explicitly cleared price limit)");
+    } else if (budgetState === BUDGET_STATES.CONFIRMED_PURCHASE) {
+        const display =
+            ctx.confirmedPurchaseBudgetDisplay ??
+            ctx.purchaseBudgetDisplay ??
+            ctx.budgetDisplay ??
+            (ctx.confirmedPurchaseBudget != null ? `R${ctx.confirmedPurchaseBudget}` : null);
+        lines.push(`- Confirmed purchase budget: ${display}`);
+    } else if (budgetState === BUDGET_STATES.INCOME_ONLY) {
+        lines.push(
+            "- Budget not specified yet — focus on family needs first; do NOT say purchase budget is confirmed or unlimited"
+        );
+    } else {
+        lines.push("- Purchase budget: not specified yet");
     }
     if (ctx.estimatedPurchaseBudgetDisplay || ctx.estimatedPurchaseBudget != null) {
         lines.push(
@@ -670,8 +794,15 @@ export function formatSalesContextForPrompt(customer) {
         }
         const locationBlock = formatLocationComparisonForPrompt(ctx.lastRecommendedVehicles);
         if (locationBlock) lines.push(`- ${locationBlock.replace(/^LOCATION VERIFICATION \(from inventory\): /, "")}`);
+        const comparisonBlock = formatVehicleComparison(ctx.lastRecommendedVehicles);
+        if (comparisonBlock) lines.push(comparisonBlock);
     }
-    if (ctx.familySize) lines.push(`- Family / passenger count: ${ctx.familySize}`);
+    if (ctx.familySize) {
+        lines.push(`- Family / passenger count: ${ctx.familySize}`);
+        lines.push(
+            `- Family guidance: explain rear space and seating using seatingCapacity from searchInventory only — never invent specs; for family of ${ctx.familySize}, compare each vehicle's verified seatingCapacity and body type`
+        );
+    }
     if (ctx.household?.length) {
         lines.push(
             `- Household: ${ctx.household.map((m) => `${m.name} (${m.role || "member"})`).join(", ")}`

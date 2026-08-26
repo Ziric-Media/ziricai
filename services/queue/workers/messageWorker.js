@@ -44,11 +44,18 @@ import {
 } from "../../conversation/salesContext.js";
 import {
     isVehicleReferenceIntent,
+    isGalleryImageIntent,
     resolveVehicleReference,
+    resolveGalleryVehicleTargets,
     formatResolvedVehicleBlock,
 } from "../../conversation/vehicleReference.js";
 import { getRecommendedVehicles } from "../../conversation/recommendedVehicles.js";
-import { buildVehicleOutboundPlan } from "../../conversation/vehicleOutboundPlan.js";
+import {
+    buildVehicleOutboundPlan,
+    buildGalleryOutboundPlan,
+    enrichRecommendedVehiclesForOutbound,
+    formatGalleryDeliveryReply,
+} from "../../conversation/vehicleOutboundPlan.js";
 
 import { captureLeadFromMessage } from "../../tenants/crmService.js";
 
@@ -341,6 +348,36 @@ async function processInboundMessage(job) {
 
     let resolvedVehicleReference = null;
     let authoritativeVehicleContext = "";
+    let galleryOutboundContext = "";
+    let galleryVehicleTargets = [];
+
+    if (resolvedCompanyId && isGalleryImageIntent(text)) {
+        const conversationRecommended = await getRecommendedVehicles(resolvedCompanyId, sender, outboundChannel);
+        galleryVehicleTargets = resolveGalleryVehicleTargets(
+            text,
+            salesContextForTurn,
+            conversationRecommended
+        );
+        if (galleryVehicleTargets.length) {
+            const labels = galleryVehicleTargets
+                .map((v) => v.title || v.make || v.vehicleId)
+                .filter(Boolean)
+                .join(", ");
+            galleryOutboundContext = [
+                "GALLERY OUTBOUND (platform will send native WhatsApp images automatically):",
+                `- Resolved ${galleryVehicleTargets.length} vehicle(s) from prior recommendations: ${labels}`,
+                "- Give a brief acknowledgment only — do NOT promise 'you'll see them shortly' or claim photos were sent.",
+                "- Platform sends images after your reply; if delivery fails, customer will be told honestly.",
+            ].join("\n");
+            console.log("[whatsapp] Gallery image intent — resolved vehicles", {
+                companyId: resolvedCompanyId,
+                customerId,
+                count: galleryVehicleTargets.length,
+                vehicleIds: galleryVehicleTargets.map((v) => v.vehicleId),
+            });
+        }
+    }
+
     if (resolvedCompanyId && isVehicleReferenceIntent(text)) {
         const conversationRecommended = await getRecommendedVehicles(resolvedCompanyId, sender, outboundChannel);
         resolvedVehicleReference = resolveVehicleReference(
@@ -365,6 +402,7 @@ async function processInboundMessage(job) {
         schedulingPrompt,
         authoritativeBookingContext,
         authoritativeVehicleContext,
+        galleryOutboundContext,
     ].filter(Boolean);
 
     const toolCtx = {
@@ -416,14 +454,27 @@ async function processInboundMessage(job) {
         });
     }
 
-    const outboundPlan =
-        outboundChannel === "whatsapp"
-            ? buildVehicleOutboundPlan({
-                  toolResults,
-                  llmReply: reply,
-                  channel: outboundChannel,
-              })
-            : null;
+    let outboundPlan = null;
+    if (outboundChannel === "whatsapp") {
+        if (galleryVehicleTargets.length) {
+            const enrichedVehicles = await enrichRecommendedVehiclesForOutbound(
+                resolvedCompanyId,
+                galleryVehicleTargets
+            );
+            outboundPlan = buildGalleryOutboundPlan({
+                vehicles: enrichedVehicles,
+                llmReply: reply,
+                channel: outboundChannel,
+                fullGallery: /\b(?:all|every)\s+(?:pictures?|photos?|images?)\b/i.test(text),
+            });
+        } else {
+            outboundPlan = buildVehicleOutboundPlan({
+                toolResults,
+                llmReply: reply,
+                channel: outboundChannel,
+            });
+        }
+    }
 
     let savedReply = reply;
     if (outboundPlan?.messages?.length) {
@@ -433,10 +484,13 @@ async function processInboundMessage(job) {
             resolvedCompanyId,
             sender,
             outboundPlan,
-            "ai_vehicle_media"
+            outboundPlan.planType === "gallery" ? "ai_gallery_media" : "ai_vehicle_media"
         );
 
+        const imageParts = outboundPlan.messages.filter((m) => m.type === "image");
+        const textParts = outboundPlan.messages.filter((m) => m.type === "text");
         let wamidIndex = 0;
+
         for (const part of outboundPlan.messages) {
             const metaMessageId = wamids[wamidIndex] || null;
             if (part.type === "image") {
@@ -455,7 +509,34 @@ async function processInboundMessage(job) {
             }
             if (metaMessageId) wamidIndex++;
         }
+
         savedReply = outboundPlan.strippedReply || reply;
+
+        if (outboundPlan.planType === "gallery") {
+            const sentImages = Math.max(0, wamids.length - textParts.length);
+            if (sentImages < imageParts.length) {
+                const failureReply = formatGalleryDeliveryReply("", {
+                    expectedImages: imageParts.length,
+                    sentImages,
+                });
+                savedReply = outboundPlan.strippedReply
+                    ? `${outboundPlan.strippedReply}\n\n${failureReply}`
+                    : failureReply;
+                const failureMetaId = await trySendOutbound(
+                    job,
+                    outboundChannel,
+                    resolvedCompanyId,
+                    sender,
+                    failureReply,
+                    "ai_gallery_failure"
+                );
+                await saveOutboundMessage(sender, failureReply, {
+                    channel: outboundChannel,
+                    companyId: resolvedCompanyId,
+                    externalId: failureMetaId,
+                });
+            }
+        }
     } else {
         const metaMessageId = await trySendOutbound(job, outboundChannel, resolvedCompanyId, sender, reply, "ai");
         await saveOutboundMessage(sender, reply, {

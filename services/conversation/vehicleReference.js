@@ -23,7 +23,82 @@ const ORDINAL_MAP = {
     last: -1,
 };
 
-const MODEL_HINTS = ["hilux", "fortuner", "everest", "x5", "x3", "ranger", "corolla", "land cruiser", "bmw"];
+const MODEL_HINTS = ["hilux", "fortuner", "everest", "x5", "x3", "ranger", "corolla", "amaze", "quest", "land cruiser", "bmw"];
+
+const GALLERY_IMAGE_PATTERNS = [
+    /\b(?:show|send|see|view|get)\s+(?:me\s+)?(?:the\s+)?(?:pictures?|photos?|images?|pics?)\b/i,
+    /\b(?:pictures?|photos?|images?|pics?)\s+(?:for|of)\s+(?:both|the\s+(?:two|cars|vehicles|options)|these)\b/i,
+    /\b(?:can\s+i\s+)?(?:see|get)\s+(?:photos?|pictures?|images?|pics?)\b/i,
+    /\b(?:more\s+)?(?:pictures?|photos?|images?|pics?)\s+(?:please|now)?\b/i,
+];
+
+/**
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isGalleryImageIntent(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return false;
+    return GALLERY_IMAGE_PATTERNS.some((p) => p.test(raw));
+}
+
+function mergeRecommendedSources(salesContext, conversationRecommended = []) {
+    const fromSales = salesContext?.lastRecommendedVehicles || [];
+    const preferredId = salesContext?.preferredVehicleId;
+    const merged = [];
+    const seen = new Set();
+
+    for (const source of [fromSales, conversationRecommended]) {
+        for (const v of source || []) {
+            if (!v?.vehicleId || seen.has(v.vehicleId)) continue;
+            seen.add(v.vehicleId);
+            merged.push(v);
+        }
+    }
+
+    if (!merged.length && preferredId) {
+        const pref =
+            fromSales.find((v) => v.vehicleId === preferredId) ||
+            conversationRecommended.find((v) => v.vehicleId === preferredId);
+        if (pref) merged.push(pref);
+    }
+
+    return merged;
+}
+
+/**
+ * Resolve vehicles for gallery/image requests from prior recommendations.
+ * @param {string} text
+ * @param {object|null|undefined} salesContext
+ * @param {object[]} [conversationRecommended]
+ * @returns {object[]}
+ */
+export function resolveGalleryVehicleTargets(text, salesContext, conversationRecommended = []) {
+    if (!isGalleryImageIntent(text)) return [];
+
+    const merged = mergeRecommendedSources(salesContext, conversationRecommended);
+    if (!merged.length) return [];
+
+    const raw = String(text || "").toLowerCase();
+
+    if (/\b(?:both|the\s+two|these\s+(?:two|cars|vehicles|options))\b/.test(raw)) {
+        return merged.slice(0, 2);
+    }
+
+    const ordinal = pickByOrdinal(merged, raw);
+    if (ordinal) return [ordinal];
+
+    for (const model of MODEL_HINTS) {
+        if (raw.includes(model)) {
+            const match = pickByHint(merged, model);
+            if (match) return [match];
+        }
+    }
+
+    if (merged.length === 1) return merged;
+
+    return merged.slice(0, 3);
+}
 
 /**
  * @param {string} text
@@ -84,24 +159,7 @@ export function pickByOrdinal(recommended, text) {
  * @returns {object|null}
  */
 export function resolveVehicleReference(text, salesContext, conversationRecommended = []) {
-    const fromSales = salesContext?.lastRecommendedVehicles || [];
-    const preferredId = salesContext?.preferredVehicleId;
-    const merged = [];
-    const seen = new Set();
-
-    for (const source of [fromSales, conversationRecommended]) {
-        for (const v of source || []) {
-            if (!v?.vehicleId || seen.has(v.vehicleId)) continue;
-            seen.add(v.vehicleId);
-            merged.push(v);
-        }
-    }
-
-    if (!merged.length && preferredId) {
-        const pref = fromSales.find((v) => v.vehicleId === preferredId) ||
-            conversationRecommended.find((v) => v.vehicleId === preferredId);
-        if (pref) merged.push(pref);
-    }
+    const merged = mergeRecommendedSources(salesContext, conversationRecommended);
 
     if (!merged.length) return null;
 
@@ -129,6 +187,7 @@ export function resolveVehicleReference(text, salesContext, conversationRecommen
 
     if (merged.length === 1 && isVehicleReferenceIntent(raw)) return merged[0];
 
+    const preferredId = salesContext?.preferredVehicleId;
     if (preferredId) {
         const pref = merged.find((v) => v.vehicleId === preferredId);
         if (pref) return pref;

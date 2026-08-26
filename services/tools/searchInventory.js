@@ -76,7 +76,14 @@ export default {
         const familySize = salesContext?.familySize ?? null;
         const minSeats = resolveMinSeatsFilter(args.minSeats, familySize);
         const budgetFilter = getActivePurchaseBudgetFilter(salesContext);
-        const activeBodyType = args.bodyType || salesContext?.bodyType || bodyHints.bodyType;
+        const prefFromContext =
+            salesContext?.bodyType ||
+            (Array.isArray(salesContext?.vehiclePreferences)
+                ? salesContext.vehiclePreferences.find((p) =>
+                      /^(suv|sedan|hatchback|bakkie)$/i.test(String(p))
+                  )
+                : null);
+        const activeBodyType = args.bodyType || prefFromContext || bodyHints.bodyType;
         const vehicles = await searchInventoryRecords(companyId, args.query || "", {
             make: args.make || args.brand || brandHints.make,
             makes: brandHints.makes,
@@ -107,17 +114,48 @@ export default {
             await storeRecommendedVehicles(companyId, customerPhone, channel || "whatsapp", vehiclesWithFit);
             await persistRecommendedToSalesContext(companyId, customerPhone, vehiclesWithFit, {
                 requirements: salesContext?.customerRequirements,
+                familySize,
             });
         }
 
         const locationComparison = compareRecommendedVehicleLocations(vehiclesWithFit);
         const locationNote = formatLocationComparisonForPrompt(vehiclesWithFit);
 
+        const normalizeBody = (v) =>
+            String(v?.bodyType ?? v?.metadata?.bodyType ?? "").toLowerCase();
+        const requestedBody = activeBodyType ? String(activeBodyType).toLowerCase() : null;
+        const bodyTypeMismatch =
+            requestedBody &&
+            vehiclesWithFit.length > 0 &&
+            vehiclesWithFit.some((v) => {
+                const bt = normalizeBody(v);
+                return bt && bt !== requestedBody && !bt.includes(requestedBody);
+            });
+
+        let message =
+            vehiclesWithFit.length === 0
+                ? "No vehicles matched that search. Try broader terms or ask about alternatives."
+                : `Inventory search returned ${vehiclesWithFit.length} vehicle${vehiclesWithFit.length === 1 ? "" : "s"}. ` +
+                  "Only recommend vehicles from this result — each has a stable vehicleId. " +
+                  "Pass vehicleId to checkTestDriveAvailability and bookTestDrive for follow-up. " +
+                  "Always compare seatingCapacity to passenger count — warn if seatingFit is insufficient. " +
+                  "Only claim 4x4/off-road when is4x4=true in results; use drive field for drive type." +
+                  (locationNote ? ` ${locationNote}` : "");
+
+        if (bodyTypeMismatch) {
+            message +=
+                ` WARNING: Results include vehicles that may not match requested body type (${activeBodyType}). ` +
+                "If you recommend a different body type, say explicitly e.g. 'These aren't SUVs but could work as alternatives…' " +
+                "or re-search with the correct bodyType filter.";
+        }
+
         return {
             ok: true,
             count: vehiclesWithFit.length,
             vehicles: vehiclesWithFit,
             passengerCount,
+            bodyTypeFilter: activeBodyType || null,
+            bodyTypeMismatch: Boolean(bodyTypeMismatch),
             locationComparison: locationComparison.sameLocation
                 ? { sameLocation: true }
                 : {
@@ -128,15 +166,7 @@ export default {
             activePurchaseBudget: budgetFilter.open
                 ? "no limit"
                 : budgetFilter.maxPrice ?? budgetFilter.minPrice ?? null,
-            message:
-                vehiclesWithFit.length === 0
-                    ? "No vehicles matched that search. Try broader terms or ask about alternatives."
-                    : `Inventory search returned ${vehiclesWithFit.length} vehicle${vehiclesWithFit.length === 1 ? "" : "s"}. ` +
-                      "Only recommend vehicles from this result — each has a stable vehicleId. " +
-                      "Pass vehicleId to checkTestDriveAvailability and bookTestDrive for follow-up. " +
-                      "Always compare seatingCapacity to passenger count — warn if seatingFit is insufficient. " +
-                      "Only claim 4x4/off-road when is4x4=true in results; use drive field for drive type." +
-                      (locationNote ? ` ${locationNote}` : ""),
+            message,
         };
     },
 };
