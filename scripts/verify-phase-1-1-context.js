@@ -219,8 +219,12 @@ async function main() {
     assert(!plan.strippedReply.includes("R389"), "LLM vehicle price lines stripped from intro");
     assert(plan.strippedReply.includes("great SUV options"), "intro prose retained");
 
-    const vehicleTextBlocks = plan.messages.filter((m) => m.type === "text" && m.text.includes("Stock:"));
-    assert(vehicleTextBlocks.length === plan.vehicleCount, "one text block per outbound vehicle");
+    const vehicleTextBlocks = plan.messages.filter((m) => m.type === "text" && m.text.includes("💰 Price:"));
+    assert(vehicleTextBlocks.length === plan.vehicleCount, "one formatted card per outbound vehicle");
+    assert(
+        !plan.messages.some((m) => m.type === "text" && /Stock:/i.test(m.text)),
+        "stock numbers must not appear in customer cards"
+    );
     console.log("✓ 4. Outbound plan canonical — deduped, max 3, intro-only LLM");
 
     console.log("\nAll Phase 1.1 context verification checks passed.");

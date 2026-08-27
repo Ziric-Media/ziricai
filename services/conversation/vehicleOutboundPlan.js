@@ -1,6 +1,10 @@
 /**
  * WhatsApp vehicle media outbound plan — native Meta image messages instead of markdown URLs.
  */
+import {
+    formatVehicleCustomerCard,
+    stripInternalVehicleIdentifiersFromText,
+} from "./vehiclePresentation.js";
 
 export const MAX_VEHICLE_IMAGES_PER_TURN = 3;
 export const MAX_GALLERY_IMAGES_PER_VEHICLE = 3;
@@ -12,7 +16,7 @@ const BARE_IMAGE_URL_PATTERN = /https?:\/\/[^\s)\]]+\.(?:jpe?g|png|webp)(?:\?[^\
 const WEBP_PATTERN = /\.webp(?:\?|$)/i;
 const SUPPORTED_IMAGE_PATTERN = /\.(?:jpe?g|png)(?:\?|$)/i;
 const VEHICLE_SPEC_LINE =
-    /(?:\b(?:19|20)\d{2}\b.*\bR[\d,\s]+|\bR[\d,\s]+.*\b(?:km|stock)\b|\bstock\s*(?:#|:)?\s*[A-Z0-9-]+\b)/i;
+    /(?:\b(?:19|20)\d{2}\b.*\bR[\d,\s]+|\bR[\d,\s]+.*\b(?:km|stock)\b|\bstock\s*(?:#|:)?\s*[A-Z0-9-]+\b|💰|📏|⚙️|⛽|👨‍👩‍👧‍👦|📍|💳)/i;
 const NUMBERED_LIST_LINE = /^\s*\d+[\.\):]\s+/;
 
 /**
@@ -47,6 +51,8 @@ export function stripWhatsAppImageUrlsFromText(text) {
  */
 export function stripVehicleListingProseFromText(text, vehicles = []) {
     let result = stripWhatsAppImageUrlsFromText(text);
+    result = stripInternalVehicleIdentifiersFromText(result, vehicles);
+
     const makeTokens = new Set(
         vehicles.flatMap((v) => [v.make, v.model, v.title, v.stockNumber].filter(Boolean).map((s) => String(s).toLowerCase()))
     );
@@ -70,20 +76,23 @@ export function stripVehicleListingProseFromText(text, vehicles = []) {
 
 /**
  * @param {object} vehicle
+ * @param {number} [index]
  */
-export function formatVehicleTextBlock(vehicle) {
-    const parts = [];
-    const title = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ");
-    if (title) parts.push(title);
-    if (vehicle.price != null) {
-        parts.push(`R${Number(vehicle.price).toLocaleString("en-ZA")}`);
-    }
-    if (vehicle.mileage != null) {
-        parts.push(`${Number(vehicle.mileage).toLocaleString("en-ZA")} km`);
-    }
-    if (vehicle.location) parts.push(vehicle.location);
-    if (vehicle.stockNumber) parts.push(`Stock: ${vehicle.stockNumber}`);
-    return parts.join(" · ");
+export function formatVehicleTextBlock(vehicle, index = 0) {
+    return formatVehicleCustomerCard(vehicle, index);
+}
+
+/**
+ * @param {object} vehicle
+ * @returns {string[]}
+ */
+export function getSupportedVehicleImageUrls(vehicle) {
+    const images = Array.isArray(vehicle?.images)
+        ? vehicle.images
+        : vehicle?.primaryImageUrl
+          ? [vehicle.primaryImageUrl]
+          : [];
+    return images.filter(isSupportedWhatsAppImageUrl);
 }
 
 /**
@@ -91,12 +100,7 @@ export function formatVehicleTextBlock(vehicle) {
  * @param {number} [max]
  */
 export function pickGalleryImageUrls(vehicle, max = 1) {
-    const images = Array.isArray(vehicle?.images)
-        ? vehicle.images
-        : vehicle?.primaryImageUrl
-          ? [vehicle.primaryImageUrl]
-          : [];
-    return images.filter(isSupportedWhatsAppImageUrl).slice(0, max);
+    return getSupportedVehicleImageUrls(vehicle).slice(0, max);
 }
 
 /**
@@ -104,6 +108,17 @@ export function pickGalleryImageUrls(vehicle, max = 1) {
  */
 export function pickHeroImageUrl(vehicle) {
     return pickGalleryImageUrls(vehicle, 1)[0] || null;
+}
+
+/**
+ * Additional gallery images — skip hero (first supported image) when possible.
+ * @param {object} vehicle
+ * @param {number} [max]
+ */
+export function pickAdditionalGalleryImageUrls(vehicle, max = MAX_GALLERY_IMAGES_PER_VEHICLE) {
+    const supported = getSupportedVehicleImageUrls(vehicle);
+    if (supported.length <= 1) return supported.slice(0, max);
+    return supported.slice(1, 1 + max);
 }
 
 /**
@@ -148,8 +163,8 @@ export function buildVehicleOutboundPlan({ toolResults = [], llmReply = "", chan
         messages.push({ type: "text", text: strippedReply });
     }
 
-    for (const vehicle of vehicles) {
-        const textBlock = formatVehicleTextBlock(vehicle);
+    vehicles.forEach((vehicle, index) => {
+        const textBlock = formatVehicleTextBlock(vehicle, index);
         if (textBlock) {
             messages.push({ type: "text", text: textBlock });
         }
@@ -165,7 +180,7 @@ export function buildVehicleOutboundPlan({ toolResults = [], llmReply = "", chan
                 caption: String(caption || "").slice(0, 1024),
             });
         }
-    }
+    });
 
     if (!messages.length) return null;
 
@@ -194,16 +209,16 @@ export function buildGalleryOutboundPlan({
     const deduped = dedupeRecommendedVehicles(vehicles);
     if (!deduped.length) return null;
 
-    const imagesPerVehicle = fullGallery ? MAX_GALLERY_IMAGES_PER_VEHICLE : 1;
+    const imagesPerVehicle = fullGallery ? MAX_GALLERY_IMAGES_PER_VEHICLE : MAX_GALLERY_IMAGES_PER_VEHICLE;
     const messages = [];
-    const strippedReply = stripWhatsAppImageUrlsFromText(llmReply);
+    const strippedReply = stripVehicleListingProseFromText(llmReply, deduped);
     if (strippedReply) {
         messages.push({ type: "text", text: strippedReply });
     }
 
     let imageCount = 0;
     for (const vehicle of deduped) {
-        const imageUrls = pickGalleryImageUrls(vehicle, imagesPerVehicle);
+        const imageUrls = pickAdditionalGalleryImageUrls(vehicle, imagesPerVehicle);
         const caption =
             vehicle.title ||
             vehicle.label ||

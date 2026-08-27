@@ -89,8 +89,12 @@ async function main() {
         "Markdown and image URLs must be stripped from LLM reply"
     );
     assert(
-        textParts.some((m) => m.text.includes("Fortuner") && m.text.includes("ST001")),
-        "Vehicle text block must include specs without URLs"
+        textParts.some((m) => m.text.includes("Fortuner") && m.text.includes("💰 Price")),
+        "Vehicle card must include formatted price without stock number"
+    );
+    assert(
+        !textParts.some((m) => m.text.includes("ST001")),
+        "Stock number must not appear in customer-facing card"
     );
 
     assert(
