@@ -18,6 +18,45 @@ export const LEAD_STAGES = [
     "TEST_DRIVE_BOOKED",
 ];
 
+/** Phase 2 — sales progression stages encoded in prompt + context. */
+export const SALES_PROGRESSION_STAGES = [
+    "DISCOVERY",
+    "QUALIFICATION",
+    "RECOMMENDATION",
+    "PRESENTATION",
+    "ENGAGEMENT",
+    "OBJECTION_HANDLING",
+    "BUILD_DESIRE",
+    "CONVERSION",
+    "PURCHASE_INTENT",
+];
+
+const LEAD_TO_SALES_PROGRESSION = {
+    NEW_LEAD: "DISCOVERY",
+    IDENTIFIED: "DISCOVERY",
+    BUDGET_ESTABLISHED: "QUALIFICATION",
+    VEHICLE_SEARCH: "QUALIFICATION",
+    OPTIONS_PRESENTED: "RECOMMENDATION",
+    PREFERRED_VEHICLE: "PRESENTATION",
+    FAMILY_CONSULTED: "ENGAGEMENT",
+    VEHICLE_CONFIRMED: "BUILD_DESIRE",
+    TEST_DRIVE_BOOKED: "CONVERSION",
+};
+
+/** Model keywords → typical customer needs (general knowledge — not inventory facts). */
+const MODEL_NEED_HINTS = {
+    corolla: ["reliability", "fuel economy", "practicality"],
+    "corolla cross": ["practicality", "SUV-style space", "reliability"],
+    hilux: ["durability", "utility", "work and leisure"],
+    fortuner: ["family space", "7 seats", "reliability"],
+    everest: ["family space", "7 seats", "capability"],
+    x5: ["luxury", "performance", "status"],
+    x3: ["luxury", "compact SUV", "prestige"],
+    ranger: ["utility", "towing", "adventure"],
+    polo: ["affordability", "city driving", "efficiency"],
+    rav4: ["reliability", "hybrid efficiency", "SUV practicality"],
+};
+
 function normalizeZarAmount(raw) {
     return String(raw || "")
         .replace(/\s+/g, "")
@@ -248,7 +287,249 @@ function parseObjection(text) {
         const vehicle = raw.match(/\b(fortuner|hilux|everest|x5|bmw)\b/i);
         return vehicle ? `${vehicle[0]} too small for family` : "Vehicle too small for family";
     }
+    if (/\b(too expensive|over budget|can't afford|price is high|out of my price range|too pricey)\b/.test(raw)) {
+        return "price too high";
+    }
+    if (/\b(too many km|high mileage|too much mileage|lots of km|worried about mileage)\b/.test(raw)) {
+        return "mileage concerns";
+    }
+    if (/\b(not a fan of|don't like|don't want|prefer not|only want|must be)\s+(?:a\s+)?([a-z][a-z\s-]{1,20})\b/.test(raw)) {
+        const brandMatch = raw.match(/\b(not a fan of|don't like|only want|must be)\s+(?:a\s+)?(toyota|bmw|ford|mercedes|vw|volkswagen|nissan|isuzu)\b/i);
+        if (brandMatch?.[2]) return `brand preference: ${brandMatch[2]}`;
+    }
     return null;
+}
+
+/**
+ * Detect "which is better X or Y" comparison intent from customer text.
+ * @param {string} text
+ * @returns {{ detected: boolean, terms?: string[] }}
+ */
+export function detectComparisonIntent(text) {
+    const raw = String(text || "");
+    if (!raw.trim()) return { detected: false };
+
+    if (/\bwhich\s+(?:one\s+)?(?:is\s+)?(?:better|best|right|smarter)\b/i.test(raw)) {
+        const terms = extractComparisonTerms(raw);
+        return { detected: true, terms };
+    }
+    if (/\bcompare\b/i.test(raw) && /\b(?:or|vs|versus|between)\b/i.test(raw)) {
+        return { detected: true, terms: extractComparisonTerms(raw) };
+    }
+    const orMatch = raw.match(
+        /\b(?:between|choose between)\s+(.+?)\s+(?:and|or|vs\.?|versus)\s+(.+?)(?:\?|$)/i
+    );
+    if (orMatch) {
+        return { detected: true, terms: [orMatch[1].trim(), orMatch[2].trim()] };
+    }
+    if (/\b(\w[\w\s-]{2,30}?)\s+(?:vs\.?|versus|or)\s+(\w[\w\s-]{2,30}?)\b/i.test(raw)) {
+        const m = raw.match(/\b(\w[\w\s-]{2,30}?)\s+(?:vs\.?|versus|or)\s+(\w[\w\s-]{2,30}?)\b/i);
+        if (m) return { detected: true, terms: [m[1].trim(), m[2].trim()] };
+    }
+    return { detected: false };
+}
+
+function extractComparisonTerms(text) {
+    const raw = String(text || "");
+    const models = [];
+    for (const kw of [
+        "fortuner",
+        "hilux",
+        "everest",
+        "x5",
+        "x3",
+        "corolla",
+        "ranger",
+        "rav4",
+        "polo",
+        "bmw",
+        "toyota",
+        "ford",
+    ]) {
+        if (new RegExp(`\\b${kw}\\b`, "i").test(raw)) models.push(kw);
+    }
+    return models.length >= 2 ? models.slice(0, 4) : models;
+}
+
+/**
+ * Distinguish explicit brand/model REQUEST from underlying NEED signals.
+ * @param {string} text
+ * @returns {{ request?: string|null, needs?: string[] }}
+ */
+export function detectNeedsVsRequest(text) {
+    const raw = String(text || "").toLowerCase();
+    const result = { request: null, needs: [] };
+
+    const brandRequest = raw.match(
+        /\b(?:want|looking for|interested in|need|prefer|show me)\s+(?:a\s+)?(?:an?\s+)?([a-z][a-z0-9\s-]{2,30}?)(?:\s+(?:please|only|specifically))?\b/i
+    );
+    if (brandRequest?.[1]) {
+        const candidate = brandRequest[1].trim();
+        if (/\b(bmw|toyota|ford|mercedes|volkswagen|vw|nissan|isuzu|mazda|hyundai|kia|mg|audi)\b/i.test(candidate)) {
+            result.request = candidate;
+        } else if (/\b(hilux|fortuner|everest|x5|corolla|ranger|rav4|polo|x3)\b/i.test(candidate)) {
+            result.request = candidate;
+        }
+    }
+
+    const directModel = raw.match(/\b(bmw|toyota|ford|mercedes|hilux|fortuner|everest|x5|corolla cross|corolla)\b/i);
+    if (!result.request && directModel) result.request = directModel[0];
+
+    for (const [model, needs] of Object.entries(MODEL_NEED_HINTS)) {
+        if (raw.includes(model)) result.needs.push(...needs);
+    }
+
+    const qualification = parseQualificationSignals(text);
+    if (qualification) result.needs.push(...qualification);
+
+    if (/\b(status|prestige|luxury|premium)\b/.test(raw)) result.needs.push("luxury/status");
+    if (/\b(family|kids|children|school run)\b/.test(raw)) result.needs.push("family practicality");
+    if (/\b(commute|city|township|fuel)\b/.test(raw)) result.needs.push("efficiency");
+    if (/\b(off.?road|4x4|farm| gravel)\b/.test(raw)) result.needs.push("capability");
+
+    result.needs = [...new Set(result.needs.map((n) => n.toLowerCase()))];
+    return result;
+}
+
+/**
+ * Map lead stage to Phase 2 sales progression stage.
+ * @param {string|null|undefined} leadStage
+ */
+export function getSalesProgressionStage(leadStage) {
+    return LEAD_TO_SALES_PROGRESSION[leadStage] || "DISCOVERY";
+}
+
+/**
+ * Build ordered fallback search strategies when primary inventory search returns empty.
+ * @param {{ query?: string, filters?: object, salesContext?: object }} params
+ */
+export function buildAlternativeSearchStrategy({ query = "", filters = {}, salesContext = {} } = {}) {
+    const strategies = [];
+    const limit = filters.limit || 10;
+    const familySize = salesContext?.familySize ?? null;
+    const minSeats = filters.minSeats ?? (familySize != null ? familySize : undefined);
+
+    const push = (nextFilters, reason) => {
+        strategies.push({
+            filters: { ...nextFilters, limit },
+            reason,
+        });
+    };
+
+    const without = (source, ...keys) => {
+        const next = { ...source };
+        for (const key of keys) next[key] = undefined;
+        return next;
+    };
+
+    if (filters.make || filters.model || filters.makes?.length) {
+        push(
+            without(filters, "make", "model", "makes"),
+            "removed brand/model filter — show similar in-stock alternatives"
+        );
+    }
+
+    if (filters.bodyType) {
+        const relaxed = without(filters, "make", "model", "makes", "bodyType");
+        if (minSeats != null) relaxed.minSeats = minSeats;
+        push(relaxed, "removed body type filter — show closest category alternatives");
+    }
+
+    if (filters.maxPrice != null) {
+        const relaxedMax = Math.round(Number(filters.maxPrice) * 1.2 + 50000);
+        const relaxed = without(filters, "make", "model", "makes", "bodyType");
+        relaxed.maxPrice = relaxedMax;
+        push(relaxed, `relaxed maxPrice to R${relaxedMax.toLocaleString("en-ZA")} — show closest options`);
+    }
+
+    if (filters.maxPrice != null) {
+        const relaxed = without(filters, "make", "model", "makes", "bodyType", "maxPrice");
+        if (minSeats != null) relaxed.minSeats = minSeats;
+        push(relaxed, "removed price cap — show value options near stated budget");
+    }
+
+    push(
+        minSeats != null ? { minSeats, limit } : { limit },
+        "broad inventory browse — never return empty-handed"
+    );
+
+    const seen = new Set();
+    return strategies.filter((s) => {
+        const key = JSON.stringify(s.filters);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+/**
+ * Ethical upsell band — one vehicle slightly above confirmed budget for optional mention.
+ * @param {number} maxPrice
+ */
+export function getEthicalUpsellPriceBand(maxPrice) {
+    const cap = Number(maxPrice);
+    if (!Number.isFinite(cap) || cap <= 0) return null;
+    return {
+        minPrice: cap,
+        maxPrice: Math.round(cap * 1.15 + 25000),
+    };
+}
+
+/**
+ * Closing guidance based on sales progression — every turn should move toward a sale.
+ * @param {object|null|undefined} ctx
+ */
+export function formatClosingSuggestion(ctx) {
+    if (!ctx) return "";
+
+    const stage = getSalesProgressionStage(ctx.leadStage);
+    const lines = ["SALES CLOSING GUIDANCE (end every reply with a meaningful next step — never a dead-end filler question):"];
+
+    if (ctx.leadStage === "TEST_DRIVE_BOOKED") {
+        lines.push(
+            "- Post-test-drive follow-up: confirm the plan warmly; set expectation for follow-up after the drive."
+        );
+        lines.push(
+            '- Example: "After you\'ve driven both, we can compare notes and work out which makes most sense for your family and budget."'
+        );
+        return lines.join("\n");
+    }
+
+    if (ctx.comparisonIntent?.detected) {
+        lines.push(
+            "- Comparison close: give a clear recommendation with reasoning tied to customer profile; end with test drive both or book the preferred one."
+        );
+        return lines.join("\n");
+    }
+
+    switch (stage) {
+        case "DISCOVERY":
+            lines.push("- Soft close: ask one qualifying question about lifestyle, family, or daily use before searching.");
+            break;
+        case "QUALIFICATION":
+            lines.push("- Recommendation close: shortlist 2–3 in-stock options and ask which direction feels right.");
+            break;
+        case "RECOMMENDATION":
+        case "PRESENTATION":
+            lines.push("- Test-drive close: invite a test drive on the strongest match or offer to compare top 2.");
+            break;
+        case "ENGAGEMENT":
+            lines.push("- Comparison close: address co-decision-maker concerns; offer joint test drive.");
+            break;
+        case "OBJECTION_HANDLING":
+            lines.push("- Redirect close: acknowledge objection, show alternative from inventory, ask to revisit top pick.");
+            break;
+        case "BUILD_DESIRE":
+            lines.push("- Purchase-intent close: confirm chosen vehicle; offer finance discussion or deposit next step.");
+            break;
+        case "CONVERSION":
+            lines.push("- Confirm booking warmly; mention follow-up after test drive.");
+            break;
+        default:
+            lines.push("- Always propose a concrete next step: shortlist, compare, test drive, or finance chat.");
+    }
+
+    return lines.join("\n");
 }
 
 function inferStageAdvance(text, currentStage) {
@@ -318,6 +599,7 @@ export function getBudgetState(ctx) {
 export function buildInventoryRecommendationReason(vehicle, { familySize = null } = {}) {
     if (!vehicle) return null;
     const parts = [];
+    const benefits = [];
     const label = vehicle.year || vehicle.title || vehicle.label || "This vehicle";
     const seating =
         vehicle.seatingCapacity ??
@@ -331,16 +613,30 @@ export function buildInventoryRecommendationReason(vehicle, { familySize = null 
                 ? `${seating}-seat capacity fits your family of ${familySize}`
                 : `${seating}-seat capacity — may not fit all ${familySize} passengers`
         );
+        if (seating >= familySize) {
+            benefits.push("room for everyone on school runs and family trips");
+        }
     } else if (seating != null) {
         parts.push(`${seating} seats`);
+        if (seating >= 7) benefits.push("generous space for passengers and luggage");
     }
     if (bodyType) parts.push(String(bodyType));
     if (vehicle.year) parts.push(`${vehicle.year} model`);
-    if (vehicle.mileage != null) parts.push(`${Number(vehicle.mileage).toLocaleString("en-ZA")} km`);
+    if (vehicle.mileage != null) {
+        parts.push(`${Number(vehicle.mileage).toLocaleString("en-ZA")} km`);
+        if (Number(vehicle.mileage) < 60000) benefits.push("lower km often means less wear for years ahead");
+        else if (Number(vehicle.mileage) > 100000) benefits.push("mature km can mean stronger value for your budget");
+    }
     if (vehicle.price != null) parts.push(`R${Number(vehicle.price).toLocaleString("en-ZA")}`);
+    if (vehicle.fuel && /diesel/i.test(String(vehicle.fuel))) {
+        benefits.push("diesel efficiency suits longer commutes and highway trips");
+    }
     if (vehicle.location) parts.push(`at ${vehicle.location}`);
     if (!parts.length) return null;
-    return `${label}: ${parts.join(", ")}`;
+
+    const specLine = `${label}: ${parts.join(", ")}`;
+    if (!benefits.length) return specLine;
+    return `${specLine} — ${benefits.slice(0, 2).join("; ")}`;
 }
 
 /**
@@ -507,6 +803,17 @@ export function extractSalesSignals(text, { customer = null } = {}) {
     const objection = parseObjection(raw);
     if (objection) signals.objections = [objection];
 
+    const comparison = detectComparisonIntent(raw);
+    if (comparison.detected) signals.comparisonIntent = comparison;
+
+    const needsVsRequest = detectNeedsVsRequest(raw);
+    if (needsVsRequest.request) signals.requestedVehicle = needsVsRequest.request;
+    if (needsVsRequest.needs?.length) {
+        signals.customerRequirements = [
+            ...new Set([...(signals.customerRequirements || []), ...needsVsRequest.needs]),
+        ];
+    }
+
     const introduced = parseIntroducedPerson(raw);
     if (introduced) {
         signals.householdMembers = [introduced];
@@ -606,6 +913,8 @@ export function mergeSalesContext(existing = {}, signals = {}) {
     if (signals.preferredVehicleId) merged.preferredVehicleId = signals.preferredVehicleId;
     if (signals.leadStage) merged.leadStage = signals.leadStage;
     if (signals.activeSpeaker) merged.activeSpeaker = signals.activeSpeaker;
+    if (signals.comparisonIntent?.detected) merged.comparisonIntent = signals.comparisonIntent;
+    if (signals.requestedVehicle) merged.requestedVehicle = signals.requestedVehicle;
 
     if (signals.bodyType) {
         merged.bodyType = signals.bodyType;
@@ -730,8 +1039,10 @@ export function formatSalesContextForPrompt(customer) {
     if (!ctx || !Object.keys(ctx).length) return "";
 
     const budgetState = getBudgetState(ctx);
+    const progressionStage = getSalesProgressionStage(ctx.leadStage);
     const lines = ["SALES CONTEXT (from customer record — use for guidance, not as inventory/booking truth):"];
     if (ctx.leadStage) lines.push(`- Lead stage: ${ctx.leadStage}`);
+    lines.push(`- Sales progression: ${progressionStage}`);
     if (ctx.occupation) lines.push(`- Occupation: ${ctx.occupation}`);
 
     lines.push(`- Budget state: ${budgetState}`);
@@ -781,7 +1092,20 @@ export function formatSalesContextForPrompt(customer) {
     if (ctx.bodyType) lines.push(`- Active body type filter: ${ctx.bodyType}`);
     if (ctx.vehiclePreferences?.length) lines.push(`- Vehicle preferences: ${ctx.vehiclePreferences.join(", ")}`);
     if (ctx.customerRequirements?.length) {
-        lines.push(`- Customer requirements: ${ctx.customerRequirements.join(", ")}`);
+        lines.push(`- Customer requirements / underlying needs: ${ctx.customerRequirements.join(", ")}`);
+    }
+    if (ctx.requestedVehicle) {
+        lines.push(
+            `- Requested vehicle/brand: ${ctx.requestedVehicle} — explore WHY (luxury, space, reliability) before searching blindly`
+        );
+    }
+    if (ctx.comparisonIntent?.detected) {
+        const terms = ctx.comparisonIntent.terms?.length
+            ? ctx.comparisonIntent.terms.join(" vs ")
+            : "options discussed";
+        lines.push(
+            `- Comparison intent detected (${terms}) — recommend one with evidence from inventory; end with test drive both or book preferred`
+        );
     }
     if (ctx.preferredVehicle) lines.push(`- Preferred vehicle: ${ctx.preferredVehicle}`);
     if (ctx.preferredVehicleId) lines.push(`- Preferred vehicleId: ${ctx.preferredVehicleId}`);
@@ -813,6 +1137,9 @@ export function formatSalesContextForPrompt(customer) {
     }
     if (ctx.activeSpeaker) lines.push(`- Active speaker this turn: ${ctx.activeSpeaker}`);
     if (ctx.objections?.length) lines.push(`- Objections: ${ctx.objections.join("; ")}`);
+
+    const closingBlock = formatClosingSuggestion(ctx);
+    if (closingBlock) lines.push(closingBlock);
 
     return lines.join("\n");
 }

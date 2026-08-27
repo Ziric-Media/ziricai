@@ -8,6 +8,8 @@ import {
     persistRecommendedToSalesContext,
     compareRecommendedVehicleLocations,
     formatLocationComparisonForPrompt,
+    buildAlternativeSearchStrategy,
+    getEthicalUpsellPriceBand,
 } from "../conversation/salesContext.js";
 import { evaluateSeatingFit, getVehicleSeatingCapacity, resolveMinSeatsFilter } from "../inventory/seatingCapacity.js";
 
@@ -84,7 +86,7 @@ export default {
                   )
                 : null);
         const activeBodyType = args.bodyType || prefFromContext || bodyHints.bodyType;
-        const vehicles = await searchInventoryRecords(companyId, args.query || "", {
+        const searchFilters = {
             make: args.make || args.brand || brandHints.make,
             makes: brandHints.makes,
             excludeMake: args.excludeMake || brandHints.excludeMake,
@@ -96,9 +98,61 @@ export default {
             minSeats,
             limit: args.limit || 10,
             availabilityOnly: false,
-        });
+        };
+
+        let vehicles = await searchInventoryRecords(companyId, args.query || "", searchFilters);
+        let fallbackApplied = null;
+
+        if (vehicles.length === 0) {
+            const strategies = buildAlternativeSearchStrategy({
+                query: args.query,
+                filters: {
+                    ...searchFilters,
+                    maxPrice: budgetFilter.open ? undefined : searchFilters.maxPrice,
+                },
+                salesContext,
+            });
+            for (const strategy of strategies) {
+                const attemptFilters = {
+                    ...searchFilters,
+                    ...strategy.filters,
+                    maxPrice:
+                        budgetFilter.open && strategy.filters.maxPrice == null
+                            ? undefined
+                            : strategy.filters.maxPrice ?? searchFilters.maxPrice,
+                };
+                const attempt = await searchInventoryRecords(companyId, "", attemptFilters);
+                if (attempt.length > 0) {
+                    vehicles = attempt;
+                    fallbackApplied = { reason: strategy.reason, relaxedFilters: attemptFilters };
+                    break;
+                }
+            }
+        }
+
+        let upsellOptions = [];
+        const effectiveMaxPrice = budgetFilter.open ? null : budgetFilter.maxPrice ?? args.maxPrice;
+        if (effectiveMaxPrice != null && effectiveMaxPrice <= 350000) {
+            const upsellBand = getEthicalUpsellPriceBand(effectiveMaxPrice);
+            if (upsellBand) {
+                upsellOptions = await searchInventoryRecords(companyId, args.query || "", {
+                    ...searchFilters,
+                    make: undefined,
+                    model: undefined,
+                    makes: undefined,
+                    bodyType: activeBodyType || undefined,
+                    maxPrice: upsellBand.maxPrice,
+                    minPrice: upsellBand.minPrice,
+                    limit: 1,
+                });
+                upsellOptions = upsellOptions.filter(
+                    (v) => !vehicles.some((existing) => existing.vehicleId === v.vehicleId)
+                );
+            }
+        }
 
         const passengerCount = familySize ?? minSeats ?? null;
+
         const vehiclesWithFit = vehicles.map((vehicle) => {
             if (passengerCount == null) return vehicle;
             const fit = evaluateSeatingFit(passengerCount, vehicle);
@@ -134,13 +188,24 @@ export default {
 
         let message =
             vehiclesWithFit.length === 0
-                ? "No vehicles matched that search. Try broader terms or ask about alternatives."
+                ? "No vehicles matched even after broadening the search. NEVER tell the customer you have nothing — acknowledge briefly, call searchInventory again with fewer filters, or browse general stock. Do NOT say 'we don't have any' or 'unfortunately'."
                 : `Inventory search returned ${vehiclesWithFit.length} vehicle${vehiclesWithFit.length === 1 ? "" : "s"}. ` +
                   "Only recommend vehicles from this result — each has a stable vehicleId. " +
                   "Pass vehicleId to checkTestDriveAvailability and bookTestDrive for follow-up. " +
                   "Always compare seatingCapacity to passenger count — warn if seatingFit is insufficient. " +
                   "Only claim 4x4/off-road when is4x4=true in results; use drive field for drive type." +
                   (locationNote ? ` ${locationNote}` : "");
+
+        if (fallbackApplied) {
+            message +=
+                ` FALLBACK SEARCH APPLIED (${fallbackApplied.reason}): present these as in-stock alternatives — ` +
+                "briefly acknowledge the exact request if unmatched, then redirect to these vehicles. Never dead-end.";
+        }
+
+        if (upsellOptions.length > 0) {
+            message +=
+                " ETHICAL UPSELL: one option slightly above budget is available in upsellOptions — mention separately for comparison only, no pressure.";
+        }
 
         if (bodyTypeMismatch) {
             message +=
@@ -166,6 +231,8 @@ export default {
             activePurchaseBudget: budgetFilter.open
                 ? "no limit"
                 : budgetFilter.maxPrice ?? budgetFilter.minPrice ?? null,
+            fallbackSearch: fallbackApplied,
+            upsellOptions: upsellOptions.length ? upsellOptions : undefined,
             message,
         };
     },

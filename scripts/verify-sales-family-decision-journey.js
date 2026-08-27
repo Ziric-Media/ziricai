@@ -179,12 +179,14 @@ async function main() {
     assert(budgetSearch.vehicles.every((v) => v.stockNumber), "all results have stock numbers");
     console.log("✓ 3. inventory recommendations within budget");
 
-    /* 4. BMW/Honda query — BMW in stock, Honda not */
+    /* 4. BMW/Honda query — BMW in stock; Honda not fabricated but alternatives offered */
     const bmwSearch = await runTool("searchInventory", ctx, { query: "BMW X5" });
     assert(bmwSearch.vehicles?.some((v) => v.make === "BMW"), "BMW X5 in inventory");
     const hondaSearch = await runTool("searchInventory", ctx, { query: "Honda" });
-    assert(hondaSearch.count === 0, "Honda not in stock — no fabricated listing");
-    console.log("✓ 4. BMW in inventory; Honda correctly absent");
+    assert(!hondaSearch.vehicles?.some((v) => /honda/i.test(v.make || "")), "Honda not in stock — no fabricated Honda listing");
+    assert(hondaSearch.count >= 1, "Honda absent — fallback must still offer in-stock alternatives");
+    assert(hondaSearch.fallbackSearch != null, "fallback search when requested brand unavailable");
+    console.log("✓ 4. BMW in inventory; Honda absent with never-dead-end alternatives");
 
     /* 5. Vehicle recommendation — Fortuner from inventory */
     const fortunerSearch = await runTool("searchInventory", { ...ctx, salesContext }, { query: "Fortuner", maxPrice: 460000 });
