@@ -272,13 +272,6 @@ export function resolveScheduledAtWithContext(args = {}, scheduling = {}) {
     const enriched = { ...args };
     const contextDate = scheduling.pendingDate || scheduling.lastMentionedDate || scheduling.lastOfferedDate;
 
-    if (enriched.scheduledAt && isFullDateTimeString(enriched.scheduledAt) && !isTimeOnlyInput(enriched.scheduledAt)) {
-        const instant = new Date(enriched.scheduledAt);
-        if (!Number.isNaN(instant.getTime())) {
-            return { ok: true, dateTime: instant, date: toBusinessDateString(instant) };
-        }
-    }
-
     if (contextDate && !enriched.date) {
         enriched.date = contextDate;
     }

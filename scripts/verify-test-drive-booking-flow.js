@@ -9,12 +9,14 @@
 process.env.STORAGE_BACKEND = process.env.STORAGE_BACKEND || "memory";
 process.env.NODE_ENV = process.env.NODE_ENV || "development";
 process.env.BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || "Africa/Johannesburg";
+/** Appointments must use in-memory store — postgres is not cleared by test resets. */
+delete process.env.DATABASE_URL;
 
 function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
 
-import { futureDateOnly as nextWeekdayDateString } from "./testHelpers/scheduling.js";
+import { futureDateOnly as nextWeekdayDateString, futureSlotIso } from "./testHelpers/scheduling.js";
 
 async function seedTiguanFleet(companyId) {
     const { seedVehicles } = await import("../services/inventory/inventoryService.js");
@@ -111,23 +113,23 @@ async function main() {
     /* 4. Slot failure does NOT return VEHICLE_NOT_IN_INVENTORY */
     const { getMaxConcurrentPerSlot } = availability;
     const max = getMaxConcurrentPerSlot();
-    const fillTime = `${weekday} 11:00 AM`;
+    const fillSlotIso = futureSlotIso(4, 11, 0);
     for (let i = 0; i < max; i++) {
         await runTool("bookTestDrive", { ...ctx, customerId: `27810001${100 + i}` }, {
             vehicleId,
-            scheduledAt: fillTime,
+            scheduledAt: fillSlotIso,
         });
     }
     const slotFail = await runTool("checkTestDriveAvailability", ctx, {
         vehicleId,
-        scheduledAt: fillTime,
+        scheduledAt: fillSlotIso,
     });
     assert(slotFail.available === false, "Full slot should not be available");
     assert(slotFail.code === "SLOT_UNAVAILABLE", `Expected SLOT_UNAVAILABLE, got ${slotFail.code}`);
     assert(slotFail.code !== "VEHICLE_NOT_IN_INVENTORY", "Slot failure must not mean vehicle sold");
     const slotBookFail = await runTool("bookTestDrive", { ...ctx, customerId: "27810001999" }, {
         vehicleId,
-        scheduledAt: fillTime,
+        scheduledAt: fillSlotIso,
     });
     assert(slotBookFail.ok === false, "bookTestDrive should fail when slot full");
     assert(slotBookFail.code === "SLOT_UNAVAILABLE", `book code SLOT_UNAVAILABLE, got ${slotBookFail.code}`);
@@ -149,15 +151,17 @@ async function main() {
     console.log("✓ 5. Auto-select next slot works");
 
     /* 6. bookTestDrive rechecks availability before DB write */
+    const recheckDate = nextWeekdayDateString(5);
+    const recheckSlotIso = futureSlotIso(5, 14, 0);
     const availabilityCheck = await runTool("checkTestDriveAvailability", ctx, {
         vehicleId,
-        date: nextWeekdayDateString(5),
+        date: recheckDate,
         time: "2:00 PM",
     });
-    assert(availabilityCheck.available === true, "precheck slot open");
+    assert(availabilityCheck.available === true, `precheck slot open (${availabilityCheck.code}: ${availabilityCheck.reason})`);
     const booked = await runTool("bookTestDrive", ctx, {
         vehicleId,
-        scheduledAt: `${nextWeekdayDateString(5)} 2:00 PM`,
+        scheduledAt: recheckSlotIso,
         customerName: "Recheck Test",
     });
     assert(booked.ok === true, `booking with recheck: ${booked.error}`);
@@ -167,12 +171,12 @@ async function main() {
     for (let i = 0; i < max - 1; i++) {
         await runTool("bookTestDrive", { ...ctx, customerId: `27810002${100 + i}` }, {
             vehicleId,
-            scheduledAt: `${nextWeekdayDateString(5)} 2:00 PM`,
+            scheduledAt: recheckSlotIso,
         });
     }
     const recheckFail = await runTool("bookTestDrive", { ...ctx, customerId: "27810002999" }, {
         vehicleId,
-        scheduledAt: `${nextWeekdayDateString(5)} 2:00 PM`,
+        scheduledAt: recheckSlotIso,
     });
     assert(recheckFail.ok === false, "recheck should reject full slot");
     assert(recheckFail.code === "SLOT_UNAVAILABLE", `recheck code SLOT_UNAVAILABLE, got ${recheckFail.code}`);
