@@ -3,6 +3,7 @@
  */
 import {
     formatVehicleCustomerCard,
+    formatVehicleTitle,
     stripInternalVehicleIdentifiersFromText,
 } from "./vehiclePresentation.js";
 
@@ -72,6 +73,27 @@ export function stripVehicleListingProseFromText(text, vehicles = []) {
 
     result = kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
     return result;
+}
+
+/**
+ * Ensure gallery intro names each vehicle — images follow without duplicate title captions.
+ * @param {string} llmReply
+ * @param {object[]} vehicles
+ */
+export function buildGalleryIntroText(llmReply = "", vehicles = []) {
+    const stripped = stripVehicleListingProseFromText(llmReply, vehicles);
+    const names = vehicles.map((v) => formatVehicleTitle(v)).filter(Boolean);
+    if (!names.length) return stripped;
+
+    const namesLine = names.length === 1 ? names[0] : names.join(", ");
+    const lower = stripped.toLowerCase();
+    const allNamed = names.every((name) => lower.includes(String(name).toLowerCase().slice(0, 12)));
+    if (allNamed) return stripped;
+
+    if (stripped) {
+        return `${stripped}\n\nPhotos: ${namesLine}`;
+    }
+    return names.length === 1 ? `Here are photos of the ${namesLine}.` : `Here are photos of the ${namesLine}.`;
 }
 
 /**
@@ -170,14 +192,10 @@ export function buildVehicleOutboundPlan({ toolResults = [], llmReply = "", chan
         }
         const imageUrl = pickHeroImageUrl(vehicle);
         if (imageUrl) {
-            const caption =
-                vehicle.title ||
-                vehicle.label ||
-                [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ");
             messages.push({
                 type: "image",
                 link: imageUrl,
-                caption: String(caption || "").slice(0, 1024),
+                caption: formatVehicleTitle(vehicle).slice(0, 1024),
             });
         }
     });
@@ -211,9 +229,9 @@ export function buildGalleryOutboundPlan({
 
     const imagesPerVehicle = fullGallery ? MAX_GALLERY_IMAGES_PER_VEHICLE : MAX_GALLERY_IMAGES_PER_VEHICLE;
     const messages = [];
-    const strippedReply = stripVehicleListingProseFromText(llmReply, deduped);
-    if (strippedReply) {
-        messages.push({ type: "text", text: strippedReply });
+    const introText = buildGalleryIntroText(llmReply, deduped);
+    if (introText) {
+        messages.push({ type: "text", text: introText });
     }
 
     let imageCount = 0;
@@ -232,7 +250,7 @@ export function buildGalleryOutboundPlan({
 
     return {
         messages,
-        strippedReply,
+        strippedReply: introText,
         vehicleCount: deduped.length,
         vehicleIds: deduped.map((v) => v.vehicleId).filter(Boolean),
         imageCount,

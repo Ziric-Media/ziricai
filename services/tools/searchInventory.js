@@ -10,6 +10,8 @@ import {
     formatLocationComparisonForPrompt,
     buildAlternativeSearchStrategy,
     getEthicalUpsellPriceBand,
+    buildRankedRecommendations,
+    formatRankedRecommendationsForPrompt,
 } from "../conversation/salesContext.js";
 import { evaluateSeatingFit, getVehicleSeatingCapacity, resolveMinSeatsFilter } from "../inventory/seatingCapacity.js";
 
@@ -164,16 +166,19 @@ export default {
             };
         });
 
+        const rankedVehicles = buildRankedRecommendations(salesContext, vehiclesWithFit);
+        const rankedPrompt = formatRankedRecommendationsForPrompt(rankedVehicles);
+
         if (customerPhone) {
-            await storeRecommendedVehicles(companyId, customerPhone, channel || "whatsapp", vehiclesWithFit);
-            await persistRecommendedToSalesContext(companyId, customerPhone, vehiclesWithFit, {
+            await storeRecommendedVehicles(companyId, customerPhone, channel || "whatsapp", rankedVehicles);
+            await persistRecommendedToSalesContext(companyId, customerPhone, rankedVehicles, {
                 requirements: salesContext?.customerRequirements,
                 familySize,
             });
         }
 
-        const locationComparison = compareRecommendedVehicleLocations(vehiclesWithFit);
-        const locationNote = formatLocationComparisonForPrompt(vehiclesWithFit);
+        const locationComparison = compareRecommendedVehicleLocations(rankedVehicles);
+        const locationNote = formatLocationComparisonForPrompt(rankedVehicles);
 
         const normalizeBody = (v) =>
             String(v?.bodyType ?? v?.metadata?.bodyType ?? "").toLowerCase();
@@ -214,10 +219,14 @@ export default {
                 "or re-search with the correct bodyType filter.";
         }
 
+        if (rankedPrompt) {
+            message += ` ${rankedPrompt} Present ranked picks in order — platform sends numbered cards with hero photos.`;
+        }
+
         return {
             ok: true,
-            count: vehiclesWithFit.length,
-            vehicles: vehiclesWithFit,
+            count: rankedVehicles.length,
+            vehicles: rankedVehicles,
             passengerCount,
             bodyTypeFilter: activeBodyType || null,
             bodyTypeMismatch: Boolean(bodyTypeMismatch),

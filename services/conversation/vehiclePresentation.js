@@ -46,7 +46,7 @@ export function formatTransmissionLine(transmission) {
  */
 export function formatFuelLine(fuel) {
     if (!fuel || !String(fuel).trim()) return null;
-    return `⛽ Fuel Type: ${String(fuel).trim()}`;
+    return `⛽ Fuel: ${String(fuel).trim()}`;
 }
 
 /**
@@ -59,9 +59,9 @@ export function formatSeatingLine(vehicle) {
         vehicle?.metadata?.seatingCapacity ??
         null;
     if (seating != null && !Number.isNaN(Number(seating))) {
-        return `👨‍👩‍👧‍👦 Seating Capacity: ${Number(seating)}`;
+        return `👨‍👩‍👧‍👦 Seating: ${Number(seating)}`;
     }
-    return `👨‍👩‍👧‍👦 Seating Capacity: Not specified in listing`;
+    return `👨‍👩‍👧‍👦 Seating: Not specified in listing`;
 }
 
 /**
@@ -91,7 +91,9 @@ export function formatFinanceLine(vehicle) {
  */
 export function formatVehicleTitle(vehicle) {
     if (vehicle?.title) return String(vehicle.title).trim();
-    return [vehicle?.year, vehicle?.make, vehicle?.model, vehicle?.trim].filter(Boolean).join(" ");
+    const built = [vehicle?.year, vehicle?.make, vehicle?.model, vehicle?.trim].filter(Boolean).join(" ");
+    if (built) return built;
+    return vehicle?.label || vehicle?.make || "Vehicle";
 }
 
 /**
@@ -101,7 +103,18 @@ export function formatVehicleTitle(vehicle) {
 export function formatRecommendationLine(vehicle) {
     const reason = vehicle?.reason || vehicle?.recommendationReason || null;
     if (!reason || !String(reason).trim()) return null;
-    return `✨ Why Sarah recommends it: ${String(reason).trim()}`;
+    return `Why Sarah recommends it:\n${String(reason).trim()}`;
+}
+
+/**
+ * Rank badge for top-3 inventory recommendations.
+ * @param {number} index — 0-based
+ */
+export function formatRankBadge(index = 0) {
+    if (index === 0) return "🥇 Best Match #1";
+    if (index === 1) return "🥈 Best Match #2";
+    if (index === 2) return "🥉 Alternative #3";
+    return null;
 }
 
 /**
@@ -114,10 +127,11 @@ export function formatVehicleCustomerCard(vehicle, index = 0) {
 
     const number = index + 1;
     const title = formatVehicleTitle(vehicle);
-    const lines = [`${number}. 🚙 *${title}*`, ""];
+    const rankBadge = vehicle?.rankLabel || formatRankBadge(index);
+    const titleLine = rankBadge ? `${rankBadge}\n🚗 ${number}. ${title}` : `🚗 ${number}. ${title}`;
+    const lines = [titleLine, ""];
 
     const detailLines = [
-        formatRecommendationLine(vehicle),
         formatPriceLine(vehicle.price),
         formatMileageLine(vehicle.mileage),
         formatTransmissionLine(vehicle.transmission),
@@ -128,6 +142,13 @@ export function formatVehicleCustomerCard(vehicle, index = 0) {
     ].filter(Boolean);
 
     lines.push(...detailLines);
+
+    const recommendation = formatRecommendationLine(vehicle);
+    if (recommendation) {
+        lines.push("");
+        lines.push(recommendation);
+    }
+
     return lines.join("\n").trim();
 }
 

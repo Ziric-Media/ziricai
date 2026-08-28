@@ -12,6 +12,7 @@ import {
     parseScheduledInput,
     hasExplicitTimeInString,
     toBusinessDateString,
+    toBusinessTimeString,
     isTimeOnlyInput,
 } from "../tools/availability.js";
 import { matchOfferedSlot } from "./testDrivePlan.js";
@@ -95,13 +96,12 @@ export function extractSchedulingFromText(text, existing = {}) {
         const parsed = parseScheduledInput({ scheduledAt: offeredMatch.slotStart });
         if (parsed.ok && parsed.dateTime) {
             const isoDate = toLocalDateString(parsed.dateTime);
-            const h = parsed.dateTime.getHours();
-            const m = parsed.dateTime.getMinutes();
+            const bizTime = toBusinessTimeString(parsed.dateTime);
             return {
                 lastMentionedDate: isoDate,
                 pendingDate: isoDate,
                 lastOfferedDate: isoDate,
-                lastMentionedTime: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+                lastMentionedTime: bizTime,
                 pendingTime: null,
             };
         }
@@ -124,7 +124,10 @@ export function extractSchedulingFromText(text, existing = {}) {
     const hasTime =
         parsed.hasExplicitTime ||
         hasExplicitTimeInString(raw) ||
-        Boolean(parsed.dateTime && (parsed.dateTime.getHours() !== 0 || parsed.dateTime.getMinutes() !== 0));
+        Boolean(
+            parsed.dateTime &&
+                (toBusinessTimeString(parsed.dateTime) !== "00:00" || /\bnoon\b|\bmidday\b/i.test(raw))
+        );
 
     if (dateObj && !timeOnly) {
         const isoDate = toLocalDateString(dateObj);
@@ -142,9 +145,7 @@ export function extractSchedulingFromText(text, existing = {}) {
     }
 
     if (hasTime && parsed.dateTime) {
-        const h = parsed.dateTime.getHours();
-        const m = parsed.dateTime.getMinutes();
-        updates.lastMentionedTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+        updates.lastMentionedTime = toBusinessTimeString(parsed.dateTime);
         updates.pendingTime = null;
     } else if (updates.pendingDate || contextDate) {
         updates.pendingTime = true;
@@ -232,7 +233,7 @@ export function schedulingUpdatesFromToolResult(toolName, args = {}, result = {}
             updates.lastOfferedDate = isoDate;
             updates.pendingDate = isoDate;
             updates.lastMentionedDate = isoDate;
-            updates.lastMentionedTime = `${String(parsed.dateTime.getHours()).padStart(2, "0")}:${String(parsed.dateTime.getMinutes()).padStart(2, "0")}`;
+            updates.lastMentionedTime = toBusinessTimeString(parsed.dateTime);
             updates.pendingTime = null;
         }
     }
@@ -322,6 +323,51 @@ export function isSchedulingDelegationIntent(text) {
     if (/\bearliest\s+available\b/i.test(t) && /\b(time|slot|book)\b/i.test(t)) return true;
     if (/\bbook\s+(?:the\s+)?(?:earliest|next|first)\s+available\b/i.test(t)) return true;
     return false;
+}
+
+/**
+ * Detect when the customer picks or states a specific test-drive time.
+ * @param {string} text
+ * @param {SchedulingContext} [scheduling]
+ */
+export function isSchedulingTimeSelectionIntent(text, scheduling = {}) {
+    const raw = String(text || "").trim();
+    if (!raw || isSchedulingDelegationIntent(raw)) return false;
+    if (/\b(?:noon|midday|\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i.test(raw)) return true;
+    if (isTimeOnlyInput(raw)) return true;
+    if (scheduling.pendingDate && hasExplicitTimeInString(raw)) return true;
+    return false;
+}
+
+/**
+ * Format tool availability result for prompt injection — Sarah must cite ONLY these slots.
+ * @param {object} result
+ */
+export function formatAuthoritativeAvailabilityBlock(result = {}) {
+    if (!result || (!result.slotLabel && !result.suggestedSlots?.length && !result.code)) return "";
+
+    const slots = (result.suggestedSlots || result.alternatives?.slots || [])
+        .slice(0, 8)
+        .map((s) => s.label)
+        .filter(Boolean)
+        .join("; ");
+
+    return [
+        "AUTHORITATIVE AVAILABILITY (from checkTestDriveAvailability — cite ONLY these slots; NEVER invent or reject times in prose):",
+        `- Code: ${result.code || "UNKNOWN"}`,
+        result.available === true ? "- Slot IS available — proceed to bookTestDrive when customer confirms." : null,
+        result.slotLabel ? `- Confirmed slot: ${result.slotLabel}` : null,
+        result.nextAlternative?.slotLabel ? `- Next alternative: ${result.nextAlternative.slotLabel}` : null,
+        slots ? `- Open slots: ${slots}` : null,
+        result.code === "OUTSIDE_BUSINESS_HOURS"
+            ? "- If code is OUTSIDE_BUSINESS_HOURS, offer suggestedSlots only — do NOT claim valid customer times are outside hours unless the tool says so."
+            : null,
+        result.code === "SLOT_UNAVAILABLE" || result.code === "OUTSIDE_BUSINESS_HOURS"
+            ? "- Vehicle is still in inventory — slot/time issue only."
+            : null,
+    ]
+        .filter(Boolean)
+        .join("\n");
 }
 
 /**

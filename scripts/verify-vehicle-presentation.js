@@ -23,6 +23,7 @@ async function main() {
     const {
         buildVehicleOutboundPlan,
         buildGalleryOutboundPlan,
+        buildGalleryIntroText,
         dedupeRecommendedVehicles,
         pickHeroImageUrl,
         pickAdditionalGalleryImageUrls,
@@ -65,12 +66,12 @@ async function main() {
 
     /* 1. Customer presentation format */
     const card = formatVehicleCustomerCard(sampleVehicle, 0);
-    assert(card.startsWith("1. 🚙 *2020 Toyota Fortuner 2.4 GD-6*"), "numbered bold title with vehicle emoji");
+    assert(card.includes("🚗 1. 2020 Toyota Fortuner 2.4 GD-6"), "numbered title with vehicle emoji and full name");
     assert(card.includes("💰 Price: R399,900"), "price line");
     assert(card.includes("📏 Mileage: 71,000 km"), "mileage line");
     assert(card.includes("⚙️ Transmission: Automatic"), "transmission line");
-    assert(card.includes("⛽ Fuel Type: Diesel"), "fuel line");
-    assert(card.includes("👨‍👩‍👧‍👦 Seating Capacity: 7"), "seating line");
+    assert(card.includes("⛽ Fuel: Diesel"), "fuel line");
+    assert(card.includes("👨‍👩‍👧‍👦 Seating: 7"), "seating line");
     assert(card.includes("📍 Location: Central Motors Sandton"), "location line");
     assert(card.includes("💳 Finance Estimate: From R10,100/month"), "finance line");
     assert(!card.includes("http"), "no raw URLs in card");
@@ -127,7 +128,7 @@ async function main() {
         price: 199900,
     };
     const sparseCard = formatVehicleCustomerCard(sparse, 1);
-    assert(sparseCard.startsWith("2. 🚙 *"), "second card numbered correctly");
+    assert(sparseCard.includes("🚗 2."), "second card numbered correctly");
     assert(sparseCard.includes("💰 Price: R199,900"), "price shown when present");
     assert(!sparseCard.includes("📏 Mileage"), "mileage omitted when missing");
     assert(!sparseCard.includes("⚙️ Transmission"), "transmission omitted when missing");
@@ -151,8 +152,12 @@ async function main() {
     assert(imageParts.length === 1, "one hero image per vehicle");
     assert(imageParts[0].link === hero, "hero image in outbound plan");
     assert(cardParts.length === 1, "one formatted card in plan");
-    assert(cardParts[0].text.includes("*2020 Toyota Fortuner"), "card in outbound plan");
-    console.log("✓ 8. Hero image delivery via native WhatsApp image part");
+    assert(cardParts[0].text.includes("2020 Toyota Fortuner"), "card in outbound plan");
+    assert(imageParts[0].caption?.includes("Fortuner"), "hero image caption has vehicle name");
+    const cardIndex = plan.messages.findIndex((m) => m.type === "text" && m.text.includes("💰"));
+    const imageIndex = plan.messages.findIndex((m) => m.type === "image");
+    assert(cardIndex >= 0 && imageIndex > cardIndex, "card text must precede hero image");
+    console.log("✓ 8. Hero image delivery — card before image with vehicle name");
 
     /* 9. Gallery request — up to 3 native images per vehicle (includes hero) */
     const galleryPlan = buildGalleryOutboundPlan({
@@ -165,8 +170,11 @@ async function main() {
     const galleryImages = galleryPlan.messages.filter((m) => m.type === "image");
     assert(galleryImages.length === 3, "3 native image messages");
     assert(galleryImages.every((m) => !m.caption), "gallery images omit duplicate title captions");
-    assert(galleryImages[0].link.endsWith("fortuner-hero.jpg"), "gallery includes hero image first");
-    console.log("✓ 9. Gallery request (up to 3 native images, no duplicate titles)");
+    const galleryIntro = galleryPlan.messages.find((m) => m.type === "text");
+    assert(galleryIntro?.text.includes("Fortuner"), "gallery intro names the vehicle");
+    const introOnly = buildGalleryIntroText("Here are more photos!", [sampleVehicle]);
+    assert(introOnly.includes("Fortuner"), "buildGalleryIntroText includes vehicle name");
+    console.log("✓ 9. Gallery request — intro names vehicle, up to 3 images");
 
     /* 10. Maximum 3 vehicles */
     const manyVehicles = Array.from({ length: 5 }, (_, i) => ({

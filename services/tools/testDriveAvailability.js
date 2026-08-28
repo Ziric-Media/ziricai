@@ -20,6 +20,7 @@ import {
     findFirstAvailableSlotForVehicle,
     slotEnd,
     toBusinessDateString,
+    toBusinessTimeString,
 } from "./availability.js";
 import { listAppointmentsByCustomer } from "../database/appointmentRepository.js";
 
@@ -176,7 +177,7 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
         if (options.contextDate && options.contextDate !== toBusinessDateString(scheduledAt)) {
             const retry = parseScheduledInput({
                 date: options.contextDate,
-                time: options.time || `${String(scheduledAt.getHours()).padStart(2, "0")}:${String(scheduledAt.getMinutes()).padStart(2, "0")}`,
+                time: options.time || toBusinessTimeString(scheduledAt),
                 contextDate: options.contextDate,
             });
             if (retry.ok && retry.dateTime && retry.dateTime.getTime() >= Date.now() - 5 * 60 * 1000) {

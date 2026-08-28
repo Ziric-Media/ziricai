@@ -181,6 +181,7 @@ export function hasExplicitTimeInString(value) {
 
     if (/\d{1,2}:\d{2}/.test(raw)) return true;
     if (/\d{1,2}\s*(am|pm)\b/i.test(raw)) return true;
+    if (/\b(?:12\s*)?noon\b|\bmidday\b/i.test(raw)) return true;
 
     const isoTimeMatch = raw.match(/\d{4}-\d{2}-\d{2}[T\s](\d{2}):(\d{2})/);
     if (isoTimeMatch) {
@@ -239,6 +240,7 @@ export function isTimeOnlyInput(raw) {
     if (/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) return false;
     if (/^\d{1,2}(:\d{2})?\s*(am|pm)?$/i.test(value)) return true;
     if (/^\d{1,2}:\d{2}$/.test(value)) return true;
+    if (/^(?:12\s*)?noon$|^midday$/i.test(value)) return true;
     return (
         hasExplicitTimeInString(value) &&
         !/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|\d{4}-\d{2}-\d{2})\b/i.test(
@@ -368,6 +370,10 @@ function applyTimeFromText(lower, baseDate) {
     const baseParts = getDatePartsInBusinessTz(baseDate);
     if (!baseParts) return null;
 
+    if (/\b(?:at\s+)?(?:12\s*)?noon\b|\bmidday\b|\b12\s*o'?clock\s+noon\b/i.test(lower)) {
+        return dateFromBusinessLocal(baseParts.year, baseParts.month, baseParts.day, 12, 0);
+    }
+
     const ampmMatch = lower.match(/(?:\bat\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
     if (ampmMatch) {
         let hour = parseInt(ampmMatch[1], 10);
@@ -400,6 +406,27 @@ export function parseScheduledInput(input = {}) {
         input.contextDate && /^\d{4}-\d{2}-\d{2}$/.test(String(input.contextDate).trim())
             ? String(input.contextDate).trim()
             : null;
+
+    if (input.date && input.time && !input.scheduledAt) {
+        const dateOnly = parseIsoAsBusinessLocal(String(input.date).trim());
+        const timeBase =
+            dateOnly?.dateOnly ||
+            (contextDate
+                ? dateFromBusinessLocal(
+                      parseInt(contextDate.slice(0, 4), 10),
+                      parseInt(contextDate.slice(5, 7), 10),
+                      parseInt(contextDate.slice(8, 10), 10),
+                      0,
+                      0
+                  )
+                : null);
+        if (timeBase) {
+            const timeApplied = applyTimeFromText(String(input.time).toLowerCase(), timeBase);
+            if (timeApplied) {
+                return { ok: true, dateTime: timeApplied, hasExplicitTime: true };
+            }
+        }
+    }
 
     if (contextDate && input.scheduledAt && isTimeOnlyInput(input.scheduledAt)) {
         const timeApplied = applyTimeFromText(
@@ -597,6 +624,16 @@ export function toBusinessDateString(date) {
     const parts = getDatePartsInBusinessTz(date);
     if (!parts) return "";
     return `${pad(parts.year, 4)}-${pad(parts.month)}-${pad(parts.day)}`;
+}
+
+/**
+ * HH:mm wall-clock time in business timezone — use instead of Date.getHours() (server TZ).
+ * @param {Date|string} date
+ */
+export function toBusinessTimeString(date) {
+    const parts = getDatePartsInBusinessTz(date);
+    if (!parts) return "";
+    return `${pad(parts.hour)}:${pad(parts.minute)}`;
 }
 
 /**

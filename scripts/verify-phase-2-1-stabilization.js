@@ -180,9 +180,11 @@ async function main() {
     const images = galleryPlan.messages.filter((m) => m.type === "image");
     assert(images.length === 3, `3 gallery images, got ${images.length}`);
     assert(images.every((m) => !m.caption), "gallery images must not duplicate vehicle title captions");
+    const galleryIntro = galleryPlan.messages.find((m) => m.type === "text");
+    assert(galleryIntro?.text.includes("Everest"), "gallery intro names the vehicle");
     assert(
-        !galleryPlan.messages.filter((m) => m.type === "text").some((m) => m.text.includes("2021 Ford Everest")),
-        "no duplicate vehicle title text blocks in gallery plan"
+        galleryPlan.messages.filter((m) => m.type === "text" && m.text.includes("💰")).length === 0,
+        "no duplicate vehicle spec cards in gallery plan"
     );
     console.log("✓ 7. Gallery sends native images without duplicate titles");
 
@@ -200,7 +202,7 @@ async function main() {
         0
     );
     assert(formatRecommendationLine({ reason }).includes("Why Sarah recommends it"), "recommendation line format");
-    assert(card.includes("🚙"), "vehicle emoji in title");
+    assert(card.includes("🚗"), "vehicle emoji in title");
     assert(card.includes("Why Sarah recommends it"), "card includes recommendation reason");
     assert(card.includes("Finance Estimate"), "card includes finance when present");
     console.log("✓ 8. Vehicle card has recommendation reason field");

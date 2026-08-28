@@ -12,6 +12,7 @@ import {
     parseScheduledInput,
     formatSlotLabel,
     toBusinessDateString,
+    toBusinessTimeString,
     findFirstAvailableSlotForVehicle,
     getDatePartsInBusinessTz,
 } from "../tools/availability.js";
@@ -345,7 +346,7 @@ export function matchOfferedSlot(text, offeredSlots = [], contextDate = null) {
         if (!slot.slotStart) continue;
         const parsed = parseScheduledInput({ scheduledAt: slot.slotStart });
         if (!parsed.ok || !parsed.dateTime) continue;
-        const slotTime = `${String(parsed.dateTime.getHours()).padStart(2, "0")}:${String(parsed.dateTime.getMinutes()).padStart(2, "0")}`;
+        const slotTime = toBusinessTimeString(parsed.dateTime);
         if (slotTime === target) {
             if (contextDate) {
                 const slotDate = toBusinessDateString(parsed.dateTime);
@@ -499,7 +500,7 @@ export function pendingEntryFromAvailability(plan = [], args = {}, result = {}) 
         const parsed = parseScheduledInput({ scheduledAt: result.slotStart });
         if (parsed.ok && parsed.dateTime) {
             patch.date = toBusinessDateString(parsed.dateTime);
-            patch.time = `${String(parsed.dateTime.getHours()).padStart(2, "0")}:${String(parsed.dateTime.getMinutes()).padStart(2, "0")}`;
+            patch.time = toBusinessTimeString(parsed.dateTime);
         }
     }
 

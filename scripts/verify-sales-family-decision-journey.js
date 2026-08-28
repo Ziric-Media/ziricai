@@ -148,7 +148,7 @@ async function main() {
         mergeSalesContext,
         getCustomer,
     });
-    assert(salesContext.leadStage === "IDENTIFIED", `stage IDENTIFIED, got ${salesContext.leadStage}`);
+    assert(salesContext.leadStage === "DISCOVERY", `stage DISCOVERY, got ${salesContext.leadStage}`);
     let customer = await getCustomer(PHONE, { companyId: COMPANY_ID });
     assert(customer.displayName === "Spencer", "Spencer stored");
     console.log("✓ 1. Spencer identified");

@@ -7,16 +7,31 @@ import { countPassengersFromText } from "../inventory/seatingCapacity.js";
 import { parseIntroducedPerson, parseRelationshipSpeaker, parseOccupation } from "../customerIdentity.js";
 
 export const LEAD_STAGES = [
-    "NEW_LEAD",
-    "IDENTIFIED",
-    "BUDGET_ESTABLISHED",
-    "VEHICLE_SEARCH",
-    "OPTIONS_PRESENTED",
-    "PREFERRED_VEHICLE",
-    "FAMILY_CONSULTED",
-    "VEHICLE_CONFIRMED",
+    "NEW",
+    "DISCOVERY",
+    "VEHICLES_RECOMMENDED",
+    "VEHICLE_INTEREST",
+    "VEHICLE_SELECTED",
+    "TEST_DRIVE_REQUESTED",
     "TEST_DRIVE_BOOKED",
+    "TEST_DRIVE_COMPLETED",
+    "FINANCE_INTEREST",
+    "FINANCE_QUOTE",
+    "PURCHASE_INTENT",
+    "HUMAN_HANDOFF",
 ];
+
+/** Map legacy lead stages to the current pipeline vocabulary. */
+export const LEGACY_LEAD_STAGE_MAP = {
+    NEW_LEAD: "NEW",
+    IDENTIFIED: "DISCOVERY",
+    BUDGET_ESTABLISHED: "DISCOVERY",
+    VEHICLE_SEARCH: "DISCOVERY",
+    OPTIONS_PRESENTED: "VEHICLES_RECOMMENDED",
+    PREFERRED_VEHICLE: "VEHICLE_INTEREST",
+    FAMILY_CONSULTED: "VEHICLE_INTEREST",
+    VEHICLE_CONFIRMED: "VEHICLE_SELECTED",
+};
 
 /** Phase 2 — sales progression stages encoded in prompt + context. */
 export const SALES_PROGRESSION_STAGES = [
@@ -32,6 +47,18 @@ export const SALES_PROGRESSION_STAGES = [
 ];
 
 const LEAD_TO_SALES_PROGRESSION = {
+    NEW: "DISCOVERY",
+    DISCOVERY: "QUALIFICATION",
+    VEHICLES_RECOMMENDED: "RECOMMENDATION",
+    VEHICLE_INTEREST: "PRESENTATION",
+    VEHICLE_SELECTED: "BUILD_DESIRE",
+    TEST_DRIVE_REQUESTED: "CONVERSION",
+    TEST_DRIVE_BOOKED: "CONVERSION",
+    TEST_DRIVE_COMPLETED: "BUILD_DESIRE",
+    FINANCE_INTEREST: "BUILD_DESIRE",
+    FINANCE_QUOTE: "CONVERSION",
+    PURCHASE_INTENT: "PURCHASE_INTENT",
+    HUMAN_HANDOFF: "PURCHASE_INTENT",
     NEW_LEAD: "DISCOVERY",
     IDENTIFIED: "DISCOVERY",
     BUDGET_ESTABLISHED: "QUALIFICATION",
@@ -42,6 +69,31 @@ const LEAD_TO_SALES_PROGRESSION = {
     VEHICLE_CONFIRMED: "BUILD_DESIRE",
     TEST_DRIVE_BOOKED: "CONVERSION",
 };
+
+const LEAD_STAGE_ORDER = LEAD_STAGES;
+
+/**
+ * Normalize legacy or unknown lead stages to the current pipeline vocabulary.
+ * @param {string|null|undefined} stage
+ */
+export function normalizeLeadStage(stage) {
+    const raw = String(stage || "NEW").trim();
+    return LEGACY_LEAD_STAGE_MAP[raw] || (LEAD_STAGES.includes(raw) ? raw : "NEW");
+}
+
+/**
+ * Advance lead stage only forward in the pipeline.
+ * @param {string|null|undefined} current
+ * @param {string} next
+ */
+export function advanceLeadStage(current, next) {
+    const from = normalizeLeadStage(current);
+    const to = normalizeLeadStage(next);
+    const fromIdx = LEAD_STAGE_ORDER.indexOf(from);
+    const toIdx = LEAD_STAGE_ORDER.indexOf(to);
+    if (fromIdx < 0 || toIdx < 0) return to;
+    return toIdx >= fromIdx ? to : from;
+}
 
 /** Model keywords → typical customer needs (general knowledge — not inventory facts). */
 const MODEL_NEED_HINTS = {
@@ -405,7 +457,42 @@ export function detectNeedsVsRequest(text) {
  * @param {string|null|undefined} leadStage
  */
 export function getSalesProgressionStage(leadStage) {
-    return LEAD_TO_SALES_PROGRESSION[leadStage] || "DISCOVERY";
+    return LEAD_TO_SALES_PROGRESSION[normalizeLeadStage(leadStage)] || "DISCOVERY";
+}
+
+/**
+ * Stage objective for prompt injection — what Sarah should accomplish this turn.
+ * @param {string|null|undefined} leadStage
+ */
+export function getLeadStageObjective(leadStage) {
+    switch (normalizeLeadStage(leadStage)) {
+        case "NEW":
+            return "Warm welcome; learn name and what brought them in.";
+        case "DISCOVERY":
+            return "Qualify needs — family, budget, lifestyle, body type — before searching.";
+        case "VEHICLES_RECOMMENDED":
+            return "Sell ranked top picks with reasons; invite comparison or test drive.";
+        case "VEHICLE_INTEREST":
+            return "Deepen interest on shortlisted vehicle(s); offer photos or side-by-side compare.";
+        case "VEHICLE_SELECTED":
+            return "Proactively suggest the next available test-drive slot — do NOT ask open-ended 'what time?'.";
+        case "TEST_DRIVE_REQUESTED":
+            return "Confirm date/time via checkTestDriveAvailability only; book when customer confirms.";
+        case "TEST_DRIVE_BOOKED":
+            return "Warm booking confirmation + set post-drive follow-up plan.";
+        case "TEST_DRIVE_COMPLETED":
+            return "Debrief the drive; narrow to final choice or compare finalists.";
+        case "FINANCE_INTEREST":
+            return "Transition to monthly payment options and finance next steps.";
+        case "FINANCE_QUOTE":
+            return "Present finance estimate; confirm purchase intent or deposit step.";
+        case "PURCHASE_INTENT":
+            return "Confirm chosen vehicle; arrange deposit, paperwork, or consultant handoff.";
+        case "HUMAN_HANDOFF":
+            return "Connect with a sales consultant for complex questions.";
+        default:
+            return "Move toward a concrete next step in the sale.";
+    }
 }
 
 /**
@@ -491,17 +578,29 @@ export function getEthicalUpsellPriceBand(maxPrice) {
 export function formatClosingSuggestion(ctx) {
     if (!ctx) return "";
 
-    const stage = getSalesProgressionStage(ctx.leadStage);
-    const lines = ["SALES CLOSING GUIDANCE (end every reply with a meaningful next step — never a dead-end filler question):"];
+    const stage = normalizeLeadStage(ctx.leadStage);
+    const lines = ["SALES CLOSING GUIDANCE (end every reply with a meaningful next step — never a vague filler question or dead-end):"];
 
-    if (ctx.leadStage === "TEST_DRIVE_BOOKED") {
+    if (stage === "TEST_DRIVE_BOOKED") {
         lines.push(
             "- Post-test-drive follow-up: confirm the plan warmly; set expectation for follow-up after the drive."
         );
         lines.push(
-            '- Example: "After you\'ve driven both, we can compare notes and work out which makes most sense for your family and budget."'
+            '- Example: "After your test drive, we can compare notes and work out monthly options if you\'d like to take it further."'
         );
         return lines.join("\n");
+    }
+
+    if (stage === "VEHICLE_SELECTED" || stage === "TEST_DRIVE_REQUESTED") {
+        lines.push(
+            "- Proactive slot close: offer the earliest slot from checkTestDriveAvailability (or AUTHORITATIVE AVAILABILITY block) — e.g. 'I can get you in at 09:30 Friday — shall I book that?' Do NOT ask open-ended 'what time works?' when tool slots exist."
+        );
+    }
+
+    if (stage === "FINANCE_INTEREST" || stage === "FINANCE_QUOTE") {
+        lines.push(
+            "- Finance close: transition to monthly payment framing — 'Based on this vehicle, typical finance from R…/pm — shall we explore options or book a finance chat?'"
+        );
     }
 
     if (ctx.preferredVehicleRecovery || ctx.preferredVehicle) {
@@ -517,7 +616,7 @@ export function formatClosingSuggestion(ctx) {
         return lines.join("\n");
     }
 
-    switch (stage) {
+    switch (getSalesProgressionStage(stage)) {
         case "DISCOVERY":
             lines.push("- Soft close: ask one qualifying question about lifestyle, family, or daily use before searching.");
             break;
@@ -549,16 +648,40 @@ export function formatClosingSuggestion(ctx) {
 
 function inferStageAdvance(text, currentStage) {
     const lower = String(text || "").toLowerCase();
-    if (/\b(my name is|i am|i'm|call me)\b/.test(lower) && currentStage === "NEW_LEAD") return "IDENTIFIED";
+    const current = normalizeLeadStage(currentStage);
+
+    if (/\b(consultant|human|manager|speak to someone|call me back)\b/.test(lower)) return "HUMAN_HANDOFF";
+    if (/\b(my name is|i am|i'm|call me)\b/.test(lower) && current === "NEW") return "DISCOVERY";
     if (!isBudgetClearIntent(text) && /\b(budget|afford|up to r|per month|\/pm)\b/.test(lower)) {
-        return "BUDGET_ESTABLISHED";
+        return advanceLeadStage(current, "DISCOVERY");
     }
-    if (/\b(what do you have|show me|options|available|in stock|search)\b/.test(lower)) return "VEHICLE_SEARCH";
-    if (/\b(recommend|suggest|which one|compare)\b/.test(lower)) return "OPTIONS_PRESENTED";
-    if (/\b(prefer|keen on|like the|want the)\b/.test(lower)) return "PREFERRED_VEHICLE";
-    if (/\b(wife|husband|spouse|partner|family|discuss with)\b/.test(lower)) return "FAMILY_CONSULTED";
-    if (/\b(confirm|decided on|we'll take|go with)\b/.test(lower)) return "VEHICLE_CONFIRMED";
-    if (/\b(book|test drive|schedule|appointment)\b/.test(lower)) return "TEST_DRIVE_BOOKED";
+    if (/\b(finance|monthly|installment|deposit|quote)\b/.test(lower)) {
+        return advanceLeadStage(current, /\bquote\b/.test(lower) ? "FINANCE_QUOTE" : "FINANCE_INTEREST");
+    }
+    if (/\b(bought|purchase|take it|i'll take|deposit paid)\b/.test(lower)) {
+        return advanceLeadStage(current, "PURCHASE_INTENT");
+    }
+    if (/\b(after the drive|drove it|test drive went|post.?drive)\b/.test(lower)) {
+        return advanceLeadStage(current, "TEST_DRIVE_COMPLETED");
+    }
+    if (/\b(book|test drive|schedule|appointment)\b/.test(lower)) {
+        return advanceLeadStage(current, /\bconfirm|booked\b/.test(lower) ? "TEST_DRIVE_BOOKED" : "TEST_DRIVE_REQUESTED");
+    }
+    if (/\b(what do you have|show me|options|available|in stock|search)\b/.test(lower)) {
+        return advanceLeadStage(current, "DISCOVERY");
+    }
+    if (/\b(recommend|suggest|which one|compare)\b/.test(lower)) {
+        return advanceLeadStage(current, "VEHICLES_RECOMMENDED");
+    }
+    if (/\b(prefer|keen on|like the|want the|interested in the)\b/.test(lower)) {
+        return advanceLeadStage(current, "VEHICLE_INTEREST");
+    }
+    if (/\b(wife|husband|spouse|partner|family|discuss with)\b/.test(lower)) {
+        return advanceLeadStage(current, "VEHICLE_INTEREST");
+    }
+    if (/\b(confirm|decided on|we'll take|go with|that one)\b/.test(lower)) {
+        return advanceLeadStage(current, "VEHICLE_SELECTED");
+    }
     return null;
 }
 
@@ -604,6 +727,91 @@ export function getBudgetState(ctx) {
         return BUDGET_STATES.INCOME_ONLY;
     }
     return BUDGET_STATES.UNSPECIFIED;
+}
+
+/**
+ * Score a vehicle against customer profile for ranked recommendations.
+ * @param {object} vehicle
+ * @param {object} profile
+ */
+function scoreVehicleForProfile(vehicle, profile = {}) {
+    let score = 0;
+    const familySize = profile.familySize ?? null;
+    const seating = vehicle.seatingCapacity ?? vehicle.metadata?.seatingCapacity ?? null;
+    const budget = profile.confirmedPurchaseBudget ?? profile.purchaseBudget ?? profile.budget ?? null;
+    const budgetOpen = profile.budgetOpen === true;
+
+    if (familySize != null && seating != null) {
+        score += seating >= familySize ? 30 : seating >= familySize - 1 ? 10 : -20;
+    }
+    if (budget != null && !budgetOpen && vehicle.price != null) {
+        const diff = Number(vehicle.price) - Number(budget);
+        score += diff <= 0 ? 25 : diff <= 50000 ? 10 : diff <= 100000 ? -5 : -15;
+    }
+    if (profile.bodyType && vehicle.bodyType) {
+        score += String(vehicle.bodyType).toLowerCase().includes(String(profile.bodyType).toLowerCase()) ? 15 : -5;
+    }
+    if (profile.preferredVehicle) {
+        const pref = String(profile.preferredVehicle).toLowerCase();
+        const hay = [vehicle.make, vehicle.model, vehicle.title].filter(Boolean).join(" ").toLowerCase();
+        if (hay.includes(pref)) score += 40;
+    }
+    if (vehicle.mileage != null && Number(vehicle.mileage) < 60000) score += 8;
+    if (vehicle.seatingFit === "insufficient") score -= 25;
+    return score;
+}
+
+/**
+ * Rank and annotate up to 3 vehicles for Sarah's sales presentation.
+ * @param {object|null|undefined} customerProfile — salesContext or similar
+ * @param {object[]} vehicles
+ */
+export function buildRankedRecommendations(customerProfile = {}, vehicles = []) {
+    const deduped = [];
+    const seen = new Set();
+    for (const vehicle of vehicles || []) {
+        const key = vehicle?.vehicleId || vehicle?.stockNumber;
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(vehicle);
+    }
+
+    const ranked = deduped
+        .map((vehicle) => ({
+            vehicle,
+            score: scoreVehicleForProfile(vehicle, customerProfile),
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+
+    const rankLabels = ["🥇 Best Match #1", "🥈 Best Match #2", "🥉 Alternative #3"];
+
+    return ranked.map(({ vehicle }, index) => {
+        const reason =
+            vehicle.reason ||
+            buildInventoryRecommendationReason(vehicle, { familySize: customerProfile?.familySize ?? null });
+        return {
+            ...vehicle,
+            rank: index + 1,
+            rankLabel: rankLabels[index] || null,
+            reason,
+            recommendationReason: reason,
+        };
+    });
+}
+
+/**
+ * Prompt block for ranked inventory picks.
+ * @param {object[]} ranked
+ */
+export function formatRankedRecommendationsForPrompt(ranked = []) {
+    if (!ranked.length) return "";
+    const lines = ["RANKED RECOMMENDATIONS (sell these in order — platform sends cards with hero photos):"];
+    for (const v of ranked.slice(0, 3)) {
+        const label = v.rankLabel || `#${v.rank || v.position || "?"}`;
+        lines.push(`- ${label}: ${v.title || [v.year, v.make, v.model].filter(Boolean).join(" ")}${v.reason ? ` — ${v.reason}` : ""}`);
+    }
+    return lines.join("\n");
 }
 
 /**
@@ -844,9 +1052,9 @@ export function extractSalesSignals(text, { customer = null } = {}) {
     const speaker = parseRelationshipSpeaker(raw);
     if (speaker) signals.activeSpeaker = speaker;
 
-    const currentStage = customer?.salesContext?.leadStage || "NEW_LEAD";
+    const currentStage = normalizeLeadStage(customer?.salesContext?.leadStage);
     const nextStage = inferStageAdvance(raw, currentStage);
-    if (nextStage) signals.leadStage = nextStage;
+    if (nextStage) signals.leadStage = advanceLeadStage(currentStage, nextStage);
 
     return signals;
 }
@@ -931,7 +1139,7 @@ export function mergeSalesContext(existing = {}, signals = {}) {
     if (signals.preferredVehicle) merged.preferredVehicle = signals.preferredVehicle;
     if (signals.preferredVehicleId) merged.preferredVehicleId = signals.preferredVehicleId;
     if (signals.preferredVehicleRecovery === true) merged.preferredVehicleRecovery = true;
-    if (signals.leadStage) merged.leadStage = signals.leadStage;
+    if (signals.leadStage) merged.leadStage = advanceLeadStage(merged.leadStage, signals.leadStage);
     if (signals.activeSpeaker) merged.activeSpeaker = signals.activeSpeaker;
     if (signals.comparisonIntent?.detected) merged.comparisonIntent = signals.comparisonIntent;
     if (signals.requestedVehicle) merged.requestedVehicle = signals.requestedVehicle;
@@ -994,7 +1202,7 @@ export async function persistRecommendedToSalesContext(companyId, phone, vehicle
     const requirements = meta.requirements || [];
     return persistSalesContext(companyId, phone, {
         lastRecommendedVehicles: records,
-        leadStage: "OPTIONS_PRESENTED",
+        leadStage: "VEHICLES_RECOMMENDED",
         customerRequirements: requirements.length ? requirements : undefined,
     });
 }
@@ -1059,9 +1267,12 @@ export function formatSalesContextForPrompt(customer) {
     if (!ctx || !Object.keys(ctx).length) return "";
 
     const budgetState = getBudgetState(ctx);
-    const progressionStage = getSalesProgressionStage(ctx.leadStage);
+    const normalizedStage = normalizeLeadStage(ctx.leadStage);
+    const progressionStage = getSalesProgressionStage(normalizedStage);
+    const stageObjective = getLeadStageObjective(normalizedStage);
     const lines = ["SALES CONTEXT (from customer record — use for guidance, not as inventory/booking truth):"];
-    if (ctx.leadStage) lines.push(`- Lead stage: ${ctx.leadStage}`);
+    if (normalizedStage) lines.push(`- Lead stage: ${normalizedStage}`);
+    lines.push(`- Stage objective: ${stageObjective}`);
     lines.push(`- Sales progression: ${progressionStage}`);
     if (ctx.occupation) lines.push(`- Occupation: ${ctx.occupation}`);
 
@@ -1135,6 +1346,8 @@ export function formatSalesContextForPrompt(customer) {
         );
     }
     if (ctx.lastRecommendedVehicles?.length) {
+        const rankedBlock = formatRankedRecommendationsForPrompt(ctx.lastRecommendedVehicles);
+        if (rankedBlock) lines.push(rankedBlock);
         lines.push("- Recently recommended (use these vehicleIds for follow-up — do NOT re-search by make/model):");
         for (const v of ctx.lastRecommendedVehicles.slice(0, 5)) {
             lines.push(
