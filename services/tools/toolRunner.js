@@ -141,7 +141,25 @@ export async function runTool(name, ctx, args = {}) {
 
         const result = await tool.execute({ ...enrichedCtx, schedulingContext: scheduling, testDrivePlan }, enrichedArgs);
         const ok = result.ok !== false && result.success !== false;
-        const payload = { success: ok, ok, tool: name, ...result };
+        let payload = { success: ok, ok, tool: name, ...result };
+
+        if (
+            name === "bookTestDrive" &&
+            !ok &&
+            result.slotIssue &&
+            result.inventoryVerified &&
+            enrichedCtx.companyId &&
+            (enrichedArgs.vehicleId || enrichedArgs.vehicleStockNumber)
+        ) {
+            payload = {
+                ...payload,
+                inventoryStillAvailable: true,
+                bookingFailureIsSlotOnly: true,
+                recoveryHint: result.nextAlternative?.slotLabel
+                    ? `${result.nextAlternative.slotLabel} is the next open slot for this vehicle.`
+                    : "The vehicle is still in inventory — offer another time from suggestedSlots.",
+            };
+        }
 
         if (ctx.customerPhone && (name === "checkTestDriveAvailability" || name === "bookTestDrive")) {
             const schedUpdates = schedulingUpdatesFromToolResult(name, enrichedArgs, result);

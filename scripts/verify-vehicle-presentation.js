@@ -65,7 +65,7 @@ async function main() {
 
     /* 1. Customer presentation format */
     const card = formatVehicleCustomerCard(sampleVehicle, 0);
-    assert(card.startsWith("1. *2020 Toyota Fortuner 2.4 GD-6*"), "numbered bold title");
+    assert(card.startsWith("1. 🚙 *2020 Toyota Fortuner 2.4 GD-6*"), "numbered bold title with vehicle emoji");
     assert(card.includes("💰 Price: R399,900"), "price line");
     assert(card.includes("📏 Mileage: 71,000 km"), "mileage line");
     assert(card.includes("⚙️ Transmission: Automatic"), "transmission line");
@@ -127,7 +127,7 @@ async function main() {
         price: 199900,
     };
     const sparseCard = formatVehicleCustomerCard(sparse, 1);
-    assert(sparseCard.startsWith("2. *"), "second card numbered correctly");
+    assert(sparseCard.startsWith("2. 🚙 *"), "second card numbered correctly");
     assert(sparseCard.includes("💰 Price: R199,900"), "price shown when present");
     assert(!sparseCard.includes("📏 Mileage"), "mileage omitted when missing");
     assert(!sparseCard.includes("⚙️ Transmission"), "transmission omitted when missing");
@@ -154,12 +154,7 @@ async function main() {
     assert(cardParts[0].text.includes("*2020 Toyota Fortuner"), "card in outbound plan");
     console.log("✓ 8. Hero image delivery via native WhatsApp image part");
 
-    /* 9. Additional photo request — up to 3 images, skip hero */
-    const additional = pickAdditionalGalleryImageUrls(sampleVehicle, MAX_GALLERY_IMAGES_PER_VEHICLE);
-    assert(additional.length === 3, `3 additional images, got ${additional.length}`);
-    assert(!additional.includes(hero), "additional images exclude hero");
-    assert(additional[0].includes("fortuner-2"), "first additional is post-hero");
-
+    /* 9. Gallery request — up to 3 native images per vehicle (includes hero) */
     const galleryPlan = buildGalleryOutboundPlan({
         vehicles: [sampleVehicle],
         llmReply: "Here are more photos!",
@@ -168,8 +163,10 @@ async function main() {
     assert(galleryPlan.planType === "gallery", "gallery plan type");
     assert(galleryPlan.imageCount === 3, `gallery sends 3 images, got ${galleryPlan.imageCount}`);
     const galleryImages = galleryPlan.messages.filter((m) => m.type === "image");
-    assert(galleryImages.every((m) => !m.link.includes("fortuner-hero")), "gallery skips hero");
-    console.log("✓ 9. Additional photo request (up to 3 images, hero excluded)");
+    assert(galleryImages.length === 3, "3 native image messages");
+    assert(galleryImages.every((m) => !m.caption), "gallery images omit duplicate title captions");
+    assert(galleryImages[0].link.endsWith("fortuner-hero.jpg"), "gallery includes hero image first");
+    console.log("✓ 9. Gallery request (up to 3 native images, no duplicate titles)");
 
     /* 10. Maximum 3 vehicles */
     const manyVehicles = Array.from({ length: 5 }, (_, i) => ({

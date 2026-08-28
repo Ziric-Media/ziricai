@@ -11,12 +11,20 @@ import {
 } from "./storage/tenantStorage.js";
 import {
     parseExplicitCustomerName,
+    parseOccupation,
     isLikelyCompanyName,
     getCustomerDisplayName,
     capitalizeCustomerName,
+    isValidExplicitCustomerName,
 } from "./customerIdentity.js";
 
-export { parseExplicitCustomerName, parseOccupation, isLikelyCompanyName, getCustomerDisplayName } from "./customerIdentity.js";
+export {
+    parseExplicitCustomerName,
+    parseOccupation,
+    isLikelyCompanyName,
+    getCustomerDisplayName,
+    isValidExplicitCustomerName,
+} from "./customerIdentity.js";
 export { parseIntroducedPerson, parseRelationshipSpeaker, isThirdPartyIntroduction } from "./customerIdentity.js";
 
 const DEFAULT_FIELDS = {
@@ -62,7 +70,9 @@ export async function updateCustomerProfile(phone, patch = {}, { companyId } = {
  */
 export async function persistExplicitCustomerName(phone, name, { companyId, companyName } = {}) {
     const trimmed = capitalizeCustomerName(name);
-    if (!trimmed || isLikelyCompanyName(trimmed, { companyName })) return null;
+    if (!trimmed || !isValidExplicitCustomerName(trimmed) || isLikelyCompanyName(trimmed, { companyName })) {
+        return null;
+    }
 
     await updateCustomerProfile(
         phone,

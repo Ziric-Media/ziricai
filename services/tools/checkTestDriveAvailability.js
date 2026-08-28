@@ -108,6 +108,8 @@ export default {
             date: result.date,
             suggestedSlots: result.suggestedSlots,
             alternatives: result.alternatives,
+            nextAlternative: result.nextAlternative,
+            slotIssue: result.slotIssue === true,
         };
     },
 };

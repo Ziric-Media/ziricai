@@ -3,8 +3,9 @@
  */
 
 const EXPLICIT_NAME_PATTERNS = [
-    /\b(?:my name is|i am|i'm|im|call me|this is|it's|its)\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i,
+    /\b(?:my name is|i am|i'm|call me|this is|it's|its)\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i,
     /\b(?:you can call me|please call me|name'?s)\s+([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})/i,
+    /\b([a-zA-Z][a-zA-Z'\-]*(?:\s+[a-zA-Z][a-zA-Z'\-]*){0,2})\s+here\b/i,
 ];
 
 /** Stop name capture at conjunctions before occupation clauses ("Spencer and I'm a …"). */
@@ -25,14 +26,30 @@ const NON_NAME_WORDS = new Set([
     "free",
     "busy",
     "ready",
+    "still",
+    "waiting",
+    "sorry",
+    "thanks",
+    "thank",
+    "please",
+    "just",
+    "also",
+    "very",
+    "really",
+    "happy",
+    "keen",
     "a",
     "an",
     "the",
 ]);
 
-/** Reject availability/scheduling phrases misparsed as names ("I'm available on that day"). */
+/** Reject availability/scheduling/status phrases misparsed as names ("I'm available on that day", "im still waiting"). */
 const AVAILABILITY_NAME_PATTERN =
-    /\b(?:available|free|busy|ready)\b(?:\s+(?:on|at|for|from|until|tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|that|this|the))?/i;
+    /\b(?:available|free|busy|ready|waiting|still\s+waiting)\b(?:\s+(?:on|at|for|from|until|tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|that|this|the))?/i;
+
+/** Reject whole-phrase false positives — never derive a customer name from conversational status updates. */
+const REJECTED_NAME_PHRASES =
+    /^(?:still\s+waiting|waiting(?:\s+for|\s+on)?|not\s+sure|on\s+my\s+way|running\s+late|almost\s+there|be\s+there\s+soon)$/i;
 
 function capitalizeWords(value) {
     return String(value || "")
@@ -54,12 +71,24 @@ function cleanNameCandidate(candidate) {
 
     const firstWord = name.split(/\s+/)[0]?.toLowerCase();
     if (NON_NAME_WORDS.has(firstWord)) return null;
-    if (/^(here|there|good|fine|well|back|interested|looking|calling|messaging|available|free|busy|ready)$/i.test(name)) {
+    if (name.split(/\s+/).some((word) => NON_NAME_WORDS.has(word.toLowerCase()))) return null;
+    if (/^(here|there|good|fine|well|back|interested|looking|calling|messaging|available|free|busy|ready|still|waiting)$/i.test(name)) {
         return null;
     }
     if (AVAILABILITY_NAME_PATTERN.test(name)) return null;
+    if (REJECTED_NAME_PHRASES.test(name)) return null;
 
     return capitalizeWords(name);
+}
+
+/**
+ * True when a parsed name candidate is safe to persist as customer displayName.
+ * @param {string|null|undefined} name
+ */
+export function isValidExplicitCustomerName(name) {
+    if (!name) return false;
+    const cleaned = cleanNameCandidate(String(name));
+    return cleaned != null && cleaned === capitalizeWords(String(name).trim());
 }
 
 /**

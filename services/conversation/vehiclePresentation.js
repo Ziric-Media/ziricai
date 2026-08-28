@@ -95,6 +95,16 @@ export function formatVehicleTitle(vehicle) {
 }
 
 /**
+ * Format optional Sarah recommendation line from vehicle + customer context.
+ * @param {object} vehicle
+ */
+export function formatRecommendationLine(vehicle) {
+    const reason = vehicle?.reason || vehicle?.recommendationReason || null;
+    if (!reason || !String(reason).trim()) return null;
+    return `✨ Why Sarah recommends it: ${String(reason).trim()}`;
+}
+
+/**
  * Format a numbered customer-facing vehicle card for WhatsApp.
  * @param {object} vehicle
  * @param {number} index — 0-based position in the recommendation list
@@ -104,9 +114,10 @@ export function formatVehicleCustomerCard(vehicle, index = 0) {
 
     const number = index + 1;
     const title = formatVehicleTitle(vehicle);
-    const lines = [`${number}. *${title}*`, ""];
+    const lines = [`${number}. 🚙 *${title}*`, ""];
 
     const detailLines = [
+        formatRecommendationLine(vehicle),
         formatPriceLine(vehicle.price),
         formatMileageLine(vehicle.mileage),
         formatTransmissionLine(vehicle.transmission),

@@ -267,6 +267,12 @@ export function schedulingUpdatesFromToolResult(toolName, args = {}, result = {}
         updates.resolvedDateLabel = result.slotLabel;
     }
 
+    const resolvedDate =
+        updates.pendingDate || updates.lastMentionedDate || updates.lastOfferedDate || result.date;
+    if (resolvedDate && /^\d{4}-\d{2}-\d{2}$/.test(String(resolvedDate))) {
+        updates.resolvedDateLabel = updates.resolvedDateLabel || String(resolvedDate);
+    }
+
     return updates;
 }
 
@@ -339,9 +345,13 @@ export function isTestDriveAvailabilityQuery(text) {
 /**
  * Resolve "this Friday" style phrases to YYYY-MM-DD in business TZ.
  * @param {string} text
+ * @param {string} [anchorDate] YYYY-MM-DD reference "today" for deterministic resolution
  */
-export function resolveRelativeDateLabel(text) {
-    const parsed = parseScheduledInput({ date: String(text || "").trim() });
+export function resolveRelativeDateLabel(text, anchorDate = null) {
+    const parsed = parseScheduledInput({
+        date: String(text || "").trim(),
+        contextDate: anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate) ? anchorDate : undefined,
+    });
     if (!parsed.ok) return null;
     const dateObj = parsed.dateOnly || parsed.dateTime;
     return dateObj ? toLocalDateString(dateObj) : null;

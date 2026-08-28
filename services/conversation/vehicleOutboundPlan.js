@@ -218,16 +218,11 @@ export function buildGalleryOutboundPlan({
 
     let imageCount = 0;
     for (const vehicle of deduped) {
-        const imageUrls = pickAdditionalGalleryImageUrls(vehicle, imagesPerVehicle);
-        const caption =
-            vehicle.title ||
-            vehicle.label ||
-            [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ");
+        const imageUrls = getSupportedVehicleImageUrls(vehicle).slice(0, imagesPerVehicle);
         for (const imageUrl of imageUrls) {
             messages.push({
                 type: "image",
                 link: imageUrl,
-                caption: String(caption || "").slice(0, 1024),
             });
             imageCount++;
         }

@@ -200,14 +200,25 @@ export function hasExplicitTimeInString(value) {
 function parseDayFromText(lower, baseToday) {
     const currentDay = getDayOfWeekInBusinessTz(baseToday);
     const wantsThisWeek = /\bthis\s+(?:week(?:'s|s)?\s+)?(?:coming\s+)?/i.test(lower);
+    const wantsNextWeek = /\bnext\s+week\b/i.test(lower);
+
+    if (wantsNextWeek) {
+        const mondayDelta = currentDay === 0 ? 1 : 8 - currentDay;
+        return addBusinessDays(baseToday, mondayDelta);
+    }
 
     for (const [index, name] of DAY_NAMES.entries()) {
-        const re = new RegExp(`\\b(?:this\\s+(?:week(?:'s|s)?\\s+)?(?:coming\\s+)?)?${name}\\b|\\b${name.slice(0, 3)}\\b`);
-        if (!re.test(lower)) continue;
+        const dayWordPattern = new RegExp(
+            `\\b(?:next\\s+|this\\s+(?:week(?:'s|s)?\\s+)?(?:coming\\s+)?)?${name}\\b`,
+            "i"
+        );
+        if (!dayWordPattern.test(lower)) continue;
 
         let delta = index - currentDay;
         if (wantsThisWeek) {
             if (delta < 0) delta += 7;
+        } else if (/\bnext\s+/i.test(lower)) {
+            if (delta <= 0) delta += 7;
         } else if (delta <= 0) {
             delta += 7;
         }
@@ -464,6 +475,10 @@ export function parseScheduledInput(input = {}) {
         base = addBusinessDays(base, 1);
     } else if (/\btoday\b/.test(lower)) {
         // keep today
+    } else if (/\bnext\s+week\b/.test(lower)) {
+        const currentDay = getDayOfWeekInBusinessTz(base);
+        const mondayDelta = currentDay === 0 ? 1 : 8 - currentDay;
+        base = addBusinessDays(base, mondayDelta);
     } else {
         const weekday = parseDayFromText(lower, base);
         if (weekday) {

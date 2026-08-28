@@ -171,7 +171,12 @@ export default {
                 "PAST_SLOT",
                 "CUSTOMER_SLOT_CONFLICT",
             ]);
+            const dateCodes = new Set(["NEED_DATE", "INVALID_DATETIME", "PAST_SLOT"]);
             const isSlotIssue = slotCodes.has(availability.code);
+            const inventoryVerified =
+                Boolean(vehicleCheck.vehicle) &&
+                availability.code !== "VEHICLE_NOT_IN_INVENTORY" &&
+                availability.code !== "INVALID_VEHICLE";
 
             let nextAlternative = availability.nextAlternative || null;
             if (isSlotIssue && !nextAlternative) {
@@ -181,13 +186,23 @@ export default {
                 });
             }
 
+            const bookingCode = dateCodes.has(availability.code)
+                ? "DATE_UNAVAILABLE"
+                : availability.code === "VEHICLE_NOT_IN_INVENTORY"
+                  ? "VEHICLE_NOT_IN_INVENTORY"
+                  : isSlotIssue
+                    ? availability.code
+                    : "BOOKING_ERROR";
+
             return {
                 ok: false,
                 error: availability.reason,
-                code: availability.code,
+                code: bookingCode,
+                availabilityCode: availability.code,
                 needsTime: availability.needsTime === true,
                 needsDate: availability.needsDate === true,
                 vehicle: availability.vehicle || vehicleToPublic(vehicleCheck.vehicle),
+                inventoryVerified,
                 alternatives: availability.alternatives,
                 suggestedSlots: availability.suggestedSlots,
                 slotIssue: isSlotIssue,
@@ -207,7 +222,10 @@ export default {
 
         const customerName = args.customerName || ctxCustomerName || null;
         if (customerName && customerPhone && companyId) {
-            await persistExplicitCustomerName(customerPhone, customerName, { companyId }).catch(() => {});
+            const { isValidExplicitCustomerName } = await import("../customerIdentity.js");
+            if (isValidExplicitCustomerName(customerName)) {
+                await persistExplicitCustomerName(customerPhone, customerName, { companyId }).catch(() => {});
+            }
         }
 
         const attendees = Array.isArray(args.attendees)
@@ -249,6 +267,7 @@ export default {
             return {
                 ok: true,
                 duplicate: true,
+                code: "BOOKING_SUCCESS",
                 message: `Test drive already booked for ${formatSlotLabel(new Date(enrichedAppointment.scheduledAt))} — ${enrichedAppointment.vehicleDescription || vehicleCheck.vehicleLabel} (stock ${enrichedAppointment.stockNumber || appointment.vehicleStockNumber}).`,
                 appointment: enrichedAppointment,
                 booking: enrichedAppointment,
@@ -284,6 +303,7 @@ export default {
         return {
             ok: true,
             duplicate: false,
+            code: "BOOKING_SUCCESS",
             message: `Test drive confirmed for ${customerName || "customer"} — ${enrichedAppointment.vehicleDescription || vehicleCheck.vehicleLabel} (${vehicleCheck.stockNumber}) on ${slotLabel}${enrichedAppointment.location ? ` at ${enrichedAppointment.location}` : ""}.`,
             appointment: enrichedAppointment,
             booking: enrichedAppointment,

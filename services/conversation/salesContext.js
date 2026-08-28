@@ -272,11 +272,20 @@ function parseQualificationSignals(text) {
 
 function parsePreferredVehicle(text) {
     const raw = String(text || "");
-    const match = raw.match(/\b(?:prefer|interested in|looking at|keen on|like the|want the)\s+(?:the\s+)?([\w\s-]{3,40}?(?:hilux|fortuner|everest|x5|ranger|corolla|land cruiser|bmw))/i);
+    const match = raw.match(/\b(?:prefer|interested in|looking at|keen on|like the|want the|wanted the|really wanted)\s+(?:the\s+)?([\w\s-]{3,40}?(?:hilux|fortuner|everest|x5|ranger|corolla|land cruiser|bmw|rav4))/i);
     if (match?.[1]) return match[1].trim();
-    const model = raw.match(/\b(hilux|fortuner|everest|x5|land cruiser|ranger|bmw)\b/i);
-    if (model && /\b(prefer|book|test drive|that one|this one|original)\b/i.test(raw)) {
+    const model = raw.match(/\b(hilux|fortuner|everest|x5|land cruiser|ranger|bmw|rav4)\b/i);
+    if (model && /\b(prefer|book|test drive|that one|this one|original|wanted|really wanted|still want)\b/i.test(raw)) {
         return model[0];
+    }
+    return null;
+}
+
+function parsePreferredVehicleRecovery(text) {
+    const raw = String(text || "").toLowerCase();
+    if (/\b(really wanted|still want|was hoping for|had my heart set on|prefer.*over)\b/.test(raw)) {
+        const vehicle = raw.match(/\b(fortuner|hilux|everest|x5|ranger|rav4|corolla|bmw)\b/i);
+        return vehicle ? { preferredVehicle: vehicle[0], recoveryMode: true } : { recoveryMode: true };
     }
     return null;
 }
@@ -493,6 +502,12 @@ export function formatClosingSuggestion(ctx) {
             '- Example: "After you\'ve driven both, we can compare notes and work out which makes most sense for your family and budget."'
         );
         return lines.join("\n");
+    }
+
+    if (ctx.preferredVehicleRecovery || ctx.preferredVehicle) {
+        lines.push(
+            `- Proactive recovery: customer wants ${ctx.preferredVehicle || "their preferred vehicle"} — stay focused on that vehicle; offer next slot, photos, or finance — do NOT pivot to unrelated alternatives unless inventory confirms unavailability.`
+        );
     }
 
     if (ctx.comparisonIntent?.detected) {
@@ -800,6 +815,10 @@ export function extractSalesSignals(text, { customer = null } = {}) {
     const preferredVehicle = parsePreferredVehicle(raw);
     if (preferredVehicle) signals.preferredVehicle = preferredVehicle;
 
+    const recovery = parsePreferredVehicleRecovery(raw);
+    if (recovery?.preferredVehicle) signals.preferredVehicle = recovery.preferredVehicle;
+    if (recovery?.recoveryMode) signals.preferredVehicleRecovery = true;
+
     const objection = parseObjection(raw);
     if (objection) signals.objections = [objection];
 
@@ -911,6 +930,7 @@ export function mergeSalesContext(existing = {}, signals = {}) {
     if (signals.familySize != null) merged.familySize = signals.familySize;
     if (signals.preferredVehicle) merged.preferredVehicle = signals.preferredVehicle;
     if (signals.preferredVehicleId) merged.preferredVehicleId = signals.preferredVehicleId;
+    if (signals.preferredVehicleRecovery === true) merged.preferredVehicleRecovery = true;
     if (signals.leadStage) merged.leadStage = signals.leadStage;
     if (signals.activeSpeaker) merged.activeSpeaker = signals.activeSpeaker;
     if (signals.comparisonIntent?.detected) merged.comparisonIntent = signals.comparisonIntent;
@@ -1109,6 +1129,11 @@ export function formatSalesContextForPrompt(customer) {
     }
     if (ctx.preferredVehicle) lines.push(`- Preferred vehicle: ${ctx.preferredVehicle}`);
     if (ctx.preferredVehicleId) lines.push(`- Preferred vehicleId: ${ctx.preferredVehicleId}`);
+    if (ctx.preferredVehicleRecovery) {
+        lines.push(
+            `- Customer strongly prefers ${ctx.preferredVehicle || "their chosen vehicle"} — do NOT switch to alternatives unless inventory tool confirms VEHICLE_NOT_IN_INVENTORY; recover with booking slots or gallery for THAT vehicle`
+        );
+    }
     if (ctx.lastRecommendedVehicles?.length) {
         lines.push("- Recently recommended (use these vehicleIds for follow-up — do NOT re-search by make/model):");
         for (const v of ctx.lastRecommendedVehicles.slice(0, 5)) {
