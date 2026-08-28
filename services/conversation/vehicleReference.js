@@ -197,6 +197,44 @@ export function resolveVehicleReference(text, salesContext, conversationRecommen
 }
 
 /**
+ * Resolve vehicle for test-drive scheduling from context when customer gives date/time only.
+ * @param {object} salesContext
+ * @param {object[]} recommended
+ * @param {object|null} [resolvedVehicleReference]
+ */
+export function resolveSchedulingVehicleReference(
+    salesContext = {},
+    recommended = [],
+    resolvedVehicleReference = null
+) {
+    if (resolvedVehicleReference?.vehicleId) return resolvedVehicleReference;
+
+    const merged = [...(recommended || [])];
+    if (salesContext?.lastRecommendedVehicles?.length) {
+        for (const v of salesContext.lastRecommendedVehicles) {
+            if (!merged.some((m) => m.vehicleId === v.vehicleId)) merged.push(v);
+        }
+    }
+
+    if (salesContext?.preferredVehicleId) {
+        const pref = merged.find((v) => v.vehicleId === salesContext.preferredVehicleId);
+        if (pref) return pref;
+    }
+
+    if (salesContext?.preferredVehicle) {
+        const hint = String(salesContext.preferredVehicle).toLowerCase();
+        const pref = merged.find((v) => {
+            const hay = [v.make, v.model, v.title, v.label].filter(Boolean).join(" ").toLowerCase();
+            return hay.includes(hint);
+        });
+        if (pref) return pref;
+    }
+
+    const rank1 = merged.find((v) => v.rank === 1) || merged[0];
+    return rank1 || null;
+}
+
+/**
  * Format resolved vehicle for system prompt injection.
  * @param {object} vehicle
  * @returns {string}

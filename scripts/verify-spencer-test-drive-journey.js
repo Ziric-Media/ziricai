@@ -140,12 +140,14 @@ async function main() {
     assert(prompt.includes("TRUTH HIERARCHY"), "assembled prompt includes truth hierarchy");
     console.log("✓ 5. Truth hierarchy + drive/location/novice prompt rules present");
 
-    /* 6. Evidence-based recommendation reason */
-    const reason = buildInventoryRecommendationReason(fourByFour);
-    assert(reason && /2020/.test(reason), `reason: ${reason}`);
-    assert(/65/.test(reason) && /000/.test(reason), "reason includes mileage");
-    assert(/449/.test(reason) && /900/.test(reason), "reason includes price");
-    console.log("✓ 6. Recommendation reason built from inventory evidence");
+    /* 6. Needs-based recommendation reason (not spec dump) */
+    const reason = buildInventoryRecommendationReason(fourByFour, {
+        familySize: 5,
+        customerRequirements: ["family practicality", "capability"],
+    });
+    assert(reason && !/R449/.test(reason), `reason should not be price dump: ${reason}`);
+    assert(/family|space|diesel|wear|option/i.test(reason), `needs-based reason: ${reason}`);
+    console.log("✓ 6. Recommendation reason is needs-based, not spec dump");
 
     /* 7. Multi booking — second vehicle same slot triggers CUSTOMER_SLOT_CONFLICT */
     const slot1 = futureSlotIso(6, 10, 0);

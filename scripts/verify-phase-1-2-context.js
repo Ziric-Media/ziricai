@@ -164,8 +164,8 @@ async function main() {
         },
         { familySize: 5 }
     );
-    assert(familyReason.includes("5-seat"), `family seating in reason: ${familyReason}`);
     assert(familyReason.includes("family of 5"), `family context in reason: ${familyReason}`);
+    assert(/comfortable|everyday|family/i.test(familyReason), `needs-based family reason: ${familyReason}`);
 
     const familySalesCtx = mergeSalesContext({}, { familySize: 5 });
     const familyPrompt = formatSalesContextForPrompt({ salesContext: familySalesCtx });

@@ -34,6 +34,7 @@ import {
     saveSchedulingContext,
     isSchedulingDelegationIntent,
     isSchedulingTimeSelectionIntent,
+    isSchedulingDateIntent,
     isTestDriveAvailabilityQuery,
     enrichToolArgsWithScheduling,
     formatAuthoritativeAvailabilityBlock,
@@ -59,6 +60,7 @@ import {
     isGalleryImageIntent,
     resolveVehicleReference,
     resolveGalleryVehicleTargets,
+    resolveSchedulingVehicleReference,
     formatResolvedVehicleBlock,
 } from "../../conversation/vehicleReference.js";
 import { getRecommendedVehicles } from "../../conversation/recommendedVehicles.js";
@@ -417,20 +419,40 @@ async function processInboundMessage(job) {
     let authoritativeAvailabilityContext = "";
     let preloadedAvailabilityResult = null;
 
+    const schedulingVehicleRecommended =
+        resolvedCompanyId && sender
+            ? await getRecommendedVehicles(resolvedCompanyId, sender, outboundChannel)
+            : [];
+    const schedulingVehicleRef = resolveSchedulingVehicleReference(
+        salesContextForTurn,
+        schedulingVehicleRecommended,
+        resolvedVehicleReference
+    );
+    if (schedulingVehicleRef?.vehicleId && !authoritativeVehicleContext) {
+        authoritativeVehicleContext = formatResolvedVehicleBlock(schedulingVehicleRef);
+    }
+
     const shouldPreloadAvailability =
         resolvedCompanyId &&
+        schedulingVehicleRef?.vehicleId &&
         (isSchedulingDelegationIntent(text) ||
             isSchedulingTimeSelectionIntent(text, schedulingContext) ||
-            (isTestDriveAvailabilityQuery(text) && (schedulingContext.pendingDate || schedulingContext.lastMentionedDate)));
+            isSchedulingDateIntent(text) ||
+            (isTestDriveAvailabilityQuery(text) &&
+                (schedulingContext.pendingDate ||
+                    schedulingContext.lastMentionedDate ||
+                    schedulingVehicleRef?.vehicleId)));
 
     if (shouldPreloadAvailability) {
         const preloadArgs = enrichToolArgsWithScheduling(
             "checkTestDriveAvailability",
-            resolvedVehicleReference?.vehicleId
-                ? { vehicleId: resolvedVehicleReference.vehicleId }
-                : {},
+            { vehicleId: schedulingVehicleRef.vehicleId },
             schedulingContext
         );
+        const delegation = isSchedulingDelegationIntent(text);
+        const proactiveSlotSearch =
+            delegation || (/\bwhen\s+can\b/i.test(text) && /test[\s-]?drive/i.test(text));
+
         preloadedAvailabilityResult = await runTool(
             "checkTestDriveAvailability",
             {
@@ -443,12 +465,52 @@ async function processInboundMessage(job) {
                 inboundMessage: text,
                 schedulingContext,
                 salesContext: salesContextForTurn,
-                resolvedVehicleReference,
-                autoSelectNext: isSchedulingDelegationIntent(text),
+                resolvedVehicleReference: schedulingVehicleRef,
+                autoSelectNext: delegation || proactiveSlotSearch,
             },
             preloadArgs
         );
         authoritativeAvailabilityContext = formatAuthoritativeAvailabilityBlock(preloadedAvailabilityResult);
+
+        if (
+            delegation &&
+            preloadedAvailabilityResult?.autoSelected &&
+            preloadedAvailabilityResult?.available &&
+            preloadedAvailabilityResult?.slotStart
+        ) {
+            preloadedBookingResult = await runTool(
+                "bookTestDrive",
+                {
+                    companyId: resolvedCompanyId,
+                    customerId,
+                    customerPhone: sender,
+                    customerName: customerDisplayName,
+                    agentId: agent?.id || null,
+                    channel: outboundChannel,
+                    inboundMessage: text,
+                    schedulingContext,
+                    salesContext: salesContextForTurn,
+                    resolvedVehicleReference: schedulingVehicleRef,
+                },
+                {
+                    vehicleId: schedulingVehicleRef.vehicleId,
+                    scheduledAt: preloadedAvailabilityResult.slotStart,
+                }
+            );
+            authoritativeBookingContext = [
+                "AUTHORITATIVE BOOKING (bookTestDrive — cite ONLY if ok/success):",
+                preloadedBookingResult?.ok
+                    ? `- BOOKING_SUCCESS: ${schedulingVehicleRef.title || schedulingVehicleRef.make || "vehicle"} at ${preloadedAvailabilityResult.slotLabel || preloadedAvailabilityResult.slotStart}`
+                    : `- BOOKING_FAILED: ${preloadedBookingResult?.code || preloadedBookingResult?.error || "unknown"} — vehicle may still be in inventory; offer nextAlternative.`,
+            ].join("\n");
+            console.log("[whatsapp] Delegation auto-book", {
+                companyId: resolvedCompanyId,
+                customerId,
+                ok: preloadedBookingResult?.ok,
+                code: preloadedBookingResult?.code,
+            });
+        }
+
         console.log("[whatsapp] Pre-loaded checkTestDriveAvailability", {
             companyId: resolvedCompanyId,
             customerId,

@@ -101,7 +101,7 @@ async function main() {
         imageParts[0].link.endsWith(".jpg"),
         "First vehicle should use jpg hero (webp skipped)"
     );
-    assert(imageParts[0].caption.includes("Fortuner"), "Image caption should be vehicle title");
+    assert(!imageParts[0].caption, "Hero image omits caption — vehicle name is on card above");
     assert(
         imageParts.every((m) => isSupportedWhatsAppImageUrl(m.link)),
         "All image links must be jpg/png"

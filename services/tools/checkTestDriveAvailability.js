@@ -94,7 +94,11 @@ export default {
         });
 
         return {
-            ok: result.available || result.code === "NEED_TIME" || result.code === "NEED_DATE",
+            ok:
+                result.available ||
+                result.code === "NEED_TIME" ||
+                result.code === "NEED_DATE" ||
+                result.code === "NEXT_AVAILABLE",
             available: result.available,
             code: result.code,
             reason: result.reason,

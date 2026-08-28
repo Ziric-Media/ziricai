@@ -17,8 +17,10 @@ const BARE_IMAGE_URL_PATTERN = /https?:\/\/[^\s)\]]+\.(?:jpe?g|png|webp)(?:\?[^\
 const WEBP_PATTERN = /\.webp(?:\?|$)/i;
 const SUPPORTED_IMAGE_PATTERN = /\.(?:jpe?g|png)(?:\?|$)/i;
 const VEHICLE_SPEC_LINE =
-    /(?:\b(?:19|20)\d{2}\b.*\bR[\d,\s]+|\bR[\d,\s]+.*\b(?:km|stock)\b|\bstock\s*(?:#|:)?\s*[A-Z0-9-]+\b|💰|📏|⚙️|⛽|👨‍👩‍👧‍👦|📍|💳)/i;
+    /(?:\b(?:19|20)\d{2}\b.*\bR[\d,\s]+|\bR[\d,\s]+.*\b(?:km|stock|mileage)\b|\bstock\s*(?:#|:)?\s*[A-Z0-9-]+\b|💰|📏|⚙️|⛽|👨‍👩‍👧‍👦|📍|💳|^\s*-\s*(?:Price|Mileage|Transmission|Fuel|Location|Seating)\s*:)/i;
 const NUMBERED_LIST_LINE = /^\s*\d+[\.\):]\s+/;
+const BARE_SPEC_BULLET = /^\s*-\s*(?:Price|Mileage|Transmission|Fuel|Location|Seating|Fuel Type)\s*:/i;
+const RANK_BADGE_LINE = /^\s*🥇|^\s*🥈|^\s*🥉|^\s*Best Match|^\s*Alternative #/i;
 
 /**
  * @param {string|null|undefined} url
@@ -63,6 +65,9 @@ export function stripVehicleListingProseFromText(text, vehicles = []) {
         const trimmed = line.trim();
         if (!trimmed) return true;
         if (NUMBERED_LIST_LINE.test(trimmed)) return false;
+        if (BARE_SPEC_BULLET.test(trimmed)) return false;
+        if (RANK_BADGE_LINE.test(trimmed)) return false;
+        if (/^🚗\s+\d+\./.test(trimmed)) return false;
         if (VEHICLE_SPEC_LINE.test(trimmed)) return false;
         const lower = trimmed.toLowerCase();
         for (const token of makeTokens) {
@@ -195,7 +200,6 @@ export function buildVehicleOutboundPlan({ toolResults = [], llmReply = "", chan
             messages.push({
                 type: "image",
                 link: imageUrl,
-                caption: formatVehicleTitle(vehicle).slice(0, 1024),
             });
         }
     });

@@ -103,7 +103,7 @@ export function formatVehicleTitle(vehicle) {
 export function formatRecommendationLine(vehicle) {
     const reason = vehicle?.reason || vehicle?.recommendationReason || null;
     if (!reason || !String(reason).trim()) return null;
-    return `Why Sarah recommends it:\n${String(reason).trim()}`;
+    return `Why I recommend it:\n${String(reason).trim()}`;
 }
 
 /**

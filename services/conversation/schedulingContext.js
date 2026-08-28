@@ -316,12 +316,33 @@ export function formatSchedulingContextForPrompt(scheduling = {}) {
  */
 export function isSchedulingDelegationIntent(text) {
     const t = String(text || "").toLowerCase();
-    if (/\b(select|choose|pick)\s+(?:(?:the|a)\s+)?(?:time|date|slot)\s+for\s+me\b/i.test(t)) return true;
+    if (/\b(select|choose|pick)\s+(?:(?:the|a)\s+)?(?:day\s+and\s+time|time\s+and\s+date|time|date|slot)\s+for\s+me\b/i.test(t)) {
+        return true;
+    }
     if (/\bselect\s+the\s+time\s+and\s+date\s+for\s+me\b/i.test(t)) return true;
-    if (/\b(you|just)\s+(?:choose|pick|select)\s+(?:a\s+)?(?:time|date|slot)\b/i.test(t)) return true;
+    if (/\b(you|just)\s+(?:choose|pick|select)\s+(?:a\s+)?(?:day\s+and\s+time|time|date|slot)\b/i.test(t)) return true;
+    if (/\b(?:find|get|book)\s+(?:a\s+)?(?:slot|time|appointment)\s+for\s+me\b/i.test(t)) return true;
+    if (/\bwhenever\s+you\s+(?:think|feel)\s+(?:is\s+)?best\b/i.test(t)) return true;
+    if (/\bbook\s+(?:the\s+)?(?:earliest|next|first)\s+available\b/i.test(t)) return true;
     if (/\bnext\s+available\s+slot\b/i.test(t)) return true;
     if (/\bearliest\s+available\b/i.test(t) && /\b(time|slot|book)\b/i.test(t)) return true;
-    if (/\bbook\s+(?:the\s+)?(?:earliest|next|first)\s+available\b/i.test(t)) return true;
+    return false;
+}
+
+/**
+ * Detect when the customer provides a date (with or without test-drive wording).
+ * @param {string} text
+ */
+export function isSchedulingDateIntent(text) {
+    const t = String(text || "").toLowerCase().trim();
+    if (!t) return false;
+    if (/\b(next|this)\s+week\b/.test(t)) return true;
+    if (/\b(next|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(t)) return true;
+    if (/\b(tomorrow|today)\b/.test(t)) return true;
+    if (/\b\d{4}-\d{2}-\d{2}\b/.test(t)) return true;
+    if (/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(t) && /\b(next|this|week)\b/.test(t)) {
+        return true;
+    }
     return false;
 }
 
@@ -358,6 +379,15 @@ export function formatAuthoritativeAvailabilityBlock(result = {}) {
         result.available === true ? "- Slot IS available — proceed to bookTestDrive when customer confirms." : null,
         result.slotLabel ? `- Confirmed slot: ${result.slotLabel}` : null,
         result.nextAlternative?.slotLabel ? `- Next alternative: ${result.nextAlternative.slotLabel}` : null,
+        result.requestedDateFullyBooked
+            ? "- Requested date has NO open slots — do NOT ask for a time on that date; offer nextAvailableSlot or search next day."
+            : null,
+        result.nextAvailableSlot?.slotLabel
+            ? `- Next available slot (searched automatically): ${result.nextAvailableSlot.slotLabel} — offer or book this.`
+            : null,
+        result.autoSelected && result.available
+            ? "- DELEGATION: customer asked you to choose — proceed to bookTestDrive with this slot if not yet booked; confirm only after BOOKING_SUCCESS."
+            : null,
         slots ? `- Open slots: ${slots}` : null,
         result.code === "OUTSIDE_BUSINESS_HOURS"
             ? "- If code is OUTSIDE_BUSINESS_HOURS, offer suggestedSlots only — do NOT claim valid customer times are outside hours unless the tool says so."

@@ -696,8 +696,18 @@ export async function findFirstAvailableSlotForVehicle(companyId, vehicleId, opt
     const evaluate = options.evaluate;
     if (typeof evaluate !== "function") return null;
 
+    const minDateStr = options.minDate || options.skipBeforeDate || null;
+    const minDateMs = minDateStr && /^\d{4}-\d{2}-\d{2}$/.test(minDateStr)
+        ? new Date(`${minDateStr}T00:00:00.000Z`).getTime()
+        : null;
+
     for (let offset = 0; offset < daysAhead; offset++) {
         const dateBase = addBusinessDays(getTodayStartInBusinessTz(), offset);
+        if (minDateMs != null) {
+            const dayStr = toBusinessDateString(dateBase);
+            if (dayStr < minDateStr) continue;
+        }
+
         const dayOfWeek = getDayOfWeekInBusinessTz(dateBase);
         if (!getBusinessHours().days.includes(dayOfWeek)) continue;
 

@@ -153,7 +153,7 @@ async function main() {
     assert(imageParts[0].link === hero, "hero image in outbound plan");
     assert(cardParts.length === 1, "one formatted card in plan");
     assert(cardParts[0].text.includes("2020 Toyota Fortuner"), "card in outbound plan");
-    assert(imageParts[0].caption?.includes("Fortuner"), "hero image caption has vehicle name");
+    assert(!imageParts[0].caption, "hero image has no duplicate caption — name is on card above");
     const cardIndex = plan.messages.findIndex((m) => m.type === "text" && m.text.includes("💰"));
     const imageIndex = plan.messages.findIndex((m) => m.type === "image");
     assert(cardIndex >= 0 && imageIndex > cardIndex, "card text must precede hero image");

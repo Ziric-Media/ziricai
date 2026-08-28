@@ -220,7 +220,7 @@ export default {
         }
 
         if (rankedPrompt) {
-            message += ` ${rankedPrompt} Present ranked picks in order — platform sends numbered cards with hero photos.`;
+            message += ` ${rankedPrompt} Platform sends numbered cards with hero photos — do NOT list prices, mileage, specs, or vehicle names in your reply (intro + follow-up only).`;
         }
 
         return {

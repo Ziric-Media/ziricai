@@ -248,12 +248,12 @@ async function main() {
         },
         { familySize: 5 }
     );
-    assert(benefitReason.includes("fits your family"), "seating benefit");
+    assert(benefitReason.includes("family of 5"), "seating benefit");
     assert(
-        benefitReason.includes("—") && (benefitReason.includes("school runs") || benefitReason.includes("diesel")),
-        `specs→benefit language: ${benefitReason}`
+        /comfortable|everyday|diesel|wear/i.test(benefitReason),
+        `needs→benefit language: ${benefitReason}`
     );
-    console.log("✓ 8. Specs→benefit language in recommendation reasons");
+    console.log("✓ 8. Needs→benefit language in recommendation reasons");
 
     /* 9. Ethical upsell — slightly above budget in upsellOptions */
     const upsellCtx = mergeSalesContext({}, extractSalesSignals("My budget is R250,000"));

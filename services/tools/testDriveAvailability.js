@@ -21,6 +21,7 @@ import {
     slotEnd,
     toBusinessDateString,
     toBusinessTimeString,
+    addBusinessDays,
 } from "./availability.js";
 import { listAppointmentsByCustomer } from "../database/appointmentRepository.js";
 
@@ -159,14 +160,49 @@ export async function evaluateTestDriveAvailability(companyId, options = {}) {
 
     if (!parsed.hasExplicitTime) {
         const dateBase = parsed.dateOnly || parsed.dateTime;
+        const requestedDate = toBusinessDateString(dateBase);
         const slots = await findOpenSlotsForDate(companyId, dateBase);
+
+        if (slots.length === 0) {
+            const searchFrom = addBusinessDays(dateBase, 1);
+            const nextSlot = await findFirstAvailableSlotForVehicle(companyId, vehicle.vehicleId, {
+                daysAhead: 14,
+                customerId: options.customerId,
+                evaluate: evaluateTestDriveAvailability,
+                minDate: toBusinessDateString(searchFrom),
+            });
+            if (nextSlot) {
+                return {
+                    available: true,
+                    code: "NEXT_AVAILABLE",
+                    reason: `No slots on ${formatSlotLabel(dateBase).split(",")[0] || requestedDate} — next available: ${nextSlot.slotLabel}.`,
+                    requestedDateFullyBooked: true,
+                    nextAvailableSlot: nextSlot,
+                    vehicle: vehicleToPublic(vehicle),
+                    slotStart: nextSlot.slotStart,
+                    slotLabel: nextSlot.slotLabel,
+                    date: nextSlot.date,
+                    suggestedSlots: [{ slotStart: nextSlot.slotStart, label: nextSlot.slotLabel }],
+                    alternatives: { vehicles: [], slots: [{ slotStart: nextSlot.slotStart, label: nextSlot.slotLabel }] },
+                };
+            }
+            return {
+                available: false,
+                code: "NO_SLOTS",
+                reason: "No test-drive slots available on that date or nearby dates.",
+                requestedDateFullyBooked: true,
+                vehicle: vehicleToPublic(vehicle),
+                alternatives: { vehicles: [], slots: [] },
+            };
+        }
+
         return {
             available: false,
             code: "NEED_TIME",
             reason: "Date noted — ask the customer for their preferred time before booking.",
             needsTime: true,
             vehicle: vehicleToPublic(vehicle),
-            date: toBusinessDateString(dateBase),
+            date: requestedDate,
             suggestedSlots: slots.slice(0, 8),
             alternatives: { vehicles: [], slots: slots.slice(0, 8) },
         };

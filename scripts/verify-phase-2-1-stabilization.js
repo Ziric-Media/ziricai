@@ -201,9 +201,9 @@ async function main() {
         },
         0
     );
-    assert(formatRecommendationLine({ reason }).includes("Why Sarah recommends it"), "recommendation line format");
+    assert(formatRecommendationLine({ reason }).includes("Why I recommend it"), "recommendation line format");
     assert(card.includes("🚗"), "vehicle emoji in title");
-    assert(card.includes("Why Sarah recommends it"), "card includes recommendation reason");
+    assert(card.includes("Why I recommend it"), "card includes recommendation reason");
     assert(card.includes("Finance Estimate"), "card includes finance when present");
     console.log("✓ 8. Vehicle card has recommendation reason field");
 

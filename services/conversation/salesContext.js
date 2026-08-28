@@ -319,15 +319,26 @@ function parseQualificationSignals(text) {
     if (/\b(fuel\s+econom|efficien|low\s+consumption)\b/.test(raw)) notes.push("fuel economy");
     if (/\b(luxur|premium|comfort|leather)\b/.test(raw)) notes.push("luxury");
     if (/\b(practic|family|spacious|space|boot)\b/.test(raw)) notes.push("practicality");
+    if (/\bmodest\b/.test(raw)) notes.push("modest budget");
+    if (/\bsmall\s+family\b/.test(raw)) notes.push("small family");
     return notes.length ? notes : null;
 }
 
 function parsePreferredVehicle(text) {
     const raw = String(text || "");
-    const match = raw.match(/\b(?:prefer|interested in|looking at|keen on|like the|want the|wanted the|really wanted)\s+(?:the\s+)?([\w\s-]{3,40}?(?:hilux|fortuner|everest|x5|ranger|corolla|land cruiser|bmw|rav4))/i);
-    if (match?.[1]) return match[1].trim();
-    const model = raw.match(/\b(hilux|fortuner|everest|x5|land cruiser|ranger|bmw|rav4)\b/i);
-    if (model && /\b(prefer|book|test drive|that one|this one|original|wanted|really wanted|still want)\b/i.test(raw)) {
+    const vehiclePattern =
+        /\b(hilux|fortuner|everest|x5|land cruiser|ranger|bmw|rav4|corolla|honda|amaze|suzuki|ciaz|changan|alsvin|tiguan|quest)\b/i;
+    const match = raw.match(
+        /\b(?:prefer|interested in|looking at|keen on|like the|want the|wanted the|recommend|schedule for|book(?:ing)?(?:\s+the)?)\s+(?:the\s+)?([\w\s.-]{2,50})/i
+    );
+    if (match?.[1] && vehiclePattern.test(match[1])) return match[1].trim();
+    const model = raw.match(vehiclePattern);
+    if (
+        model &&
+        /\b(prefer|book|test drive|schedule|that one|this one|original|wanted|really wanted|still want|recommend|honda|amaze|we can)\b/i.test(
+            raw
+        )
+    ) {
         return model[0];
     }
     return null;
@@ -789,7 +800,7 @@ export function buildRankedRecommendations(customerProfile = {}, vehicles = []) 
     return ranked.map(({ vehicle }, index) => {
         const reason =
             vehicle.reason ||
-            buildInventoryRecommendationReason(vehicle, { familySize: customerProfile?.familySize ?? null });
+            buildInventoryRecommendationReason(vehicle, customerProfile);
         return {
             ...vehicle,
             rank: index + 1,
@@ -815,51 +826,70 @@ export function formatRankedRecommendationsForPrompt(ranked = []) {
 }
 
 /**
- * Build recommendation records from searchInventory results.
+ * Build needs-based recommendation copy — not a spec dump.
  * @param {object} vehicle
- * @param {{ familySize?: number|null }} [options]
+ * @param {object} [customerProfile]
  */
-export function buildInventoryRecommendationReason(vehicle, { familySize = null } = {}) {
+export function buildInventoryRecommendationReason(vehicle, customerProfile = {}) {
     if (!vehicle) return null;
-    const parts = [];
-    const benefits = [];
-    const label = vehicle.year || vehicle.title || vehicle.label || "This vehicle";
+
+    const familySize = customerProfile.familySize ?? null;
+    const reqs = (customerProfile.customerRequirements || []).map((r) => String(r).toLowerCase());
+    const bodyPref = customerProfile.bodyType || customerProfile.vehiclePreferences?.bodyType || null;
     const seating =
-        vehicle.seatingCapacity ??
-        vehicle.metadata?.seatingCapacity ??
-        null;
+        vehicle.seatingCapacity ?? vehicle.metadata?.seatingCapacity ?? null;
     const bodyType = vehicle.bodyType ?? vehicle.metadata?.bodyType ?? null;
+    const transmission = vehicle.transmission ? String(vehicle.transmission) : null;
+    const price = vehicle.price != null ? Number(vehicle.price) : null;
 
-    if (familySize != null && seating != null) {
-        parts.push(
-            seating >= familySize
-                ? `${seating}-seat capacity fits your family of ${familySize}`
-                : `${seating}-seat capacity — may not fit all ${familySize} passengers`
-        );
-        if (seating >= familySize) {
-            benefits.push("room for everyone on school runs and family trips");
-        }
-    } else if (seating != null) {
-        parts.push(`${seating} seats`);
-        if (seating >= 7) benefits.push("generous space for passengers and luggage");
-    }
-    if (bodyType) parts.push(String(bodyType));
-    if (vehicle.year) parts.push(`${vehicle.year} model`);
-    if (vehicle.mileage != null) {
-        parts.push(`${Number(vehicle.mileage).toLocaleString("en-ZA")} km`);
-        if (Number(vehicle.mileage) < 60000) benefits.push("lower km often means less wear for years ahead");
-        else if (Number(vehicle.mileage) > 100000) benefits.push("mature km can mean stronger value for your budget");
-    }
-    if (vehicle.price != null) parts.push(`R${Number(vehicle.price).toLocaleString("en-ZA")}`);
-    if (vehicle.fuel && /diesel/i.test(String(vehicle.fuel))) {
-        benefits.push("diesel efficiency suits longer commutes and highway trips");
-    }
-    if (vehicle.location) parts.push(`at ${vehicle.location}`);
-    if (!parts.length) return null;
+    const wantsModest =
+        reqs.some((r) => /modest|econom|budget|afford|value|practical/.test(r)) ||
+        /\bmodest\b/i.test(String(customerProfile.budgetTone || ""));
+    const wantsSmallFamily =
+        reqs.some((r) => /small family|family practicality|practicality/.test(r)) ||
+        (familySize != null && familySize <= 5);
+    const wantsSedanHatch =
+        reqs.some((r) => /sedan|hatch/.test(r)) ||
+        (bodyPref && /sedan|hatch/i.test(String(bodyPref)));
 
-    const specLine = `${label}: ${parts.join(", ")}`;
-    if (!benefits.length) return specLine;
-    return `${specLine} — ${benefits.slice(0, 2).join("; ")}`;
+    const sentences = [];
+
+    if (wantsSmallFamily && wantsSedanHatch && bodyType && /sedan|hatch/i.test(bodyType)) {
+        sentences.push("A practical choice for a small family without stepping into a larger SUV");
+    } else if (wantsSmallFamily && familySize != null && seating != null && seating >= familySize) {
+        sentences.push(`Comfortable for your family of ${familySize} with room for everyday use`);
+    } else if (wantsSmallFamily) {
+        sentences.push("Sized for everyday family use without unnecessary bulk");
+    }
+
+    if (wantsModest && price != null && price <= 280000) {
+        sentences.push("Keeps purchase price modest while still giving you a solid daily driver");
+    } else if (wantsModest && price != null) {
+        sentences.push("Balances value and practicality for a modest budget");
+    }
+
+    if (transmission && /automatic/i.test(transmission)) {
+        sentences.push("Automatic transmission makes town and school-run driving easier");
+    } else if (transmission && /manual/i.test(transmission) && wantsModest) {
+        sentences.push("Manual gearbox can help keep running costs down");
+    }
+
+    if (vehicle.fuel && /petrol/i.test(String(vehicle.fuel)) && wantsModest) {
+        sentences.push("Petrol power suited to mixed city and suburban driving");
+    } else if (vehicle.fuel && /diesel/i.test(String(vehicle.fuel))) {
+        sentences.push("Diesel efficiency helps on longer commutes");
+    }
+
+    if (vehicle.mileage != null && Number(vehicle.mileage) < 50000) {
+        sentences.push("Lower mileage means less wear for years ahead");
+    }
+
+    if (!sentences.length) {
+        if (bodyType) sentences.push(`A ${String(bodyType).toLowerCase()} option worth a closer look`);
+        else sentences.push("A solid option based on what you've told me so far");
+    }
+
+    return sentences.slice(0, 2).join(". ") + ".";
 }
 
 /**
@@ -975,7 +1005,7 @@ export function buildRecommendedVehicleRecords(vehicles = [], { reason, requirem
             seatingCapacity: v.seatingCapacity ?? v.metadata?.seatingCapacity ?? null,
             location: v.location || null,
             primaryImageUrl: Array.isArray(v.images) ? v.images[0] || null : null,
-            reason: reason || buildInventoryRecommendationReason(v, { familySize }),
+            reason: reason || buildInventoryRecommendationReason(v, { familySize, ...(requirements ? { customerRequirements: requirements } : {}) }),
             requirements: requirements?.length ? [...requirements] : undefined,
             recommendedAt: now,
             position: index + 1,
