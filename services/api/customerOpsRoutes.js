@@ -152,7 +152,7 @@ export function mountCustomerOpsRoutes(app) {
     app.get("/api/companies/:companyId/crm/customers/:customerId/timeline", requireTenantScope(), async (req, res) => {
         try {
             const phone = normalizePhone(req.params.customerId);
-            const items = await getTimeline(phone);
+            const items = await getTimeline(phone, { companyId: req.params.companyId });
             res.json({ items, customerId: req.params.customerId });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to load timeline" });
@@ -162,7 +162,7 @@ export function mountCustomerOpsRoutes(app) {
     app.get("/api/companies/:companyId/crm/customers/:customerId", requireTenantScope(), async (req, res) => {
         try {
             const phone = normalizePhone(req.params.customerId);
-            const profile = await getCustomerProfile(phone);
+            const profile = await getCustomerProfile(phone, { companyId: req.params.companyId });
             if (!profile) return res.status(404).json({ error: "Customer not found" });
             await syncCustomerToTenant(req.params.companyId, phone, profile);
             res.json({ customer: profile });
@@ -173,22 +173,31 @@ export function mountCustomerOpsRoutes(app) {
 
     app.patch("/api/companies/:companyId/crm/customers/:customerId", requireTenantScope(), async (req, res) => {
         try {
+            const companyId = req.params.companyId;
             const phone = normalizePhone(req.params.customerId);
             const body = req.body || {};
             if (body.note?.text) {
-                const note = await addNote(phone, body.note);
-                return res.json({ success: true, note, customer: await getCustomerProfile(phone) });
+                const note = await addNote(phone, body.note, { companyId });
+                return res.json({
+                    success: true,
+                    note,
+                    customer: await getCustomerProfile(phone, { companyId }),
+                });
             }
             if (body.task?.title) {
-                const task = await addTask(phone, body.task);
-                return res.json({ success: true, task, customer: await getCustomerProfile(phone) });
+                const task = await addTask(phone, body.task, { companyId });
+                return res.json({
+                    success: true,
+                    task,
+                    customer: await getCustomerProfile(phone, { companyId }),
+                });
             }
             const patch = {};
             if (body.tags) patch.tags = body.tags;
             if (body.status) patch.status = body.status;
             if (body.aiSummary != null) patch.aiSummary = body.aiSummary;
             if (Object.keys(patch).length) await updateCustomer(phone, patch);
-            res.json({ success: true, customer: await getCustomerProfile(phone) });
+            res.json({ success: true, customer: await getCustomerProfile(phone, { companyId }) });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to update customer" });
         }

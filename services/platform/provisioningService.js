@@ -35,6 +35,7 @@ import {
     addTask,
     parseExplicitCustomerName,
     getCustomerDisplayName,
+    updateCustomerProfile,
 } from "../customerService.js";
 import { analyzeMessage, extractMemoryFacts } from "../intelligence/conversationIntelligence.js";
 import { storeMemory } from "../memory/aiMemoryService.js";
@@ -446,6 +447,7 @@ export async function processInboundCustomerPipeline(phone, context = {}) {
         companyId: ctxCompanyId,
         reply = "",
         agentId: ctxAgentId,
+        externalId = null,
     } = context;
 
     const store = await adapter();
@@ -471,37 +473,60 @@ export async function processInboundCustomerPipeline(phone, context = {}) {
         (resolvedCompanyId ? await getDefaultAgentForCompany(resolvedCompanyId) : null);
 
     if (agent && !customer.assignedAiEmployee) {
-        await store.updateCustomer?.(phone, {
-            assignedAiEmployee: agent.name,
-            assignedEmployee: customer.assignedEmployee || agent.name,
-            companyId: resolvedCompanyId,
-        });
+        if (resolvedCompanyId) {
+            await updateCustomerProfile(
+                phone,
+                {
+                    assignedAiEmployee: agent.name,
+                    assignedEmployee: customer.assignedEmployee || agent.name,
+                },
+                { companyId: resolvedCompanyId }
+            );
+        } else {
+            await store.updateCustomer?.(phone, {
+                assignedAiEmployee: agent.name,
+                assignedEmployee: customer.assignedEmployee || agent.name,
+                companyId: resolvedCompanyId,
+            });
+        }
     }
 
+    const tenantScope = resolvedCompanyId ? { companyId: resolvedCompanyId } : {};
     const analysis = analyzeMessage(phone, text, reply);
-    await applyIntelligence(phone, analysis);
+    await applyIntelligence(phone, analysis, tenantScope);
 
     const summary = buildConversationSummary(text, analysis);
-    await updateAiSummary(phone, summary);
+    await updateAiSummary(phone, summary, tenantScope);
 
-    await addTimelineEvent(phone, {
-        type: "whatsapp",
-        title: "WhatsApp Message",
-        description: String(text).slice(0, 200),
-    });
+    await addTimelineEvent(
+        phone,
+        {
+            id: externalId ? `whatsapp-inbound-${externalId}` : undefined,
+            type: "whatsapp",
+            title: "WhatsApp Message",
+            description: String(text).slice(0, 200),
+        },
+        { ...tenantScope, idempotent: Boolean(externalId) }
+    );
 
     await appendAiSummary(
         phone,
-        `Discussed: ${analysis.category || analysis.topic || "general"} (${analysis.intent}). ${analysis.recommendedAction || ""}`
+        `Discussed: ${analysis.category || analysis.topic || "general"} (${analysis.intent}). ${analysis.recommendedAction || ""}`,
+        tenantScope
     );
 
     if (analysis.recommendedAction) {
-        await addTimelineEvent(phone, {
-            type: "recommendation",
-            title: "Recommended Follow-up",
-            description: analysis.recommendedAction,
-            meta: { reason: analysis.recommendedReason, confidence: analysis.confidence },
-        });
+        await addTimelineEvent(
+            phone,
+            {
+                id: externalId ? `whatsapp-followup-${externalId}` : undefined,
+                type: "recommendation",
+                title: "Recommended Follow-up",
+                description: analysis.recommendedAction,
+                meta: { reason: analysis.recommendedReason, confidence: analysis.confidence },
+            },
+            { ...tenantScope, idempotent: Boolean(externalId) }
+        );
     }
 
     const facts = extractMemoryFacts(text);

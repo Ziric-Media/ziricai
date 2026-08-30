@@ -10,7 +10,8 @@ import {
 } from "../inventory/inventoryService.js";
 import { getRecommendedVehicles, pickFromRecommended } from "../conversation/recommendedVehicles.js";
 import { publish, EventTypes } from "../events/index.js";
-import { addTimelineEvent, persistExplicitCustomerName } from "../customerService.js";
+import { persistExplicitCustomerName } from "../customerService.js";
+import { syncTestDriveBooked } from "../integrations/crmSyncService.js";
 import { buildIdempotencyKey } from "./toolRunner.js";
 import { formatSlotLabel, parseScheduledAt } from "./availability.js";
 import { evaluateTestDriveAvailability } from "./testDriveAvailability.js";
@@ -286,16 +287,11 @@ export default {
             source: "ai_tool",
         });
 
-        if (customerPhone) {
-            await addTimelineEvent(customerPhone, {
-                type: "appointment",
-                title: "Test drive booked",
-                description: `${vehicleCheck.vehicleLabel} — ${formatSlotLabel(new Date(appointment.scheduledAt))}`,
-                meta: {
-                    appointmentId: appointment.id,
-                    vehicleId: vehicleCheck.vehicleId,
-                    stockNumber: appointment.vehicleStockNumber,
-                },
+        if (customerPhone && companyId) {
+            await syncTestDriveBooked(companyId, customerPhone, {
+                appointment,
+                vehicleLabel: vehicleCheck.vehicleLabel,
+                duplicate: false,
             }).catch(() => {});
         }
 

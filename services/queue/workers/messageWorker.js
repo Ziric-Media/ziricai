@@ -71,7 +71,7 @@ import {
     formatGalleryDeliveryReply,
 } from "../../conversation/vehicleOutboundPlan.js";
 
-import { captureLeadFromMessage } from "../../tenants/crmService.js";
+import { syncFromSalesTurn } from "../../integrations/crmSyncService.js";
 
 import { superviseReply } from "../../intelligence/aiSupervisor.js";
 
@@ -253,6 +253,15 @@ async function processInboundMessage(job) {
             }
             salesContextForTurn = mergeSalesContext(customer?.salesContext, salesSignals);
             await persistSalesContext(resolvedCompanyId, sender, salesSignals);
+            await syncFromSalesTurn(resolvedCompanyId, sender, {
+                contactName,
+                channel: outboundChannel,
+                salesContext: salesContextForTurn,
+                aiEmployeeId: agent?.id || null,
+                aiEmployeeName: agent?.name || "Sarah",
+            }).catch((err) => {
+                console.warn("[crm-sync] persistSalesContext sync failed:", err.message);
+            });
         }
     }
 
@@ -734,6 +743,7 @@ async function processInboundMessage(job) {
         companyId: resolvedCompanyId,
         reply,
         agentId: agent?.id || null,
+        externalId,
     });
 
     if (resolvedCompanyId) {
@@ -755,12 +765,17 @@ async function processInboundMessage(job) {
     }
 
     if (knowledgeBundle.sources?.length) {
-        await addTimelineEvent(sender, {
-            type: "knowledge",
-            title: "Knowledge Used",
-            description: knowledgeBundle.sources.slice(0, 3).join(", "),
-            meta: { sources: knowledgeBundle.sources, knowledgeBaseId: knowledgeBundle.knowledgeBaseId },
-        });
+        await addTimelineEvent(
+            sender,
+            {
+                id: externalId ? `knowledge-${externalId}` : undefined,
+                type: "knowledge",
+                title: "Knowledge Used",
+                description: knowledgeBundle.sources.slice(0, 3).join(", "),
+                meta: { sources: knowledgeBundle.sources, knowledgeBaseId: knowledgeBundle.knowledgeBaseId },
+            },
+            { companyId: resolvedCompanyId, idempotent: Boolean(externalId) }
+        );
         if (resolvedCompanyId) {
             await publish(resolvedCompanyId, EventTypes.KNOWLEDGE_QUERY, {
                 phone: sender,
@@ -786,13 +801,18 @@ async function processInboundMessage(job) {
         timestamp: timestamp || new Date().toISOString(),
     });
 
-    if (resolvedCompanyId && (pipeline.analysis?.leadQuality ?? 0) >= 60) {
-        await captureLeadFromMessage(resolvedCompanyId, {
-            phone: sender,
+    if (resolvedCompanyId) {
+        const latestCustomer = (await getCustomer(sender, { companyId: resolvedCompanyId })) || refreshedCustomer;
+        await syncFromSalesTurn(resolvedCompanyId, sender, {
             contactName,
-            leadScore: pipeline.analysis.leadQuality,
-            topic: pipeline.analysis.topic,
             channel: outboundChannel,
+            leadScore: pipeline.analysis?.leadQuality,
+            topic: pipeline.analysis?.topic,
+            salesContext: latestCustomer?.salesContext || salesContextForTurn,
+            aiEmployeeId: agent?.id || pipeline.agentId || null,
+            aiEmployeeName: agent?.name || "Sarah",
+        }).catch((err) => {
+            console.warn("[crm-sync] end-of-turn sync failed:", err.message);
         });
     }
 

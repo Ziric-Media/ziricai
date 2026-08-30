@@ -293,9 +293,9 @@ export async function upsertCustomerFromWhatsApp(
 /** @deprecated alias */
 export const upsertFromWhatsApp = upsertCustomerFromWhatsApp;
 
-export async function getCustomerProfile(phone) {
+export async function getCustomerProfile(phone, { companyId } = {}) {
     const key = normalizePhone(phone);
-    const customer = (await getCustomer(key)) || null;
+    const customer = (await getCustomer(key, { companyId })) || null;
     if (!customer) return null;
 
     const companyName = customer.companyName || null;
@@ -318,16 +318,21 @@ export async function getCustomerProfile(phone) {
     };
 }
 
-export async function updateAiSummary(phone, summary) {
-    return updateCustomer(normalizePhone(phone), {
+export async function updateAiSummary(phone, summary, { companyId } = {}) {
+    const key = normalizePhone(phone);
+    const patch = {
         aiSummary: String(summary || "").slice(0, 4000),
         updatedAt: new Date().toISOString(),
-    });
+    };
+    if (companyId) {
+        return upsertTenantCustomer(companyId, key, patch);
+    }
+    return updateCustomer(key, patch);
 }
 
-export async function addNote(phone, { text, author = "Admin" } = {}) {
+export async function addNote(phone, { text, author = "Admin" } = {}, { companyId } = {}) {
     const key = normalizePhone(phone);
-    const customer = (await getCustomer(key)) || {};
+    const customer = (await getCustomer(key, { companyId })) || {};
     const note = {
         id: uid("note"),
         text: String(text || "").trim(),
@@ -335,13 +340,17 @@ export async function addNote(phone, { text, author = "Admin" } = {}) {
         createdAt: new Date().toISOString(),
     };
     const notesList = [...(customer.notesList || []), note];
-    await updateCustomer(key, { notesList });
+    if (companyId) {
+        await upsertTenantCustomer(companyId, key, { notesList });
+    } else {
+        await updateCustomer(key, { notesList });
+    }
     return note;
 }
 
-export async function addTask(phone, { title, deadline, priority = "medium", assignedTo = "Unassigned" } = {}) {
+export async function addTask(phone, { title, deadline, priority = "medium", assignedTo = "Unassigned" } = {}, { companyId } = {}) {
     const key = normalizePhone(phone);
-    const customer = (await getCustomer(key)) || {};
+    const customer = (await getCustomer(key, { companyId })) || {};
     const task = {
         id: uid("task"),
         title: String(title || "").trim(),
@@ -352,29 +361,41 @@ export async function addTask(phone, { title, deadline, priority = "medium", ass
         createdAt: new Date().toISOString(),
     };
     const tasks = [...(customer.tasks || []), task];
-    await updateCustomer(key, { tasks });
+    if (companyId) {
+        await upsertTenantCustomer(companyId, key, { tasks });
+    } else {
+        await updateCustomer(key, { tasks });
+    }
     return task;
 }
 
-export async function updateTask(phone, taskId, patch) {
+export async function updateTask(phone, taskId, patch, { companyId } = {}) {
     const key = normalizePhone(phone);
-    const customer = (await getCustomer(key)) || {};
+    const customer = (await getCustomer(key, { companyId })) || {};
     const tasks = (customer.tasks || []).map((t) => (t.id === taskId ? { ...t, ...patch } : t));
-    await updateCustomer(key, { tasks });
+    if (companyId) {
+        await upsertTenantCustomer(companyId, key, { tasks });
+    } else {
+        await updateCustomer(key, { tasks });
+    }
     return tasks.find((t) => t.id === taskId) || null;
 }
 
-export async function deleteNote(phone, noteId) {
+export async function deleteNote(phone, noteId, { companyId } = {}) {
     const key = normalizePhone(phone);
-    const customer = (await getCustomer(key)) || {};
+    const customer = (await getCustomer(key, { companyId })) || {};
     const notesList = (customer.notesList || []).filter((n) => n.id !== noteId);
-    await updateCustomer(key, { notesList });
+    if (companyId) {
+        await upsertTenantCustomer(companyId, key, { notesList });
+    } else {
+        await updateCustomer(key, { notesList });
+    }
     return notesList;
 }
 
-export async function addTimelineEvent(phone, event) {
+export async function addTimelineEvent(phone, event, { companyId, idempotent = false } = {}) {
     const key = normalizePhone(phone);
-    const customer = (await getCustomer(key)) || {};
+    const customer = (await getCustomer(key, { companyId })) || {};
     const entry = {
         id: event.id || uid("tl"),
         type: event.type || "event",
@@ -383,20 +404,29 @@ export async function addTimelineEvent(phone, event) {
         createdAt: event.createdAt || new Date().toISOString(),
         meta: event.meta || null,
     };
-    const timeline = [...(customer.timeline || []), entry];
-    await updateCustomer(key, { timeline });
+    const timeline = customer.timeline || [];
+    if (idempotent && entry.id && timeline.some((item) => item.id === entry.id)) {
+        return timeline.find((item) => item.id === entry.id) || entry;
+    }
+    const nextTimeline = [...timeline, entry];
+    if (companyId) {
+        await upsertTenantCustomer(companyId, key, { timeline: nextTimeline });
+    } else {
+        await updateCustomer(key, { timeline: nextTimeline });
+    }
     return entry;
 }
 
-export async function getTimeline(phone) {
-    const profile = await getCustomerProfile(phone);
+export async function getTimeline(phone, { companyId } = {}) {
+    const profile = await getCustomerProfile(phone, { companyId });
     return profile?.timeline || [];
 }
 
-export async function applyIntelligence(phone, analysis) {
+export async function applyIntelligence(phone, analysis, { companyId } = {}) {
     const key = normalizePhone(phone);
-    const adapter = await store();
-    const existing = (await adapter.getCustomer(key)) || {};
+    const existing = companyId
+        ? (await getTenantCustomer(companyId, key)) || {}
+        : (await (await store()).getCustomer(key)) || {};
     const lead = calculateLeadScore(existing, analysis);
 
     const patch = {
@@ -432,33 +462,49 @@ export async function applyIntelligence(phone, analysis) {
     };
     patch.analytics = analytics;
 
-    await adapter.updateCustomer(key, patch);
+    if (companyId) {
+        await upsertTenantCustomer(companyId, key, patch);
+    } else {
+        await (await store()).updateCustomer(key, patch);
+    }
 
-    await addTimelineEvent(key, {
-        type: "ai_analysis",
-        title: "AI Intelligence Updated",
-        description: `${capitalize(analysis.sentiment)} sentiment · ${analysis.intent} intent · score ${patch.leadScore}`,
-        meta: { analysis },
-    });
+    await addTimelineEvent(
+        key,
+        {
+            type: "ai_analysis",
+            title: "AI Intelligence Updated",
+            description: `${capitalize(analysis.sentiment)} sentiment · ${analysis.intent} intent · score ${patch.leadScore}`,
+            meta: { analysis },
+        },
+        { companyId }
+    );
 
     if (analysis.replyPreview) {
-        await addTimelineEvent(key, {
-            type: "ai_reply",
-            title: "AI Replied",
-            description: analysis.replyPreview,
-        });
+        await addTimelineEvent(
+            key,
+            {
+                type: "ai_reply",
+                title: "AI Replied",
+                description: analysis.replyPreview,
+            },
+            { companyId }
+        );
     }
 
     return patch;
 }
 
-export async function appendAiSummary(phone, line) {
+export async function appendAiSummary(phone, line, { companyId } = {}) {
     const key = normalizePhone(phone);
-    const customer = (await getCustomer(key)) || {};
+    const customer = (await getCustomer(key, { companyId })) || {};
     const prev = customer.aiSummary || "";
     const stamp = new Date().toISOString().slice(0, 10);
     const next = prev ? `${prev}\n[${stamp}] ${line}` : `[${stamp}] ${line}`;
-    return updateCustomer(key, { aiSummary: next.slice(-4000) });
+    const patch = { aiSummary: next.slice(-4000) };
+    if (companyId) {
+        return upsertTenantCustomer(companyId, key, patch);
+    }
+    return updateCustomer(key, patch);
 }
 
 function capitalize(value) {
