@@ -4,7 +4,11 @@
  */
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, enableNetwork } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  enableNetwork,
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFirebaseConfig, getFirebaseDatabaseId } from './firebase-config.js';
 
@@ -14,10 +18,15 @@ export const app = initializeApp(firebaseConfig);
 
 let dbInstance = null;
 
-/** Lazy Firestore — avoids "Component firestore has not been registered yet" on CDN/importmap loads. */
+/** Lazy Firestore — avoids component registration races on CDN/importmap loads. */
 export function getDb() {
   if (!dbInstance) {
-    dbInstance = getFirestore(app, getFirebaseDatabaseId());
+    const databaseId = getFirebaseDatabaseId();
+    if (databaseId === '(default)') {
+      dbInstance = getFirestore(app);
+    } else {
+      dbInstance = initializeFirestore(app, {}, databaseId);
+    }
   }
   return dbInstance;
 }
@@ -61,3 +70,21 @@ export async function ensureAuthReadyForApi() {
 }
 
 export { getFirebaseConfig };
+
+/** Same-module re-exports so doc()/collection() accept getDb() on gstatic CDN. */
+export {
+  doc,
+  collection,
+  getDoc,
+  getDocFromServer,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+} from 'firebase/firestore';

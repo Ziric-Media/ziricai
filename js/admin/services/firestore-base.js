@@ -11,13 +11,13 @@ import {
   where,
   orderBy,
   serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../../firebase.js';
+  getDb,
+} from '../../firebase.js';
 
-export { db, serverTimestamp };
+export { getDb, serverTimestamp };
 
 export function collectionRef(name) {
-  return collection(db, name);
+  return collection(getDb(), name);
 }
 
 export async function listDocuments(name, options = {}) {
@@ -31,8 +31,8 @@ export async function listDocuments(name, options = {}) {
     }
 
     const q = constraints.length
-      ? query(collection(db, name), ...constraints)
-      : collection(db, name);
+      ? query(collection(getDb(), name), ...constraints)
+      : collection(getDb(), name);
 
     const snapshot = await getDocs(q);
     const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -45,7 +45,7 @@ export async function listDocuments(name, options = {}) {
 
 export async function getDocument(name, id) {
   try {
-    const snapshot = await getDoc(doc(db, name, id));
+    const snapshot = await getDoc(doc(getDb(), name, id));
     if (!snapshot.exists()) return { error: 'Document not found' };
     return { item: { id: snapshot.id, ...snapshot.data() } };
   } catch (error) {
@@ -57,10 +57,10 @@ export async function createDocument(name, data, id) {
   try {
     const payload = { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
     if (id) {
-      await setDoc(doc(db, name, id), payload);
+      await setDoc(doc(getDb(), name, id), payload);
       return { id, item: { id, ...data } };
     }
-    const ref = await addDoc(collection(db, name), payload);
+    const ref = await addDoc(collection(getDb(), name), payload);
     return { id: ref.id, item: { id: ref.id, ...data } };
   } catch (error) {
     return { error: error.message };
@@ -69,7 +69,7 @@ export async function createDocument(name, data, id) {
 
 export async function updateDocument(name, id, data) {
   try {
-    await updateDoc(doc(db, name, id), { ...data, updatedAt: serverTimestamp() });
+    await updateDoc(doc(getDb(), name, id), { ...data, updatedAt: serverTimestamp() });
     return { success: true };
   } catch (error) {
     return { error: error.message };
@@ -78,7 +78,7 @@ export async function updateDocument(name, id, data) {
 
 export async function removeDocument(name, id) {
   try {
-    await deleteDoc(doc(db, name, id));
+    await deleteDoc(doc(getDb(), name, id));
     return { success: true };
   } catch (error) {
     return { error: error.message };
