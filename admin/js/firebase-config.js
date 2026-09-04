@@ -38,6 +38,10 @@ function configFromEnv() {
             process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
         appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID || "",
         measurementId: process.env.FIREBASE_MEASUREMENT_ID || process.env.VITE_FIREBASE_MEASUREMENT_ID || "",
+        databaseId:
+            process.env.FIREBASE_DATABASE_ID ||
+            process.env.VITE_FIREBASE_DATABASE_ID ||
+            (projectId === "ziricai" ? "default" : "(default)"),
     };
 }
 
@@ -57,4 +61,23 @@ export function getFirebaseConfig() {
 
 export function getFirebaseProjectId() {
     return getFirebaseConfig().projectId || "ziricai";
+}
+
+/** Firestore database ID (ziricai project uses named database "default", not "(default)"). */
+export function getFirebaseDatabaseId() {
+    if (typeof window !== "undefined" && window.__ZIRICAI_CONFIG__?.firebase?.databaseId) {
+        return window.__ZIRICAI_CONFIG__.firebase.databaseId;
+    }
+
+    if (typeof process !== "undefined" && process.env) {
+        const fromEnv =
+            process.env.FIREBASE_DATABASE_ID ||
+            process.env.VITE_FIREBASE_DATABASE_ID ||
+            null;
+        if (fromEnv) return fromEnv;
+        const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+        if (projectId === "ziricai") return "default";
+    }
+
+    return getFirebaseProjectId() === "ziricai" ? "default" : "(default)";
 }
