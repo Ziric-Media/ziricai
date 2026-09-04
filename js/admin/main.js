@@ -21,6 +21,7 @@ export async function bootstrap() {
     initRouter();
     bindShellEvents();
     document.addEventListener('ziric:companies-updated', refreshCompanies);
+    document.addEventListener('ziric:agents-updated', updateAgentCountBadge);
 
     initAuthGuard({
       onReady: () => {
@@ -49,7 +50,23 @@ async function refreshCompanies() {
   const companyCount = document.getElementById('companyCount');
   if (companyCount) companyCount.textContent = String(state.companies.length || '—');
   const agentCount = document.getElementById('agentCount');
-  if (agentCount) agentCount.textContent = state.companies.length ? '—' : '4';
+  if (agentCount) agentCount.textContent = '—';
+}
+
+function updateAgentCountBadge(event) {
+  const agentCount = document.getElementById('agentCount');
+  if (!agentCount) return;
+
+  const detail = event?.detail || {};
+  if (!state.selectedCompanyId || detail.loadState === 'scope_required') {
+    agentCount.textContent = '—';
+    return;
+  }
+  if (detail.loadState === 'error' || detail.count == null) {
+    agentCount.textContent = '—';
+    return;
+  }
+  agentCount.textContent = String(detail.count);
 }
 
 function updateCompanySelector() {
@@ -71,6 +88,9 @@ function bindShellEvents() {
   document.getElementById('companySelector')?.addEventListener('change', (e) => {
     const value = e.target.value || null;
     setState({ selectedCompanyId: value });
+    if (!value) {
+      updateAgentCountBadge({ detail: { loadState: 'scope_required', count: null } });
+    }
     showToast(value ? `Scoped to selected company` : 'Showing all companies', 'info');
     navigateTo(state.currentPage);
   });

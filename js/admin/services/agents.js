@@ -14,6 +14,7 @@ import {
 } from '../api.js';
 
 const COLLECTION = 'agents';
+export { PRIMARY_PILOT_TENANT_ID, enrichAgentsForDisplay, isWhatsappChannelEnabled } from './agentDisplay.js';
 const DEMO_STORE_KEY = 'ziricai-demo-agents';
 const DEMO_DATA_VERSION = '2025-07-agents-v2';
 const DEMO_VERSION_KEY = 'ziricai-demo-agents-version';
@@ -44,6 +45,12 @@ function saveDemoStore(items) {
 function shouldUseDemo(result) {
   return shouldUseDemoForEmptyOrError(result);
 }
+
+import {
+  enrichAgentsForDisplay,
+  isWhatsappChannelEnabled,
+  PRIMARY_PILOT_TENANT_ID,
+} from './agentDisplay.js';
 
 function normalizePayload(data, existing = null) {
   const knowledgeSources = {
@@ -110,13 +117,15 @@ export async function listAgents(companyId) {
     const api = await fetchAiEmployeesFromApi(companyId);
     if (!isDemoDataAllowed()) {
       if (api.error) {
-        return { items: [], source: 'api', error: api.error, loadState: 'error' };
+        return { items: [], source: 'api', error: api.error, loadState: 'error', companyId };
       }
       const items = api.data?.items || [];
       return {
         items,
         source: 'api',
         loadState: items.length ? 'ok' : 'empty',
+        companyId,
+        defaultAgentId: api.data?.defaultAgentId || null,
       };
     }
     if (!api.error && api.data?.items?.length) {

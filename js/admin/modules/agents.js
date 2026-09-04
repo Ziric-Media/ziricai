@@ -16,6 +16,9 @@ import {
   updateAgent,
   deleteAgent,
   duplicateAgent,
+  enrichAgentsForDisplay,
+  isWhatsappChannelEnabled,
+  PRIMARY_PILOT_TENANT_ID,
 } from '../services/agents.js';
 import { provisionAgentWorkspace, fetchSupervisorReviews } from '../api.js';
 import { withTimeout } from '../utils.js';
@@ -82,6 +85,25 @@ function sourceBadgeLabel() {
   return 'Live API';
 }
 
+function notifyAgentsSidebar(detail) {
+  document.dispatchEvent(new CustomEvent('ziric:agents-updated', { detail }));
+}
+
+function confirmPilotMutation(actionLabel) {
+  if (isDemoDataAllowed()) return true;
+  if (state.selectedCompanyId !== PRIMARY_PILOT_TENANT_ID) return true;
+  return confirm(
+    `${actionLabel} on the live Central Motors pilot tenant (${PRIMARY_PILOT_TENANT_ID}). ` +
+      'This affects production Sarah — continue only if you intend to change the pilot employee.'
+  );
+}
+
+function personalityLabel(value) {
+  if (!value) return '';
+  const match = PERSONALITIES.find((p) => p.value === value);
+  return match?.label || String(value).replace(/_/g, ' ');
+}
+
 export async function renderAgents(container) {
   container.innerHTML = loadingState('Loading AI employees...');
 
@@ -96,6 +118,7 @@ export async function renderAgents(container) {
   listError = agentsRes.error || null;
 
   if (listLoadState === 'scope_required') {
+    notifyAgentsSidebar({ companyId: null, count: null, loadState: 'scope_required' });
     container.innerHTML = `
       ${pageHeader(
         'AI Employees',
@@ -116,6 +139,7 @@ export async function renderAgents(container) {
   }
 
   if (listLoadState === 'error') {
+    notifyAgentsSidebar({ companyId: scopedCompanyId, count: null, loadState: 'error' });
     container.innerHTML = `
       ${pageHeader(
         'AI Employees',
@@ -133,13 +157,21 @@ export async function renderAgents(container) {
     return;
   }
 
-  const agents = isDemoDataAllowed()
-    ? resolveListItems(agentsRes, DEMO_AGENTS)
-    : (agentsRes.items || []);
   const companies = isDemoDataAllowed()
     ? resolveListItems(companiesRes, () => (state.companies?.length ? state.companies : DEMO_COMPANIES))
     : (companiesRes.items || state.companies || []);
+
+  const agents = enrichAgentsForDisplay(
+    isDemoDataAllowed() ? resolveListItems(agentsRes, DEMO_AGENTS) : (agentsRes.items || []),
+    { companyId: scopedCompanyId, companies }
+  );
+
   setState({ agents, companies });
+  notifyAgentsSidebar({
+    companyId: scopedCompanyId,
+    count: agents.length,
+    loadState: listLoadState,
+  });
 
   const companyId = scopedCompanyId || companies[0]?.id || null;
   let supervisor = null;
@@ -188,11 +220,24 @@ function employeeAvatar(agent) {
 }
 
 function whatsappBadge(agent) {
-  const connected = agent.whatsappConnected && agent.channels?.whatsapp !== false;
+  const connected = agent.whatsappConnected === true;
   if (connected) {
     return '<span class="status-badge active"><i class="fa-brands fa-whatsapp"></i> Connected</span>';
   }
+  if (isWhatsappChannelEnabled(agent)) {
+    return '<span class="status-badge pending"><i class="fa-brands fa-whatsapp"></i> Channel enabled</span>';
+  }
   return '<span class="status-badge inactive">Not connected</span>';
+}
+
+function defaultBadge(agent) {
+  if (!agent.isDefault) return '';
+  return '<span class="status-badge active" style="margin-left:8px"><i class="fa-solid fa-star"></i> Default</span>';
+}
+
+function formatConversations(agent) {
+  if (agent.conversations == null || agent.conversations === undefined) return '—';
+  return formatNumber(agent.conversations);
 }
 
 function actionMenu(agent) {
@@ -225,20 +270,27 @@ function actionMenu(agent) {
 }
 
 function renderRow(agent, companies) {
+  const personality = personalityLabel(agent.personality);
   return `
     <tr data-id="${escapeHtml(agent.id)}">
       <td>
         <div class="org-name">
           <div class="avatar employee-table-avatar">${employeeAvatar(agent)}</div>
-          <div class="company-name-text">${escapeHtml(agent.name)}</div>
+          <div>
+            <div class="company-name-text">${escapeHtml(agent.name)}${defaultBadge(agent)}</div>
+            ${agent.knowledgeBaseId ? `<div class="text-muted" style="font-size:12px">KB: ${escapeHtml(agent.knowledgeBaseId)}</div>` : ''}
+          </div>
         </div>
       </td>
       <td>${escapeHtml(companyName(agent.companyId, companies))}</td>
-      <td>${escapeHtml(roleLabel(agent))}</td>
-      <td><span class="model-tag">${escapeHtml(agent.model || 'gpt-4o-mini')}</span></td>
+      <td>
+        <div>${escapeHtml(roleLabel(agent))}</div>
+        ${personality ? `<div class="text-muted" style="font-size:12px">${escapeHtml(personality)}</div>` : ''}
+      </td>
+      <td><span class="model-tag">${escapeHtml(agent.model || '—')}</span></td>
       <td>${whatsappBadge(agent)}</td>
       <td>${statusBadge(agent.status === 'training' ? 'inactive' : agent.status)}</td>
-      <td>${formatNumber(agent.conversations || 0)}</td>
+      <td>${formatConversations(agent)}</td>
       <td class="col-actions">${actionMenu(agent)}</td>
     </tr>
   `;
@@ -594,6 +646,7 @@ function bindListEvents(container, agents, companies) {
   };
 
   container.querySelector('#openEmployeeWizard')?.addEventListener('click', () => {
+    if (!confirmPilotMutation('Create a new AI employee')) return;
     resetWizardForm(container, companies);
     container.querySelector('#employeeWizardTitle').textContent = 'Create AI Employee';
     container.querySelector('#employeeEditId').value = '';
@@ -602,6 +655,7 @@ function bindListEvents(container, agents, companies) {
   });
 
   container.querySelector('#openEmployeeWizardEmpty')?.addEventListener('click', () => {
+    if (!confirmPilotMutation('Create a new AI employee')) return;
     resetWizardForm(container, companies);
     container.querySelector('#employeeWizardTitle').textContent = 'Create AI Employee';
     container.querySelector('#employeeEditId').value = '';
@@ -883,6 +937,9 @@ async function saveEmployee(container, closeWizard, agents, companies) {
     return;
   }
 
+  const mutationLabel = id ? 'Update this AI employee' : 'Create a new AI employee';
+  if (!confirmPilotMutation(mutationLabel)) return;
+
   const existing = id ? agents.find((a) => a.id === id) : null;
   if (existing?.conversations) payload.conversations = existing.conversations;
 
@@ -1043,6 +1100,7 @@ function bindDelegatedActions(container, { openWizard, agents, companies }) {
     if (dupBtn) {
       e.stopPropagation();
       container.querySelectorAll('.action-menu.open').forEach((m) => m.classList.remove('open'));
+      if (!confirmPilotMutation('Duplicate this AI employee')) return;
       const result = await duplicateAgent(dupBtn.dataset.id);
       if (result.error) { showToast(result.error, 'error'); return; }
       showToast('AI employee duplicated', 'success');
@@ -1076,6 +1134,7 @@ function bindDelegatedActions(container, { openWizard, agents, companies }) {
       e.stopPropagation();
       container.querySelectorAll('.action-menu.open').forEach((m) => m.classList.remove('open'));
       if (!confirm('Delete this AI employee? This cannot be undone.')) return;
+      if (!confirmPilotMutation('Delete this AI employee')) return;
       const result = await deleteAgent(deleteBtn.dataset.id);
       if (result.error) { showToast(result.error, 'error'); return; }
       showToast('AI employee deleted', 'success');
