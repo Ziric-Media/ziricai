@@ -5,6 +5,7 @@ import {
   updateDocument,
 } from './firestore-base.js';
 import { DEMO_AGENTS } from '../demo-data.js';
+import { isDemoDataAllowed, shouldUseDemoForEmptyOrError } from './dataMode.js';
 import {
   fetchAiEmployeesFromApi,
   createAiEmployeeFromApi,
@@ -41,7 +42,7 @@ function saveDemoStore(items) {
 }
 
 function shouldUseDemo(result) {
-  return Boolean(result?.error) || !result?.items?.length;
+  return shouldUseDemoForEmptyOrError(result);
 }
 
 function normalizePayload(data, existing = null) {
@@ -101,21 +102,37 @@ function normalizePayload(data, existing = null) {
 }
 
 export async function listAgents(companyId) {
+  if (!isDemoDataAllowed() && !companyId) {
+    return { items: [], source: 'api', loadState: 'scope_required' };
+  }
+
   if (companyId) {
-    const apiResult = await fetchAiEmployeesFromApi(companyId);
-    if (apiResult.data?.items?.length) {
-      return { items: apiResult.data.items, isDemo: false };
+    const api = await fetchAiEmployeesFromApi(companyId);
+    if (!isDemoDataAllowed()) {
+      if (api.error) {
+        return { items: [], source: 'api', error: api.error, loadState: 'error' };
+      }
+      const items = api.data?.items || [];
+      return {
+        items,
+        source: 'api',
+        loadState: items.length ? 'ok' : 'empty',
+      };
+    }
+    if (!api.error && api.data?.items?.length) {
+      return { items: api.data.items, source: 'api', loadState: 'ok', isDemo: false };
     }
   }
 
   const options = { orderByField: 'updatedAt' };
   if (companyId) options.companyId = companyId;
   const result = await listDocuments(COLLECTION, options);
-  if (!shouldUseDemo(result)) return result;
-  // TEMP: demo fallback when Firestore empty/unavailable
+  if (!shouldUseDemo(result)) {
+    return { items: result.items || [], isDemo: false, error: result.error, loadState: result.error ? 'error' : 'empty' };
+  }
   let items = loadDemoStore();
   if (companyId) items = items.filter((a) => a.companyId === companyId);
-  return { items, isDemo: true };
+  return { items, isDemo: true, source: 'demo', loadState: 'demo' };
 }
 
 export async function createAgent(data) {
@@ -130,8 +147,8 @@ export async function createAgent(data) {
 
   const result = await createDocument(COLLECTION, payload);
   if (!result.error) return result;
+  if (!isDemoDataAllowed()) return result;
 
-  // TEMP: demo fallback when Firestore write fails
   const items = loadDemoStore();
   const id = `demo-agent-${Date.now()}`;
   const item = { id, ...payload, createdAt: new Date().toISOString() };
@@ -152,8 +169,8 @@ export async function updateAgent(id, data) {
 
   const result = await updateDocument(COLLECTION, id, payload);
   if (!result.error) return result;
+  if (!isDemoDataAllowed()) return result;
 
-  // TEMP: demo fallback
   const idx = items.findIndex((a) => a.id === id);
   if (idx === -1) return { error: 'Employee not found' };
   items[idx] = { ...items[idx], ...payload, updatedAt: new Date().toISOString() };
@@ -171,8 +188,8 @@ export async function deleteAgent(id) {
 
   const result = await removeDocument(COLLECTION, id);
   if (!result.error) return result;
+  if (!isDemoDataAllowed()) return result;
 
-  // TEMP: demo fallback
   const next = items.filter((a) => a.id !== id);
   if (next.length === items.length) return { error: 'Employee not found' };
   saveDemoStore(next);
@@ -180,24 +197,26 @@ export async function deleteAgent(id) {
 }
 
 export async function duplicateAgent(id) {
-  const items = loadDemoStore();
-  const source = items.find((a) => a.id === id);
-  if (!source) {
-    const { items: firestoreItems } = await listDocuments(COLLECTION, {});
-    const fromDb = firestoreItems.find((a) => a.id === id);
-    if (!fromDb) return { error: 'Employee not found' };
-    return createAgent({
-      ...fromDb,
-      name: `${fromDb.name} (Copy)`,
-      status: 'inactive',
-      conversations: 0,
-    });
+  if (isDemoDataAllowed()) {
+    const items = loadDemoStore();
+    const source = items.find((a) => a.id === id);
+    if (source) {
+      const { id: _id, createdAt, updatedAt, ...rest } = source;
+      return createAgent({
+        ...rest,
+        name: `${rest.name} (Copy)`,
+        status: 'inactive',
+        conversations: 0,
+      });
+    }
   }
 
-  const { id: _id, createdAt, updatedAt, ...rest } = source;
+  const { items: firestoreItems } = await listDocuments(COLLECTION, {});
+  const fromDb = firestoreItems.find((a) => a.id === id);
+  if (!fromDb) return { error: 'Employee not found' };
   return createAgent({
-    ...rest,
-    name: `${rest.name} (Copy)`,
+    ...fromDb,
+    name: `${fromDb.name} (Copy)`,
     status: 'inactive',
     conversations: 0,
   });

@@ -2,9 +2,12 @@ import { state, getSelectedCompany, setState } from '../state.js';
 import {
   pageHeader,
   loadingState,
+  emptyState,
+  errorState,
   showToast,
   escapeHtml,
 } from '../ui.js';
+import { isDemoDataAllowed } from '../services/dataMode.js';
 import { withTimeout } from '../utils.js';
 import {
   listKnowledge,
@@ -29,16 +32,61 @@ import {
 
 let activeSection = 'documents';
 
+function sourceBadgeLabel(source) {
+  if (source === 'demo') return 'Demo fallback';
+  return 'Live API';
+}
+
 export async function renderKnowledge(container) {
   container.innerHTML = loadingState('Loading AI Training Center...');
 
-  const companyId = state.selectedCompanyId || state.companies[0]?.id || 'demo-central-motors';
-  const company = getSelectedCompany() || state.companies.find((c) => c.id === companyId) || DEMO_COMPANIES[0];
+  const companyId = state.selectedCompanyId || (isDemoDataAllowed() ? (state.companies[0]?.id || 'demo-central-motors') : null);
+  const company = companyId
+    ? (getSelectedCompany() || state.companies.find((c) => c.id === companyId) || (isDemoDataAllowed() ? DEMO_COMPANIES[0] : null))
+    : null;
 
   const [knowledgeRes, historyRes] = await Promise.all([
     withTimeout(listKnowledge(companyId)),
     withTimeout(listTrainingHistory(companyId)),
   ]);
+
+  if (knowledgeRes.loadState === 'scope_required') {
+    container.innerHTML = `
+      ${pageHeader(
+        'Knowledge Base',
+        'AI Training Center — tenant-scoped knowledge for each company.',
+        '<span class="crm-source-badge">Live API</span>'
+      )}
+      ${emptyState(
+        'Select a company to view knowledge.',
+        '<button class="btn btn-primary" type="button" id="selectCompanyScopeKnowledge"><i class="fa-solid fa-building"></i> Select company</button>'
+      )}
+    `;
+    container.querySelector('#selectCompanyScopeKnowledge')?.addEventListener('click', () => {
+      const select = document.getElementById('companySelector');
+      select?.focus();
+      select?.click();
+    });
+    return;
+  }
+
+  if (knowledgeRes.loadState === 'error') {
+    container.innerHTML = `
+      ${pageHeader(
+        'Knowledge Base',
+        'AI Training Center — tenant-scoped knowledge for each company.',
+        '<span class="crm-source-badge">Live API</span>'
+      )}
+      ${errorState('Unable to load knowledge. Please check your connection and try again.')}
+      <div style="text-align:center;margin-top:-24px;padding-bottom:32px;">
+        <button class="btn btn-primary" type="button" id="retryKnowledge">
+          <i class="fa-solid fa-rotate-right"></i> Retry
+        </button>
+      </div>
+    `;
+    container.querySelector('#retryKnowledge')?.addEventListener('click', () => renderKnowledge(container));
+    return;
+  }
 
   const items = knowledgeRes.items || [];
   const history = historyRes.items || [];
@@ -55,18 +103,21 @@ export async function renderKnowledge(container) {
     stats,
     queue,
     isDemo: knowledgeRes.isDemo,
+    source: knowledgeRes.source || 'api',
+    loadState: knowledgeRes.loadState || 'ok',
   });
 
   bindEvents(container, { companyId, company, items });
   resumeActiveJobs(container, companyId, company);
 }
 
-function buildPageMarkup({ company, companyId, items, history, stats, queue, isDemo }) {
+function buildPageMarkup({ company, companyId, items, history, stats, queue, isDemo, source = 'api', loadState = 'ok' }) {
   return `
     ${pageHeader(
       'Knowledge Base',
       `AI Training Center — ${escapeHtml(company?.name || 'Company')} knowledge brain`,
       `<div class="kb-header-actions">
+        <span class="crm-source-badge">${escapeHtml(sourceBadgeLabel(source))}</span>
         <button class="btn btn-secondary btn-sm" type="button" id="kbUploadBtn"><i class="fa-solid fa-upload"></i> Upload Knowledge</button>
         <button class="btn btn-secondary btn-sm" type="button" id="kbCreateFaqBtn"><i class="fa-solid fa-plus"></i> Create FAQ</button>
         <button class="btn btn-secondary btn-sm" type="button" id="kbImportWebBtn"><i class="fa-solid fa-globe"></i> Import Website</button>
@@ -74,6 +125,7 @@ function buildPageMarkup({ company, companyId, items, history, stats, queue, isD
       </div>`
     )}
     ${isDemo ? `<div class="demo-banner"><i class="fa-solid fa-flask"></i> Showing demo data — Firestore unavailable or empty. Changes persist locally.</div>` : ''}
+    ${loadState === 'empty' && !items.length ? `<div class="demo-banner" style="background:var(--surface-2);color:var(--text-muted)"><i class="fa-solid fa-database"></i> No knowledge documents yet for this company — upload or create content to train Sarah.</div>` : ''}
 
     ${renderKbStats(stats)}
 

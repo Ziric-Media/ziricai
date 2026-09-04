@@ -16,6 +16,7 @@ import { listCompanies } from '../services/companies.js';
 import { navigateTo } from '../router.js';
 import { withTimeout } from '../utils.js';
 import { DEMO_COMPANIES } from '../demo-data.js';
+import { resolveListItems } from '../services/dataMode.js';
 
 let selectedCategory = null;
 
@@ -28,7 +29,7 @@ export async function renderMarketplace(container) {
     withTimeout(listCompanies()),
   ]);
 
-  const companies = companiesRes.items?.length ? companiesRes.items : DEMO_COMPANIES;
+  const companies = resolveListItems(companiesRes, DEMO_COMPANIES);
   const catalog = catalogRes.error ? null : catalogRes.data;
   const fallbackCatalog = buildFallbackCatalog();
 

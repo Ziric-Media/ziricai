@@ -21,6 +21,7 @@ import { listAnalytics } from '../services/dashboard.js';
 import { withTimeout } from '../utils.js';
 
 import { DEMO_ANALYTICS_ROWS, DEMO_ANALYTICS_SERIES } from '../demo-data.js';
+import { isDemoDataAllowed, resolveListItems, emptyChartSeries } from '../services/dataMode.js';
 
 
 
@@ -38,43 +39,32 @@ export async function renderAnalytics(container) {
 
   const result = await withTimeout(listAnalytics(companyId));
 
-  const rows = result.items?.length ? result.items : DEMO_ANALYTICS_ROWS;
+  const rows = resolveListItems(result, DEMO_ANALYTICS_ROWS);
+  const hasRealRows = Boolean(result.items?.length);
 
-  const series = rows.length >= 3
-
+  const series = hasRealRows && rows.length >= 3
     ? {
-
         labels: rows.slice(0, 7).reverse().map((r) => r.date?.slice(5) || '—'),
-
         messages: rows.slice(0, 7).reverse().map((r) => r.whatsappMessages || 0),
-
       }
+    : (isDemoDataAllowed()
+      ? { labels: DEMO_ANALYTICS_SERIES.labels, messages: DEMO_ANALYTICS_SERIES.whatsappMessages }
+      : { labels: emptyChartSeries().labels, messages: emptyChartSeries().messages });
 
-    : { labels: DEMO_ANALYTICS_SERIES.labels, messages: DEMO_ANALYTICS_SERIES.whatsappMessages };
-
-
-
-  const totalConversations = rows.reduce((s, r) => s + (r.conversations || 0), 0);
-
-  const totalTokens = rows.reduce((s, r) => s + (r.tokensUsed || 0), 0);
-
-  const avgResponse =
-
-    rows.length > 0
-
-      ? Math.round(rows.reduce((s, r) => s + (r.avgResponseTimeMs || 0), 0) / rows.length)
-
-      : 0;
-
-  const avgSatisfaction =
-
-    rows.length > 0
-
-      ? (rows.reduce((s, r) => s + (r.satisfaction || 4.5), 0) / rows.length).toFixed(1)
-
-      : '4.5';
-
-  const activeCompanies = rows[0]?.activeCompanies || state.companies.length || 3;
+  const totalConversations = hasRealRows ? rows.reduce((s, r) => s + (r.conversations || 0), 0) : null;
+  const totalTokens = hasRealRows ? rows.reduce((s, r) => s + (r.tokensUsed || 0), 0) : null;
+  const avgResponse = hasRealRows && rows.length > 0
+    ? Math.round(rows.reduce((s, r) => s + (r.avgResponseTimeMs || 0), 0) / rows.length)
+    : null;
+  const avgSatisfaction = hasRealRows && rows.length > 0
+    ? (rows.reduce((s, r) => s + (r.satisfaction || 0), 0) / rows.length).toFixed(1)
+    : null;
+  const activeCompanies = hasRealRows
+    ? (rows[0]?.activeCompanies ?? state.companies.length)
+    : (state.companies.length || null);
+  const avgMessages = hasRealRows && series.messages.length
+    ? Math.round(series.messages.reduce((a, b) => a + b, 0) / series.messages.length)
+    : null;
 
 
 
@@ -86,25 +76,25 @@ export async function renderAnalytics(container) {
 
       <div class="kpi-card">
 
-        <div class="header"><div><div class="label">Messages / Day (avg)</div><div class="value">${formatNumber(Math.round(series.messages.reduce((a, b) => a + b, 0) / series.messages.length))}</div>${trendHtml(9.8)}</div><div class="icon-wrapper blue"><i class="fa-brands fa-whatsapp"></i></div></div>
+        <div class="header"><div><div class="label">Messages / Day (avg)</div><div class="value">${avgMessages != null ? formatNumber(avgMessages) : '—'}</div>${hasRealRows ? trendHtml(9.8) : ''}</div><div class="icon-wrapper blue"><i class="fa-brands fa-whatsapp"></i></div></div>
 
       </div>
 
       <div class="kpi-card">
 
-        <div class="header"><div><div class="label">Active Companies</div><div class="value">${activeCompanies}</div>${trendHtml(8.2)}</div><div class="icon-wrapper purple"><i class="fa-solid fa-building"></i></div></div>
+        <div class="header"><div><div class="label">Active Companies</div><div class="value">${activeCompanies ?? '—'}</div>${hasRealRows ? trendHtml(8.2) : ''}</div><div class="icon-wrapper purple"><i class="fa-solid fa-building"></i></div></div>
 
       </div>
 
       <div class="kpi-card">
 
-        <div class="header"><div><div class="label">Customer Satisfaction</div><div class="value">${avgSatisfaction}<span style="font-size:16px;color:var(--text-muted);">/5</span></div>${trendHtml(2.1)}</div><div class="icon-wrapper green"><i class="fa-solid fa-star"></i></div></div>
+        <div class="header"><div><div class="label">Customer Satisfaction</div><div class="value">${avgSatisfaction != null ? `${avgSatisfaction}<span style="font-size:16px;color:var(--text-muted);">/5</span>` : '—'}</div>${hasRealRows ? trendHtml(2.1) : ''}</div><div class="icon-wrapper green"><i class="fa-solid fa-star"></i></div></div>
 
       </div>
 
       <div class="kpi-card">
 
-        <div class="header"><div><div class="label">AI Response Time</div><div class="value">${avgResponse ? `${avgResponse}ms` : '—'}</div>${trendHtml(-5.3)}</div><div class="icon-wrapper yellow"><i class="fa-solid fa-bolt"></i></div></div>
+        <div class="header"><div><div class="label">AI Response Time</div><div class="value">${avgResponse != null ? `${avgResponse}ms` : '—'}</div>${hasRealRows ? trendHtml(-5.3) : ''}</div><div class="icon-wrapper yellow"><i class="fa-solid fa-bolt"></i></div></div>
 
       </div>
 

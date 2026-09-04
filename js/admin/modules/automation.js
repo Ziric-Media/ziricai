@@ -19,6 +19,7 @@ import {
 import { listCompanies } from '../services/companies.js';
 import { withTimeout } from '../utils.js';
 import { DEMO_COMPANIES } from '../demo-data.js';
+import { resolveListItems } from '../services/dataMode.js';
 import { openBuilder } from './automation-builder.js';
 import { openTemplatesGallery } from './automation-templates.js';
 
@@ -37,7 +38,7 @@ async function loadHome(container) {
   ]);
 
   const workflows = wfResult.items || [];
-  const companies = coResult.items?.length ? coResult.items : DEMO_COMPANIES;
+  const companies = resolveListItems(coResult, DEMO_COMPANIES);
 
   container.innerHTML = buildHomeMarkup(workflows, wfResult.isDemo);
   bindHomeEvents(container, companies);

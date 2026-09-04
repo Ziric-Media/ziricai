@@ -6,6 +6,8 @@ import {
   trendHtml,
 } from '../ui.js';
 
+import { apiRequest } from '../../shared/apiRequest.js';
+
 const API = '/api/operations/command-center';
 
 export async function renderCommandCenter(container) {
@@ -13,9 +15,9 @@ export async function renderCommandCenter(container) {
 
   let data;
   try {
-    const res = await fetch(API);
-    data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    const result = await apiRequest(API, { silent: true });
+    if (result.error) throw new Error(result.error);
+    data = result.data;
   } catch (err) {
     container.innerHTML = loadingState(`Failed to load: ${err.message}`);
     return;

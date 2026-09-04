@@ -34,7 +34,7 @@ export function initAuthGuard({ onReady, onDenied }) {
 
     if (!profile) {
       showAccessDenied(
-        'No Super Admin profile found. Register at register-admin.html or contact platform support.'
+        'No Super Admin Firestore profile found for your account. Open superadmin-register.html with the same email/password to link your profile, then sign in again.'
       );
       return;
     }

@@ -9,6 +9,7 @@ import { listAgents } from './agents.js';
 import { withTimeout } from '../utils.js';
 
 import { demoDashboardStats, DEMO_ANALYTICS_SERIES } from '../demo-data.js';
+import { isDemoDataAllowed, emptyChartSeries } from './dataMode.js';
 
 
 
@@ -48,7 +49,9 @@ export async function listConversations(companyId) {
 
 function buildChartSeries(analytics) {
 
-  if (!analytics?.length) return DEMO_ANALYTICS_SERIES;
+  if (!analytics?.length) {
+    return isDemoDataAllowed() ? DEMO_ANALYTICS_SERIES : emptyChartSeries();
+  }
 
   const rows = [...analytics].slice(-7);
 
@@ -143,11 +146,27 @@ export async function getDashboardStats(companyId) {
 
 
   if (!hasLiveData || companiesRes.timedOut || agentsRes.timedOut) {
-
+    if (!isDemoDataAllowed()) {
+      return {
+        totalCompanies: companyId ? (companies.length ? 1 : 0) : companies.length,
+        activeAgents: activeAgents.length,
+        totalCustomers: customersRes.count || 0,
+        conversationsToday: conversations.length,
+        whatsappMessagesToday: 0,
+        openAiTokensToday: 0,
+        trends: {},
+        companies,
+        agents,
+        analytics,
+        conversations,
+        chartSeries: buildChartSeries(analytics),
+        isDemo: false,
+        errors,
+        empty: true,
+      };
+    }
     const demo = demoDashboardStats();
-
     return { ...demo, errors };
-
   }
 
 

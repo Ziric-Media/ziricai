@@ -5,6 +5,8 @@ import {
   updateDocument,
 } from './firestore-base.js';
 import { DEMO_KNOWLEDGE_ITEMS, DEMO_TRAINING_HISTORY } from '../demo-data.js';
+import { isDemoDataAllowed, shouldUseDemoForEmptyOrError } from './dataMode.js';
+import { listKnowledgeDocumentsFromApi } from '../api.js';
 
 const COLLECTION = 'knowledge';
 const DEMO_STORE_KEY = 'ziricai-demo-knowledge';
@@ -57,6 +59,7 @@ function saveDemoHistory(items) {
 }
 
 export function loadTrainingQueue() {
+  if (!isDemoDataAllowed()) return [];
   try {
     const stored = localStorage.getItem(DEMO_QUEUE_KEY);
     if (stored) return JSON.parse(stored);
@@ -71,7 +74,7 @@ export function saveTrainingQueue(jobs) {
 }
 
 function shouldUseDemo(result) {
-  return Boolean(result?.error) || !result?.items?.length;
+  return shouldUseDemoForEmptyOrError(result);
 }
 
 function newId(prefix = 'demo-kn') {
@@ -110,61 +113,91 @@ function normalizeItem(data, existing = null) {
 }
 
 export async function listKnowledge(companyId) {
+  if (!isDemoDataAllowed() && !companyId) {
+    return { items: [], source: 'api', loadState: 'scope_required' };
+  }
+
+  if (companyId) {
+    const api = await listKnowledgeDocumentsFromApi(companyId);
+    if (!isDemoDataAllowed()) {
+      if (api.error) {
+        return { items: [], source: 'api', error: api.error, loadState: 'error' };
+      }
+      const items = api.data?.items || [];
+      return {
+        items,
+        source: 'api',
+        loadState: items.length ? 'ok' : 'empty',
+      };
+    }
+    if (!api.error && api.data?.items?.length) {
+      return { items: api.data.items, source: 'api', loadState: 'ok', isDemo: false };
+    }
+  }
+
   const result = await listDocuments(COLLECTION, {
     companyId,
     orderByField: 'createdAt',
   });
   if (shouldUseDemo(result)) {
     const items = loadDemoStore().filter((item) => !companyId || item.companyId === companyId);
-    return { items, isDemo: true };
+    return { items, isDemo: true, source: 'demo', loadState: 'demo' };
   }
-  return { items: result.items, isDemo: false };
+  return {
+    items: result.items || [],
+    isDemo: false,
+    error: result.error,
+    loadState: result.error ? 'error' : 'empty',
+  };
 }
 
 export async function createKnowledge(data) {
   const payload = normalizeItem(data);
   const result = await createDocument(COLLECTION, payload);
-  if (result.error) {
-    const items = loadDemoStore();
-    const item = {
-      id: newId(),
-      ...payload,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    items.unshift(item);
-    saveDemoStore(items);
-    return { id: item.id, item, isDemo: true };
-  }
-  return result;
+  if (!result.error) return result;
+  if (!isDemoDataAllowed()) return result;
+
+  const items = loadDemoStore();
+  const item = {
+    id: newId(),
+    ...payload,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  items.unshift(item);
+  saveDemoStore(items);
+  return { id: item.id, item, isDemo: true };
 }
 
 export async function updateKnowledge(id, data) {
   const result = await updateDocument(COLLECTION, id, normalizeItem(data));
-  if (result.error) {
-    const items = loadDemoStore();
-    const idx = items.findIndex((i) => i.id === id);
-    if (idx === -1) return { error: 'Item not found' };
-    items[idx] = { ...items[idx], ...normalizeItem(data, items[idx]), updatedAt: new Date().toISOString() };
-    saveDemoStore(items);
-    return { success: true, item: items[idx], isDemo: true };
-  }
-  return result;
+  if (!result.error) return result;
+  if (!isDemoDataAllowed()) return result;
+
+  const items = loadDemoStore();
+  const idx = items.findIndex((i) => i.id === id);
+  if (idx === -1) return { error: 'Item not found' };
+  items[idx] = { ...items[idx], ...normalizeItem(data, items[idx]), updatedAt: new Date().toISOString() };
+  saveDemoStore(items);
+  return { success: true, item: items[idx], isDemo: true };
 }
 
 export async function deleteKnowledge(id) {
   const result = await removeDocument(COLLECTION, id);
-  if (result.error) {
-    const items = loadDemoStore().filter((i) => i.id !== id);
-    saveDemoStore(items);
-    return { success: true, isDemo: true };
-  }
-  return result;
+  if (!result.error) return result;
+  if (!isDemoDataAllowed()) return result;
+
+  const items = loadDemoStore().filter((i) => i.id !== id);
+  saveDemoStore(items);
+  return { success: true, isDemo: true };
 }
 
 export async function listTrainingHistory(companyId) {
+  if (!isDemoDataAllowed()) {
+    return { items: [], isDemo: false, source: 'api', loadState: 'empty' };
+  }
   const items = loadDemoHistory().filter((h) => !companyId || h.companyId === companyId);
-  return { items, isDemo: true };
+  return { items, isDemo: true, source: 'demo', loadState: items.length ? 'ok' : 'empty' };
 }
 
 export function computeKnowledgeStats(items) {
@@ -185,6 +218,19 @@ export function computeKnowledgeStats(items) {
 }
 
 export function createTrainingJob({ companyId, title, type }) {
+  if (!isDemoDataAllowed()) {
+    return {
+      id: newId('job'),
+      companyId,
+      title,
+      type,
+      status: 'completed',
+      currentStep: TRAINING_STEPS.length - 1,
+      steps: [...TRAINING_STEPS],
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+    };
+  }
   const job = {
     id: newId('job'),
     companyId,

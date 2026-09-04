@@ -40,11 +40,23 @@ export async function renderDashboard(container) {
     state.user?.email?.split('@')[0] ||
     'Super Admin';
 
-  const demoNote = ops.isDemo
-    ? '<span class="demo-badge"><i class="fa-solid fa-flask"></i> Sample data</span>'
-    : '';
+  const isLiveCrm =
+    ops.dataSource === 'crm' ||
+    (!ops.isDemo && (ops.tenantMetrics || ops.dataSources?.crm === 'tenant_crm_apis'));
 
-  const { metrics, trends } = ops;
+  const demoNote = ops.authRequired
+    ? '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-lock"></i> Sign in required for live CRM</span>'
+    : ops.authForbidden
+      ? '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-user-shield"></i> Super Admin authorization required</span>'
+      : ops.apiError
+        ? '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-triangle-exclamation"></i> Live CRM temporarily unavailable</span>'
+        : isLiveCrm
+          ? '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-database"></i> Live CRM · central-motors-rtb</span>'
+          : ops.isDemo
+            ? '<span class="demo-badge"><i class="fa-solid fa-flask"></i> Sample data</span>'
+            : '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-database"></i> Live CRM · central-motors-rtb</span>';
+
+  const { metrics, trends, metricAvailability = {}, tenantMetrics } = ops;
 
   container.innerHTML = `
     <div class="dashboard-header ops-header">
@@ -65,17 +77,19 @@ export async function renderDashboard(container) {
       </div>
     </div>
 
+    ${renderCentralMotorsPanel(tenantMetrics, metricAvailability, ops)}
+
     <div class="kpi-grid kpi-grid-ops">
-      ${kpiCard('AI Employees Online', formatNumber(metrics.aiEmployeesOnline), 'fa-robot', 'green', trends.aiEmployeesOnline)}
-      ${kpiCard('Active Conversations', formatNumber(metrics.activeConversations), 'fa-comments', 'purple', trends.activeConversations)}
-      ${kpiCard('Avg Response Time', `${metrics.avgResponseTimeSec} sec`, 'fa-bolt', 'yellow', trends.avgResponseTimeSec)}
-      ${kpiCard('Customer Satisfaction', `${metrics.customerSatisfaction}%`, 'fa-face-smile', 'green', trends.customerSatisfaction)}
-      ${kpiCard('Messages Today', formatCompact(metrics.messagesToday), 'fa-fire', 'orange', trends.messagesToday)}
-      ${kpiCard('OpenAI Tokens Used', formatCompact(metrics.openAiTokensUsed), 'fa-brain', 'yellow', trends.openAiTokensUsed)}
-      ${kpiCard('Est. Revenue Generated', formatCurrency(metrics.estimatedRevenue), 'fa-money-bill', 'green', trends.estimatedRevenue)}
-      ${kpiCard('Human Takeovers', formatNumber(metrics.humanTakeovers), 'fa-user-shield', 'red', trends.humanTakeovers)}
-      ${kpiCard('AI Success Rate', `${metrics.aiSuccessRate}%`, 'fa-chart-line', 'purple', trends.aiSuccessRate)}
-      ${kpiCard('Companies Online', formatNumber(metrics.companiesOnline), 'fa-building', 'blue', trends.companiesOnline)}
+      ${kpiCard('Active Conversations', formatMetric(metrics.activeConversations, metricAvailability.activeConversations), 'fa-comments', 'purple', trends.activeConversations)}
+      ${kpiCard('CRM Leads', formatMetric(metrics.crmLeads, metricAvailability.leads), 'fa-user-plus', 'blue', null)}
+      ${kpiCard('Qualified Leads', formatMetric(metrics.crmQualifiedLeads, metricAvailability.pipeline), 'fa-filter', 'purple', null)}
+      ${kpiCard('Test Drives Booked', formatMetric(metrics.crmTestDrivesBooked, metricAvailability.testDrivesBooked), 'fa-car', 'green', null)}
+      ${kpiCard('Finance Enquiries', formatMetric(metrics.crmFinanceEnquiries, metricAvailability.financeEnquiries), 'fa-coins', 'yellow', null)}
+      ${kpiCard('Deals Won', formatMetric(metrics.crmDealsWon, metricAvailability.pipeline), 'fa-trophy', 'green', null)}
+      ${kpiCard('Messages (CRM total)', formatMetric(metrics.messagesTotal, metricAvailability.messagesTotal), 'fa-fire', 'orange', null)}
+      ${kpiCard('Human Takeovers', formatMetric(metrics.humanTakeovers, metricAvailability.humanTakeovers), 'fa-user-shield', 'red', trends.humanTakeovers)}
+      ${kpiCard('AI Employees Online', formatMetric(metrics.aiEmployeesOnline, 'derived'), 'fa-robot', 'green', trends.aiEmployeesOnline)}
+      ${kpiCard('Est. Revenue', formatMetric(metrics.estimatedRevenue, metricAvailability.estimatedRevenue), 'fa-money-bill', 'green', trends.estimatedRevenue)}
     </div>
 
     <div class="ops-grid ops-row-1">
@@ -104,7 +118,7 @@ export async function renderDashboard(container) {
       <div class="panel-card">
         <div class="panel-header">
           <h3><i class="fa-solid fa-circle-question"></i> Trending Questions</h3>
-          <span class="ops-tag">Today</span>
+          <span class="ops-tag">Unavailable</span>
         </div>
         <div class="trending-list">
           ${renderTrendingQuestions(ops.trendingQuestions)}
@@ -137,7 +151,7 @@ export async function renderDashboard(container) {
         <div class="chart-card-header">
           <h3><i class="fa-solid fa-chart-bar"></i> Hourly Conversations (24h)</h3>
           <div class="chart-legend">
-            <span class="legend-item"><span class="dot purple"></span> Conversations</span>
+            <span class="legend-item"><span class="dot purple"></span> Unavailable</span>
           </div>
         </div>
         <div class="chart-canvas-wrap ops-chart-wrap"><canvas id="hourlyConversationsChart"></canvas></div>
@@ -176,7 +190,91 @@ function formatCurrency(value) {
   return `R${formatNumber(n)}`;
 }
 
-function kpiCard(label, value, icon, color, trend) {
+function formatMetric(value, availability, { currency = false } = {}) {
+  if (availability === 'unavailable' || availability === 'demo' || value == null) {
+    return '—';
+  }
+  if (currency) return formatCurrency(value);
+  if (typeof value === 'number' && value >= 10000) return formatCompact(value);
+  return formatNumber(value);
+}
+
+function renderCentralMotorsPanel(tenantMetrics, availability, ops = {}) {
+  if (ops.authRequired) {
+    return `
+      <div class="panel-card" style="margin-bottom:1rem">
+        <div class="panel-header">
+          <h3><i class="fa-solid fa-building"></i> Central Motors (central-motors-rtb)</h3>
+          <span class="ops-tag">Sign in required</span>
+        </div>
+        <p class="welcome-text ops-subtitle">Sign in with your Super Admin account to load live CRM metrics for central-motors-rtb.</p>
+      </div>`;
+  }
+
+  if (ops.authForbidden) {
+    return `
+      <div class="panel-card" style="margin-bottom:1rem">
+        <div class="panel-header">
+          <h3><i class="fa-solid fa-building"></i> Central Motors (central-motors-rtb)</h3>
+          <span class="ops-tag">Authorization required</span>
+        </div>
+        <p class="welcome-text ops-subtitle">Your account is signed in but does not have Super Admin access to Mission Control CRM data.</p>
+      </div>`;
+  }
+
+  if (ops.apiError) {
+    return `
+      <div class="panel-card" style="margin-bottom:1rem">
+        <div class="panel-header">
+          <h3><i class="fa-solid fa-building"></i> Central Motors (central-motors-rtb)</h3>
+          <span class="ops-tag">Temporarily unavailable</span>
+        </div>
+        <p class="welcome-text ops-subtitle">Live CRM is temporarily unavailable. Refresh in a moment or check platform API health.</p>
+      </div>`;
+  }
+
+  if (!tenantMetrics) {
+    return `
+      <div class="panel-card" style="margin-bottom:1rem">
+        <div class="panel-header">
+          <h3><i class="fa-solid fa-building"></i> Central Motors (central-motors-rtb)</h3>
+          <span class="ops-tag">No CRM data yet</span>
+        </div>
+        <p class="welcome-text ops-subtitle">Sarah → CRM metrics will appear here once WhatsApp sales activity is recorded for the production tenant.</p>
+      </div>`;
+  }
+
+  const c = tenantMetrics.counts || {};
+  const s = tenantMetrics.sarah || {};
+  const p = tenantMetrics.pipeline || {};
+
+  return `
+    <div class="panel-card" style="margin-bottom:1rem">
+      <div class="panel-header">
+        <h3><i class="fa-solid fa-building"></i> ${escapeHtml(tenantMetrics.companyName || 'Central Motors')}</h3>
+        <span class="ops-tag">${escapeHtml(tenantMetrics.companyId)} · Sarah 🟢</span>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem">
+        ${miniStat('Conversations', c.conversations, availability.conversations)}
+        ${miniStat('New Leads', c.newLeads, availability.leads)}
+        ${miniStat('Qualified', c.qualifiedLeads, availability.pipeline)}
+        ${miniStat('Test Drives', c.testDrivesBooked, availability.testDrivesBooked)}
+        ${miniStat('Finance', c.financeEnquiries, availability.financeEnquiries)}
+        ${miniStat('Deals Won', c.dealsWon, availability.pipeline)}
+      </div>
+      <p class="welcome-text ops-subtitle" style="margin-top:0.75rem">
+        Pipeline: new ${p.new || 0} · contacted ${p.contacted || 0} · qualified ${p.qualified || 0} · proposal ${p.proposal || 0} · won ${p.won || 0}
+        ${s.conversionPct != null ? ` · Sarah conversion ${s.conversionPct}%` : ''}
+      </p>
+    </div>`;
+}
+
+function miniStat(label, value, availability) {
+  const display = formatMetric(value, availability);
+  return `<div class="kpi-card"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(String(display))}</div></div>`;
+}
+
+function kpiCard(label, value, icon, color, trend, currency = false) {
   return `
     <div class="kpi-card">
       <div class="header">
@@ -265,8 +363,8 @@ function renderAgentLeaderboard(agents) {
         <div class="rank-meta">${escapeHtml(a.company)} · ${formatNumber(a.messages)} msgs</div>
       </div>
       <div class="rank-stats">
-        <span class="rank-stat">${a.satisfaction}%<small>CSAT</small></span>
-        <span class="rank-stat">${a.conversion}%<small>Conv</small></span>
+        <span class="rank-stat">${a.satisfaction != null ? `${a.satisfaction}%` : '—'}<small>CSAT</small></span>
+        <span class="rank-stat">${a.conversion != null ? `${a.conversion}%` : '—'}<small>Conv</small></span>
       </div>
     </div>`
     )
@@ -356,7 +454,7 @@ function initHourlyChart(container, hourlyData) {
   const ctx = container.querySelector('#hourlyConversationsChart');
   if (!ctx) return;
 
-  const data = hourlyData || DEMO_HOURLY_FALLBACK;
+  const data = (hourlyData && hourlyData.some((v) => v != null)) ? hourlyData : Array.from({ length: 24 }, () => 0);
   const gridColor = 'rgba(148, 163, 184, 0.15)';
   const textColor = '#94a3b8';
 
@@ -398,7 +496,7 @@ function initHourlyChart(container, hourlyData) {
   });
 }
 
-const DEMO_HOURLY_FALLBACK = [12, 8, 5, 4, 6, 18, 42, 68, 94, 112, 128, 134, 118, 102, 96, 88, 76, 64, 52, 38, 28, 22, 18, 14];
+const DEMO_HOURLY_FALLBACK = Array.from({ length: 24 }, () => 0);
 
 function bindDashboardEvents(container) {
   container.querySelector('#refreshDashboard')?.addEventListener('click', () => renderDashboard(container));

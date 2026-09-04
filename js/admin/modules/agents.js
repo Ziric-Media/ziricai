@@ -4,10 +4,12 @@ import {
   pageHeader,
   emptyState,
   loadingState,
+  errorState,
   showToast,
   statusBadge,
   formatNumber,
 } from '../ui.js';
+import { isDemoDataAllowed, resolveListItems } from '../services/dataMode.js';
 import {
   listAgents,
   createAgent,
@@ -71,21 +73,75 @@ const AVATAR_PRESETS = ['🤖', '👩‍💼', '👨‍💼', '🧑‍💻', '�
 
 let filters = { search: '', company: '', role: '', status: '' };
 let wizardStep = 1;
+let listLoadState = 'ok';
+let listSource = 'api';
+let listError = null;
+
+function sourceBadgeLabel() {
+  if (listSource === 'demo') return 'Demo fallback';
+  return 'Live API';
+}
 
 export async function renderAgents(container) {
   container.innerHTML = loadingState('Loading AI employees...');
 
+  const scopedCompanyId = state.selectedCompanyId || null;
   const [agentsRes, companiesRes] = await Promise.all([
-    withTimeout(listAgents()),
+    withTimeout(listAgents(scopedCompanyId)),
     withTimeout(listCompanies()),
   ]);
 
-  let agents = agentsRes.items?.length ? agentsRes.items : DEMO_AGENTS;
-  if (!agents.length) agents = DEMO_AGENTS;
-  const companies = companiesRes.items?.length ? companiesRes.items : (state.companies?.length ? state.companies : DEMO_COMPANIES);
+  listLoadState = agentsRes.loadState || (agentsRes.isDemo ? 'demo' : agentsRes.items?.length ? 'ok' : 'empty');
+  listSource = agentsRes.source || (agentsRes.isDemo ? 'demo' : 'api');
+  listError = agentsRes.error || null;
+
+  if (listLoadState === 'scope_required') {
+    container.innerHTML = `
+      ${pageHeader(
+        'AI Employees',
+        'Create named AI team members — not chatbots, but dedicated digital employees for each company.',
+        '<span class="crm-source-badge">Live API</span>'
+      )}
+      ${emptyState(
+        'Select a company to view AI employees.',
+        '<button class="btn btn-primary" type="button" id="selectCompanyScopeAgents"><i class="fa-solid fa-building"></i> Select company</button>'
+      )}
+    `;
+    container.querySelector('#selectCompanyScopeAgents')?.addEventListener('click', () => {
+      const select = document.getElementById('companySelector');
+      select?.focus();
+      select?.click();
+    });
+    return;
+  }
+
+  if (listLoadState === 'error') {
+    container.innerHTML = `
+      ${pageHeader(
+        'AI Employees',
+        'Create named AI team members — not chatbots, but dedicated digital employees for each company.',
+        '<span class="crm-source-badge">Live API</span>'
+      )}
+      ${errorState('Unable to load AI employees. Please check your connection and try again.')}
+      <div style="text-align:center;margin-top:-24px;padding-bottom:32px;">
+        <button class="btn btn-primary" type="button" id="retryAgents">
+          <i class="fa-solid fa-rotate-right"></i> Retry
+        </button>
+      </div>
+    `;
+    container.querySelector('#retryAgents')?.addEventListener('click', () => renderAgents(container));
+    return;
+  }
+
+  const agents = isDemoDataAllowed()
+    ? resolveListItems(agentsRes, DEMO_AGENTS)
+    : (agentsRes.items || []);
+  const companies = isDemoDataAllowed()
+    ? resolveListItems(companiesRes, () => (state.companies?.length ? state.companies : DEMO_COMPANIES))
+    : (companiesRes.items || state.companies || []);
   setState({ agents, companies });
 
-  const companyId = state.selectedCompanyId || companies[0]?.id || null;
+  const companyId = scopedCompanyId || companies[0]?.id || null;
   let supervisor = null;
   if (companyId) {
     const supRes = await withTimeout(fetchSupervisorReviews(companyId, 5));
@@ -252,13 +308,17 @@ function buildListMarkup(agents, companies, isDemo, supervisor = null) {
     ? companies
     : [...new Map(agents.map((a) => [a.companyId, { id: a.companyId, name: companyName(a.companyId, companies) }])).values()];
 
+  const headerActions = `
+    <span class="crm-source-badge">${escapeHtml(sourceBadgeLabel())}</span>
+    <button class="btn btn-primary btn-sm" type="button" id="openEmployeeWizard">
+      <i class="fa-solid fa-plus"></i> Create AI Employee
+    </button>`;
+
   return `
     ${pageHeader(
       'AI Employees',
       'Create named AI team members — not chatbots, but dedicated digital employees for each company.',
-      `<button class="btn btn-primary btn-sm" type="button" id="openEmployeeWizard">
-        <i class="fa-solid fa-plus"></i> Create AI Employee
-      </button>`
+      headerActions
     )}
     ${isDemo ? `<div class="demo-banner"><i class="fa-solid fa-flask"></i> Showing demo data — Firestore unavailable or empty. Changes persist locally.</div>` : ''}
 
@@ -289,7 +349,12 @@ function buildListMarkup(agents, companies, isDemo, supervisor = null) {
     <div id="employeesContent">
       ${filtered.length
         ? renderTable(filtered, companies)
-        : emptyState('No AI employees match your filters.', '<button class="btn btn-primary btn-sm" type="button" id="clearEmployeeFilters">Clear filters</button>')}
+        : listLoadState === 'empty' && !filters.search && !filters.company && !filters.role && !filters.status
+          ? emptyState(
+              'No AI employees configured for this company yet.',
+              '<button class="btn btn-primary btn-sm" type="button" id="openEmployeeWizardEmpty"><i class="fa-solid fa-plus"></i> Create AI Employee</button>'
+            )
+          : emptyState('No AI employees match your filters.', '<button class="btn btn-primary btn-sm" type="button" id="clearEmployeeFilters">Clear filters</button>')}
     </div>
 
     ${buildWizardSlideOver(companies)}
@@ -529,6 +594,14 @@ function bindListEvents(container, agents, companies) {
   };
 
   container.querySelector('#openEmployeeWizard')?.addEventListener('click', () => {
+    resetWizardForm(container, companies);
+    container.querySelector('#employeeWizardTitle').textContent = 'Create AI Employee';
+    container.querySelector('#employeeEditId').value = '';
+    openWizard();
+    seedPreviewChat(container);
+  });
+
+  container.querySelector('#openEmployeeWizardEmpty')?.addEventListener('click', () => {
     resetWizardForm(container, companies);
     container.querySelector('#employeeWizardTitle').textContent = 'Create AI Employee';
     container.querySelector('#employeeEditId').value = '';

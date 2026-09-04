@@ -2,7 +2,7 @@
 
 
 
-import { auth } from '../firebase.js';
+import { auth, ensureAuthReadyForApi } from '../firebase.js';
 
 /** Resolve API origin: injected config, same-origin Netlify proxy, or production default. */
 const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
@@ -66,6 +66,8 @@ export function registerApiErrorToast(fn) {
 async function withAuthHeaders(options = {}) {
 
   const headers = { ...(options.headers || {}) };
+
+  await ensureAuthReadyForApi();
 
   const user = auth.currentUser;
 
