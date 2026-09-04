@@ -98,10 +98,18 @@ export async function getCustomer(phone, options = {}) {
     return (await store()).getCustomer(normalizePhone(phone));
 }
 
+export function isLegacyRootCustomerListAllowed(options = {}) {
+    if (options.companyId) return false;
+    return process.env.NODE_ENV !== "production";
+}
+
 export async function listCustomers(options = {}) {
     const { companyId } = options;
     if (companyId) {
         return listTenantCustomers(companyId, { limit: options.limit || 100 });
+    }
+    if (!isLegacyRootCustomerListAllowed(options)) {
+        return [];
     }
     const adapter = await store();
     if (adapter.listCustomers) {

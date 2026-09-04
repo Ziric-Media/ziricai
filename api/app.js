@@ -1260,8 +1260,15 @@ app.get("/api/conversations/:id/messages", requireTenantScope({ optional: true }
 app.get("/api/customers", requireTenantScope({ optional: true }), async (req, res) => {
     try {
         const companyId = req.query.companyId || null;
+        if (process.env.NODE_ENV === "production" && !companyId) {
+            return res.json({
+                items: [],
+                scopeRequired: true,
+                message: "companyId is required in production",
+            });
+        }
         const items = await listCustomers({ companyId, limit: 100 });
-        res.json({ items });
+        res.json({ items, scopeRequired: false });
     } catch (err) {
         console.error("[api/customers] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to list customers" });
