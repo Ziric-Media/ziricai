@@ -423,6 +423,52 @@ export async function cancelAppointmentRecord({ companyId, appointmentId, custom
     return { ok: true, duplicate: false, appointment: enriched, booking: enriched };
 }
 
+/**
+ * List appointments for a tenant (read-only aggregation for Mission Control).
+ * @param {string} companyId
+ * @param {{ limit?: number, statusFilter?: "all"|"upcoming"|"past" }} [options]
+ */
+export async function listAppointmentsForCompany(companyId, { limit = 500, statusFilter = "all" } = {}) {
+    await ensureSchema();
+    if (!companyId) return [];
+
+    const max = Math.min(Math.max(parseInt(String(limit || 500), 10) || 500, 1), 1000);
+    const pool = await getPostgresPool();
+
+    if (pool) {
+        const conditions = ["company_id = $1"];
+        const params = [companyId];
+        if (statusFilter === "upcoming") {
+            conditions.push(`status NOT IN ('cancelled')`);
+            conditions.push(`scheduled_at >= NOW()`);
+        } else if (statusFilter === "past") {
+            conditions.push(`(status = 'cancelled' OR scheduled_at < NOW())`);
+        }
+        params.push(max);
+        const result = await pool.query(
+            `SELECT * FROM ziricai_appointments
+             WHERE ${conditions.join(" AND ")}
+             ORDER BY scheduled_at DESC
+             LIMIT $2`,
+            params
+        );
+        const enriched = [];
+        for (const row of result.rows) {
+            enriched.push(await enrichAppointment(companyId, rowToAppointment(row)));
+        }
+        return enriched;
+    }
+
+    let rows = memoryAll.filter((a) => a.companyId === companyId);
+    rows = rows.filter((a) => matchesStatusFilter(a, statusFilter));
+    rows = sortAppointmentsDesc(rows).slice(0, max);
+    const enriched = [];
+    for (const row of rows) {
+        enriched.push(await enrichAppointment(companyId, row));
+    }
+    return enriched;
+}
+
 /** Test helper — reset in-memory store. */
 export function _resetMemoryAppointmentsForTests() {
     memoryByIdempotency.clear();
