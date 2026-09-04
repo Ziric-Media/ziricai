@@ -41,9 +41,12 @@ import { getQueueStats, initQueue } from "../services/queue/jobQueue.js";
 import { startMessageWorker } from "../services/queue/workers/messageWorker.js";
 import { isWhatsAppDevMode } from "../services/integrations/metaWhatsAppErrors.js";
 import { logRailwayEnvDiagnostics } from "../services/env/startupEnv.js";
+import { isFirebaseTokenVerificationReady } from "../services/auth/authService.js";
 import {
     getPlatformMetrics,
     getPlatformActivity,
+    getTenantMissionMetrics,
+    PRIMARY_MISSION_TENANT_ID,
 } from "../services/operations/platformOperations.js";
 import {
     listWorkflows,
@@ -76,6 +79,8 @@ import {
     archiveCompany,
     saveCompanyBranding,
     saveCompanyGeneralSettings,
+    listAllCompaniesFromStorage,
+    enrichCompanyIntegrationStatus,
 } from "../services/tenants/companyService.js";
 import {
     listDepartments,
@@ -186,6 +191,8 @@ async function healthHandler(req, res) {
             storage: adapter.name,
             storageConfigured: configured,
             firestoreAdmin: hasAdminCredentials(),
+            firebaseTokenVerify: isFirebaseTokenVerificationReady(),
+            firebaseDatabaseId: process.env.FIREBASE_DATABASE_ID || "default",
             storageFallback: getStorageFallbackReason() || null,
             firebaseProjectId: process.env.FIREBASE_PROJECT_ID || "ziricai",
             queue: await getQueueStats(),
@@ -341,7 +348,8 @@ app.post("/api/auth/logout", attachTenantContext(), async (req, res) => {
 /** AI Operations Center — aggregated platform metrics (superadmin or API key) */
 app.get("/api/operations/metrics", requirePlatformAccess(), async (req, res) => {
     try {
-        const data = await getPlatformMetrics();
+        const companyId = req.query.companyId || PRIMARY_MISSION_TENANT_ID;
+        const data = await getPlatformMetrics({ companyId });
         res.json(data);
     } catch (err) {
         console.error("[api/operations/metrics] error:", err.message);
@@ -349,10 +357,22 @@ app.get("/api/operations/metrics", requirePlatformAccess(), async (req, res) => 
     }
 });
 
+/** Read-only tenant CRM metrics for Mission Control (superadmin or API key) */
+app.get("/api/operations/tenant/:companyId/metrics", requirePlatformAccess(), async (req, res) => {
+    try {
+        const data = await getTenantMissionMetrics(req.params.companyId);
+        res.json(data);
+    } catch (err) {
+        console.error("[api/operations/tenant/metrics] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load tenant mission metrics" });
+    }
+});
+
 /** AI Operations Center — live activity feed (superadmin or API key) */
 app.get("/api/operations/activity", requirePlatformAccess(), async (req, res) => {
     try {
-        const data = await getPlatformActivity();
+        const companyId = req.query.companyId || PRIMARY_MISSION_TENANT_ID;
+        const data = await getPlatformActivity({ companyId });
         res.json(data);
     } catch (err) {
         console.error("[api/operations/activity] error:", err.message);
@@ -654,16 +674,26 @@ app.post("/api/onboarding/complete", authRateLimit("onboarding"), requireBodyFie
     }
 });
 
-/** Super Admin — server-side tenant registry (memory-backed for demo) */
-app.get("/api/platform/companies", async (req, res) => {
+/** Super Admin — tenant list from platform registry with Firestore fallback */
+app.get("/api/platform/companies", requirePlatformAccess(), async (req, res) => {
     try {
         const adapter = await getStorageAdapter();
-        const items = listPlatformCompanies();
+        let items = listPlatformCompanies();
+        let source = "platform-registry";
+
+        if (!items.length) {
+            items = await listAllCompaniesFromStorage();
+            source = items.length ? "firestore" : "empty";
+        }
+
+        items = await Promise.all(items.map(enrichCompanyIntegrationStatus));
+
         res.json({
             items,
             total: items.length,
-            isDemo: items.length === 0,
+            isDemo: false,
             storage: adapter.name,
+            source,
         });
     } catch (err) {
         console.error("[api/platform/companies] error:", err.message);
@@ -671,11 +701,14 @@ app.get("/api/platform/companies", async (req, res) => {
     }
 });
 
-app.get("/api/platform/companies/:companyId", async (req, res) => {
+app.get("/api/platform/companies/:companyId", requirePlatformAccess(), async (req, res) => {
     try {
-        const record = getPlatformCompany(req.params.companyId);
-        if (!record) return res.status(404).json({ error: "Company not found in platform registry" });
-        res.json({ company: record });
+        let record = getPlatformCompany(req.params.companyId);
+        if (!record) {
+            record = await getCompany(req.params.companyId);
+        }
+        if (!record) return res.status(404).json({ error: "Company not found" });
+        res.json({ company: await enrichCompanyIntegrationStatus(record) });
     } catch (err) {
         console.error("[api/platform/companies GET] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load platform company" });

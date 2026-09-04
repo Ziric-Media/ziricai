@@ -7,6 +7,7 @@ import {
 } from './firestore-base.js';
 import { fetchPlatformCompanies } from '../api.js';
 import { DEMO_COMPANIES, PLAN_AMOUNTS } from '../demo-data.js';
+import { isDemoDataAllowed, shouldUseDemoForEmptyOrError } from './dataMode.js';
 import { getPlan } from '../../shared/billingPlans.js';
 
 const COLLECTION = 'companies';
@@ -38,7 +39,7 @@ function saveDemoStore(items) {
 }
 
 function shouldUseDemo(result) {
-  return Boolean(result?.error) || !result?.items?.length;
+  return shouldUseDemoForEmptyOrError(result);
 }
 
 function normalizePayload(data, existing = null) {
@@ -89,35 +90,58 @@ export function maskApiKey(key) {
   return `${key.slice(0, 7)}••••••••${key.slice(-4)}`;
 }
 
+function normalizeCompanyItem(raw = {}) {
+  return {
+    ...raw,
+    id: raw.id || raw.companyId,
+    plan: raw.plan || raw.billing?.planId || 'trial',
+    status: raw.status || 'active',
+  };
+}
+
 export async function listCompanies() {
-  try {
-    const platform = await fetchPlatformCompanies();
-    if (platform?.items?.length) {
-      return {
-        items: platform.items.map((c) => ({
-          ...c,
-          plan: c.plan || c.billing?.planId || 'trial',
-          status: c.status || 'active',
-        })),
-        isDemo: false,
-        source: 'platform-registry',
-      };
+  const api = await fetchPlatformCompanies();
+
+  if (!isDemoDataAllowed()) {
+    if (api.error) {
+      return { items: [], source: 'api', error: api.error, loadState: 'error' };
     }
-  } catch {
-    /* fall through to Firestore / local demo */
+    const items = (api.data?.items || []).map(normalizeCompanyItem);
+    return {
+      items,
+      source: 'api',
+      loadState: items.length ? 'ok' : 'empty',
+    };
+  }
+
+  if (!api.error && api.data?.items?.length) {
+    return {
+      items: api.data.items.map(normalizeCompanyItem),
+      source: 'api',
+      loadState: 'ok',
+      isDemo: false,
+    };
   }
 
   const result = await listDocuments(COLLECTION, { orderByField: 'createdAt' });
-  if (!shouldUseDemo(result)) return result;
-  // TEMP: demo fallback when Firestore empty/unavailable
-  return { items: loadDemoStore(), isDemo: true };
+  if (!shouldUseDemo(result)) {
+    return {
+      items: (result.items || []).map(normalizeCompanyItem),
+      isDemo: false,
+      error: result.error,
+      loadState: result.error ? 'error' : 'empty',
+    };
+  }
+  return { items: loadDemoStore(), isDemo: true, source: 'demo', loadState: 'demo' };
 }
 
 export async function getCompany(id) {
   const result = await getDocument(COLLECTION, id);
   if (result.item) return result;
-  const item = loadDemoStore().find((c) => c.id === id);
-  if (item) return { item, isDemo: true };
+  if (isDemoDataAllowed()) {
+    const item = loadDemoStore().find((c) => c.id === id);
+    if (item) return { item, isDemo: true };
+  }
   return { error: 'Company not found' };
 }
 
@@ -127,8 +151,8 @@ export async function createCompany(data) {
 
   const result = await createDocument(COLLECTION, payload);
   if (!result.error) return result;
+  if (!isDemoDataAllowed()) return result;
 
-  // TEMP: demo fallback when Firestore write fails
   const items = loadDemoStore();
   const id = `demo-co-${Date.now()}`;
   const item = { id, ...payload, createdAt: new Date().toISOString() };
@@ -140,8 +164,8 @@ export async function createCompany(data) {
 export async function updateCompany(id, data) {
   const result = await updateDocument(COLLECTION, id, data);
   if (!result.error) return result;
+  if (!isDemoDataAllowed()) return result;
 
-  // TEMP: demo fallback when Firestore write fails
   const items = loadDemoStore();
   const index = items.findIndex((c) => c.id === id);
   if (index === -1) return { error: 'Company not found' };
@@ -155,8 +179,8 @@ export async function updateCompany(id, data) {
 export async function deleteCompany(id) {
   const result = await removeDocument(COLLECTION, id);
   if (!result.error) return result;
+  if (!isDemoDataAllowed()) return result;
 
-  // TEMP: demo fallback when Firestore write fails
   const items = loadDemoStore();
   const next = items.filter((c) => c.id !== id);
   if (next.length === items.length) return { error: 'Company not found' };

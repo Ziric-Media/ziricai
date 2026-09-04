@@ -4,6 +4,7 @@ import {
   pageHeader,
   emptyState,
   loadingState,
+  errorState,
   planBadge,
   statusBadge,
   showToast,
@@ -20,30 +21,66 @@ import { provisionCompanyWorkspace } from '../api.js';
 import { navigateTo } from '../router.js';
 import { withTimeout } from '../utils.js';
 import { DEMO_COMPANIES, DEMO_AGENTS, DEMO_KNOWLEDGE, PLAN_AMOUNTS } from '../demo-data.js';
+import { isDemoDataAllowed, resolveListItems } from '../services/dataMode.js';
 import { formatPrice } from '../../shared/billingPlans.js';
 
 let filters = { search: '', plan: '', status: '' };
 let deleteTargetId = null;
+let listLoadState = 'ok';
+let listSource = 'api';
+let listError = null;
 
 export async function renderCompanies(container) {
   container.innerHTML = loadingState('Loading companies...');
   const result = await withTimeout(listCompanies());
-  const items = result.items?.length ? result.items : DEMO_COMPANIES;
+
+  listLoadState = result.loadState || (result.isDemo ? 'demo' : result.items?.length ? 'ok' : 'empty');
+  listSource = result.source || (result.isDemo ? 'demo' : 'api');
+  listError = result.error || null;
+
+  if (listLoadState === 'error') {
+    container.innerHTML = `
+      ${pageHeader(
+        'Companies',
+        'Manage tenant workspaces — the root of your multi-tenant AI platform.',
+        '<span class="crm-source-badge">Live API</span>'
+      )}
+      ${errorState('Unable to load companies. Please check your connection and try again.')}
+      <div style="text-align:center;margin-top:-24px;padding-bottom:32px;">
+        <button class="btn btn-primary" type="button" id="retryCompanies">
+          <i class="fa-solid fa-rotate-right"></i> Retry
+        </button>
+      </div>
+    `;
+    container.querySelector('#retryCompanies')?.addEventListener('click', () => renderCompanies(container));
+    return;
+  }
+
+  const items = isDemoDataAllowed()
+    ? resolveListItems(result, DEMO_COMPANIES)
+    : (result.items || []);
   setState({ companies: items });
 
-  container.innerHTML = buildListMarkup(items, result.isDemo);
+  const sourceBadge = listSource === 'demo'
+    ? '<span class="crm-source-badge demo">Demo fallback</span>'
+    : '<span class="crm-source-badge">Live API</span>';
+
+  container.innerHTML = buildListMarkup(items, result.isDemo, sourceBadge, listLoadState);
   bindListEvents(container);
 }
 
-function buildListMarkup(companies, isDemo) {
+function buildListMarkup(companies, isDemo, sourceBadge = '', loadState = 'ok') {
   const filtered = applyFilters(companies);
+  const emptyMessage = loadState === 'empty'
+    ? 'No companies yet. Add your first tenant workspace to get started.'
+    : 'No companies match your filters.';
   return `
     ${pageHeader(
       'Companies',
       'Manage tenant workspaces — the root of your multi-tenant AI platform.',
       `<button class="btn btn-primary btn-sm" type="button" id="openCompanyForm">
         <i class="fa-solid fa-plus"></i> Add Company
-      </button>`
+      </button>${sourceBadge ? ` ${sourceBadge}` : ''}`
     )}
     ${isDemo ? `<div class="demo-banner"><i class="fa-solid fa-flask"></i> Showing demo data — Firestore unavailable or empty. Changes persist locally.</div>` : ''}
 
@@ -72,7 +109,9 @@ function buildListMarkup(companies, isDemo) {
     <div id="companiesContent">
       ${filtered.length
         ? renderTable(filtered)
-        : emptyState('No companies match your filters.', '<button class="btn btn-primary btn-sm" type="button" id="clearCompanyFilters">Clear filters</button>')}
+        : emptyState(emptyMessage, filters.search || filters.plan || filters.status
+          ? '<button class="btn btn-primary btn-sm" type="button" id="clearCompanyFilters">Clear filters</button>'
+          : '<button class="btn btn-primary btn-sm" type="button" id="openCompanyFormEmpty"><i class="fa-solid fa-plus"></i> Add Company</button>')}
     </div>
 
     ${buildFormSlideOver()}
@@ -104,13 +143,14 @@ function logoCell(company) {
 }
 
 function whatsappCell(company) {
-  if (!company.whatsappNumber) {
-    return '<span class="text-muted">Not connected</span>';
+  if (company.whatsappConnected) {
+    const label = company.whatsappNumber || 'Connected';
+    return `<span class="wa-cell"><i class="fa-solid fa-circle-check wa-connected" title="Connected"></i> ${escapeHtml(label)}</span>`;
   }
-  const connected = company.whatsappConnected
-    ? '<i class="fa-solid fa-circle-check wa-connected" title="Connected"></i>'
-    : '<i class="fa-solid fa-circle-xmark wa-disconnected" title="Not connected"></i>';
-  return `<span class="wa-cell">${connected} ${escapeHtml(company.whatsappNumber)}</span>`;
+  if (company.whatsappNumber) {
+    return `<span class="wa-cell"><i class="fa-solid fa-circle-xmark wa-disconnected" title="Not connected"></i> ${escapeHtml(company.whatsappNumber)}</span>`;
+  }
+  return '<span class="text-muted">Not connected</span>';
 }
 
 function actionMenu(company) {
@@ -378,6 +418,7 @@ function bindListEvents(container) {
   };
 
   container.querySelector('#openCompanyForm')?.addEventListener('click', () => openCompanyForm(container, null, openForm));
+  container.querySelector('#openCompanyFormEmpty')?.addEventListener('click', () => openCompanyForm(container, null, openForm));
   container.querySelector('#closeCompanyForm')?.addEventListener('click', closeForm);
   container.querySelector('#cancelCompanyForm')?.addEventListener('click', closeForm);
 

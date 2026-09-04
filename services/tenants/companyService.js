@@ -2,10 +2,14 @@
  * Company workspace service — tenant root document + settings subcollection.
  */
 import { ServiceBase } from "../core/serviceBase.js";
-import { TENANT_COLLECTIONS, COMPANY_STATUS } from "../database/schema.js";
+import { ROOT, TENANT_COLLECTIONS, COMPANY_STATUS } from "../database/schema.js";
 import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { companyRef, setDoc, getDoc, serverTimestamp } from "../database/firestoreClient.js";
+import { getAdminFirestore, isServerSide } from "../database/firestoreAdmin.js";
 import { portalUrlForCompany } from "../core/siteUrls.js";
+import { getWhatsAppIntegration } from "./integrationService.js";
+
+const ACTIVE_WHATSAPP_STATUSES = new Set(["active", "connected"]);
 
 class SettingsRepo extends ServiceBase {
     constructor() {
@@ -214,4 +218,38 @@ export function buildWorkspaceLinks(companyId, extras = {}) {
         conversations: `${base}#conversations`,
         ...extras,
     };
+}
+
+/** List tenant root documents from durable storage (Firestore when available). */
+export async function listAllCompaniesFromStorage() {
+    const adapter = await getStorageAdapter();
+
+    if (adapter.name === "firestore" && isServerSide()) {
+        const admin = getAdminFirestore();
+        if (admin) {
+            const snap = await admin.collection(ROOT.COMPANIES).get();
+            return snap.docs
+                .map((d) => normalizeCompanyRecord(d.id, d.data()))
+                .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        }
+    }
+
+    return [];
+}
+
+/** Merge live WhatsApp integration status for Mission Control company lists. */
+export async function enrichCompanyIntegrationStatus(company) {
+    if (!company?.id) return company;
+
+    try {
+        const wa = await getWhatsAppIntegration(company.id);
+        const waActive = Boolean(wa && ACTIVE_WHATSAPP_STATUSES.has(String(wa.status || "").toLowerCase()));
+        return {
+            ...company,
+            whatsappConnected: Boolean(company.whatsappConnected || waActive),
+            whatsappNumber: company.whatsappNumber || wa?.displayPhoneNumber || "",
+        };
+    } catch {
+        return company;
+    }
 }

@@ -5,6 +5,7 @@ import { initAuthGuard, bindLoginForm, bindLogout } from './auth-guard.js';
 import { listCompanies } from './services/companies.js';
 import { withTimeout } from './utils.js';
 import { DEMO_COMPANIES } from './demo-data.js';
+import { isDemoDataAllowed, resolveListItems } from './services/dataMode.js';
 
 export async function bootstrap() {
   if (location.protocol === 'file:') {
@@ -23,7 +24,7 @@ export async function bootstrap() {
 
     initAuthGuard({
       onReady: () => {
-        setState({ companies: DEMO_COMPANIES });
+        setState({ companies: isDemoDataAllowed() ? DEMO_COMPANIES : [] });
         // Render dashboard immediately — do not block on Firestore (can hang when billing/rules fail)
         navigateTo('dashboard');
         refreshCompanies().catch((err) => console.warn('Companies refresh:', err));
@@ -40,7 +41,9 @@ export async function bootstrap() {
 
 async function refreshCompanies() {
   const result = await withTimeout(listCompanies());
-  const items = result.items?.length ? result.items : DEMO_COMPANIES;
+  const items = isDemoDataAllowed()
+    ? resolveListItems(result, DEMO_COMPANIES)
+    : (result.items || []);
   setState({ companies: items });
   updateCompanySelector();
   const companyCount = document.getElementById('companyCount');
