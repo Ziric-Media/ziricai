@@ -42,7 +42,13 @@ const FIREBASE_IMPORTMAP_NODE = `"firebase/app": "./node_modules/firebase/app/di
         "idb": "./node_modules/idb/build/index.js",
         "re2js": "./node_modules/re2js/build/index.esm.js"`;
 
-const FIREBASE_IMPORTMAP_CDN = `"firebase/": "https://esm.sh/firebase@12.15.0/"`;
+/** Match package.json firebase version — gstatic shares one component registry across modules (esm.sh prefix does not). */
+const FIREBASE_CDN_VERSION = '12.15.0';
+const FIREBASE_GSTATIC = `https://www.gstatic.com/firebasejs/${FIREBASE_CDN_VERSION}`;
+const FIREBASE_IMPORTMAP_CDN = `"firebase/app": "${FIREBASE_GSTATIC}/firebase-app.js",
+        "firebase/auth": "${FIREBASE_GSTATIC}/firebase-auth.js",
+        "firebase/firestore": "${FIREBASE_GSTATIC}/firebase-firestore.js",
+        "firebase/storage": "${FIREBASE_GSTATIC}/firebase-storage.js"`;
 
 const useCdnFirebase = process.env.NETLIFY === 'true' || process.env.USE_CDN_FIREBASE === 'true';
 
@@ -56,6 +62,7 @@ function firebaseConfigFromEnv() {
     messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
     appId: process.env.FIREBASE_APP_ID || '',
     measurementId: process.env.FIREBASE_MEASUREMENT_ID || '',
+    databaseId: process.env.FIREBASE_DATABASE_ID || (projectId === 'ziricai' ? 'default' : '(default)'),
   };
 }
 
