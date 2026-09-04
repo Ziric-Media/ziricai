@@ -3,8 +3,8 @@
  * Config lives in firebase-config.js (env / __ZIRICAI_CONFIG__).
  */
 import { initializeApp } from 'firebase/app';
-import { getFirestore, enableNetwork } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { getFirestore, enableNetwork } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFirebaseConfig, getFirebaseDatabaseId } from './firebase-config.js';
 
@@ -12,13 +12,9 @@ const firebaseConfig = getFirebaseConfig();
 
 export const app = initializeApp(firebaseConfig);
 
-// Auth/storage first — eager Firestore before getAuth breaks importmap loads.
-export const auth = getAuth(app);
-export const storage = getStorage(app);
-
 let dbInstance = null;
 
-/** Lazy Firestore — avoids "Component auth/firestore has not been registered yet" on CDN/importmap loads. */
+/** Lazy Firestore — avoids "Component firestore has not been registered yet" on CDN/importmap loads. */
 export function getDb() {
   if (!dbInstance) {
     dbInstance = getFirestore(app, getFirebaseDatabaseId());
@@ -37,6 +33,9 @@ export const db = new Proxy(
     },
   }
 );
+
+export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 async function ensureNetworkOnline() {
   await enableNetwork(getDb());
