@@ -21,7 +21,7 @@ import {
 } from "firebase/firestore";
 import crypto from "crypto";
 import { db } from "../../js/firebase.js";
-import { getAdminFirestore, isServerSide, adminServerTimestamp } from "../database/firestoreAdmin.js";
+import { getAdminFirestore, isServerSide, adminServerTimestamp, hasAdminCredentials } from "../database/firestoreAdmin.js";
 import { LEGACY_COLLECTIONS } from "../database/schema.js";
 
 /** True when Firestore DB is missing, wrong project, or backend unreachable. */
@@ -95,6 +95,11 @@ export const firestoreAdapter = {
             if (admin) {
                 await admin.collection("_healthcheck").limit(1).get();
                 return true;
+            }
+            if (isServerSide() && hasAdminCredentials()) {
+                throw new Error(
+                    "Firebase Admin credentials are configured but Admin Firestore failed to initialize"
+                );
             }
             const q = query(collection(db, "_healthcheck"), limit(1));
             await getDocsFromServer(q);
