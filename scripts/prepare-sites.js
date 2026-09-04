@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { resolveWebFirebaseConfig } from '../js/firebase-config.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCES = path.join(ROOT, '_sources');
@@ -54,16 +55,16 @@ const useCdnFirebase = process.env.NETLIFY === 'true' || process.env.USE_CDN_FIR
 
 function firebaseConfigFromEnv() {
   const projectId = process.env.FIREBASE_PROJECT_ID || 'ziricai';
-  return {
-    apiKey: process.env.FIREBASE_API_KEY || '',
+  return resolveWebFirebaseConfig({
+    apiKey: process.env.FIREBASE_API_KEY,
     authDomain: process.env.FIREBASE_AUTH_DOMAIN || `${projectId}.firebaseapp.com`,
     projectId,
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`,
-    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
-    appId: process.env.FIREBASE_APP_ID || '',
-    measurementId: process.env.FIREBASE_MEASUREMENT_ID || '',
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.FIREBASE_APP_ID,
+    measurementId: process.env.FIREBASE_MEASUREMENT_ID,
     databaseId: process.env.FIREBASE_DATABASE_ID || (projectId === 'ziricai' ? 'default' : '(default)'),
-  };
+  });
 }
 
 /** Production API host (Railway). Override with PRODUCTION_API_URL env at build time. */
