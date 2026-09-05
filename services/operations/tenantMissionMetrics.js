@@ -7,6 +7,10 @@ import { CENTRAL_MOTORS_COMPANY_ID } from "../storage/seedDemoTenants.js";
 import { listTenantCustomers, listLeads } from "../tenants/crmService.js";
 import { listTenantConversations } from "../tenants/conversationService.js";
 import { listAppointmentsForCompany } from "../database/appointmentRepository.js";
+import {
+    countFinanceEnquiries,
+    extractFinanceContextSnapshot,
+} from "./financeAnalytics.js";
 
 export const PRIMARY_MISSION_TENANT_ID = CENTRAL_MOTORS_RTB_COMPANY_ID;
 
@@ -52,7 +56,7 @@ function buildMetricAvailability({ customers, leads, conversations, appointments
             ? "real"
             : "unavailable",
         testDriveRequests: leads.some((l) => sarahStage(l).includes("TEST_DRIVE")) ? "real" : "unavailable",
-        financeEnquiries: leads.some((l) => sarahStage(l).includes("FINANCE")) ? "real" : "unavailable",
+        financeEnquiries: hasCrm ? "real" : "unavailable",
         vehicleInterests: leads.some((l) => l.vehicleInterest) || customers.some((c) => c.interests?.vehicleInterest)
             ? "real"
             : "unavailable",
@@ -96,7 +100,7 @@ export async function getTenantMissionMetrics(companyId) {
 
     const testDriveBookedLeads = leads.filter((l) => sarahStage(l).includes("TEST_DRIVE_BOOKED"));
     const testDriveRequestLeads = leads.filter((l) => sarahStage(l).includes("TEST_DRIVE"));
-    const financeLeads = leads.filter((l) => sarahStage(l).includes("FINANCE"));
+    const financeEnquiries = countFinanceEnquiries(leads, customers);
     const vehicleInterestCount = new Set(
         [
             ...leads.filter((l) => l.vehicleInterest).map((l) => l.vehicleInterest),
@@ -145,7 +149,7 @@ export async function getTenantMissionMetrics(companyId) {
             qualifiedLeads: (pipeline.qualified || 0) + (pipeline.proposal || 0),
             testDrivesBooked: testDrivesBooked,
             testDriveRequests: testDriveRequestLeads.length,
-            financeEnquiries: financeLeads.length,
+            financeEnquiries,
             vehicleInterests: vehicleInterestCount,
             dealsWon,
         },
@@ -157,12 +161,13 @@ export async function getTenantMissionMetrics(companyId) {
             assignedCustomers: sarahCustomers.length,
             leadsGenerated: leads.length,
             testDrivesBooked: testDrivesBooked,
-            financeEnquiries: financeLeads.length,
+            financeEnquiries,
             sales: dealsWon,
             conversionPct,
             messagesHandled: messagesTotal,
         },
         metricAvailability,
+        financeContext: extractFinanceContextSnapshot(customers),
         leaderboards: {
             agents:
                 leads.length || customers.length

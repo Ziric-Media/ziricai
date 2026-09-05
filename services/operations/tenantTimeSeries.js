@@ -8,11 +8,17 @@ import { TENANT_COLLECTIONS } from "../database/schema.js";
 import { getPostgresPool } from "../database/postgresClient.js";
 import { listAppointmentsForCompany } from "../database/appointmentRepository.js";
 import { getTenantMissionMetrics } from "./tenantMissionMetrics.js";
+import { listLeads, listTenantCustomers } from "../tenants/crmService.js";
+import {
+    collectFinanceEnquiryRecords,
+    financeRecordActivityTimestamp,
+} from "./financeAnalytics.js";
 
 export const TIME_SERIES_NAMES = Object.freeze([
     "messages",
     "conversationsCreated",
     "testDrivesBooked",
+    "financeEnquiries",
 ]);
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -367,6 +373,53 @@ async function aggregateTestDrivesBooked(companyId, startDate, endDate) {
 }
 
 /**
+ * Finance enquiries per day — CRM records in FINANCE Sarah stage bucketed by last activity.
+ * @param {string} companyId
+ * @param {string} startDate
+ * @param {string} endDate
+ */
+async function aggregateFinanceEnquiries(companyId, startDate, endDate) {
+    const [leads, customers] = await Promise.all([
+        listLeads(companyId).catch(() => []),
+        listTenantCustomers(companyId, { limit: 1000 }).catch(() => []),
+    ]);
+
+    const records = collectFinanceEnquiryRecords(leads, customers);
+    const bucketMap = Object.fromEntries(
+        buildZeroFilledBuckets(startDate, endDate).map((row) => [row.date, 0])
+    );
+    let totalInRange = 0;
+    let invalidTimestampCount = 0;
+
+    for (const record of records) {
+        const day = utcDayFromTimestamp(financeRecordActivityTimestamp(record));
+        if (!day) {
+            invalidTimestampCount += 1;
+            continue;
+        }
+        if (!isDayInRange(day, startDate, endDate)) continue;
+        bucketMap[day] = (bucketMap[day] || 0) + 1;
+        totalInRange += 1;
+    }
+
+    return {
+        points: buildZeroFilledBuckets(startDate, endDate).map(({ date }) => ({
+            date,
+            value: bucketMap[date] || 0,
+        })),
+        meta: {
+            source: "crm:leads+customers.sarahLeadStage",
+            metric: "financeEnquiries",
+            totalInRange,
+            recordsInFinanceStage: records.length,
+            invalidTimestampCount,
+            complete: invalidTimestampCount === 0,
+            note: "Counts CRM records currently in FINANCE stage by last activity timestamp; not stage-transition history",
+        },
+    };
+}
+
+/**
  * Read-only tenant time-series aggregation.
  * @param {string} companyId
  * @param {{ startDate: string, endDate: string, series: string[] }} options
@@ -404,21 +457,35 @@ export async function getTenantAnalyticsTimeSeries(companyId, options) {
             const result = await aggregateTestDrivesBooked(companyId, startDate, endDate);
             response.series.testDrivesBooked = result.points;
             response.meta.testDrivesBooked = result.meta;
+            return;
+        }
+        if (name === "financeEnquiries") {
+            const result = await aggregateFinanceEnquiries(companyId, startDate, endDate);
+            response.series.financeEnquiries = result.points;
+            response.meta.financeEnquiries = result.meta;
         }
     });
 
     await Promise.all(tasks);
 
-    if (series.includes("messages")) {
+    if (series.includes("messages") || series.includes("financeEnquiries")) {
         try {
             const metrics = await getTenantMissionMetrics(companyId);
-            response.kpis = {
-                messagesTotal: {
+            response.kpis = response.kpis || {};
+            if (series.includes("messages")) {
+                response.kpis.messagesTotal = {
                     value: metrics.counts?.messagesTotal ?? null,
                     source: "crm:customer.totalMessages",
                     note: "CRM counter; not equivalent to message document count",
-                },
-            };
+                };
+            }
+            if (series.includes("financeEnquiries")) {
+                response.kpis.financeEnquiriesTotal = {
+                    value: metrics.counts?.financeEnquiries ?? null,
+                    source: "crm:leads+customers.sarahLeadStage",
+                    note: "CRM records in FINANCE Sarah stage; not income/budget signals alone",
+                };
+            }
         } catch {
             /* KPI reference is optional when CRM read fails */
         }

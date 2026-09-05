@@ -44,6 +44,7 @@ export function mapTenantMetricsToAnalyticsView(data) {
       won: pipeline.won ?? 0,
       lost: pipeline.lost ?? 0,
     },
+    financeContext: Array.isArray(data?.financeContext) ? data.financeContext : [],
     hasOperationalData:
       (counts.customers || 0) > 0 ||
       (counts.leads || 0) > 0 ||

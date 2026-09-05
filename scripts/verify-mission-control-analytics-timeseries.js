@@ -65,12 +65,32 @@ async function seedTimeSeriesFixture() {
 
     const messagesRepo = new TenantRepository(TENANT_COLLECTIONS.MESSAGES);
     const conversationsRepo = new TenantRepository(TENANT_COLLECTIONS.CONVERSATIONS);
+    const leadsRepo = new TenantRepository(TENANT_COLLECTIONS.LEADS);
     const customersRepo = new TenantRepository(TENANT_COLLECTIONS.CUSTOMERS);
 
     await customersRepo.set(RTB, "27849000523", {
         customerId: "27849000523",
         phone: "27849000523",
         totalMessages: 176,
+        salesContext: {
+            incomeDisplay: "R25,000/month",
+            budgetDisplay: "no limit",
+            leadStage: "TEST_DRIVE_REQUESTED",
+            updatedAt: "2026-09-04T13:58:54.420Z",
+        },
+    });
+
+    await leadsRepo.set(RTB, "27849000523", {
+        id: "27849000523",
+        phone: "27849000523",
+        stage: "proposal",
+        leadScore: 80,
+        sarahLeadStage: "FINANCE_INTEREST",
+        salesContext: {
+            leadStage: "FINANCE_INTEREST",
+            updatedAt: "2026-09-04T14:00:00.000Z",
+        },
+        createdAt: "2026-09-03T10:00:00.000Z",
     });
 
     for (let i = 0; i < 85; i += 1) {
@@ -152,6 +172,7 @@ function testStaticRouteAndAuth() {
     assert.match(appSource, /requirePlatformAccess\(\)/);
     assert.match(registry, /analytics\/timeseries/);
     assert.match(serviceSource, /messageDocuments/);
+    assert.match(serviceSource, /financeEnquiries/);
     assert.doesNotMatch(serviceSource, /getDailyAggregates|queueAggregateUpdate|ingestEvent|analyticsDaily\//);
     assert.doesNotMatch(serviceSource, /TENANT_COLLECTIONS\.ANALYTICS|LEGACY_COLLECTIONS\.ANALYTICS/);
     console.log("✓ Route registered with requirePlatformAccess and read-only service boundaries");
@@ -186,7 +207,12 @@ function testDateValidation() {
 
     const defaults = parseTimeSeriesQuery({});
     assert.equal(daySpanInclusive(defaults.startDate, defaults.endDate), 14);
-    assert.deepEqual(defaults.series, ["messages", "conversationsCreated", "testDrivesBooked"]);
+    assert.deepEqual(defaults.series, [
+        "messages",
+        "conversationsCreated",
+        "testDrivesBooked",
+        "financeEnquiries",
+    ]);
 
     const ninety = parseTimeSeriesQuery({ startDate: "2026-06-08", endDate: "2026-09-05" });
     assert.equal(daySpanInclusive(ninety.startDate, ninety.endDate), 90);
@@ -199,7 +225,7 @@ async function testAggregation() {
     const fullRange = await getTenantAnalyticsTimeSeries(RTB, {
         startDate: "2026-08-23",
         endDate: "2026-09-05",
-        series: ["messages", "conversationsCreated", "testDrivesBooked"],
+        series: ["messages", "conversationsCreated", "testDrivesBooked", "financeEnquiries"],
     });
 
     assert.equal(fullRange.companyId, RTB);
@@ -229,10 +255,17 @@ async function testAggregation() {
     assert.equal(fullRange.meta.testDrivesBooked.metric, "testDrivesBooked");
     assert.equal(fullRange.meta.testDrivesBooked.source, "postgres:ziricai_appointments.created_at");
 
+    const financeByDay = Object.fromEntries(fullRange.series.financeEnquiries.map((row) => [row.date, row.value]));
+    assert.equal(financeByDay["2026-09-04"], 1);
+    assert.equal(fullRange.meta.financeEnquiries.totalInRange, 1);
+    assert.equal(fullRange.meta.financeEnquiries.recordsInFinanceStage, 1);
+    assert.equal(fullRange.meta.financeEnquiries.metric, "financeEnquiries");
+    assert.equal(fullRange.kpis.financeEnquiriesTotal.value, 1);
+
     const defaults = await getTenantAnalyticsTimeSeries(RTB, parseTimeSeriesQuery({}));
     assert.ok(defaults.series.messages);
     assert.ok(defaults.series.conversationsCreated);
-    assert.ok(defaults.series.testDrivesBooked);
+    assert.ok(defaults.series.financeEnquiries);
 
     const messagesOnly = await getTenantAnalyticsTimeSeries(RTB, {
         startDate: "2026-09-03",
@@ -267,7 +300,7 @@ async function testNoWrites() {
     await getTenantAnalyticsTimeSeries(RTB, {
         startDate: "2026-09-03",
         endDate: "2026-09-04",
-        series: ["messages", "conversationsCreated", "testDrivesBooked"],
+        series: ["messages", "conversationsCreated", "testDrivesBooked", "financeEnquiries"],
     });
     const after = (await messagesRepo.list(RTB, { max: 500 })).length;
     assert.equal(before, after);

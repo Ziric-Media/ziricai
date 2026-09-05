@@ -181,6 +181,14 @@ function initTimeSeriesCharts(container, timeSeries) {
       color: 'rgba(34, 197, 94, ALPHA)',
       title: 'Test Drives Booked Per Day',
     },
+    {
+      id: 'analyticsFinanceChart',
+      points: timeSeries.series.financeEnquiries,
+      meta: timeSeries.meta?.financeEnquiries,
+      label: 'Finance enquiries',
+      color: 'rgba(234, 179, 8, ALPHA)',
+      title: 'Finance Enquiries Per Day',
+    },
   ];
 
   for (const spec of charts) {
@@ -246,6 +254,42 @@ export async function renderAnalytics(container) {
   const messagesMetaNote = formatSeriesMetaNote(ts?.meta?.messages);
   const conversationsMetaNote = formatSeriesMetaNote(ts?.meta?.conversationsCreated);
   const testDrivesMetaNote = formatSeriesMetaNote(ts?.meta?.testDrivesBooked);
+  const financeMetaNote = formatSeriesMetaNote(ts?.meta?.financeEnquiries);
+
+  const financeContextRows = Array.isArray(view?.financeContext) ? view.financeContext : [];
+  const financeContextSection =
+    financeContextRows.length > 0
+      ? `
+    <div class="table-container" style="margin-bottom:28px;">
+      <table class="org-table">
+        <thead>
+          <tr>
+            <th>Finance Context</th>
+            <th>Lead Stage</th>
+            <th>Income Signal</th>
+            <th>Budget Signal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${financeContextRows
+            .map(
+              (row) => `
+            <tr>
+              <td>${escapeHtml(row.name || row.customerId || 'Customer')}</td>
+              <td>${escapeHtml(row.leadStage || '—')}</td>
+              <td>${escapeHtml(row.incomeDisplay || '—')}</td>
+              <td>${escapeHtml(row.budgetDisplay || '—')}</td>
+            </tr>`
+            )
+            .join('')}
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:var(--text-muted);margin:8px 4px 0;">
+        Derived from customer salesContext — informational only; not counted as Finance Enquiries.
+      </p>
+    </div>
+  `
+      : '';
 
   const timeseriesSection = ts
     ? `
@@ -270,6 +314,12 @@ export async function renderAnalytics(container) {
       tag: 'Live API · UTC',
       note: testDrivesMetaNote || 'PostgreSQL bookings by created_at.',
     })}
+    ${chartCard({
+      id: 'analyticsFinanceChart',
+      title: 'Finance Enquiries Per Day',
+      tag: ts.meta?.financeEnquiries?.recordsInFinanceStage === 0 ? 'No FINANCE-stage leads yet' : 'Live API · UTC',
+      note: financeMetaNote || 'CRM records in FINANCE Sarah stage — not income/budget alone.',
+    })}
   `
     : `
     <div class="chart-card chart-card-line" style="margin-bottom:28px;">
@@ -292,16 +342,18 @@ export async function renderAnalytics(container) {
       ${kpiCard('CRM Leads', kpis.leads, 'fa-user-plus', 'blue')}
       ${kpiCard('Qualified Leads', kpis.qualifiedLeads, 'fa-filter', 'purple')}
       ${kpiCard('Test Drives', kpis.testDrives, 'fa-car', 'green')}
-      ${kpiCard('Finance Enquiries', kpis.financeEnquiries, 'fa-coins', 'yellow')}
+      ${kpiCard('Finance Enquiries', kpis.financeEnquiries, 'fa-coins', 'yellow', 'CRM FINANCE Sarah stage')}
       ${kpiCard('Deals Won', kpis.dealsWon, 'fa-trophy', 'green')}
       ${kpiCard('Messages', kpis.messages, 'fa-fire', 'orange', 'CRM counter (totalMessages)')}
       ${kpiCard('Human Takeovers', kpis.humanTakeovers, 'fa-user-shield', 'red')}
       ${kpiCard('AI Employees', kpis.aiEmployees, 'fa-robot', 'green')}
-      ${kpiCard('Est. Revenue', kpis.revenue, 'fa-money-bill', 'green')}
+      ${kpiCard('Est. Revenue', kpis.revenue, 'fa-money-bill', 'green', 'No authoritative revenue source')}
       ${kpiCard('Customer Satisfaction', kpis.customerSatisfaction, 'fa-star', 'green')}
       ${kpiCard('AI Response Time', kpis.responseTime, 'fa-bolt', 'yellow')}
       ${kpiCard('Token Usage', kpis.tokens, 'fa-microchip', 'blue')}
     </div>
+
+    ${financeContextSection}
 
     ${timeseriesSection}
 

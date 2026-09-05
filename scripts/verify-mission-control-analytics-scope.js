@@ -66,12 +66,21 @@ withMode('production', () => {
       pipeline: 'real',
       messagesTotal: 'real',
       testDrivesBooked: 'real',
-      financeEnquiries: 'unavailable',
+      financeEnquiries: 'real',
       customerSatisfaction: 'unavailable',
       avgResponseTimeSec: 'unavailable',
       estimatedRevenue: 'unavailable',
       openAiTokensUsed: 'unavailable',
     },
+    financeContext: [
+      {
+        customerId: '27849000523',
+        name: 'Spencer',
+        leadStage: 'TEST_DRIVE_REQUESTED',
+        incomeDisplay: 'R25,000/month',
+        budgetDisplay: 'no limit',
+      },
+    ],
   };
 
   const rtb = resolveAnalyticsLoadState(RTB, { data: rtbPayload });
@@ -80,6 +89,9 @@ withMode('production', () => {
   assert.equal(rtb.view.kpis.leads.value, 1);
   assert.equal(rtb.view.kpis.testDrives.value, 11);
   assert.equal(rtb.view.kpis.messages.value, 176);
+  assert.equal(rtb.view.kpis.financeEnquiries.value, 0);
+  assert.equal(formatAnalyticsMetric(rtb.view.kpis.financeEnquiries), 0);
+  assert.equal(rtb.view.financeContext.length, 1);
   assert.equal(formatAnalyticsMetric(rtb.view.kpis.revenue), '—');
   assert.equal(formatAnalyticsMetric(rtb.view.kpis.customerSatisfaction), '—');
   assert.equal(formatAnalyticsMetric(rtb.view.kpis.responseTime), '—');
@@ -118,7 +130,10 @@ assert.ok(!analyticsModule.includes('9.8'), 'Analytics module must not contain h
 assert.ok(analyticsModule.includes('loadTenantAnalytics'), 'Analytics module must use loadTenantAnalytics');
 assert.ok(analyticsModule.includes('loadTenantAnalyticsTimeSeries'), 'Analytics module must load time-series API');
 assert.ok(analyticsModule.includes('Message Documents Per Day'), 'Analytics must label message document chart distinctly');
-assert.ok(analyticsModule.includes('CRM counter (totalMessages)'), 'Messages KPI must identify CRM counter source');
+assert.ok(analyticsModule.includes('Finance Enquiries Per Day'), 'Analytics must include finance time-series chart');
+assert.ok(analyticsModule.includes('Finance Context'), 'Analytics must show derived finance context table');
+assert.ok(analyticsModule.includes('CRM FINANCE Sarah stage'), 'Finance KPI must identify CRM stage source');
+assert.ok(analyticsModule.includes('No authoritative revenue source'), 'Revenue KPI must stay unavailable honestly');
 assert.ok(!analyticsModule.includes('Coming in B-MC-4b'), 'Analytics must not show B-MC-4b placeholder');
 assert.ok(!analyticsModule.includes('DEMO_ANALYTICS'), 'Analytics module must not use demo analytics');
 assert.ok(analyticsModule.includes('Live API'), 'Analytics module must show Live API badge');

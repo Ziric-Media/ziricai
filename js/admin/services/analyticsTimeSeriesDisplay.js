@@ -31,6 +31,12 @@ export function formatSeriesMetaNote(meta) {
   if (meta.metric === 'messageDocuments') {
     parts.push('Message documents — not the CRM Messages KPI');
   }
+  if (meta.metric === 'financeEnquiries') {
+    parts.push('CRM records in FINANCE Sarah stage by last activity');
+  }
+  if (meta.note) {
+    parts.push(meta.note);
+  }
   if (meta.invalidTimestampCount > 0) {
     parts.push(`${meta.invalidTimestampCount} record(s) missing valid createdAt`);
   }
