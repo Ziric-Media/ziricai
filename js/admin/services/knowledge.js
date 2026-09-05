@@ -7,6 +7,26 @@ import {
 import { DEMO_KNOWLEDGE_ITEMS, DEMO_TRAINING_HISTORY } from '../demo-data.js';
 import { isDemoDataAllowed, shouldUseDemoForEmptyOrError } from './dataMode.js';
 import { listKnowledgeDocumentsFromApi } from '../api.js';
+import {
+  createKnowledgeDocumentFromApi,
+  updateKnowledgeDocumentFromApi,
+  deleteKnowledgeDocumentFromApi,
+  fetchAiEmployeesFromApi,
+} from '../api.js';
+import {
+  enrichKnowledgeForDisplay,
+  computeKnowledgeDisplayStats,
+  resolveAuthoritativeKnowledgeBaseId,
+} from './knowledgeDisplay.js';
+
+export {
+  enrichKnowledgeForDisplay,
+  resolveDefaultKnowledgeSection,
+  resolveKnowledgeBaseLabel,
+  resolveAuthoritativeKnowledgeBaseId,
+  computeKnowledgeDisplayStats,
+  PRIMARY_PILOT_KB_ID,
+} from './knowledgeDisplay.js';
 
 const COLLECTION = 'knowledge';
 const DEMO_STORE_KEY = 'ziricai-demo-knowledge';
@@ -81,6 +101,49 @@ function newId(prefix = 'demo-kn') {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function toTenantStatus(status) {
+  const normalized = String(status || 'active').toLowerCase();
+  if (['trained', 'active', 'completed'].includes(normalized)) return 'active';
+  return status || 'active';
+}
+
+function toTenantWritePayload(data, knowledgeBaseId) {
+  const payload = normalizeItem(data);
+  const content = payload.content || payload.answer || '';
+  return {
+    companyId: payload.companyId,
+    knowledgeBaseId,
+    type: payload.type,
+    title: payload.title,
+    content,
+    question: payload.question || (payload.type === 'faq' ? payload.title : ''),
+    answer: payload.answer || content,
+    url: payload.url || '',
+    fileName: payload.fileName || '',
+    status: toTenantStatus(payload.status),
+    uploadedBy: payload.uploadedBy || null,
+    source: 'mission-control',
+  };
+}
+
+/** Resolve tenant KB for writes — matches Sarah's authoritative KB when possible. */
+export async function resolveKnowledgeBaseIdForWrite(companyId, { company = null, agents = [], existingItems = [] } = {}) {
+  let kb = resolveAuthoritativeKnowledgeBaseId({ company, agents, existingItems });
+  if (kb) return kb;
+
+  if (!isDemoDataAllowed() && companyId) {
+    const res = await fetchAiEmployeesFromApi(companyId);
+    if (!res.error) {
+      const fetched = res.data?.items || res.data?.agents || [];
+      kb = resolveAuthoritativeKnowledgeBaseId({ company, agents: fetched, existingItems });
+      if (kb) return kb;
+    }
+    return null;
+  }
+
+  return company?.knowledgeBaseId || agents[0]?.knowledgeBaseId || `kb-${companyId}`;
+}
+
 function normalizeItem(data, existing = null) {
   return {
     companyId: data.companyId || existing?.companyId || '',
@@ -109,29 +172,45 @@ function normalizeItem(data, existing = null) {
     policyType: data.policyType ?? existing?.policyType ?? '',
     preview: data.preview ?? existing?.preview ?? '',
     pagesScraped: Number(data.pagesScraped ?? existing?.pagesScraped ?? 0),
+    knowledgeBaseId: data.knowledgeBaseId ?? existing?.knowledgeBaseId ?? null,
   };
 }
 
-export async function listKnowledge(companyId) {
+export async function listKnowledge(companyId, options = {}) {
   if (!isDemoDataAllowed() && !companyId) {
-    return { items: [], source: 'api', loadState: 'scope_required' };
+    return { items: [], source: 'api', loadState: 'scope_required', knowledgeBaseId: null };
   }
 
   if (companyId) {
-    const api = await listKnowledgeDocumentsFromApi(companyId);
+    const api = await listKnowledgeDocumentsFromApi(companyId, {
+      knowledgeBaseId: options.knowledgeBaseId || null,
+    });
     if (!isDemoDataAllowed()) {
       if (api.error) {
-        return { items: [], source: 'api', error: api.error, loadState: 'error' };
+        return {
+          items: [],
+          source: 'api',
+          error: api.error,
+          loadState: 'error',
+          knowledgeBaseId: options.knowledgeBaseId || null,
+        };
       }
-      const items = api.data?.items || [];
+      const items = enrichKnowledgeForDisplay(api.data?.items || []);
       return {
         items,
         source: 'api',
         loadState: items.length ? 'ok' : 'empty',
+        knowledgeBaseId: api.data?.knowledgeBaseId || options.knowledgeBaseId || null,
       };
     }
     if (!api.error && api.data?.items?.length) {
-      return { items: api.data.items, source: 'api', loadState: 'ok', isDemo: false };
+      return {
+        items: enrichKnowledgeForDisplay(api.data.items),
+        source: 'api',
+        loadState: 'ok',
+        isDemo: false,
+        knowledgeBaseId: api.data?.knowledgeBaseId || options.knowledgeBaseId || null,
+      };
     }
   }
 
@@ -151,16 +230,32 @@ export async function listKnowledge(companyId) {
   };
 }
 
-export async function createKnowledge(data) {
+export async function createKnowledge(data, options = {}) {
   const payload = normalizeItem(data);
+  const knowledgeBaseId = options.knowledgeBaseId || payload.knowledgeBaseId;
+
+  if (!isDemoDataAllowed()) {
+    if (!payload.companyId) return { error: 'companyId is required' };
+    if (!knowledgeBaseId) {
+      return { error: 'Knowledge base not configured for this tenant — select a company with an AI employee KB' };
+    }
+    const api = await createKnowledgeDocumentFromApi(
+      payload.companyId,
+      toTenantWritePayload(payload, knowledgeBaseId)
+    );
+    if (api.error) return api;
+    const item = api.data?.item || api.data;
+    return { id: item?.id, item, success: true };
+  }
+
   const result = await createDocument(COLLECTION, payload);
   if (!result.error) return result;
-  if (!isDemoDataAllowed()) return result;
 
   const items = loadDemoStore();
   const item = {
     id: newId(),
     ...payload,
+    knowledgeBaseId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -169,23 +264,48 @@ export async function createKnowledge(data) {
   return { id: item.id, item, isDemo: true };
 }
 
-export async function updateKnowledge(id, data) {
-  const result = await updateDocument(COLLECTION, id, normalizeItem(data));
+export async function updateKnowledge(id, data, options = {}) {
+  const payload = normalizeItem(data);
+  const knowledgeBaseId = options.knowledgeBaseId || payload.knowledgeBaseId;
+
+  if (!isDemoDataAllowed()) {
+    if (!payload.companyId) return { error: 'companyId is required' };
+    if (!knowledgeBaseId) {
+      return { error: 'Knowledge base not configured for this tenant' };
+    }
+    const api = await updateKnowledgeDocumentFromApi(
+      payload.companyId,
+      id,
+      toTenantWritePayload(payload, knowledgeBaseId)
+    );
+    if (api.error) return api;
+    const item = api.data?.item || api.data;
+    return { success: true, item };
+  }
+
+  const result = await updateDocument(COLLECTION, id, payload);
   if (!result.error) return result;
-  if (!isDemoDataAllowed()) return result;
 
   const items = loadDemoStore();
   const idx = items.findIndex((i) => i.id === id);
   if (idx === -1) return { error: 'Item not found' };
-  items[idx] = { ...items[idx], ...normalizeItem(data, items[idx]), updatedAt: new Date().toISOString() };
+  items[idx] = { ...items[idx], ...payload, updatedAt: new Date().toISOString() };
   saveDemoStore(items);
   return { success: true, item: items[idx], isDemo: true };
 }
 
-export async function deleteKnowledge(id) {
+export async function deleteKnowledge(id, options = {}) {
+  const { companyId } = options;
+
+  if (!isDemoDataAllowed()) {
+    if (!companyId) return { error: 'companyId is required' };
+    const api = await deleteKnowledgeDocumentFromApi(companyId, id);
+    if (api.error) return api;
+    return { success: true };
+  }
+
   const result = await removeDocument(COLLECTION, id);
   if (!result.error) return result;
-  if (!isDemoDataAllowed()) return result;
 
   const items = loadDemoStore().filter((i) => i.id !== id);
   saveDemoStore(items);
@@ -201,20 +321,7 @@ export async function listTrainingHistory(companyId) {
 }
 
 export function computeKnowledgeStats(items) {
-  const documents = items.filter((i) => i.type === 'document').length;
-  const faqs = items.filter((i) => i.type === 'faq').length;
-  const webPages = items.reduce((sum, i) => {
-    if (i.type === 'website') return sum + (i.pagesScraped || 0);
-    return sum;
-  }, 0);
-  const chunks = items.reduce((sum, i) => sum + (i.chunks || 0), 0);
-  const trainedDates = items
-    .map((i) => i.lastTrained)
-    .filter(Boolean)
-    .map((d) => new Date(d).getTime())
-    .filter((t) => !Number.isNaN(t));
-  const lastTrainingDate = trainedDates.length ? new Date(Math.max(...trainedDates)).toISOString() : null;
-  return { documents, faqs, webPages, chunks, lastTrainingDate };
+  return computeKnowledgeDisplayStats(items);
 }
 
 export function createTrainingJob({ companyId, title, type }) {

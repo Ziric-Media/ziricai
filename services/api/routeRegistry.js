@@ -26,8 +26,9 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/admin/config", domain: "platform", tenantScoped: false, description: "Admin config snapshot (masked secrets)" },
 
     // Operations (superadmin)
-    { method: "GET", path: "/api/operations/metrics", domain: "operations", tenantScoped: false, description: "Platform metrics" },
-    { method: "GET", path: "/api/operations/activity", domain: "operations", tenantScoped: false, description: "Platform activity feed" },
+    { method: "GET", path: "/api/operations/metrics", domain: "operations", tenantScoped: false, description: "Platform metrics (optional ?companyId= for tenant CRM aggregation)" },
+    { method: "GET", path: "/api/operations/tenant/:companyId/metrics", domain: "operations", tenantScoped: false, description: "Read-only tenant CRM metrics for Mission Control" },
+    { method: "GET", path: "/api/operations/activity", domain: "operations", tenantScoped: false, description: "Platform activity feed (optional ?companyId=)" },
     { method: "GET", path: "/api/operations/command-center", domain: "operations", tenantScoped: false, description: "Command center dashboard" },
 
     // Portal (tenant-scoped)
@@ -108,9 +109,14 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/conversations/:id/messages", domain: "conversations", tenantScoped: true, tenantOptional: true, description: "Conversation messages" },
 
     // Knowledge (legacy flat + memory adapter)
-    { method: "GET", path: "/api/knowledge", domain: "knowledge", tenantScoped: true, tenantOptional: true, description: "List knowledge docs" },
-    { method: "POST", path: "/api/knowledge", domain: "knowledge", tenantScoped: true, description: "Create knowledge doc" },
-    { method: "POST", path: "/api/knowledge/upload", domain: "knowledge", tenantScoped: true, description: "Upload knowledge file" },
+    { method: "GET", path: "/api/companies/:companyId/knowledge/documents", domain: "knowledge", tenantScoped: true, description: "List tenant knowledge documents" },
+    { method: "POST", path: "/api/companies/:companyId/knowledge/documents", domain: "knowledge", tenantScoped: true, description: "Create tenant knowledge document" },
+    { method: "PATCH", path: "/api/companies/:companyId/knowledge/documents/:docId", domain: "knowledge", tenantScoped: true, description: "Update tenant knowledge document" },
+    { method: "DELETE", path: "/api/companies/:companyId/knowledge/documents/:docId", domain: "knowledge", tenantScoped: true, description: "Delete tenant knowledge document" },
+    { method: "POST", path: "/api/companies/:companyId/knowledge/upload", domain: "knowledge", tenantScoped: true, description: "Upload tenant knowledge file" },
+    { method: "GET", path: "/api/knowledge", domain: "knowledge", tenantScoped: true, tenantOptional: true, description: "List knowledge docs (legacy alias)" },
+    { method: "POST", path: "/api/knowledge", domain: "knowledge", tenantScoped: true, description: "Create knowledge doc (legacy alias)" },
+    { method: "POST", path: "/api/knowledge/upload", domain: "knowledge", tenantScoped: true, description: "Upload knowledge file (legacy alias)" },
 
     // Sarah AI
     { method: "POST", path: "/api/sarah/chat", domain: "sarah", tenantScoped: true, tenantOptional: true, description: "Sarah chat" },

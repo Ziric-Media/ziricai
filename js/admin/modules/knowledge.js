@@ -2,7 +2,6 @@ import { state, getSelectedCompany, setState } from '../state.js';
 import {
   pageHeader,
   loadingState,
-  emptyState,
   errorState,
   showToast,
   escapeHtml,
@@ -19,6 +18,10 @@ import {
   createTrainingJob,
   advanceTrainingJob,
   loadTrainingQueue,
+  resolveDefaultKnowledgeSection,
+  resolveKnowledgeBaseLabel,
+  resolveKnowledgeBaseIdForWrite,
+  resolveAuthoritativeKnowledgeBaseId,
 } from '../services/knowledge.js';
 import { uploadKnowledgeFile, addKnowledgeEntry } from '../api.js';
 import { DEMO_COMPANIES } from '../demo-data.js';
@@ -31,6 +34,25 @@ import {
 } from './knowledge-ui.js';
 
 let activeSection = 'documents';
+let lastKnowledgeCompanyId = null;
+
+function notifyKnowledgeSidebar({ companyId, count, loadState }) {
+  document.dispatchEvent(
+    new CustomEvent('ziric:knowledge-updated', {
+      detail: { companyId, count, loadState },
+    })
+  );
+}
+
+function resolveScopedKnowledgeBaseId(companyId, company, existingItems = []) {
+  const agents = (state.agents || []).filter((a) => a.companyId === companyId);
+  return resolveAuthoritativeKnowledgeBaseId({ company, agents, existingItems });
+}
+
+async function resolveWriteKnowledgeBaseId(companyId, company, existingItems = []) {
+  const agents = (state.agents || []).filter((a) => a.companyId === companyId);
+  return resolveKnowledgeBaseIdForWrite(companyId, { company, agents, existingItems });
+}
 
 function sourceBadgeLabel(source) {
   if (source === 'demo') return 'Demo fallback';
@@ -45,22 +67,37 @@ export async function renderKnowledge(container) {
     ? (getSelectedCompany() || state.companies.find((c) => c.id === companyId) || (isDemoDataAllowed() ? DEMO_COMPANIES[0] : null))
     : null;
 
+  const knowledgeBaseId = resolveScopedKnowledgeBaseId(companyId, company);
+
   const [knowledgeRes, historyRes] = await Promise.all([
-    withTimeout(listKnowledge(companyId)),
+    withTimeout(listKnowledge(companyId, { knowledgeBaseId })),
     withTimeout(listTrainingHistory(companyId)),
   ]);
 
   if (knowledgeRes.loadState === 'scope_required') {
+    notifyKnowledgeSidebar({ companyId: null, count: null, loadState: 'scope_required' });
+    const companyHints = (state.companies || [])
+      .slice(0, 5)
+      .map((c) => escapeHtml(c.name))
+      .join(', ');
     container.innerHTML = `
       ${pageHeader(
         'Knowledge Base',
         'AI Training Center — tenant-scoped knowledge for each company.',
         '<span class="crm-source-badge">Live API</span>'
       )}
-      ${emptyState(
-        'Select a company to view knowledge.',
-        '<button class="btn btn-primary" type="button" id="selectCompanyScopeKnowledge"><i class="fa-solid fa-building"></i> Select company</button>'
-      )}
+      <div class="profile-card" style="text-align:center;padding:48px 24px;">
+        <div style="font-size:40px;margin-bottom:12px;">🏢</div>
+        <div style="font-weight:600;margin-bottom:8px;">Company scope required</div>
+        <div style="color:var(--text-muted);font-size:14px;margin-bottom:16px;max-width:520px;margin-left:auto;margin-right:auto;">
+          Knowledge loads per tenant — not across all companies at once.
+          Use the <strong>Scope</strong> dropdown in the top bar and choose a company
+          ${companyHints ? `(e.g. ${companyHints})` : ''} to view its knowledge base.
+        </div>
+        <button class="btn btn-primary" type="button" id="selectCompanyScopeKnowledge">
+          <i class="fa-solid fa-building"></i> Open Scope selector
+        </button>
+      </div>
     `;
     container.querySelector('#selectCompanyScopeKnowledge')?.addEventListener('click', () => {
       const select = document.getElementById('companySelector');
@@ -71,6 +108,7 @@ export async function renderKnowledge(container) {
   }
 
   if (knowledgeRes.loadState === 'error') {
+    notifyKnowledgeSidebar({ companyId, count: null, loadState: 'error' });
     container.innerHTML = `
       ${pageHeader(
         'Knowledge Base',
@@ -92,8 +130,26 @@ export async function renderKnowledge(container) {
   const history = historyRes.items || [];
   const stats = computeKnowledgeStats(items);
   const queue = loadTrainingQueue().filter((j) => j.companyId === companyId);
+  const kbLabel = resolveKnowledgeBaseLabel({
+    items,
+    company,
+    apiKnowledgeBaseId: knowledgeRes.knowledgeBaseId,
+  });
+
+  if (companyId !== lastKnowledgeCompanyId) {
+    activeSection = resolveDefaultKnowledgeSection(items);
+    lastKnowledgeCompanyId = companyId;
+  }
+
+  notifyKnowledgeSidebar({
+    companyId,
+    count: items.length,
+    loadState: knowledgeRes.loadState || (items.length ? 'ok' : 'empty'),
+  });
 
   setState({ knowledge: items });
+
+  const writeKnowledgeBaseId = await resolveWriteKnowledgeBaseId(companyId, company, items);
 
   container.innerHTML = buildPageMarkup({
     company,
@@ -102,22 +158,28 @@ export async function renderKnowledge(container) {
     history,
     stats,
     queue,
+    kbLabel,
+    writeKnowledgeBaseId,
     isDemo: knowledgeRes.isDemo,
     source: knowledgeRes.source || 'api',
     loadState: knowledgeRes.loadState || 'ok',
   });
 
-  bindEvents(container, { companyId, company, items });
+  bindEvents(container, { companyId, company, items, writeKnowledgeBaseId });
   resumeActiveJobs(container, companyId, company);
 }
 
-function buildPageMarkup({ company, companyId, items, history, stats, queue, isDemo, source = 'api', loadState = 'ok' }) {
+function buildPageMarkup({ company, companyId, items, history, stats, queue, kbLabel, isDemo, source = 'api', loadState = 'ok' }) {
+  const kbBadge = kbLabel
+    ? `<span class="crm-source-badge" title="Knowledge base used by this tenant's AI employees">KB: ${escapeHtml(kbLabel)}</span>`
+    : '';
   return `
     ${pageHeader(
       'Knowledge Base',
       `AI Training Center — ${escapeHtml(company?.name || 'Company')} knowledge brain`,
       `<div class="kb-header-actions">
         <span class="crm-source-badge">${escapeHtml(sourceBadgeLabel(source))}</span>
+        ${kbBadge}
         <button class="btn btn-secondary btn-sm" type="button" id="kbUploadBtn"><i class="fa-solid fa-upload"></i> Upload Knowledge</button>
         <button class="btn btn-secondary btn-sm" type="button" id="kbCreateFaqBtn"><i class="fa-solid fa-plus"></i> Create FAQ</button>
         <button class="btn btn-secondary btn-sm" type="button" id="kbImportWebBtn"><i class="fa-solid fa-globe"></i> Import Website</button>
@@ -291,7 +353,14 @@ function buildModals(companyId, company) {
   `;
 }
 
-function bindEvents(container, { companyId, company, items }) {
+function bindEvents(container, { companyId, company, items, writeKnowledgeBaseId }) {
+  const writeOptions = () => ({ knowledgeBaseId: writeKnowledgeBaseId });
+
+  const requireWriteKb = () => {
+    if (writeKnowledgeBaseId) return true;
+    showToast('Knowledge base not configured for this tenant', 'error');
+    return false;
+  };
   const backdrop = document.getElementById('overlay');
   const openModal = (id) => {
     container.querySelector(`#${id}`)?.classList.add('open');
@@ -350,6 +419,7 @@ function bindEvents(container, { companyId, company, items }) {
   });
 
   container.querySelector('#kbUploadSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const title = container.querySelector('#kbUploadTitle').value.trim();
     const file = uploadFile?.files[0];
     if (!title || !file) {
@@ -362,30 +432,24 @@ function bindEvents(container, { companyId, company, items }) {
     const job = createTrainingJob({ companyId, title: file.name, type: 'document' });
     refreshQueuePanel(container, companyId);
 
-    let result = await uploadKnowledgeFile({ companyId, title, type: typeMap[ext] || 'document', file });
-    if (result.error) {
-      result = await createKnowledge({
-        companyId,
-        type: 'document',
-        title,
-        fileName: file.name,
-        pages: Math.floor(Math.random() * 40) + 5,
-        status: 'training',
-        uploadedBy: state.profile?.displayName || state.user?.email || 'Admin',
-        chunks: Math.floor(Math.random() * 100) + 20,
-        lastTrained: new Date().toISOString(),
-      });
-    }
+    const result = await uploadKnowledgeFile({
+      companyId,
+      knowledgeBaseId: writeKnowledgeBaseId,
+      title,
+      type: typeMap[ext] || 'document',
+      file,
+    });
     if (result.error) {
       showToast(result.error, 'error');
       return;
     }
     showToast(`"${file.name}" uploaded — training started`, 'success');
-    animateJob(container, job.id, companyId, company);
+    animateJob(container, job.id, companyId, company, () => renderKnowledge(container));
   });
 
   /* FAQ */
   container.querySelector('#kbFaqSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const editId = container.querySelector('#kbFaqEditId').value;
     const question = container.querySelector('#kbFaqQuestion').value.trim();
     const answer = container.querySelector('#kbFaqAnswer').value.trim();
@@ -399,14 +463,13 @@ function bindEvents(container, { companyId, company, items }) {
       title: question.slice(0, 60),
       question,
       answer,
-      status: 'trained',
+      content: answer,
+      status: 'active',
       uploadedBy: state.profile?.displayName || 'Admin',
-      lastTrained: new Date().toISOString(),
-      chunks: 2,
     };
     const result = editId
-      ? await updateKnowledge(editId, payload)
-      : await createKnowledge(payload);
+      ? await updateKnowledge(editId, payload, writeOptions())
+      : await createKnowledge(payload, writeOptions());
     if (result.error) {
       showToast(result.error, 'error');
       return;
@@ -425,6 +488,7 @@ function bindEvents(container, { companyId, company, items }) {
   });
 
   container.querySelector('#kbManualSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const title = container.querySelector('#kbManualTitle').value.trim();
     const contentEl = container.querySelector('#kbManualContent');
     const content = contentEl?.innerText?.trim() || '';
@@ -437,11 +501,9 @@ function bindEvents(container, { companyId, company, items }) {
       type: 'manual',
       title,
       content,
-      status: 'trained',
+      status: 'active',
       uploadedBy: state.profile?.displayName || 'Admin',
-      lastTrained: new Date().toISOString(),
-      chunks: Math.ceil(content.length / 200),
-    });
+    }, writeOptions());
     if (result.error) {
       showToast(result.error, 'error');
       return;
@@ -455,6 +517,7 @@ function bindEvents(container, { companyId, company, items }) {
 
   /* Website import */
   container.querySelector('#kbImportWebsiteBtn')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const url = container.querySelector('#kbWebsiteUrl')?.value.trim();
     if (!url) {
       showToast('Enter a website URL', 'warning');
@@ -470,19 +533,16 @@ function bindEvents(container, { companyId, company, items }) {
     const job = createTrainingJob({ companyId, title: hostname, type: 'website' });
     refreshQueuePanel(container, companyId);
 
-    let result = await addKnowledgeEntry({ companyId, title: hostname, type: 'website', url });
+    const result = await addKnowledgeEntry({
+      companyId,
+      knowledgeBaseId: writeKnowledgeBaseId,
+      title: hostname,
+      type: 'website',
+      url,
+    });
     if (result.error) {
-      result = await createKnowledge({
-        companyId,
-        type: 'website',
-        title: hostname,
-        url,
-        pagesScraped: Math.floor(Math.random() * 30) + 10,
-        status: 'training',
-        uploadedBy: state.profile?.displayName || 'Admin',
-        lastTrained: new Date().toISOString(),
-        chunks: Math.floor(Math.random() * 80) + 20,
-      });
+      showToast(result.error, 'error');
+      return;
     }
     showToast(`Importing ${hostname} — scraping pages…`, 'success');
     animateJob(container, job.id, companyId, company, () => {
@@ -499,7 +559,7 @@ function bindEvents(container, { companyId, company, items }) {
     const deleteBtn = e.target.closest('.kb-delete');
     if (deleteBtn) {
       if (!confirm('Delete this knowledge item?')) return;
-      const result = await deleteKnowledge(deleteBtn.dataset.id);
+      const result = await deleteKnowledge(deleteBtn.dataset.id, { companyId });
       if (result.error) showToast(result.error, 'error');
       else {
         showToast('Deleted', 'success');
@@ -566,6 +626,7 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
   });
 
   container.querySelector('#kbProductSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const editId = container.querySelector('#kbProductEditId').value;
     const name = container.querySelector('#kbProductName').value.trim();
     if (!name) { showToast('Product name is required', 'warning'); return; }
@@ -579,12 +640,12 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
       imageUrl: container.querySelector('#kbProductImage').value.trim(),
       features: container.querySelector('#kbProductFeatures').value.trim(),
       warranty: container.querySelector('#kbProductWarranty').value.trim(),
-      status: 'trained',
+      status: 'active',
       uploadedBy: state.profile?.displayName || 'Admin',
-      lastTrained: new Date().toISOString(),
-      chunks: 4,
     };
-    const result = editId ? await updateKnowledge(editId, payload) : await createKnowledge(payload);
+    const result = editId
+      ? await updateKnowledge(editId, payload, writeOptions())
+      : await createKnowledge(payload, writeOptions());
     if (result.error) { showToast(result.error, 'error'); return; }
     closeModal('kbProductModal');
     showToast(editId ? 'Product updated' : 'Product added', 'success');
@@ -592,6 +653,7 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
   });
 
   container.querySelector('#kbServiceSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const editId = container.querySelector('#kbServiceEditId').value;
     const name = container.querySelector('#kbServiceName').value.trim();
     if (!name) { showToast('Service name is required', 'warning'); return; }
@@ -604,12 +666,12 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
       price: container.querySelector('#kbServicePrice').value.trim(),
       waitingTime: container.querySelector('#kbServiceWait').value.trim(),
       requirements: container.querySelector('#kbServiceReq').value.trim(),
-      status: 'trained',
+      status: 'active',
       uploadedBy: state.profile?.displayName || 'Admin',
-      lastTrained: new Date().toISOString(),
-      chunks: 3,
     };
-    const result = editId ? await updateKnowledge(editId, payload) : await createKnowledge(payload);
+    const result = editId
+      ? await updateKnowledge(editId, payload, writeOptions())
+      : await createKnowledge(payload, writeOptions());
     if (result.error) { showToast(result.error, 'error'); return; }
     closeModal('kbServiceModal');
     showToast(editId ? 'Service updated' : 'Service added', 'success');
@@ -617,6 +679,7 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
   });
 
   container.querySelector('#kbPolicySubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const editId = container.querySelector('#kbPolicyEditId').value;
     const title = container.querySelector('#kbPolicyTitle').value.trim();
     const content = container.querySelector('#kbPolicyContent').value.trim();
@@ -627,12 +690,10 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
       title,
       content,
       preview: content.slice(0, 120),
-      status: 'trained',
+      status: 'active',
       uploadedBy: state.profile?.displayName || 'Admin',
-      lastTrained: new Date().toISOString(),
-      chunks: 3,
     };
-    const result = await updateKnowledge(editId, payload);
+    const result = await updateKnowledge(editId, payload, writeOptions());
     if (result.error) { showToast(result.error, 'error'); return; }
     closeModal('kbPolicyModal');
     showToast('Policy updated', 'success');
@@ -685,8 +746,9 @@ async function switchSection(container, section, companyId, company) {
   const header = container.querySelector('.kb-section-header h2');
   if (header) header.innerHTML = `<i class="fa-solid fa-brain"></i> ${sectionTitle(section)}`;
 
+  const knowledgeBaseId = resolveScopedKnowledgeBaseId(companyId, company);
   const [knowledgeRes, historyRes] = await Promise.all([
-    listKnowledge(companyId),
+    listKnowledge(companyId, { knowledgeBaseId }),
     listTrainingHistory(companyId),
   ]);
   const content = container.querySelector('#kbSectionContent');

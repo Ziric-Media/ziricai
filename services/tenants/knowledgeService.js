@@ -27,6 +27,41 @@ const docService = new DocumentService();
 
 export { parseUploadedFile };
 
+/**
+ * Resolve authoritative KB for writes — same source as Sarah (default AI employee).
+ * Never falls back to kb-{companyId} in production Firestore mode.
+ */
+export async function resolveWriteKnowledgeBaseId(companyId, provided = null) {
+    if (provided) return provided;
+
+    const { getDefaultAiEmployee } = await import("./aiEmployeeService.js");
+    const agent = await getDefaultAiEmployee(companyId);
+    if (agent?.knowledgeBaseId) return agent.knowledgeBaseId;
+
+    throw new Error(
+        "knowledgeBaseId is required — configure a default AI employee knowledge base for this tenant"
+    );
+}
+
+function buildDocumentPayload(params, companyId, knowledgeBaseId) {
+    const content = params.content ?? params.answer ?? "";
+    return {
+        companyId,
+        knowledgeBaseId,
+        title: params.title,
+        type: params.type,
+        content,
+        url: params.url || "",
+        fileName: params.fileName || "",
+        status: params.status || "active",
+        agentId: params.agentId || null,
+        source: params.source || "mission-control",
+        question: params.question || (params.type === "faq" ? params.title : "") || "",
+        answer: params.answer || content,
+        uploadedBy: params.uploadedBy || null,
+    };
+}
+
 export async function ensureKnowledgeBase(companyId, kbId = null) {
     const id = kbId || `kb-${companyId}`;
     const existing = await kbService.get(companyId, id);
@@ -47,21 +82,58 @@ export async function saveKnowledgeDocument(params) {
     const { companyId } = params;
     if (!companyId) throw new Error("companyId is required");
 
-    const knowledgeBaseId = params.knowledgeBaseId || `kb-${companyId}`;
-    await ensureKnowledgeBase(companyId, knowledgeBaseId);
+    const adapter = await getStorageAdapter();
+    const knowledgeBaseId = await resolveWriteKnowledgeBaseId(companyId, params.knowledgeBaseId);
+    const docPayload = buildDocumentPayload(params, companyId, knowledgeBaseId);
 
-    const saved = await legacySave({ ...params, knowledgeBaseId });
-
-    if (saved?.id) {
-        await docService.upsert(companyId, saved.id, {
-            ...saved,
-            knowledgeBaseId,
-            agentId: params.agentId || null,
-            source: params.source || "upload",
-        });
+    if (adapter.name === "memory") {
+        await ensureKnowledgeBase(companyId, knowledgeBaseId);
+        const saved = await legacySave({ ...params, knowledgeBaseId, content: docPayload.content });
+        if (saved?.id) {
+            await docService.upsert(companyId, saved.id, {
+                ...docPayload,
+                id: saved.id,
+            });
+        }
+        return { ...saved, knowledgeBaseId };
     }
 
-    return { ...saved, knowledgeBaseId };
+    let record;
+    if (params.id) {
+        record = await docService.upsert(companyId, params.id, docPayload);
+    } else {
+        record = await docService.create(companyId, docPayload, null);
+    }
+    return { id: record.id, ...record, knowledgeBaseId };
+}
+
+export async function updateKnowledgeDocument(companyId, docId, patch) {
+    if (!companyId) throw new Error("companyId is required");
+    if (!docId) throw new Error("docId is required");
+
+    const existing = await docService.get(companyId, docId);
+    if (!existing) {
+        throw Object.assign(new Error("Knowledge document not found"), { status: 404 });
+    }
+
+    const merged = { ...existing, ...patch, companyId };
+    const knowledgeBaseId = merged.knowledgeBaseId;
+    if (!knowledgeBaseId) {
+        throw new Error("knowledgeBaseId is required");
+    }
+
+    const content = merged.content ?? merged.answer ?? "";
+    const normalized = {
+        ...merged,
+        knowledgeBaseId,
+        content,
+        question: merged.question || (merged.type === "faq" ? merged.title : merged.question) || "",
+        answer: merged.answer || content,
+    };
+    delete normalized.id;
+
+    const record = await docService.update(companyId, docId, normalized);
+    return { id: docId, ...record, knowledgeBaseId };
 }
 
 export async function listKnowledgeDocuments(companyId, options = {}) {

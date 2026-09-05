@@ -6,8 +6,10 @@ import multer from "multer";
 import {
     parseUploadedFile,
     saveKnowledgeDocument,
+    updateKnowledgeDocument,
     listKnowledgeDocuments,
     deleteKnowledgeDocument,
+    resolveWriteKnowledgeBaseId,
 } from "../services/tenants/knowledgeService.js";
 import {
     listAiEmployees,
@@ -1007,6 +1009,71 @@ app.delete("/api/companies/:companyId/knowledge/documents/:docId", requireTenant
     }
 });
 
+app.post("/api/companies/:companyId/knowledge/documents", requireTenantScope(), checkPermission("canUploadKnowledge"), async (req, res) => {
+    try {
+        const companyId = req.params.companyId;
+        const body = req.body || {};
+        const { title, type } = body;
+        if (!title || !type) {
+            return res.status(400).json({ error: "title and type are required" });
+        }
+        const knowledgeBaseId = await resolveWriteKnowledgeBaseId(companyId, body.knowledgeBaseId || null);
+        const saved = await saveKnowledgeDocument({ ...body, companyId, knowledgeBaseId });
+        res.status(201).json({ success: true, item: saved, ...saved });
+    } catch (err) {
+        console.error("[api/knowledge/documents] create error:", err.message);
+        res.status(err.status || 500).json({ error: err.message || "Failed to create knowledge document" });
+    }
+});
+
+app.patch("/api/companies/:companyId/knowledge/documents/:docId", requireTenantScope(), checkPermission("canUploadKnowledge"), async (req, res) => {
+    try {
+        const companyId = req.params.companyId;
+        const docId = req.params.docId;
+        const body = req.body || {};
+        const knowledgeBaseId = body.knowledgeBaseId
+            ? await resolveWriteKnowledgeBaseId(companyId, body.knowledgeBaseId)
+            : undefined;
+        const saved = await updateKnowledgeDocument(companyId, docId, {
+            ...body,
+            ...(knowledgeBaseId ? { knowledgeBaseId } : {}),
+        });
+        res.json({ success: true, item: saved, ...saved });
+    } catch (err) {
+        console.error("[api/knowledge/documents] patch error:", err.message);
+        res.status(err.status || 500).json({ error: err.message || "Failed to update knowledge document" });
+    }
+});
+
+app.post("/api/companies/:companyId/knowledge/upload", requireTenantScope(), checkPermission("canUploadKnowledge"), upload.single("file"), async (req, res) => {
+    try {
+        const companyId = req.params.companyId;
+        const { title, type, knowledgeBaseId: bodyKbId } = req.body || {};
+        if (!title || !req.file) {
+            return res.status(400).json({ error: "title and file are required" });
+        }
+        const content = await parseUploadedFile(
+            req.file.buffer,
+            req.file.mimetype,
+            req.file.originalname
+        );
+        const knowledgeBaseId = await resolveWriteKnowledgeBaseId(companyId, bodyKbId || null);
+        const saved = await saveKnowledgeDocument({
+            companyId,
+            knowledgeBaseId,
+            title,
+            type: type || "document",
+            content,
+            fileName: req.file.originalname,
+            source: "upload",
+        });
+        res.status(201).json({ success: true, contentLength: content.length, item: saved, ...saved });
+    } catch (err) {
+        console.error("[api/knowledge/documents/upload] error:", err.message);
+        res.status(err.status || 500).json({ error: err.message || "Upload failed" });
+    }
+});
+
 app.get("/api/admin/config", (req, res) => {
     const phoneId = process.env.PHONE_NUMBER_ID || "";
     res.json({
@@ -1223,21 +1290,30 @@ app.get("/api/knowledge", requireTenantScope({ optional: true }), async (req, re
 
 app.post("/api/knowledge", requireTenantScope(), checkPermission("canUploadKnowledge"), async (req, res) => {
     try {
-        const { companyId, title, type, content, url } = req.body || {};
+        const { companyId, title, type, content, url, knowledgeBaseId: bodyKbId } = req.body || {};
         if (!companyId || !title || !type) {
             return res.status(400).json({ error: "companyId, title, and type are required" });
         }
-        const saved = await saveKnowledgeDocument({ companyId, title, type, content, url });
+        const knowledgeBaseId = await resolveWriteKnowledgeBaseId(companyId, bodyKbId || null);
+        const saved = await saveKnowledgeDocument({
+            companyId,
+            knowledgeBaseId,
+            title,
+            type,
+            content,
+            url,
+            source: "mission-control",
+        });
         res.json({ success: true, ...saved });
     } catch (err) {
         console.error("[api/knowledge] create error:", err.message);
-        res.status(500).json({ error: err.message || "Failed to save knowledge" });
+        res.status(err.status || 500).json({ error: err.message || "Failed to save knowledge" });
     }
 });
 
 app.post("/api/knowledge/upload", requireTenantScope(), checkPermission("canUploadKnowledge"), upload.single("file"), async (req, res) => {
     try {
-        const { companyId, title, type } = req.body || {};
+        const { companyId, title, type, knowledgeBaseId: bodyKbId } = req.body || {};
         if (!companyId || !title || !req.file) {
             return res.status(400).json({ error: "companyId, title, and file are required" });
         }
@@ -1246,17 +1322,20 @@ app.post("/api/knowledge/upload", requireTenantScope(), checkPermission("canUplo
             req.file.mimetype,
             req.file.originalname
         );
+        const knowledgeBaseId = await resolveWriteKnowledgeBaseId(companyId, bodyKbId || null);
         const saved = await saveKnowledgeDocument({
             companyId,
+            knowledgeBaseId,
             title,
             type: type || "document",
             content,
             fileName: req.file.originalname,
+            source: "upload",
         });
         res.json({ success: true, contentLength: content.length, ...saved });
     } catch (err) {
         console.error("[api/knowledge/upload] error:", err.message);
-        res.status(500).json({ error: err.message || "Upload failed" });
+        res.status(err.status || 500).json({ error: err.message || "Upload failed" });
     }
 });
 

@@ -22,6 +22,7 @@ export async function bootstrap() {
     bindShellEvents();
     document.addEventListener('ziric:companies-updated', refreshCompanies);
     document.addEventListener('ziric:agents-updated', updateAgentCountBadge);
+    document.addEventListener('ziric:knowledge-updated', updateKnowledgeCountBadge);
 
     initAuthGuard({
       onReady: () => {
@@ -51,6 +52,24 @@ async function refreshCompanies() {
   if (companyCount) companyCount.textContent = String(state.companies.length || '—');
   const agentCount = document.getElementById('agentCount');
   if (agentCount) agentCount.textContent = '—';
+  const knowledgeCount = document.getElementById('knowledgeCount');
+  if (knowledgeCount) knowledgeCount.textContent = '—';
+}
+
+function updateKnowledgeCountBadge(event) {
+  const knowledgeCount = document.getElementById('knowledgeCount');
+  if (!knowledgeCount) return;
+
+  const detail = event?.detail || {};
+  if (!state.selectedCompanyId || detail.loadState === 'scope_required') {
+    knowledgeCount.textContent = '—';
+    return;
+  }
+  if (detail.loadState === 'error' || detail.count == null) {
+    knowledgeCount.textContent = '—';
+    return;
+  }
+  knowledgeCount.textContent = String(detail.count);
 }
 
 function updateAgentCountBadge(event) {
@@ -90,6 +109,7 @@ function bindShellEvents() {
     setState({ selectedCompanyId: value });
     if (!value) {
       updateAgentCountBadge({ detail: { loadState: 'scope_required', count: null } });
+      updateKnowledgeCountBadge({ detail: { loadState: 'scope_required', count: null } });
     }
     showToast(value ? `Scoped to selected company` : 'Showing all companies', 'info');
     navigateTo(state.currentPage);

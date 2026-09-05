@@ -26,20 +26,49 @@ export async function fetchAdminConfig() {
   return request('/api/admin/config');
 }
 
-export async function uploadKnowledgeFile({ companyId, title, type, file }) {
+export async function uploadKnowledgeFile({ companyId, knowledgeBaseId, title, type, file }) {
   const form = new FormData();
   form.append('companyId', companyId);
   form.append('title', title);
   form.append('type', type);
   form.append('file', file);
-  return request('/api/knowledge/upload', { method: 'POST', body: form });
+  if (knowledgeBaseId) form.append('knowledgeBaseId', knowledgeBaseId);
+  return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/upload`, {
+    method: 'POST',
+    body: form,
+  });
 }
 
-export async function addKnowledgeEntry({ companyId, title, type, content, url }) {
-  return request('/api/knowledge', {
+export async function addKnowledgeEntry({ companyId, knowledgeBaseId, title, type, content, url }) {
+  return createKnowledgeDocumentFromApi(companyId, {
+    companyId,
+    knowledgeBaseId,
+    title,
+    type,
+    content,
+    url,
+  });
+}
+
+export async function createKnowledgeDocumentFromApi(companyId, data) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/documents`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ companyId, title, type, content, url }),
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateKnowledgeDocumentFromApi(companyId, docId, data) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/documents/${encodeURIComponent(docId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteKnowledgeDocumentFromApi(companyId, docId) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/documents/${encodeURIComponent(docId)}`, {
+    method: 'DELETE',
   });
 }
 
@@ -48,8 +77,13 @@ export async function listKnowledgeFromApi(companyId) {
   return request(`/api/knowledge${qs}`);
 }
 
-export async function listKnowledgeDocumentsFromApi(companyId) {
-  return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/documents`);
+export async function listKnowledgeDocumentsFromApi(companyId, options = {}) {
+  const params = new URLSearchParams();
+  if (options.knowledgeBaseId) {
+    params.set('knowledgeBaseId', options.knowledgeBaseId);
+  }
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/documents${qs}`);
 }
 
 export async function fetchAiEmployeesFromApi(companyId) {
