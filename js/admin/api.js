@@ -18,6 +18,16 @@ export async function fetchOperationsActivity() {
   return request('/api/operations/activity');
 }
 
+/** Read-only tenant CRM metrics — authoritative source for Analytics (B-MC-4a). */
+export async function fetchTenantMissionMetrics(companyId) {
+  if (!companyId) {
+    return { error: 'companyId is required', status: 400, data: null };
+  }
+  return request(`/api/operations/tenant/${encodeURIComponent(companyId)}/metrics`, {
+    silent: true,
+  });
+}
+
 export async function fetchPlatformCompanies() {
   return request('/api/platform/companies');
 }

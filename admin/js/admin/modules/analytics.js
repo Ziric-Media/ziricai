@@ -1,236 +1,166 @@
 import { state } from '../state.js';
-
 import {
-
   escapeHtml,
-
   formatNumber,
-
   pageHeader,
-
   emptyState,
-
   loadingState,
-
-  trendHtml,
-
+  errorState,
 } from '../ui.js';
-
-import { listAnalytics } from '../services/dashboard.js';
-
 import { withTimeout } from '../utils.js';
+import {
+  loadTenantAnalytics,
+  formatAnalyticsMetric,
+} from '../services/analytics.js';
 
-import { DEMO_ANALYTICS_ROWS, DEMO_ANALYTICS_SERIES } from '../demo-data.js';
+const PIPELINE_ROWS = [
+  { key: 'new', label: 'New' },
+  { key: 'contacted', label: 'Contacted' },
+  { key: 'qualified', label: 'Qualified' },
+  { key: 'proposal', label: 'Proposal' },
+  { key: 'won', label: 'Won' },
+  { key: 'lost', label: 'Lost' },
+];
 
-
-
-let analyticsChart = null;
-
-
-
-export async function renderAnalytics(container) {
-
-  container.innerHTML = loadingState('Loading analytics...');
-
-
-
-  const companyId = state.selectedCompanyId || state.companies[0]?.id;
-
-  const result = await withTimeout(listAnalytics(companyId));
-
-  const rows = result.items?.length ? result.items : DEMO_ANALYTICS_ROWS;
-
-  const series = rows.length >= 3
-
-    ? {
-
-        labels: rows.slice(0, 7).reverse().map((r) => r.date?.slice(5) || '—'),
-
-        messages: rows.slice(0, 7).reverse().map((r) => r.whatsappMessages || 0),
-
-      }
-
-    : { labels: DEMO_ANALYTICS_SERIES.labels, messages: DEMO_ANALYTICS_SERIES.whatsappMessages };
-
-
-
-  const totalConversations = rows.reduce((s, r) => s + (r.conversations || 0), 0);
-
-  const totalTokens = rows.reduce((s, r) => s + (r.tokensUsed || 0), 0);
-
-  const avgResponse =
-
-    rows.length > 0
-
-      ? Math.round(rows.reduce((s, r) => s + (r.avgResponseTimeMs || 0), 0) / rows.length)
-
-      : 0;
-
-  const avgSatisfaction =
-
-    rows.length > 0
-
-      ? (rows.reduce((s, r) => s + (r.satisfaction || 4.5), 0) / rows.length).toFixed(1)
-
-      : '4.5';
-
-  const activeCompanies = rows[0]?.activeCompanies || state.companies.length || 3;
-
-
-
-  container.innerHTML = `
-
-    ${pageHeader('Analytics', 'Messages per day, active companies, satisfaction, and AI response time.')}
-
-    <div class="kpi-grid">
-
-      <div class="kpi-card">
-
-        <div class="header"><div><div class="label">Messages / Day (avg)</div><div class="value">${formatNumber(Math.round(series.messages.reduce((a, b) => a + b, 0) / series.messages.length))}</div>${trendHtml(9.8)}</div><div class="icon-wrapper blue"><i class="fa-brands fa-whatsapp"></i></div></div>
-
+function kpiCard(label, kpi, icon, colorClass) {
+  const raw = formatAnalyticsMetric(kpi);
+  const display = raw === '—' ? '—' : formatNumber(raw);
+  return `
+    <div class="kpi-card">
+      <div class="header">
+        <div>
+          <div class="label">${escapeHtml(label)}</div>
+          <div class="value">${display}</div>
+        </div>
+        <div class="icon-wrapper ${colorClass}"><i class="fa-solid ${icon}"></i></div>
       </div>
-
-      <div class="kpi-card">
-
-        <div class="header"><div><div class="label">Active Companies</div><div class="value">${activeCompanies}</div>${trendHtml(8.2)}</div><div class="icon-wrapper purple"><i class="fa-solid fa-building"></i></div></div>
-
-      </div>
-
-      <div class="kpi-card">
-
-        <div class="header"><div><div class="label">Customer Satisfaction</div><div class="value">${avgSatisfaction}<span style="font-size:16px;color:var(--text-muted);">/5</span></div>${trendHtml(2.1)}</div><div class="icon-wrapper green"><i class="fa-solid fa-star"></i></div></div>
-
-      </div>
-
-      <div class="kpi-card">
-
-        <div class="header"><div><div class="label">AI Response Time</div><div class="value">${avgResponse ? `${avgResponse}ms` : '—'}</div>${trendHtml(-5.3)}</div><div class="icon-wrapper yellow"><i class="fa-solid fa-bolt"></i></div></div>
-
-      </div>
-
-    </div>
-
-
-
-    <div class="chart-card chart-card-line" style="margin-bottom:28px;">
-
-      <div class="chart-card-header">
-
-        <h3><i class="fa-solid fa-chart-bar"></i> Messages Per Day</h3>
-
-      </div>
-
-      <div class="chart-canvas-wrap"><canvas id="analyticsChart"></canvas></div>
-
-    </div>
-
-
-
-    <div class="table-container">
-
-      <table class="org-table">
-
-        <thead>
-
-          <tr><th>Date</th><th>Conversations</th><th>WhatsApp Msgs</th><th>Tokens</th><th>Response Time</th><th>Satisfaction</th></tr>
-
-        </thead>
-
-        <tbody>
-
-          ${rows.length
-
-            ? rows
-
-                .map(
-
-                  (r) => `
-
-              <tr>
-
-                <td>${escapeHtml(r.date || '—')}</td>
-
-                <td>${formatNumber(r.conversations || 0)}</td>
-
-                <td>${formatNumber(r.whatsappMessages || 0)}</td>
-
-                <td>${formatNumber(r.tokensUsed || 0)}</td>
-
-                <td>${r.avgResponseTimeMs ? `${r.avgResponseTimeMs}ms` : '—'}</td>
-
-                <td>${r.satisfaction ? `${r.satisfaction}/5` : '—'}</td>
-
-              </tr>`
-
-                )
-
-                .join('')
-
-            : `<tr><td colspan="6">${emptyState('Analytics records will populate as conversations are tracked.')}</td></tr>`}
-
-        </tbody>
-
-      </table>
-
-    </div>
-
-  `;
-
-
-
-  if (typeof Chart !== 'undefined') {
-
-    analyticsChart?.destroy();
-
-    const ctx = container.querySelector('#analyticsChart');
-
-    if (ctx) {
-
-      analyticsChart = new Chart(ctx, {
-
-        type: 'bar',
-
-        data: {
-
-          labels: series.labels,
-
-          datasets: [{
-
-            label: 'Messages',
-
-            data: series.messages,
-
-            backgroundColor: 'rgba(139, 92, 246, 0.7)',
-
-            borderRadius: 6,
-
-          }],
-
-        },
-
-        options: {
-
-          responsive: true,
-
-          maintainAspectRatio: false,
-
-          plugins: { legend: { display: false } },
-
-          scales: {
-
-            x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
-
-            y: { grid: { color: 'rgba(148,163,184,0.15)' }, ticks: { color: '#94a3b8' }, beginAtZero: true },
-
-          },
-
-        },
-
-      });
-
-    }
-
-  }
-
+    </div>`;
 }
 
+function renderScopeRequired(container) {
+  const companyHints = (state.companies || [])
+    .slice(0, 5)
+    .map((c) => escapeHtml(c.name))
+    .join(', ');
+
+  container.innerHTML = `
+    ${pageHeader(
+      'Analytics',
+      'Tenant operational metrics from live CRM, conversations, and appointments.',
+      '<span class="crm-source-badge">Live API</span>'
+    )}
+    <div class="profile-card" style="text-align:center;padding:48px 24px;">
+      <div style="font-size:40px;margin-bottom:12px;">🏢</div>
+      <div style="font-weight:600;margin-bottom:8px;">No data yet</div>
+      <div style="color:var(--text-muted);font-size:14px;margin-bottom:16px;max-width:520px;margin-left:auto;margin-right:auto;">
+        Select a company to view analytics.
+        Use the <strong>Scope</strong> dropdown in the top bar
+        ${companyHints ? ` (e.g. ${companyHints})` : ''}.
+      </div>
+      <button class="btn btn-primary" type="button" id="selectCompanyScopeAnalytics">
+        <i class="fa-solid fa-building"></i> Open Scope selector
+      </button>
+    </div>
+  `;
+
+  container.querySelector('#selectCompanyScopeAnalytics')?.addEventListener('click', () => {
+    const select = document.getElementById('companySelector');
+    select?.focus();
+    select?.click();
+  });
+}
+
+export async function renderAnalytics(container) {
+  container.innerHTML = loadingState('Loading analytics...');
+
+  const companyId = state.selectedCompanyId || null;
+
+  if (!companyId) {
+    renderScopeRequired(container);
+    return;
+  }
+
+  const result = await withTimeout(loadTenantAnalytics(companyId));
+
+  if (result.loadState === 'scope_required') {
+    renderScopeRequired(container);
+    return;
+  }
+
+  if (result.loadState === 'error') {
+    container.innerHTML = `
+      ${pageHeader(
+        'Analytics',
+        'Tenant operational metrics from live CRM, conversations, and appointments.',
+        '<span class="crm-source-badge">Live API</span>'
+      )}
+      ${errorState(result.error || 'Unable to load analytics. Please check your connection and try again.')}
+      <div style="text-align:center;margin-top:-24px;padding-bottom:32px;">
+        <button class="btn btn-primary" type="button" id="retryAnalytics">
+          <i class="fa-solid fa-rotate"></i> Retry
+        </button>
+      </div>
+    `;
+    container.querySelector('#retryAnalytics')?.addEventListener('click', () => renderAnalytics(container));
+    return;
+  }
+
+  const view = result.view;
+  const kpis = view?.kpis || {};
+  const companyLabel = escapeHtml(view?.companyName || companyId);
+  const subtitle = view?.hasOperationalData
+    ? `${companyLabel} — live tenant operational metrics.`
+    : `${companyLabel} — no operational records yet for this tenant.`;
+
+  container.innerHTML = `
+    ${pageHeader('Analytics', subtitle, '<span class="crm-source-badge">Live API</span>')}
+
+    <div class="kpi-grid">
+      ${kpiCard('Conversations', kpis.conversations, 'fa-comments', 'purple')}
+      ${kpiCard('Active Conversations', kpis.activeConversations, 'fa-comment-dots', 'purple')}
+      ${kpiCard('CRM Leads', kpis.leads, 'fa-user-plus', 'blue')}
+      ${kpiCard('Qualified Leads', kpis.qualifiedLeads, 'fa-filter', 'purple')}
+      ${kpiCard('Test Drives', kpis.testDrives, 'fa-car', 'green')}
+      ${kpiCard('Finance Enquiries', kpis.financeEnquiries, 'fa-coins', 'yellow')}
+      ${kpiCard('Deals Won', kpis.dealsWon, 'fa-trophy', 'green')}
+      ${kpiCard('Messages', kpis.messages, 'fa-fire', 'orange')}
+      ${kpiCard('Human Takeovers', kpis.humanTakeovers, 'fa-user-shield', 'red')}
+      ${kpiCard('AI Employees', kpis.aiEmployees, 'fa-robot', 'green')}
+      ${kpiCard('Est. Revenue', kpis.revenue, 'fa-money-bill', 'green')}
+      ${kpiCard('Customer Satisfaction', kpis.customerSatisfaction, 'fa-star', 'green')}
+      ${kpiCard('AI Response Time', kpis.responseTime, 'fa-bolt', 'yellow')}
+      ${kpiCard('Token Usage', kpis.tokens, 'fa-microchip', 'blue')}
+    </div>
+
+    <div class="chart-card chart-card-line" style="margin-bottom:28px;">
+      <div class="chart-card-header">
+        <h3><i class="fa-solid fa-chart-bar"></i> Messages Per Day</h3>
+        <span class="ops-tag">Coming in B-MC-4b</span>
+      </div>
+      <div class="chart-canvas-wrap" style="min-height:120px;display:flex;align-items:center;justify-content:center;">
+        ${emptyState('Daily message trends will be available once time-series aggregation is wired (B-MC-4b).')}
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table class="org-table">
+        <thead>
+          <tr><th>Pipeline Stage</th><th>Count</th></tr>
+        </thead>
+        <tbody>
+          ${
+            view?.hasOperationalData
+              ? PIPELINE_ROWS.map(
+                  (row) => `
+              <tr>
+                <td>${escapeHtml(row.label)}</td>
+                <td>${formatNumber(view.pipeline?.[row.key] ?? 0)}</td>
+              </tr>`
+                ).join('')
+              : `<tr><td colspan="2">${emptyState('Pipeline counts will appear when CRM leads exist for this tenant.')}</td></tr>`
+          }
+        </tbody>
+      </table>
+    </div>
+  `;
+}
