@@ -9,6 +9,10 @@ import {
   resolveTenantAnalyticsLoadState,
 } from './analyticsDisplay.js';
 import { resolveTimeSeriesLoadState } from './analyticsTimeSeriesDisplay.js';
+import {
+  defaultAnalyticsDateRange,
+  validateAnalyticsDateRange,
+} from './analyticsDateRange.js';
 
 export { mapTenantMetricsToAnalyticsView, formatAnalyticsMetric } from './analyticsDisplay.js';
 export {
@@ -17,6 +21,13 @@ export {
   formatSeriesMetaNote,
   resolveTimeSeriesLoadState,
 } from './analyticsTimeSeriesDisplay.js';
+export {
+  defaultAnalyticsDateRange,
+  analyticsRangeForLastDays,
+  validateAnalyticsDateRange,
+  ANALYTICS_MAX_RANGE_DAYS,
+  ANALYTICS_RANGE_PRESETS,
+} from './analyticsDateRange.js';
 
 /**
  * Load tenant analytics for Mission Control Analytics page.
