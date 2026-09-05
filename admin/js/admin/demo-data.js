@@ -905,6 +905,7 @@ export const DEMO_INBOX_TAG_OPTIONS = [
   'Hot Lead',
 ];
 
+// B-MC-4e — legacy demo only; Mission Control Analytics uses tenant operations APIs.
 export const DEMO_ANALYTICS_SERIES = {
   labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
   conversations: [124, 156, 142, 189, 201, 98, 112],

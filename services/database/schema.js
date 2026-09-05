@@ -67,6 +67,7 @@ export const LEGACY_COLLECTIONS = {
     AGENTS: "agents",
     KNOWLEDGE: "knowledge",
     CONVERSATIONS: "conversations",
+    /** @deprecated B-MC-4e — Mission Control reads tenant operations APIs, not root analytics/. */
     ANALYTICS: "analytics",
     BILLING: "billing",
     MEMORIES: "memories",
