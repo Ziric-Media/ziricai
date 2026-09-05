@@ -28,6 +28,22 @@ export async function fetchTenantMissionMetrics(companyId) {
   });
 }
 
+/** Read-only tenant analytics time-series — B-MC-4b (message documents, conversations, test drives). */
+export async function fetchTenantAnalyticsTimeSeries(companyId, { startDate, endDate, series } = {}) {
+  if (!companyId) {
+    return { error: 'companyId is required', status: 400, data: null };
+  }
+  const params = new URLSearchParams();
+  if (startDate) params.set('startDate', startDate);
+  if (endDate) params.set('endDate', endDate);
+  if (series) params.set('series', series);
+  const qs = params.toString();
+  return request(
+    `/api/operations/tenant/${encodeURIComponent(companyId)}/analytics/timeseries${qs ? `?${qs}` : ''}`,
+    { silent: true }
+  );
+}
+
 export async function fetchPlatformCompanies() {
   return request('/api/platform/companies');
 }

@@ -2,14 +2,21 @@
  * B-MC-4a — tenant Analytics via authoritative operations metrics API.
  * Read-only; no root Firestore analytics/ reads in production.
  */
-import { fetchTenantMissionMetrics } from '../api.js';
+import { fetchTenantMissionMetrics, fetchTenantAnalyticsTimeSeries } from '../api.js';
 import {
   mapTenantMetricsToAnalyticsView,
   formatAnalyticsMetric,
   resolveTenantAnalyticsLoadState,
 } from './analyticsDisplay.js';
+import { resolveTimeSeriesLoadState } from './analyticsTimeSeriesDisplay.js';
 
 export { mapTenantMetricsToAnalyticsView, formatAnalyticsMetric } from './analyticsDisplay.js';
+export {
+  chartLabelsFromSeries,
+  chartValuesFromSeries,
+  formatSeriesMetaNote,
+  resolveTimeSeriesLoadState,
+} from './analyticsTimeSeriesDisplay.js';
 
 /**
  * Load tenant analytics for Mission Control Analytics page.
@@ -32,4 +39,28 @@ export async function loadTenantAnalytics(companyId) {
   }
 
   return resolveTenantAnalyticsLoadState(companyId, { data: result.data });
+}
+
+/**
+ * Load tenant analytics time-series (B-MC-4b). Default 14-day UTC range from API.
+ * @param {string|null|undefined} companyId
+ * @param {{ startDate?: string, endDate?: string, series?: string }} [options]
+ */
+export async function loadTenantAnalyticsTimeSeries(companyId, options = {}) {
+  if (!companyId) {
+    return { loadState: 'scope_required', timeSeries: null };
+  }
+
+  const result = await fetchTenantAnalyticsTimeSeries(companyId, options);
+
+  if (result.error) {
+    return {
+      loadState: 'error',
+      timeSeries: null,
+      error: result.error,
+      status: result.status ?? null,
+    };
+  }
+
+  return resolveTimeSeriesLoadState({ data: result.data });
 }

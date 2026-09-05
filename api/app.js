@@ -48,8 +48,14 @@ import {
     getPlatformMetrics,
     getPlatformActivity,
     getTenantMissionMetrics,
+    getPrimaryTenantMissionMetrics,
     PRIMARY_MISSION_TENANT_ID,
 } from "../services/operations/platformOperations.js";
+import {
+    getTenantAnalyticsTimeSeries,
+    parseTimeSeriesQuery,
+    TimeSeriesValidationError,
+} from "../services/operations/tenantTimeSeries.js";
 import {
     listWorkflows,
     getWorkflow,
@@ -367,6 +373,21 @@ app.get("/api/operations/tenant/:companyId/metrics", requirePlatformAccess(), as
     } catch (err) {
         console.error("[api/operations/tenant/metrics] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load tenant mission metrics" });
+    }
+});
+
+/** Read-only tenant analytics time-series for Mission Control (superadmin or API key) */
+app.get("/api/operations/tenant/:companyId/analytics/timeseries", requirePlatformAccess(), async (req, res) => {
+    try {
+        const query = parseTimeSeriesQuery(req.query);
+        const data = await getTenantAnalyticsTimeSeries(req.params.companyId, query);
+        res.json(data);
+    } catch (err) {
+        if (err instanceof TimeSeriesValidationError) {
+            return res.status(400).json({ error: err.message, code: err.code });
+        }
+        console.error("[api/operations/tenant/analytics/timeseries] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load tenant analytics time-series" });
     }
 });
 

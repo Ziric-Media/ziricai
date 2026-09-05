@@ -116,8 +116,14 @@ assert.ok(!analyticsModule.includes('DEMO_ANALYTICS_SERIES'), 'Analytics module 
 assert.ok(!analyticsModule.includes('trendHtml'), 'Analytics module must not render fake trend percentages');
 assert.ok(!analyticsModule.includes('9.8'), 'Analytics module must not contain hardcoded +9.8% trend');
 assert.ok(analyticsModule.includes('loadTenantAnalytics'), 'Analytics module must use loadTenantAnalytics');
+assert.ok(analyticsModule.includes('loadTenantAnalyticsTimeSeries'), 'Analytics module must load time-series API');
+assert.ok(analyticsModule.includes('Message Documents Per Day'), 'Analytics must label message document chart distinctly');
+assert.ok(analyticsModule.includes('CRM counter (totalMessages)'), 'Messages KPI must identify CRM counter source');
+assert.ok(!analyticsModule.includes('Coming in B-MC-4b'), 'Analytics must not show B-MC-4b placeholder');
+assert.ok(!analyticsModule.includes('DEMO_ANALYTICS'), 'Analytics module must not use demo analytics');
 assert.ok(analyticsModule.includes('Live API'), 'Analytics module must show Live API badge');
 assert.ok(analyticsService.includes('fetchTenantMissionMetrics'), 'Analytics service must call tenant metrics API');
+assert.ok(analyticsService.includes('fetchTenantAnalyticsTimeSeries'), 'Analytics service must call time-series API');
 assert.ok(!analyticsService.includes("listDocuments"), 'Analytics service must not use Firestore listDocuments');
 
 const apiJs = fs.readFileSync(path.join(ROOT, 'js/admin/api.js'), 'utf8');
@@ -125,5 +131,12 @@ assert.ok(
   apiJs.includes('/api/operations/tenant/') && apiJs.includes('/metrics'),
   'api.js must expose fetchTenantMissionMetrics endpoint'
 );
+assert.ok(
+  apiJs.includes('/analytics/timeseries'),
+  'api.js must expose fetchTenantAnalyticsTimeSeries endpoint'
+);
+
+const consoleHtml = fs.readFileSync(path.join(ROOT, 'ziric-superadmin-console.html'), 'utf8');
+assert.ok(consoleHtml.includes('chart.umd.min.js'), 'Super Admin console must load Chart.js for analytics charts');
 
 console.log('All mission-control analytics scope checks passed.');

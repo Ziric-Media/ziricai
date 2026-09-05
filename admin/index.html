@@ -9,25 +9,14 @@
     <script type="importmap">
     {
       "imports": {
-        "firebase/app": "./node_modules/firebase/app/dist/esm/index.esm.js",
-        "firebase/auth": "./node_modules/firebase/auth/dist/esm/index.esm.js",
-        "firebase/firestore": "./node_modules/firebase/firestore/dist/esm/index.esm.js",
-        "firebase/storage": "./node_modules/firebase/storage/dist/esm/index.esm.js",
-        "@firebase/app": "./node_modules/@firebase/app/dist/esm/index.esm.js",
-        "@firebase/auth": "./node_modules/@firebase/auth/dist/esm/index.js",
-        "@firebase/firestore": "./node_modules/@firebase/firestore/dist/index.esm.js",
-        "@firebase/storage": "./node_modules/@firebase/storage/dist/index.esm.js",
-        "@firebase/util": "./node_modules/@firebase/util/dist/index.esm.js",
-        "@firebase/logger": "./node_modules/@firebase/logger/dist/esm/index.esm.js",
-        "@firebase/component": "./node_modules/@firebase/component/dist/esm/index.esm.js",
-        "@firebase/webchannel-wrapper/bloom-blob": "./node_modules/@firebase/webchannel-wrapper/dist/bloom-blob/esm/bloom_blob_es2018.js",
-        "@firebase/webchannel-wrapper/webchannel-blob": "./node_modules/@firebase/webchannel-wrapper/dist/webchannel-blob/esm/webchannel_blob_es2018.js",
-        "idb": "./node_modules/idb/build/index.js",
-        "re2js": "./node_modules/re2js/build/index.esm.js"
+        "firebase/app": "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js",
+        "firebase/storage": "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js"
       }
     }
     </script>
-<script>window.__ZIRICAI_CONFIG__={"apiBase":"https://ziricai-production.up.railway.app","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"firebase":{"apiKey":"","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"","appId":"","measurementId":""}};</script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"firebase":{"apiKey":"AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"482382497730","appId":"1:482382497730:web:6bc2f8668a1598fa13f85b","measurementId":"G-92ZVT0731S","databaseId":"default"}};</script>
 </head>
 <body>
 
@@ -87,6 +76,7 @@
                 </a>
                 <a href="#" data-page="knowledge">
                     <span class="icon">📚</span><span>Knowledge Base</span>
+                    <span class="badge" id="knowledgeCount">—</span>
                 </a>
                 <a href="#" data-page="customers">
                     <span class="icon">👥</span><span>Customers</span>
@@ -137,6 +127,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script type="module" src="js/admin/main.js"></script>
 </body>
 </html>
