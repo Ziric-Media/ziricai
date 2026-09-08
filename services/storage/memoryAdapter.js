@@ -202,6 +202,12 @@ export const memoryAdapter = {
         return portalCompanies.get(companyId) || null;
     },
 
+    async deletePortalCompany(companyId) {
+        const existed = portalCompanies.has(companyId);
+        portalCompanies.delete(companyId);
+        return { companyId, deleted: existed };
+    },
+
     async pushPortalNotification(companyId, notification) {
         if (!portalNotifications.has(companyId)) portalNotifications.set(companyId, []);
         const entry = { id: notification.id || uid("n"), ...notification, companyId };

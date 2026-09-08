@@ -90,6 +90,10 @@ import {
     listAllCompaniesFromStorage,
     enrichCompanyIntegrationStatus,
     platformCompanyDirectorySource,
+    updatePlatformCompanyAdmin,
+    deleteCompanyRecord,
+    activateCompany,
+    assertAllowedCompanyStatus,
 } from "../services/tenants/companyService.js";
 import {
     listDepartments,
@@ -128,6 +132,7 @@ import {
     listOnboardingIndustries,
     getOnboardingSession,
     getWhatsAppConfig,
+    slugifyCompanyName,
 } from "../services/platform/onboardingService.js";
 import { completeOnboarding } from "../services/platform/onboardingOrchestrator.js";
 import { getAllPlans, getPlan, checkPlanLimit } from "../services/platform/billingPlans.js";
@@ -137,7 +142,7 @@ import { resolveAuthFromRequest } from "../services/auth/authService.js";
 import { trackSession, invalidateSession, buildSessionResponse } from "../services/auth/sessionService.js";
 import { checkPermission } from "../services/auth/permissionsService.js";
 import { requirePlatformAccess } from "../services/auth/platformAuth.js";
-import { validateCompanyIdParam, requireBodyFields } from "../services/auth/validateInput.js";
+import { validateCompanyIdParam, requireBodyFields, isValidCompanyId } from "../services/auth/validateInput.js";
 import { authRateLimit } from "../services/auth/authRateLimiter.js";
 import { auditLog } from "../services/audit/auditLog.js";
 import { isDemoTenant } from "../services/core/dataMode.js";
@@ -729,6 +734,102 @@ app.get("/api/platform/companies/:companyId", requirePlatformAccess(), async (re
         res.status(500).json({ error: err.message || "Failed to load platform company" });
     }
 });
+
+/** Super Admin — create tenant company record (B-MC-5c-1). */
+app.post(
+    "/api/platform/companies",
+    requirePlatformAccess(),
+    authRateLimit("platform-companies"),
+    requireBodyFields(["name"]),
+    async (req, res) => {
+        try {
+            const body = req.body || {};
+            const name = String(body.name || "").trim();
+            if (!name) return res.status(400).json({ error: "Company name is required" });
+
+            let companyId = body.companyId || body.id || null;
+            if (companyId && !isValidCompanyId(companyId)) {
+                return res.status(400).json({ error: "Invalid companyId format", code: "INVALID_COMPANY_ID" });
+            }
+
+            if (!companyId) {
+                const base = slugifyCompanyName(name);
+                companyId = base;
+                let suffix = 0;
+                while (await getCompany(companyId)) {
+                    suffix += 1;
+                    companyId = `${base}-${suffix}`;
+                }
+            } else if (await getCompany(companyId)) {
+                return res.status(409).json({ error: "Company already exists", companyId });
+            }
+
+            if (body.status !== undefined) {
+                try {
+                    assertAllowedCompanyStatus(body.status);
+                } catch (statusErr) {
+                    return res.status(400).json({ error: statusErr.message });
+                }
+            }
+
+            auditLog("platform_company_create", { companyId, via: req.platformAuth?.via });
+            const company = await createCompany(companyId, { ...body, name });
+            res.status(201).json({
+                success: true,
+                company: await enrichCompanyIntegrationStatus(company),
+            });
+        } catch (err) {
+            console.error("[api/platform/companies POST] error:", err.message);
+            res.status(500).json({ error: err.message || "Failed to create platform company" });
+        }
+    }
+);
+
+/** Super Admin — update tenant company profile (B-MC-5c-1). */
+app.patch(
+    "/api/platform/companies/:companyId",
+    requirePlatformAccess(),
+    authRateLimit("platform-companies"),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const existing = await getCompany(companyId);
+            if (!existing) return res.status(404).json({ error: "Company not found" });
+
+            auditLog("platform_company_update", { companyId, via: req.platformAuth?.via });
+            const company = await updatePlatformCompanyAdmin(companyId, req.body || {});
+            res.json({
+                success: true,
+                company: await enrichCompanyIntegrationStatus(company),
+            });
+        } catch (err) {
+            const status = /Invalid company status/.test(err.message) ? 400 : 500;
+            console.error("[api/platform/companies PATCH] error:", err.message);
+            res.status(status).json({ error: err.message || "Failed to update platform company" });
+        }
+    }
+);
+
+/** Super Admin — delete tenant company root record (B-MC-5c-1). */
+app.delete(
+    "/api/platform/companies/:companyId",
+    requirePlatformAccess(),
+    authRateLimit("platform-companies"),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            auditLog("platform_company_delete", { companyId, via: req.platformAuth?.via });
+            const result = await deleteCompanyRecord(companyId);
+            res.json({ success: true, ...result });
+        } catch (err) {
+            const status = err.status || (/not found/i.test(err.message) ? 404 : 500);
+            console.error("[api/platform/companies DELETE] error:", err.message);
+            res.status(status).json({ error: err.message || "Failed to delete platform company" });
+        }
+    }
+);
 
 /** AI Command Center — Super Admin strategic dashboard */
 app.get("/api/operations/command-center", requirePlatformAccess(), async (req, res) => {

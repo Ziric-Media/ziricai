@@ -48,6 +48,28 @@ export async function fetchPlatformCompanies() {
   return request('/api/platform/companies');
 }
 
+export async function createPlatformCompany(body) {
+  return request('/api/platform/companies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updatePlatformCompany(companyId, body) {
+  return request(`/api/platform/companies/${encodeURIComponent(companyId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deletePlatformCompany(companyId) {
+  return request(`/api/platform/companies/${encodeURIComponent(companyId)}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function fetchAdminConfig() {
   return request('/api/admin/config');
 }

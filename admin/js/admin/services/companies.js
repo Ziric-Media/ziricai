@@ -5,7 +5,12 @@ import {
   removeDocument,
   updateDocument,
 } from './firestore-base.js';
-import { fetchPlatformCompanies } from '../api.js';
+import {
+  fetchPlatformCompanies,
+  createPlatformCompany,
+  updatePlatformCompany,
+  deletePlatformCompany,
+} from '../api.js';
 import { DEMO_COMPANIES, PLAN_AMOUNTS } from '../demo-data.js';
 import { isDemoDataAllowed, shouldUseDemoForEmptyOrError } from './dataMode.js';
 import { getPlan } from '../../shared/billingPlans.js';
@@ -104,6 +109,17 @@ export function normalizeCompanyItem(raw = {}) {
   };
 }
 
+function mapPlatformCompanyResponse(api) {
+  if (api.error) return { error: api.error };
+  const company = api.data?.company;
+  return {
+    success: true,
+    id: company?.id,
+    item: company,
+    company,
+  };
+}
+
 export async function listCompanies() {
   const api = await fetchPlatformCompanies();
 
@@ -141,12 +157,13 @@ export async function listCompanies() {
 }
 
 export async function getCompany(id) {
+  if (!isDemoDataAllowed()) {
+    return { error: 'Company not found' };
+  }
   const result = await getDocument(COLLECTION, id);
   if (result.item) return result;
-  if (isDemoDataAllowed()) {
-    const item = loadDemoStore().find((c) => c.id === id);
-    if (item) return { item, isDemo: true };
-  }
+  const item = loadDemoStore().find((c) => c.id === id);
+  if (item) return { item, isDemo: true };
   return { error: 'Company not found' };
 }
 
@@ -154,9 +171,13 @@ export async function createCompany(data) {
   const payload = normalizePayload(data);
   if (!payload.name) return { error: 'Company name is required' };
 
+  if (!isDemoDataAllowed()) {
+    const api = await createPlatformCompany(payload);
+    return mapPlatformCompanyResponse(api);
+  }
+
   const result = await createDocument(COLLECTION, payload);
   if (!result.error) return result;
-  if (!isDemoDataAllowed()) return result;
 
   const items = loadDemoStore();
   const id = `demo-co-${Date.now()}`;
@@ -167,9 +188,13 @@ export async function createCompany(data) {
 }
 
 export async function updateCompany(id, data) {
+  if (!isDemoDataAllowed()) {
+    const api = await updatePlatformCompany(id, data);
+    return mapPlatformCompanyResponse(api);
+  }
+
   const result = await updateDocument(COLLECTION, id, data);
   if (!result.error) return result;
-  if (!isDemoDataAllowed()) return result;
 
   const items = loadDemoStore();
   const index = items.findIndex((c) => c.id === id);
@@ -182,9 +207,14 @@ export async function updateCompany(id, data) {
 }
 
 export async function deleteCompany(id) {
+  if (!isDemoDataAllowed()) {
+    const api = await deletePlatformCompany(id);
+    if (api.error) return { error: api.error };
+    return { success: true };
+  }
+
   const result = await removeDocument(COLLECTION, id);
   if (!result.error) return result;
-  if (!isDemoDataAllowed()) return result;
 
   const items = loadDemoStore();
   const next = items.filter((c) => c.id !== id);

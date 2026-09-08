@@ -133,6 +133,14 @@ export async function suspendCompany(companyId, reason = "") {
     });
 }
 
+export async function activateCompany(companyId) {
+    return updateCompany(companyId, {
+        status: COMPANY_STATUS.ACTIVE,
+        suspendedAt: null,
+        suspendReason: null,
+    });
+}
+
 export async function archiveCompany(companyId, reason = "") {
     return updateCompany(companyId, {
         status: COMPANY_STATUS.ARCHIVED,
@@ -260,6 +268,88 @@ export function applyWhatsAppDisplayFromIntegration(company, wa) {
 
 export function platformCompanyDirectorySource(adapterName) {
     return adapterName === "firestore" ? "firestore" : adapterName || "empty";
+}
+
+const PLATFORM_ADMIN_EXTRA_FIELDS = [
+    "logoUrl",
+    "ownerPhone",
+    "agentId",
+    "agentName",
+    "aiModel",
+    "aiTemperature",
+    "openAiApiKey",
+    "knowledgeBaseId",
+    "knowledgeBaseName",
+    "knowledgeMaxDocs",
+    "knowledgeAutoSync",
+    "whatsappBusinessId",
+    "whatsappWebhookUrl",
+    "billing",
+    "usage",
+    "provisioningLinks",
+];
+
+export function assertAllowedCompanyStatus(status) {
+    const value = String(status || "").toLowerCase();
+    const allowed = new Set(Object.values(COMPANY_STATUS));
+    if (value && !allowed.has(value)) {
+        throw new Error(`Invalid company status: ${status}`);
+    }
+    return value || COMPANY_STATUS.ACTIVE;
+}
+
+/** Mission Control platform admin patch — core + extended profile fields. */
+export async function updatePlatformCompanyAdmin(companyId, body = {}) {
+    if (!companyId) throw new Error("companyId is required");
+
+    const existing = (await getCompany(companyId)) || { id: companyId };
+    if (body.status !== undefined) {
+        assertAllowedCompanyStatus(body.status);
+    }
+
+    const core = normalizeCompanyRecord(companyId, body, existing);
+    const record = { ...existing, ...core, id: companyId };
+
+    for (const key of PLATFORM_ADMIN_EXTRA_FIELDS) {
+        if (body[key] !== undefined) {
+            record[key] = body[key];
+        }
+    }
+
+    await persistCompanyRoot(companyId, record, { merge: true });
+    return record;
+}
+
+/** Delete tenant root company document only (subcollections untouched). */
+export async function deleteCompanyRecord(companyId) {
+    if (!companyId) throw new Error("companyId is required");
+
+    const existing = await getCompany(companyId);
+    if (!existing) {
+        const err = new Error("Company not found");
+        err.status = 404;
+        throw err;
+    }
+
+    const adapter = await getStorageAdapter();
+
+    if (adapter.name === "firestore" && isServerSide()) {
+        const admin = getAdminFirestore();
+        if (admin) {
+            await admin.doc(`${ROOT.COMPANIES}/${companyId}`).delete();
+            return { companyId, deleted: true };
+        }
+    }
+
+    if (adapter.name === "memory") {
+        if (adapter.deletePortalCompany) {
+            await adapter.deletePortalCompany(companyId);
+        }
+        await settingsRepo.delete(companyId, "profile");
+        return { companyId, deleted: true };
+    }
+
+    throw new Error("Company delete requires Firestore or memory storage backend");
 }
 
 /** Merge live WhatsApp integration status for Mission Control company lists. */
