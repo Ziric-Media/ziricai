@@ -142,6 +142,7 @@ export const ROUTE_CATALOG = [
     { method: "PATCH", path: "/api/platform/companies/:companyId", domain: "platform", tenantScoped: false, description: "Super Admin update company" },
     { method: "DELETE", path: "/api/platform/companies/:companyId", domain: "platform", tenantScoped: false, description: "Super Admin delete company root" },
     { method: "GET", path: "/api/platform/companies/:companyId/links", domain: "platform", tenantScoped: false, description: "Admin navigation links (platform auth)" },
+    { method: "GET", path: "/api/platform/companies/:companyId/integrations/whatsapp", domain: "platform", tenantScoped: false, description: "Super Admin read WhatsApp integration (sanitized)" },
 
     // Marketplace
     { method: "GET", path: "/api/marketplace/catalog", domain: "marketplace", tenantScoped: false, description: "Browse industry packs" },

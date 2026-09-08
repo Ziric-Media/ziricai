@@ -205,3 +205,31 @@ export async function disconnectIntegration(companyId, integrationId) {
 export async function getWhatsAppIntegration(companyId) {
     return integrationService.getByProvider(companyId, PROVIDER_WHATSAPP);
 }
+
+/** Allowlisted, sanitized WhatsApp integration payload for Platform API (B-MC-5c-2a). */
+export function sanitizeIntegrationForPlatform(integration) {
+    if (!integration) return null;
+    const safe = sanitizeIntegrationRecord(integration);
+    return {
+        id: safe.id,
+        provider: safe.provider || PROVIDER_WHATSAPP,
+        channel: safe.channel || PROVIDER_WHATSAPP,
+        status: safe.status || null,
+        phoneNumberId: safe.phoneNumberId || null,
+        displayPhoneNumber: safe.displayPhoneNumber ?? null,
+        credentialsSource: safe.credentialsSource ?? null,
+        businessAccountId: safe.businessAccountId ?? null,
+    };
+}
+
+/**
+ * Mission Control read-only WhatsApp integration for a tenant (B-MC-5c-2a).
+ * Reads companies/{companyId}/integrations/* only — not company-root whatsappConnected.
+ * @param {string} companyId
+ * @returns {Promise<object|null>}
+ */
+export async function getPlatformWhatsAppIntegration(companyId) {
+    const raw = await getWhatsAppIntegration(companyId);
+    if (!raw) return null;
+    return sanitizeIntegrationForPlatform(raw);
+}

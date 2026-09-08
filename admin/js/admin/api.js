@@ -70,6 +70,17 @@ export async function deletePlatformCompany(companyId) {
   });
 }
 
+/** Read-only tenant WhatsApp integration for Mission Control (B-MC-5c-2a). */
+export async function fetchPlatformWhatsAppIntegration(companyId) {
+  if (!companyId) {
+    return { error: 'companyId is required', status: 400, data: null };
+  }
+  return request(
+    `/api/platform/companies/${encodeURIComponent(companyId)}/integrations/whatsapp`,
+    { silent: true }
+  );
+}
+
 export async function fetchAdminConfig() {
   return request('/api/admin/config');
 }

@@ -156,6 +156,7 @@ import {
     getPlatformKnowledgeSummary,
     getRelatedEntries,
 } from "../services/knowledge/platformKnowledgeLoader.js";
+import { getPlatformWhatsAppIntegration } from "../services/tenants/integrationService.js";
 import {
     initIntegrationHub,
     mountIntegrationRoutes,
@@ -734,6 +735,32 @@ app.get("/api/platform/companies/:companyId", requirePlatformAccess(), async (re
         res.status(500).json({ error: err.message || "Failed to load platform company" });
     }
 });
+
+/** Super Admin — read tenant WhatsApp integration (B-MC-5c-2a, read-only). */
+app.get(
+    "/api/platform/companies/:companyId/integrations/whatsapp",
+    requirePlatformAccess(),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const company = await getCompany(companyId);
+            if (!company) {
+                return res.status(404).json({ error: "Company not found" });
+            }
+
+            const integration = await getPlatformWhatsAppIntegration(companyId);
+            if (!integration) {
+                return res.status(404).json({ error: "WhatsApp integration not found", companyId });
+            }
+
+            res.json({ companyId, integration });
+        } catch (err) {
+            console.error("[api/platform/companies/:companyId/integrations/whatsapp] error:", err.message);
+            res.status(500).json({ error: err.message || "Failed to load WhatsApp integration" });
+        }
+    }
+);
 
 /** Super Admin — create tenant company record (B-MC-5c-1). */
 app.post(
