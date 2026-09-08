@@ -142,10 +142,15 @@ function logoCell(company) {
   return `<span class="logo-fallback table-logo-fallback">${escapeHtml(companyInitials(company.name))}</span>`;
 }
 
+/** Integration-derived WhatsApp status from platform API (B-MC-5b). */
+function isIntegrationWhatsAppConnected(company) {
+  return company?.whatsappConnected === true;
+}
+
 function whatsappCell(company) {
-  if (company.whatsappConnected) {
+  if (isIntegrationWhatsAppConnected(company)) {
     const label = company.whatsappNumber || 'Connected';
-    return `<span class="wa-cell"><i class="fa-solid fa-circle-check wa-connected" title="Connected"></i> ${escapeHtml(label)}</span>`;
+    return `<span class="wa-cell"><i class="fa-solid fa-circle-check wa-connected" title="Connected via tenant integration"></i> ${escapeHtml(label)}</span>`;
   }
   if (company.whatsappNumber) {
     return `<span class="wa-cell"><i class="fa-solid fa-circle-xmark wa-disconnected" title="Not connected"></i> ${escapeHtml(company.whatsappNumber)}</span>`;
@@ -340,8 +345,11 @@ function buildFormSlideOver() {
           <div class="form-group form-check">
             <label class="checkbox-label">
               <input type="checkbox" id="companyWhatsappConnected" />
-              <span>WhatsApp connected and verified</span>
+              <span>Company profile: WhatsApp connected flag</span>
             </label>
+            <p class="form-hint" style="margin:6px 0 0;font-size:12px;color:var(--text-secondary);">
+              The Companies table shows live WhatsApp status from the tenant integration (platform API), not this checkbox.
+            </p>
           </div>
         </div>
 

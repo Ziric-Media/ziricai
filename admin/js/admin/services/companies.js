@@ -90,12 +90,17 @@ export function maskApiKey(key) {
   return `${key.slice(0, 7)}••••••••${key.slice(-4)}`;
 }
 
-function normalizeCompanyItem(raw = {}) {
+/**
+ * Normalize a platform company list item from GET /api/platform/companies.
+ * whatsappConnected is integration-derived on the backend (B-MC-5a) — pass through only.
+ */
+export function normalizeCompanyItem(raw = {}) {
   return {
     ...raw,
     id: raw.id || raw.companyId,
     plan: raw.plan || raw.billing?.planId || 'trial',
     status: raw.status || 'active',
+    whatsappConnected: raw.whatsappConnected === true,
   };
 }
 
