@@ -237,19 +237,39 @@ export async function listAllCompaniesFromStorage() {
     return [];
 }
 
+/**
+ * Mission Control WhatsApp display — integration-derived only.
+ * Company-root whatsappConnected must not make a tenant appear connected.
+ * Lookup must be scoped to the same companyId as the company record.
+ */
+export function applyWhatsAppDisplayFromIntegration(company, wa) {
+    if (!company) return company;
+
+    const scoped = !wa || !wa.companyId || String(wa.companyId) === String(company.id);
+    const status = String(wa?.status || "").toLowerCase();
+    const waActive = Boolean(
+        scoped && wa && ACTIVE_WHATSAPP_STATUSES.has(status)
+    );
+
+    return {
+        ...company,
+        whatsappConnected: waActive,
+        whatsappNumber: company.whatsappNumber || wa?.displayPhoneNumber || "",
+    };
+}
+
+export function platformCompanyDirectorySource(adapterName) {
+    return adapterName === "firestore" ? "firestore" : adapterName || "empty";
+}
+
 /** Merge live WhatsApp integration status for Mission Control company lists. */
 export async function enrichCompanyIntegrationStatus(company) {
     if (!company?.id) return company;
 
     try {
         const wa = await getWhatsAppIntegration(company.id);
-        const waActive = Boolean(wa && ACTIVE_WHATSAPP_STATUSES.has(String(wa.status || "").toLowerCase()));
-        return {
-            ...company,
-            whatsappConnected: Boolean(company.whatsappConnected || waActive),
-            whatsappNumber: company.whatsappNumber || wa?.displayPhoneNumber || "",
-        };
+        return applyWhatsAppDisplayFromIntegration(company, wa);
     } catch {
-        return company;
+        return applyWhatsAppDisplayFromIntegration(company, null);
     }
 }

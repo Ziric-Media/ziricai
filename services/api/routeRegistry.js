@@ -136,7 +136,9 @@ export const ROUTE_CATALOG = [
     // Platform provisioning
     { method: "POST", path: "/api/platform/provision/company", domain: "platform", tenantScoped: false, description: "Provision company workspace" },
     { method: "POST", path: "/api/platform/provision/agent", domain: "platform", tenantScoped: false, description: "Provision AI employee" },
-    { method: "GET", path: "/api/platform/companies/:companyId/links", domain: "platform", tenantScoped: false, description: "Admin navigation links" },
+    { method: "GET", path: "/api/platform/companies", domain: "platform", tenantScoped: false, description: "Super Admin company directory (Firestore)" },
+    { method: "GET", path: "/api/platform/companies/:companyId", domain: "platform", tenantScoped: false, description: "Super Admin company record (Firestore)" },
+    { method: "GET", path: "/api/platform/companies/:companyId/links", domain: "platform", tenantScoped: false, description: "Admin navigation links (platform auth)" },
 
     // Marketplace
     { method: "GET", path: "/api/marketplace/catalog", domain: "marketplace", tenantScoped: false, description: "Browse industry packs" },

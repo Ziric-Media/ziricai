@@ -89,6 +89,7 @@ import {
     saveCompanyGeneralSettings,
     listAllCompaniesFromStorage,
     enrichCompanyIntegrationStatus,
+    platformCompanyDirectorySource,
 } from "../services/tenants/companyService.js";
 import {
     listDepartments,
@@ -129,7 +130,6 @@ import {
     getWhatsAppConfig,
 } from "../services/platform/onboardingService.js";
 import { completeOnboarding } from "../services/platform/onboardingOrchestrator.js";
-import { listPlatformCompanies, getPlatformCompany } from "../services/platform/platformRegistry.js";
 import { getAllPlans, getPlan, checkPlanLimit } from "../services/platform/billingPlans.js";
 import { getCommandCenterDashboard } from "../services/operations/commandCenterService.js";
 import { attachTenantContext, requireTenantScope } from "../services/core/tenantContext.js";
@@ -697,23 +697,18 @@ app.post("/api/onboarding/complete", authRateLimit("onboarding"), requireBodyFie
     }
 });
 
-/** Super Admin — tenant list from platform registry with Firestore fallback */
+/** Super Admin — tenant directory from Firestore companies/* (B-MC-5a). */
 app.get("/api/platform/companies", requirePlatformAccess(), async (req, res) => {
     try {
         const adapter = await getStorageAdapter();
-        let items = listPlatformCompanies();
-        let source = "platform-registry";
+        const items = await listAllCompaniesFromStorage();
+        const source = platformCompanyDirectorySource(adapter.name);
 
-        if (!items.length) {
-            items = await listAllCompaniesFromStorage();
-            source = items.length ? "firestore" : "empty";
-        }
-
-        items = await Promise.all(items.map(enrichCompanyIntegrationStatus));
+        const enriched = await Promise.all(items.map(enrichCompanyIntegrationStatus));
 
         res.json({
-            items,
-            total: items.length,
+            items: enriched,
+            total: enriched.length,
             isDemo: false,
             storage: adapter.name,
             source,
@@ -726,10 +721,7 @@ app.get("/api/platform/companies", requirePlatformAccess(), async (req, res) => 
 
 app.get("/api/platform/companies/:companyId", requirePlatformAccess(), async (req, res) => {
     try {
-        let record = getPlatformCompany(req.params.companyId);
-        if (!record) {
-            record = await getCompany(req.params.companyId);
-        }
+        const record = await getCompany(req.params.companyId);
         if (!record) return res.status(404).json({ error: "Company not found" });
         res.json({ company: await enrichCompanyIntegrationStatus(record) });
     } catch (err) {
@@ -1158,7 +1150,7 @@ app.post(
 });
 
 /** Cross-links for admin UI navigation */
-app.get("/api/platform/companies/:companyId/links", async (req, res) => {
+app.get("/api/platform/companies/:companyId/links", requirePlatformAccess(), async (req, res) => {
     try {
         const data = await getCompanyLinks(req.params.companyId);
         res.json(data);

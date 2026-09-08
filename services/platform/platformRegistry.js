@@ -1,5 +1,6 @@
 /**
- * Platform registry — super-admin visibility for onboarded tenants (memory-backed for demo).
+ * Platform registry — in-memory ops cache for onboarding/activity (not the production directory).
+ * Mission Control GET /api/platform/companies reads Firestore companies/* (B-MC-5a).
  */
 import { getCompany } from "../tenants/companyService.js";
 import { getTenantBilling } from "../payments/billingService.js";
