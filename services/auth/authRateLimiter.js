@@ -10,6 +10,7 @@ const DEFAULTS = {
     auth: { windowMs: 60_000, max: 30 },
     "platform-companies": { windowMs: 60_000, max: 30 },
     "platform-integrations": { windowMs: 60_000, max: 20 },
+    "health-probe": { windowMs: 60_000, max: 120 },
 };
 
 function hit(key, { windowMs, max }) {

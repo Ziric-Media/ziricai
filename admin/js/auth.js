@@ -89,20 +89,14 @@ export function isActiveStatus(status) {
 
 /**
  * Whether tenant scope enforcement is lax (demo fallback allowed).
- * Cached from /api/admin/config on first call.
+ * Uses the documented production default — /api/admin/config requires platform auth.
  */
 export async function isLaxTenantMode() {
   if (cachedEnforcement !== null) {
     return cachedEnforcement === 'lax';
   }
-  try {
-    const res = await fetch(`${getApiBase()}/api/admin/config`);
-    const data = await res.json().catch(() => ({}));
-    cachedEnforcement = (data.tenantScopeEnforcement || 'lax').toLowerCase();
-  } catch {
-    cachedEnforcement = 'lax';
-  }
-  return cachedEnforcement === 'lax';
+  cachedEnforcement = 'lax';
+  return true;
 }
 
 /**

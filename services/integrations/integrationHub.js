@@ -11,6 +11,7 @@ import { isRetryableOutboundError } from "./metaWhatsAppErrors.js";
 import { handleWebhookRequest, handleWhatsAppWebhook, handleLegacyWhatsAppWebhook } from "./webhookRouter.js";
 import { ingest, ingestBatch } from "./conversationPipeline.js";
 import { requireTenantOrPlatformAccess } from "../core/tenantContext.js";
+import { requirePlatformAccess } from "../auth/platformAuth.js";
 import { listChannelIntegrations } from "../tenants/integrationService.js";
 
 let initialized = false;
@@ -118,7 +119,7 @@ export function mountIntegrationRoutes(app) {
         });
     });
 
-    app.get("/api/integrations/health", (req, res) => {
+    app.get("/api/integrations/health", requirePlatformAccess(), (req, res) => {
         const companyId = req.query.companyId || process.env.DEFAULT_COMPANY_ID || null;
         res.json({
             status: "ok",

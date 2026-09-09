@@ -4,6 +4,7 @@
 import express from "express";
 import { bootstrapEnv } from "../services/env/startupEnv.js";
 import { getConfiguredStorageBackend } from "../services/storage/storageAdapter.js";
+import { authRateLimit } from "../services/auth/authRateLimiter.js";
 
 bootstrapEnv();
 
@@ -28,8 +29,10 @@ async function earlyHealthHandler(req, res) {
     });
 }
 
-app.get("/api/health", earlyHealthHandler);
-app.get("/health", earlyHealthHandler);
+const healthProbeLimit = authRateLimit("health-probe");
+
+app.get("/api/health", healthProbeLimit, earlyHealthHandler);
+app.get("/health", healthProbeLimit, earlyHealthHandler);
 
 logStartup("ZiricAI booting", {
     node: process.version,

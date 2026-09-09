@@ -22,8 +22,11 @@ export const API_VERSION = "1";
 /** @type {RouteDefinition[]} */
 export const ROUTE_CATALOG = [
     // Health & platform
-    { method: "GET", path: "/api/health", domain: "platform", tenantScoped: false, description: "Health check + storage backend" },
-    { method: "GET", path: "/api/admin/config", domain: "platform", tenantScoped: false, description: "Admin config snapshot (masked secrets)" },
+    { method: "GET", path: "/api/health", domain: "platform", tenantScoped: false, description: "Public liveness probe (status + timestamp)" },
+    { method: "GET", path: "/health", domain: "platform", tenantScoped: false, description: "Public liveness probe alias (status + timestamp)" },
+    { method: "GET", path: "/api/platform/health", domain: "platform", tenantScoped: false, description: "Full operational diagnostics (platform auth)" },
+    { method: "GET", path: "/api/admin/config", domain: "platform", tenantScoped: false, description: "Admin config snapshot (platform auth, masked secrets)" },
+    { method: "GET", path: "/api/integrations/health", domain: "integrations", tenantScoped: false, description: "Integration hub diagnostics (platform auth)" },
 
     // Operations (superadmin)
     { method: "GET", path: "/api/operations/metrics", domain: "operations", tenantScoped: false, description: "Platform metrics (optional ?companyId= for tenant CRM aggregation)" },

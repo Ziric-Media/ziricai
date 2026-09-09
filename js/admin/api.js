@@ -7,7 +7,7 @@ async function request(path, options = {}) {
 }
 
 export async function fetchHealth() {
-  return request('/api/health');
+  return request('/api/platform/health');
 }
 
 export async function fetchOperationsMetrics() {

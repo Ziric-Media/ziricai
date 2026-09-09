@@ -192,7 +192,7 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-async function healthHandler(req, res) {
+async function platformHealthHandler(req, res) {
     try {
         const adapter = await getStorageAdapter();
         const configured = process.env.STORAGE_BACKEND || getConfiguredStorageBackend();
@@ -231,8 +231,15 @@ async function healthHandler(req, res) {
     }
 }
 
+function publicHealthHandler(req, res) {
+    res.json({
+        status: "ok",
+        timestamp: new Date().toISOString(),
+    });
+}
+
 export function createHealthHandler() {
-    return healthHandler;
+    return publicHealthHandler;
 }
 
 export async function setupApp(app) {
@@ -1346,7 +1353,9 @@ app.post("/api/companies/:companyId/knowledge/upload", requireTenantScope(), che
     }
 });
 
-app.get("/api/admin/config", (req, res) => {
+app.get("/api/platform/health", requirePlatformAccess(), platformHealthHandler);
+
+app.get("/api/admin/config", requirePlatformAccess(), (req, res) => {
     const phoneId = process.env.PHONE_NUMBER_ID || "";
     res.json({
         firebase: { projectId: "ziricai" },
