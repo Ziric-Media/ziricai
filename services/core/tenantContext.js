@@ -9,6 +9,7 @@ import {
     getTenantMembership,
     assertMfaIfRequired,
 } from "../auth/authService.js";
+import { hasPlatformApiKeyAccess } from "../auth/platformAuth.js";
 import { auditLog } from "../audit/auditLog.js";
 
 const ENFORCEMENT = (process.env.TENANT_SCOPE_ENFORCEMENT || "lax").toLowerCase();
@@ -98,6 +99,77 @@ export async function assertTenantAccess(ctx) {
 
         assertMfaIfRequired(ctx.profile);
     }
+}
+
+/**
+ * Integration read authorization — always enforced (independent of TENANT_SCOPE_ENFORCEMENT=lax).
+ * Allows: platform API key, superadmin Firebase session, or authenticated tenant member.
+ * @param {{ companyId: string|null, uid: string|null, isSuperAdmin: boolean, profile?: object }} ctx
+ * @param {import('express').Request} req
+ * @returns {Promise<{ via: 'api_key'|'superadmin'|'tenant' }>}
+ */
+export async function assertIntegrationReadAccess(ctx, req) {
+    if (!ctx.companyId) {
+        throw Object.assign(new Error("companyId is required"), { status: 400, code: "MISSING_COMPANY_ID" });
+    }
+
+    if (hasPlatformApiKeyAccess(req)) {
+        return { via: "api_key" };
+    }
+
+    if (ctx.isSuperAdmin) {
+        return { via: "superadmin" };
+    }
+
+    if (!ctx.uid) {
+        throw Object.assign(new Error("Authentication required"), { status: 401, code: "UNAUTHORIZED" });
+    }
+
+    if (!ctx.profile) {
+        throw Object.assign(new Error("User profile not found — complete onboarding or contact support"), {
+            status: 403,
+            code: "PROFILE_REQUIRED",
+        });
+    }
+
+    if (!userBelongsToCompany(ctx.profile, ctx.companyId)) {
+        auditLog("cross_tenant_denied", {
+            uid: ctx.uid,
+            requestedCompanyId: ctx.companyId,
+            profileCompanyId: ctx.profile.companyId || ctx.profile.company,
+            surface: "integration_read",
+        });
+        throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
+    }
+
+    const membership = await getTenantMembership(ctx.uid, ctx.companyId);
+    if (!membership) {
+        throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
+    }
+
+    assertMfaIfRequired(ctx.profile);
+    return { via: "tenant" };
+}
+
+/**
+ * Middleware for integration read routes (channels, logs).
+ * Enforces tenant or platform access regardless of global lax/strict setting.
+ */
+export function requireTenantOrPlatformAccess() {
+    return async (req, res, next) => {
+        try {
+            const ctx = await resolveTenantContext(req);
+            req.tenant = ctx;
+            req.integrationReadAuth = await assertIntegrationReadAccess(ctx, req);
+            next();
+        } catch (err) {
+            const status = err.status || 403;
+            res.status(status).json({
+                error: err.message || "Access denied",
+                code: err.code || "TENANT_ERROR",
+            });
+        }
+    };
 }
 
 /**

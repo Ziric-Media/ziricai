@@ -10,7 +10,7 @@ import { IntegrationError, RateLimitError, AdapterNotConfiguredError } from "./e
 import { isRetryableOutboundError } from "./metaWhatsAppErrors.js";
 import { handleWebhookRequest, handleWhatsAppWebhook, handleLegacyWhatsAppWebhook } from "./webhookRouter.js";
 import { ingest, ingestBatch } from "./conversationPipeline.js";
-import { requireTenantScope } from "../core/tenantContext.js";
+import { requireTenantOrPlatformAccess } from "../core/tenantContext.js";
 import { listChannelIntegrations } from "../tenants/integrationService.js";
 
 let initialized = false;
@@ -129,14 +129,14 @@ export function mountIntegrationRoutes(app) {
         });
     });
 
-    app.get("/api/integrations/logs/:companyId", requireTenantScope({ optional: true }), (req, res) => {
+    app.get("/api/integrations/logs/:companyId", requireTenantOrPlatformAccess(), (req, res) => {
         const limit = Number(req.query.limit) || 50;
         const channel = req.query.channel || undefined;
         const logs = getIntegrationLogs(req.params.companyId, { limit, channel });
         res.json({ items: logs, count: logs.length });
     });
 
-    app.get("/api/integrations/channels/:companyId", requireTenantScope({ optional: true }), async (req, res) => {
+    app.get("/api/integrations/channels/:companyId", requireTenantOrPlatformAccess(), async (req, res) => {
         const companyId = req.params.companyId;
         const integrations = await listChannelIntegrations(companyId, "whatsapp");
         res.json({

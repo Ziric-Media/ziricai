@@ -4,17 +4,28 @@
 import { resolveAuthFromRequest } from "./authService.js";
 import { auditLog } from "../audit/auditLog.js";
 
-const PLATFORM_KEY = process.env.PLATFORM_API_KEY || "";
+function getPlatformKey() {
+    return process.env.PLATFORM_API_KEY || "";
+}
 
 function extractApiKey(req) {
-    const header = req.headers["x-platform-api-key"] || req.headers["x-api-key"];
+    const platformKey = getPlatformKey();
+    const headers = req?.headers || {};
+    const header = headers["x-platform-api-key"] || headers["x-api-key"];
     if (header) return String(header).trim();
-    const auth = req.headers.authorization;
+    const auth = headers.authorization;
     if (auth?.startsWith("Bearer ")) {
         const token = auth.slice(7).trim();
-        if (token && PLATFORM_KEY && token === PLATFORM_KEY) return token;
+        if (token && platformKey && token === platformKey) return token;
     }
     return null;
+}
+
+/** True when request carries a valid PLATFORM_API_KEY (always enforced, independent of tenant lax/strict). */
+export function hasPlatformApiKeyAccess(req) {
+    const platformKey = getPlatformKey();
+    const apiKey = extractApiKey(req);
+    return Boolean(platformKey && apiKey === platformKey);
 }
 
 /**
@@ -25,7 +36,8 @@ export function requirePlatformAccess() {
     return async (req, res, next) => {
         try {
             const apiKey = extractApiKey(req);
-            if (PLATFORM_KEY && apiKey === PLATFORM_KEY) {
+            const platformKey = getPlatformKey();
+            if (platformKey && apiKey === platformKey) {
                 req.platformAuth = { via: "api_key" };
                 return next();
             }
