@@ -110,7 +110,8 @@ function envWhatsAppConfigured() {
     };
 }
 
-function assessRuntimeReadiness(integration) {
+/** Server-side runtime readiness (uses raw integration record, not masked API fields). */
+export function assessRuntimeReadiness(integration) {
     const missing = [];
     if (!integration?.phoneNumberId) {
         missing.push("phoneNumberId");

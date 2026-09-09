@@ -6,6 +6,7 @@ import { TENANT_COLLECTIONS } from "../database/schema.js";
 import { getAdminFirestore, isServerSide } from "../database/firestoreAdmin.js";
 import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { memoryFindAll } from "../database/tenantRepository.js";
+import { assessRuntimeReadiness } from "./platformWhatsAppIntegrationService.js";
 
 const PROVIDER_WHATSAPP = "whatsapp";
 const ACTIVE_WHATSAPP_STATUSES = new Set(["active", "connected"]);
@@ -239,4 +240,22 @@ export async function getPlatformWhatsAppIntegration(companyId) {
     const raw = await getWhatsAppIntegration(companyId);
     if (!raw) return null;
     return sanitizeIntegrationForPlatform(raw);
+}
+
+/**
+ * Mission Control read WhatsApp integration + runtime readiness (B-MC-5c-2c).
+ * Readiness is computed from the raw integration doc (unmasked phoneNumberId).
+ * @param {string} companyId
+ * @returns {Promise<{ integration: object, runtimeReady: boolean, missing: string[] }|null>}
+ */
+export async function getPlatformWhatsAppIntegrationWithReadiness(companyId) {
+    const raw = await getWhatsAppIntegration(companyId);
+    if (!raw) return null;
+    const integration = sanitizeIntegrationForPlatform(raw);
+    const readiness = assessRuntimeReadiness(raw);
+    return {
+        integration,
+        runtimeReady: readiness.runtimeReady,
+        missing: readiness.missing,
+    };
 }

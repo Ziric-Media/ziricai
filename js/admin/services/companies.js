@@ -100,12 +100,30 @@ export function maskApiKey(key) {
  * whatsappConnected is integration-derived on the backend (B-MC-5a) — pass through only.
  */
 export function normalizeCompanyItem(raw = {}) {
+  const wa = raw.whatsappIntegration || null;
   return {
     ...raw,
     id: raw.id || raw.companyId,
     plan: raw.plan || raw.billing?.planId || 'trial',
     status: raw.status || 'active',
     whatsappConnected: raw.whatsappConnected === true,
+    whatsappIntegration: wa
+      ? {
+          status: wa.status ?? null,
+          phoneNumberId: wa.phoneNumberId ?? null,
+          displayPhoneNumber: wa.displayPhoneNumber ?? null,
+          credentialsSource: wa.credentialsSource ?? null,
+          runtimeReady: wa.runtimeReady ?? null,
+          missing: Array.isArray(wa.missing) ? wa.missing : [],
+        }
+      : {
+          status: null,
+          phoneNumberId: null,
+          displayPhoneNumber: null,
+          credentialsSource: null,
+          runtimeReady: null,
+          missing: [],
+        },
   };
 }
 

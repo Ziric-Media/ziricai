@@ -7,7 +7,11 @@ import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { companyRef, setDoc, getDoc, serverTimestamp } from "../database/firestoreClient.js";
 import { getAdminFirestore, isServerSide } from "../database/firestoreAdmin.js";
 import { portalUrlForCompany } from "../core/siteUrls.js";
-import { getWhatsAppIntegration } from "./integrationService.js";
+import {
+    getWhatsAppIntegration,
+    sanitizeIntegrationForPlatform,
+} from "./integrationService.js";
+import { assessRuntimeReadiness } from "./platformWhatsAppIntegrationService.js";
 
 const ACTIVE_WHATSAPP_STATUSES = new Set(["active", "connected"]);
 
@@ -352,14 +356,46 @@ export async function deleteCompanyRecord(companyId) {
     throw new Error("Company delete requires Firestore or memory storage backend");
 }
 
+/** Compact WhatsApp integration summary for Mission Control list rows (B-MC-5c-2c). */
+export function buildWhatsAppIntegrationSummary(wa) {
+    if (!wa) {
+        return {
+            status: null,
+            phoneNumberId: null,
+            displayPhoneNumber: null,
+            credentialsSource: null,
+            runtimeReady: null,
+            missing: [],
+        };
+    }
+
+    const sanitized = sanitizeIntegrationForPlatform(wa);
+    const { runtimeReady, missing } = assessRuntimeReadiness(wa);
+
+    return {
+        status: sanitized.status ?? null,
+        phoneNumberId: sanitized.phoneNumberId ?? null,
+        displayPhoneNumber: sanitized.displayPhoneNumber ?? null,
+        credentialsSource: sanitized.credentialsSource ?? null,
+        runtimeReady,
+        missing,
+    };
+}
+
 /** Merge live WhatsApp integration status for Mission Control company lists. */
 export async function enrichCompanyIntegrationStatus(company) {
     if (!company?.id) return company;
 
     try {
         const wa = await getWhatsAppIntegration(company.id);
-        return applyWhatsAppDisplayFromIntegration(company, wa);
+        return {
+            ...applyWhatsAppDisplayFromIntegration(company, wa),
+            whatsappIntegration: buildWhatsAppIntegrationSummary(wa),
+        };
     } catch {
-        return applyWhatsAppDisplayFromIntegration(company, null);
+        return {
+            ...applyWhatsAppDisplayFromIntegration(company, null),
+            whatsappIntegration: buildWhatsAppIntegrationSummary(null),
+        };
     }
 }

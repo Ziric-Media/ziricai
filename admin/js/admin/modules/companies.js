@@ -17,18 +17,35 @@ import {
   suspendCompany,
   activateCompany,
 } from '../services/companies.js';
-import { provisionCompanyWorkspace } from '../api.js';
+import {
+  provisionCompanyWorkspace,
+  fetchPlatformWhatsAppIntegration,
+  registerPlatformWhatsAppIntegration,
+  configurePlatformWhatsAppIntegration,
+  activatePlatformWhatsAppIntegration,
+  deactivatePlatformWhatsAppIntegration,
+} from '../api.js';
 import { navigateTo } from '../router.js';
 import { withTimeout } from '../utils.js';
 import { DEMO_COMPANIES, DEMO_AGENTS, DEMO_KNOWLEDGE, PLAN_AMOUNTS } from '../demo-data.js';
 import { isDemoDataAllowed, resolveListItems } from '../services/dataMode.js';
 import { formatPrice } from '../../shared/billingPlans.js';
+import {
+  whatsappIntegrationTableLabel,
+  whatsappIntegrationTableIconClass,
+  credentialsSourceLabel,
+  humanizeMissingRequirement,
+  integrationCardState,
+  isActiveIntegrationStatus,
+} from '../services/whatsappIntegrationDisplay.js';
 
 let filters = { search: '', plan: '', status: '' };
 let deleteTargetId = null;
 let listLoadState = 'ok';
 let listSource = 'api';
 let listError = null;
+/** @type {string|null} company id for open integration modals */
+let waModalCompanyId = null;
 
 export async function renderCompanies(container) {
   container.innerHTML = loadingState('Loading companies...');
@@ -116,6 +133,7 @@ function buildListMarkup(companies, isDemo, sourceBadge = '', loadState = 'ok') 
 
     ${buildFormSlideOver()}
     ${buildDeleteModal()}
+    ${buildWhatsAppModals()}
   `;
 }
 
@@ -142,20 +160,13 @@ function logoCell(company) {
   return `<span class="logo-fallback table-logo-fallback">${escapeHtml(companyInitials(company.name))}</span>`;
 }
 
-/** Integration-derived WhatsApp status from platform API (B-MC-5b). */
-function isIntegrationWhatsAppConnected(company) {
-  return company?.whatsappConnected === true;
-}
-
+/** Lifecycle-aware WhatsApp column from company.whatsappIntegration (B-MC-5c-2c). */
 function whatsappCell(company) {
-  if (isIntegrationWhatsAppConnected(company)) {
-    const label = company.whatsappNumber || 'Connected';
-    return `<span class="wa-cell"><i class="fa-solid fa-circle-check wa-connected" title="Connected via tenant integration"></i> ${escapeHtml(label)}</span>`;
-  }
-  if (company.whatsappNumber) {
-    return `<span class="wa-cell"><i class="fa-solid fa-circle-xmark wa-disconnected" title="Not connected"></i> ${escapeHtml(company.whatsappNumber)}</span>`;
-  }
-  return '<span class="text-muted">Not connected</span>';
+  const label = whatsappIntegrationTableLabel(company);
+  const iconClass = whatsappIntegrationTableIconClass(company);
+  const phone = company?.whatsappIntegration?.phoneNumberId;
+  const phoneHint = phone ? `<span class="wa-phone-hint">${escapeHtml(phone)}</span>` : '';
+  return `<span class="wa-cell ${iconClass}"><i class="fa-brands fa-whatsapp"></i> ${escapeHtml(label)}${phoneHint}</span>`;
 }
 
 function actionMenu(company) {
@@ -335,21 +346,10 @@ function buildFormSlideOver() {
           </div>
         </div>
 
-        <div class="form-section">
-          <h4><i class="fa-brands fa-whatsapp"></i> WhatsApp Configuration</h4>
-          <div class="form-row">
-            <div class="form-group"><label for="companyWhatsapp">WhatsApp Number</label><input type="tel" id="companyWhatsapp" placeholder="+27 71 000 1234" /></div>
-            <div class="form-group"><label for="companyWhatsappBusinessId">Business Account ID</label><input type="text" id="companyWhatsappBusinessId" placeholder="WABA-..." /></div>
-          </div>
-          <div class="form-group"><label for="companyWhatsappWebhook">Webhook URL</label><input type="url" id="companyWhatsappWebhook" placeholder="https://api.ziric.ai/webhook/..." /></div>
-          <div class="form-group form-check">
-            <label class="checkbox-label">
-              <input type="checkbox" id="companyWhatsappConnected" />
-              <span>Company profile: WhatsApp connected flag</span>
-            </label>
-            <p class="form-hint" style="margin:6px 0 0;font-size:12px;color:var(--text-secondary);">
-              The Companies table shows live WhatsApp status from the tenant integration (platform API), not this checkbox.
-            </p>
+        <div class="form-section" id="whatsappIntegrationSection">
+          <h4><i class="fa-brands fa-whatsapp"></i> WhatsApp Integration</h4>
+          <div id="whatsappIntegrationCard" class="whatsapp-integration-card">
+            <p class="text-muted integration-card-hint">Save the company first to manage WhatsApp integration.</p>
           </div>
         </div>
 
@@ -378,6 +378,386 @@ function buildFormSlideOver() {
       </div>
     </div>
   `;
+}
+
+function buildWhatsAppModals() {
+  return `
+    <div class="wizard-overlay" id="waRegisterModal">
+      <div class="wizard-modal" style="max-width:520px;">
+        <div class="wizard-header">
+          <div><h2>Register WhatsApp integration</h2></div>
+          <button class="btn btn-secondary btn-sm" type="button" data-wa-close="waRegisterModal"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="wizard-body">
+          <p class="form-hint">Optional metadata — you can configure details after registration.</p>
+          <div class="form-group">
+            <label for="waRegisterCredentialsSource">Credentials source</label>
+            <select id="waRegisterCredentialsSource">
+              <option value="env" selected>Environment (server-managed)</option>
+              <option value="tenant">Tenant-managed</option>
+            </select>
+            <p class="form-hint" id="waRegisterCredentialsHint">WhatsApp credentials are managed on the server environment. This form does not store tokens.</p>
+          </div>
+          <div class="form-group"><label for="waRegisterPhoneNumberId">Phone number ID</label><input type="text" id="waRegisterPhoneNumberId" placeholder="Meta phone_number_id (digits)" /></div>
+          <div class="form-group"><label for="waRegisterDisplayPhone">Display phone number</label><input type="tel" id="waRegisterDisplayPhone" placeholder="+27 71 000 1234" /></div>
+          <div class="form-group"><label for="waRegisterBusinessAccountId">Business account ID</label><input type="text" id="waRegisterBusinessAccountId" placeholder="Optional WABA ID" /></div>
+        </div>
+        <div class="wizard-footer">
+          <button class="btn btn-secondary" type="button" data-wa-close="waRegisterModal">Cancel</button>
+          <button class="btn btn-primary" type="button" id="waRegisterSubmit"><i class="fa-solid fa-plus"></i> Register</button>
+        </div>
+      </div>
+    </div>
+    <div class="wizard-overlay" id="waConfigureModal">
+      <div class="wizard-modal" style="max-width:520px;">
+        <div class="wizard-header">
+          <div><h2>Configure integration</h2></div>
+          <button class="btn btn-secondary btn-sm" type="button" data-wa-close="waConfigureModal"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="wizard-body">
+          <div class="form-group">
+            <label for="waConfigureCredentialsSource">Credentials source</label>
+            <select id="waConfigureCredentialsSource">
+              <option value="env">Environment (server-managed)</option>
+              <option value="tenant">Tenant-managed</option>
+            </select>
+            <p class="form-hint" id="waConfigureCredentialsHint">WhatsApp credentials are managed on the server environment. This form does not store tokens.</p>
+          </div>
+          <div class="form-group"><label for="waConfigurePhoneNumberId">Phone number ID</label><input type="text" id="waConfigurePhoneNumberId" placeholder="Meta phone_number_id (digits)" /></div>
+          <div class="form-group"><label for="waConfigureDisplayPhone">Display phone number</label><input type="tel" id="waConfigureDisplayPhone" placeholder="+27 71 000 1234" /></div>
+          <div class="form-group"><label for="waConfigureBusinessAccountId">Business account ID</label><input type="text" id="waConfigureBusinessAccountId" placeholder="Optional WABA ID" /></div>
+        </div>
+        <div class="wizard-footer">
+          <button class="btn btn-secondary" type="button" data-wa-close="waConfigureModal">Cancel</button>
+          <button class="btn btn-primary" type="button" id="waConfigureSubmit"><i class="fa-solid fa-sliders"></i> Save configuration</button>
+        </div>
+      </div>
+    </div>
+    <div class="wizard-overlay" id="waActivateModal">
+      <div class="wizard-modal" style="max-width:520px;">
+        <div class="wizard-header">
+          <div><h2>Activate WhatsApp integration?</h2></div>
+          <button class="btn btn-secondary btn-sm" type="button" data-wa-close="waActivateModal"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="wizard-body">
+          <p style="color:var(--text-secondary);line-height:1.6;">
+            This marks the integration as <strong>active</strong> in Mission Control and enables active integration routing for this phone number ID.
+            It does <strong>not</strong> configure Meta or store access tokens.
+          </p>
+          <div class="form-group form-check" id="waActivateAckRow" style="display:none;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="waActivateAck" />
+              <span>I acknowledge the configured phone number ID may differ from the server environment phone number ID.</span>
+            </label>
+          </div>
+          <div id="waActivateResult" class="wa-activate-result" hidden></div>
+        </div>
+        <div class="wizard-footer">
+          <button class="btn btn-secondary" type="button" data-wa-close="waActivateModal">Cancel</button>
+          <button class="btn btn-primary" type="button" id="waActivateSubmit"><i class="fa-solid fa-play"></i> Activate integration</button>
+        </div>
+      </div>
+    </div>
+    <div class="wizard-overlay" id="waDeactivateModal">
+      <div class="wizard-modal" style="max-width:520px;">
+        <div class="wizard-header">
+          <div><h2>Deactivate WhatsApp integration?</h2></div>
+          <button class="btn btn-secondary btn-sm" type="button" data-wa-close="waDeactivateModal"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="wizard-body">
+          <p style="color:var(--text-secondary);line-height:1.6;">
+            This will stop the integration from being treated as <strong>active</strong>.
+            Your configuration will be retained and can be activated again later.
+          </p>
+          <div class="form-group">
+            <label for="waDeactivateReason">Reason (optional)</label>
+            <input type="text" id="waDeactivateReason" placeholder="Optional note for audit log" />
+          </div>
+        </div>
+        <div class="wizard-footer">
+          <button class="btn btn-secondary" type="button" data-wa-close="waDeactivateModal">Cancel</button>
+          <button class="btn btn-warning" type="button" id="waDeactivateSubmit"><i class="fa-solid fa-pause"></i> Deactivate integration</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderWhatsAppIntegrationCardContent(payload) {
+  const { loadState, integration, runtimeReady, missing, error } = payload;
+
+  if (loadState === 'loading') {
+    return `<div class="integration-card-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading integration…</div>`;
+  }
+  if (loadState === 'error') {
+    return `
+      ${errorState(error || 'Unable to load integration')}
+      <div style="text-align:center;margin-top:12px;">
+        <button class="btn btn-secondary btn-sm" type="button" id="waIntegrationRetry"><i class="fa-solid fa-rotate-right"></i> Retry</button>
+      </div>`;
+  }
+  if (loadState === 'not_registered') {
+    return `
+      <div class="integration-card-status wa-none">
+        <span class="integration-status-label">Not registered</span>
+      </div>
+      <p class="form-hint">No WhatsApp integration document exists for this company.</p>
+      <button class="btn btn-primary btn-sm" type="button" id="waOpenRegister"><i class="fa-solid fa-plus"></i> Register WhatsApp integration</button>`;
+  }
+
+  const state = integrationCardState(integration, runtimeReady, missing);
+  const status = integration?.status || '—';
+  const statusLabel = String(status).replace(/_/g, ' ');
+  const runtimeBlock = isActiveIntegrationStatus(status)
+    ? (runtimeReady
+      ? '<div class="integration-runtime ready"><i class="fa-solid fa-circle-check"></i> Runtime ready</div>'
+      : `<div class="integration-runtime warn"><i class="fa-solid fa-triangle-exclamation"></i> Runtime not fully ready</div>
+         ${missing?.length ? `<ul class="integration-missing">${missing.map((k) => `<li>${escapeHtml(humanizeMissingRequirement(k))}</li>`).join('')}</ul>` : ''}`)
+    : '';
+
+  let actions = '';
+  if (state === 'pending' || state === 'disconnected') {
+    const hasPhone = Boolean(integration?.phoneNumberId);
+    actions = `
+      <div class="integration-card-actions">
+        <button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>
+        <button class="btn btn-primary btn-sm" type="button" id="waOpenActivate" ${hasPhone ? '' : 'disabled title="Phone number ID required"'}><i class="fa-solid fa-play"></i> Activate integration</button>
+      </div>`;
+  } else if (state === 'active_ready' || state === 'active_not_ready') {
+    actions = `
+      <div class="integration-card-actions">
+        <button class="btn btn-warning btn-sm" type="button" id="waOpenDeactivate"><i class="fa-solid fa-pause"></i> Deactivate integration</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>
+      </div>`;
+  } else {
+    actions = `<button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>`;
+  }
+
+  return `
+    <div class="integration-card-status ${escapeHtml(state)}">
+      <span class="integration-status-label">${escapeHtml(statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1))}</span>
+    </div>
+    ${runtimeBlock}
+    <dl class="integration-details">
+      <div><dt>Phone number ID</dt><dd>${escapeHtml(integration?.phoneNumberId || '—')}</dd></div>
+      <div><dt>Display phone</dt><dd>${escapeHtml(integration?.displayPhoneNumber || '—')}</dd></div>
+      <div><dt>Credentials</dt><dd>${escapeHtml(credentialsSourceLabel(integration?.credentialsSource))}</dd></div>
+      <div><dt>Business account ID</dt><dd>${escapeHtml(integration?.businessAccountId || '—')}</dd></div>
+    </dl>
+    ${actions}`;
+}
+
+async function loadWhatsAppIntegrationCard(container, companyId) {
+  const card = container.querySelector('#whatsappIntegrationCard');
+  if (!card) return;
+
+  if (!companyId) {
+    card.innerHTML = '<p class="text-muted integration-card-hint">Save the company first to manage WhatsApp integration.</p>';
+    return;
+  }
+
+  card.innerHTML = renderWhatsAppIntegrationCardContent({ loadState: 'loading' });
+  bindWhatsAppCardActions(container, companyId);
+
+  const res = await fetchPlatformWhatsAppIntegration(companyId);
+  if (res.status === 404) {
+    card.innerHTML = renderWhatsAppIntegrationCardContent({ loadState: 'not_registered' });
+    bindWhatsAppCardActions(container, companyId);
+    return;
+  }
+  if (res.error) {
+    card.innerHTML = renderWhatsAppIntegrationCardContent({
+      loadState: 'error',
+      error: res.error,
+    });
+    bindWhatsAppCardActions(container, companyId);
+    return;
+  }
+
+  const data = res.data || {};
+  card.innerHTML = renderWhatsAppIntegrationCardContent({
+    loadState: 'loaded',
+    integration: data.integration,
+    runtimeReady: data.runtimeReady,
+    missing: data.missing || [],
+  });
+  bindWhatsAppCardActions(container, companyId, data.integration);
+}
+
+function openWaModal(container, modalId) {
+  const backdrop = document.getElementById('overlay');
+  container.querySelector(`#${modalId}`)?.classList.add('open');
+  backdrop?.classList.add('open');
+}
+
+function closeWaModal(container, modalId) {
+  const backdrop = document.getElementById('overlay');
+  container.querySelector(`#${modalId}`)?.classList.remove('open');
+  const anyOpen = container.querySelector('.wizard-overlay.open');
+  if (!anyOpen && !container.querySelector('#companyFormPanel.open')) {
+    backdrop?.classList.remove('open');
+  }
+}
+
+function bindWhatsAppCardActions(container, companyId, integration = null) {
+  waModalCompanyId = companyId;
+
+  container.querySelector('#waIntegrationRetry')?.addEventListener('click', () => {
+    loadWhatsAppIntegrationCard(container, companyId);
+  });
+  container.querySelector('#waOpenRegister')?.addEventListener('click', () => {
+    const hint = container.querySelector('#waRegisterCredentialsHint');
+    const sel = container.querySelector('#waRegisterCredentialsSource');
+    const updateHint = () => {
+      if (!hint || !sel) return;
+      hint.textContent = sel.value === 'tenant'
+        ? 'Per-tenant credentials are not available in this pilot. Runtime will remain not ready until tenant credential support is implemented.'
+        : 'WhatsApp credentials are managed on the server environment. This form does not store tokens.';
+    };
+    sel?.addEventListener('change', updateHint);
+    updateHint();
+    openWaModal(container, 'waRegisterModal');
+  });
+  container.querySelector('#waOpenConfigure')?.addEventListener('click', () => {
+    const sel = container.querySelector('#waConfigureCredentialsSource');
+    const hint = container.querySelector('#waConfigureCredentialsHint');
+    if (integration) {
+      container.querySelector('#waConfigurePhoneNumberId').value = integration.phoneNumberId?.startsWith('***')
+        ? '' : (integration.phoneNumberId || '');
+      container.querySelector('#waConfigureDisplayPhone').value = integration.displayPhoneNumber || '';
+      container.querySelector('#waConfigureBusinessAccountId').value = integration.businessAccountId || '';
+      if (sel) sel.value = integration.credentialsSource || 'env';
+    }
+    const updateHint = () => {
+      if (!hint || !sel) return;
+      hint.textContent = sel.value === 'tenant'
+        ? 'Per-tenant credentials are not available in this pilot. Runtime will remain not ready until tenant credential support is implemented.'
+        : 'WhatsApp credentials are managed on the server environment. This form does not store tokens.';
+    };
+    sel?.addEventListener('change', updateHint);
+    updateHint();
+    openWaModal(container, 'waConfigureModal');
+  });
+  container.querySelector('#waOpenActivate')?.addEventListener('click', () => {
+    const ackRow = container.querySelector('#waActivateAckRow');
+    const result = container.querySelector('#waActivateResult');
+    if (ackRow) ackRow.style.display = 'none';
+    if (result) {
+      result.hidden = true;
+      result.innerHTML = '';
+    }
+    container.querySelector('#waActivateAck').checked = false;
+    openWaModal(container, 'waActivateModal');
+  });
+  container.querySelector('#waOpenDeactivate')?.addEventListener('click', () => {
+    container.querySelector('#waDeactivateReason').value = '';
+    openWaModal(container, 'waDeactivateModal');
+  });
+}
+
+function bindWhatsAppModalEvents(container) {
+  container.querySelectorAll('[data-wa-close]').forEach((btn) => {
+    btn.addEventListener('click', () => closeWaModal(container, btn.dataset.waClose));
+  });
+
+  container.querySelector('#waRegisterSubmit')?.addEventListener('click', async () => {
+    if (!waModalCompanyId) return;
+    const body = {
+      credentialsSource: container.querySelector('#waRegisterCredentialsSource')?.value || 'env',
+    };
+    const phone = container.querySelector('#waRegisterPhoneNumberId')?.value?.trim();
+    const display = container.querySelector('#waRegisterDisplayPhone')?.value?.trim();
+    const business = container.querySelector('#waRegisterBusinessAccountId')?.value?.trim();
+    if (phone) body.phoneNumberId = phone;
+    if (display) body.displayPhoneNumber = display;
+    if (business) body.businessAccountId = business;
+
+    const res = await registerPlatformWhatsAppIntegration(waModalCompanyId, body);
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
+    showToast('WhatsApp integration registered', 'success');
+    closeWaModal(container, 'waRegisterModal');
+    await loadWhatsAppIntegrationCard(container, waModalCompanyId);
+    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
+    renderCompanies(container);
+  });
+
+  container.querySelector('#waConfigureSubmit')?.addEventListener('click', async () => {
+    if (!waModalCompanyId) return;
+    const body = {
+      credentialsSource: container.querySelector('#waConfigureCredentialsSource')?.value || 'env',
+    };
+    const phone = container.querySelector('#waConfigurePhoneNumberId')?.value?.trim();
+    const display = container.querySelector('#waConfigureDisplayPhone')?.value?.trim();
+    const business = container.querySelector('#waConfigureBusinessAccountId')?.value?.trim();
+    if (phone) body.phoneNumberId = phone;
+    if (display) body.displayPhoneNumber = display;
+    if (business) body.businessAccountId = business;
+
+    const res = await configurePlatformWhatsAppIntegration(waModalCompanyId, body);
+    if (res.error) {
+      const msg = res.status === 409
+        ? 'Phone number ID is already active for another tenant'
+        : res.error;
+      showToast(msg, 'error');
+      return;
+    }
+    showToast('Integration configuration saved', 'success');
+    closeWaModal(container, 'waConfigureModal');
+    await loadWhatsAppIntegrationCard(container, waModalCompanyId);
+    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
+    renderCompanies(container);
+  });
+
+  container.querySelector('#waActivateSubmit')?.addEventListener('click', async () => {
+    if (!waModalCompanyId) return;
+    const ack = container.querySelector('#waActivateAck')?.checked === true;
+    const res = await activatePlatformWhatsAppIntegration(waModalCompanyId, {
+      acknowledgeEnvCredentials: ack,
+    });
+    if (res.error) {
+      if (/acknowledgeEnvCredentials/i.test(res.error)) {
+        const ackRow = container.querySelector('#waActivateAckRow');
+        if (ackRow) ackRow.style.display = 'block';
+      }
+      showToast(res.error, 'error');
+      return;
+    }
+    const data = res.data || {};
+    const result = container.querySelector('#waActivateResult');
+    if (result) {
+      const missing = data.missing || [];
+      result.hidden = false;
+      result.innerHTML = `
+        <div class="integration-activate-summary ${data.runtimeReady ? 'ready' : 'warn'}">
+          <p><strong>Status:</strong> ${escapeHtml(data.integration?.status || 'active')}</p>
+          <p><strong>Runtime:</strong> ${data.runtimeReady ? 'Ready' : 'Not fully ready'}</p>
+          ${missing.length ? `<ul>${missing.map((k) => `<li>${escapeHtml(humanizeMissingRequirement(k))}</li>`).join('')}</ul>` : ''}
+        </div>`;
+    }
+    showToast(data.runtimeReady ? 'Integration activated' : 'Integration activated — runtime not fully ready', data.runtimeReady ? 'success' : 'warning');
+    closeWaModal(container, 'waActivateModal');
+    await loadWhatsAppIntegrationCard(container, waModalCompanyId);
+    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
+    renderCompanies(container);
+  });
+
+  container.querySelector('#waDeactivateSubmit')?.addEventListener('click', async () => {
+    if (!waModalCompanyId) return;
+    const reason = container.querySelector('#waDeactivateReason')?.value?.trim();
+    const res = await deactivatePlatformWhatsAppIntegration(waModalCompanyId, reason ? { reason } : {});
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
+    showToast('Integration deactivated', 'success');
+    closeWaModal(container, 'waDeactivateModal');
+    await loadWhatsAppIntegrationCard(container, waModalCompanyId);
+    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
+    renderCompanies(container);
+  });
 }
 
 function buildDeleteModal() {
@@ -510,6 +890,7 @@ function bindListEvents(container) {
 
   bindDelegatedActions(container, { openForm, openDeleteModal, closeForm });
   bindDropdownClose(container);
+  bindWhatsAppModalEvents(container);
 }
 
 function bindDropdownClose(container) {
@@ -641,14 +1022,11 @@ function openCompanyForm(container, company, openForm) {
   container.querySelector('#companyAiModel').value = company?.aiModel || 'gpt-4o-mini';
   container.querySelector('#companyAiTemperature').value = company?.aiTemperature ?? 0.7;
   container.querySelector('#companyOpenAiKey').value = company?.openAiApiKey || '';
-  container.querySelector('#companyWhatsapp').value = company?.whatsappNumber || '';
-  container.querySelector('#companyWhatsappBusinessId').value = company?.whatsappBusinessId || '';
-  container.querySelector('#companyWhatsappWebhook').value = company?.whatsappWebhookUrl || '';
-  container.querySelector('#companyWhatsappConnected').checked = Boolean(company?.whatsappConnected);
   container.querySelector('#companyKnowledgeBase').value = company?.knowledgeBaseId || '';
   container.querySelector('#companyKnowledgeMaxDocs').value = company?.knowledgeMaxDocs ?? 500;
   container.querySelector('#companyKnowledgeAutoSync').checked = company?.knowledgeAutoSync !== false;
   openForm();
+  loadWhatsAppIntegrationCard(container, isEdit ? company.id : null);
 }
 
 async function saveCompany(container, closeForm) {
@@ -676,10 +1054,6 @@ async function saveCompany(container, closeForm) {
     aiModel: container.querySelector('#companyAiModel').value,
     aiTemperature: Number(container.querySelector('#companyAiTemperature').value) || 0.7,
     openAiApiKey: container.querySelector('#companyOpenAiKey').value.trim(),
-    whatsappNumber: container.querySelector('#companyWhatsapp').value.trim(),
-    whatsappBusinessId: container.querySelector('#companyWhatsappBusinessId').value.trim(),
-    whatsappWebhookUrl: container.querySelector('#companyWhatsappWebhook').value.trim(),
-    whatsappConnected: container.querySelector('#companyWhatsappConnected').checked,
     knowledgeBaseId: kbSelect.value || null,
     knowledgeBaseName: kbOption?.dataset?.name || '',
     knowledgeMaxDocs: Number(container.querySelector('#companyKnowledgeMaxDocs').value) || 500,

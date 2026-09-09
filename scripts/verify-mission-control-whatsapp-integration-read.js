@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   getPlatformWhatsAppIntegration,
+  getPlatformWhatsAppIntegrationWithReadiness,
   sanitizeIntegrationForPlatform,
   upsertWhatsAppIntegration,
 } from '../services/tenants/integrationService.js';
@@ -49,7 +50,9 @@ const routeBlock = extractRouteBlock(
 );
 assert.match(routeBlock, /requirePlatformAccess\(\)/);
 assert.match(routeBlock, /validateCompanyIdParam\("params"\)/);
-assert.match(routeBlock, /getPlatformWhatsAppIntegration/);
+assert.match(routeBlock, /getPlatformWhatsAppIntegrationWithReadiness/);
+assert.match(routeBlock, /runtimeReady/);
+assert.match(routeBlock, /missing/);
 assert.match(routeBlock, /Company not found/);
 assert.match(routeBlock, /WhatsApp integration not found/);
 
@@ -107,6 +110,13 @@ assert.equal(integration.id, 'whatsapp');
 assert.equal(integration.status, 'active');
 assert.equal(integration.phoneNumberId, '***3699');
 assert.equal(integration.credentialsSource, 'env');
+
+process.env.PHONE_NUMBER_ID = '1209265748933699';
+process.env.WHATSAPP_TOKEN = 'test-token';
+const withReadiness = await getPlatformWhatsAppIntegrationWithReadiness('mc-test-wa');
+assert.equal(withReadiness.integration.status, 'active');
+assert.equal(withReadiness.runtimeReady, true);
+assert.deepEqual(withReadiness.missing, []);
 
 // Missing integration → null (route maps to 404)
 await createCompany('mc-test-no-wa', { name: 'No WA Co' });

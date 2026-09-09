@@ -156,7 +156,10 @@ import {
     getPlatformKnowledgeSummary,
     getRelatedEntries,
 } from "../services/knowledge/platformKnowledgeLoader.js";
-import { getPlatformWhatsAppIntegration } from "../services/tenants/integrationService.js";
+import {
+    getPlatformWhatsAppIntegration,
+    getPlatformWhatsAppIntegrationWithReadiness,
+} from "../services/tenants/integrationService.js";
 import {
     registerPlatformWhatsAppIntegration,
     configurePlatformWhatsAppIntegration,
@@ -755,12 +758,17 @@ app.get(
                 return res.status(404).json({ error: "Company not found" });
             }
 
-            const integration = await getPlatformWhatsAppIntegration(companyId);
-            if (!integration) {
+            const result = await getPlatformWhatsAppIntegrationWithReadiness(companyId);
+            if (!result) {
                 return res.status(404).json({ error: "WhatsApp integration not found", companyId });
             }
 
-            res.json({ companyId, integration });
+            res.json({
+                companyId,
+                integration: result.integration,
+                runtimeReady: result.runtimeReady,
+                missing: result.missing,
+            });
         } catch (err) {
             console.error("[api/platform/companies/:companyId/integrations/whatsapp] error:", err.message);
             res.status(500).json({ error: err.message || "Failed to load WhatsApp integration" });
