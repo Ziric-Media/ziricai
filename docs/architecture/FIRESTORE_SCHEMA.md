@@ -58,14 +58,33 @@ companies/{companyId}/conversations/{convId}/messages/{messageId}
   website: string,
   ownerUid: string,
   ownerEmail: string,
-  whatsappNumber: string,
-  whatsappConnected: boolean,
+  // Deprecated B-MC-5c-2d — do not write via API; may exist on older records
+  whatsappNumber: string,       // legacy display phone (not Meta phoneNumberId)
+  whatsappConnected: boolean,   // legacy compatibility flag (not authoritative)
+  whatsappBusinessId: string,   // deprecated — use integration.businessAccountId
+  whatsappWebhookUrl: string,   // deprecated — runtime webhook is global /webhook
   branding: { primaryColor, whatsappGreeting, logoUrl? },
   createdAt: timestamp,
   updatedAt: timestamp,
   provisionedAt: timestamp
 }
 ```
+
+## Authoritative WhatsApp Integration (B-MC-5c-2d)
+
+WhatsApp connection state is stored at:
+
+`companies/{companyId}/integrations/whatsapp`
+
+| Field | Purpose |
+|-------|---------|
+| `status` | Lifecycle (`active`, `connected`, `pending_configuration`, `disconnected`, …) |
+| `phoneNumberId` | Meta Phone Number ID — **routing only** (never human display) |
+| `displayPhoneNumber` | Optional human-readable phone for UI |
+| `businessAccountId` | Meta WABA / business account ID |
+| `credentialsSource` | `env` or `tenant` — readiness metadata |
+
+Platform GET may still expose deprecated `whatsappConnected` derived from `integration.status` for compatibility.
 
 ## Legacy Collections (Phase 1 — deprecating)
 

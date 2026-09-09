@@ -237,14 +237,6 @@ export async function completeOnboardingStep(sessionId, step, data = {}) {
             session.whatsappConnected = true;
             session.whatsappSimulated = wa.simulate;
             await syncWhatsAppIntegrationStatus(session.companyId);
-            if (store.getPortalCompany && store.savePortalCompany) {
-                const company = (await store.getPortalCompany(session.companyId)) || {};
-                await store.savePortalCompany(session.companyId, {
-                    ...company,
-                    whatsappConnected: true,
-                    whatsappSimulated: wa.simulate,
-                });
-            }
             result.whatsapp = { connected: true, simulated: wa.simulate, ...wa };
             break;
         }
@@ -307,7 +299,6 @@ export async function completeOnboardingStep(sessionId, step, data = {}) {
             await updateCompany(session.companyId, {
                 industry: session.industry || undefined,
                 industryId: session.industryId || undefined,
-                whatsappConnected: session.whatsappConnected,
                 onboardingCompletedAt: timestamp,
             });
 

@@ -35,7 +35,6 @@ const PILOT_COMPANY = {
     email: "info@centralmotorsrtb.co.za",
     phone: "+27 14 000 0000",
     website: "https://centralmotorsrtb.co.za",
-    whatsappConnected: true,
 };
 
 const PILOT_AGENT = {

@@ -104,8 +104,14 @@ export const FIELD_SCHEMA = {
         website: "string",
         ownerUid: "string",
         ownerEmail: "string",
+        /** @deprecated B-MC-5c-2d — use companies/{id}/integrations/whatsapp */
         whatsappNumber: "string",
+        /** @deprecated B-MC-5c-2d — derived from integration.status in API responses */
         whatsappConnected: "boolean",
+        /** @deprecated B-MC-5c-2d — use integration.businessAccountId */
+        whatsappBusinessId: "string",
+        /** @deprecated B-MC-5c-2d — webhook is global /webhook */
+        whatsappWebhookUrl: "string",
         branding: "map",
         createdAt: "timestamp",
         updatedAt: "timestamp",

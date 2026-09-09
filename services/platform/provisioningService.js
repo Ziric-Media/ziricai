@@ -124,8 +124,6 @@ export async function provisionCompany(companyId, companyData = {}) {
         ownerEmail: companyData.ownerEmail || "",
         ownerId: companyData.ownerId || companyData.ownerUid || null,
         ownerUid: companyData.ownerUid || companyData.ownerId || null,
-        whatsappNumber: companyData.whatsappNumber || "",
-        whatsappConnected: Boolean(companyData.whatsappConnected),
         provisionedAt: timestamp,
     });
 
@@ -157,8 +155,6 @@ export async function provisionCompany(companyId, companyData = {}) {
         roleLabel: "Customer Support",
         isDefault: true,
         companyName: name,
-        whatsappNumber: companyData.whatsappNumber || "",
-        whatsappConnected: Boolean(companyData.whatsappConnected),
     });
 
     const knowledgeBaseId = `kb-${companyId}`;
@@ -346,8 +342,6 @@ export async function provisionAgent(companyId, agentId = null, agentData = {}) 
         greetingMessage:
             agentData.greetingMessage ||
             `Hi! I'm ${agentData.name || "your AI assistant"}. How can I help you today?`,
-        whatsappNumber: agentData.whatsappNumber || "",
-        whatsappConnected: Boolean(agentData.whatsappConnected),
         knowledgeBaseId: agentData.knowledgeBaseId || `kb-${companyId}`,
         status: agentData.status || "active",
         isDefault: Boolean(agentData.isDefault),

@@ -76,12 +76,6 @@ function normalizePayload(data, existing = null) {
     agentName: data.agentName ?? existing?.agentName ?? '',
     aiModel: data.aiModel ?? existing?.aiModel ?? 'gpt-4o-mini',
     aiTemperature: Number(data.aiTemperature ?? existing?.aiTemperature ?? 0.7),
-    whatsappNumber: data.whatsappNumber ?? existing?.whatsappNumber ?? '',
-    whatsappConnected: Boolean(
-      data.whatsappConnected ?? (data.whatsappNumber || existing?.whatsappNumber)
-    ),
-    whatsappBusinessId: data.whatsappBusinessId ?? existing?.whatsappBusinessId ?? '',
-    whatsappWebhookUrl: data.whatsappWebhookUrl ?? existing?.whatsappWebhookUrl ?? '',
     openAiApiKey: data.openAiApiKey !== undefined ? data.openAiApiKey : (existing?.openAiApiKey || ''),
     usage: data.usage || existing?.usage || { messages: 0, tokens: 0, period: 'This month' },
     billing,

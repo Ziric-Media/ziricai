@@ -14,6 +14,7 @@ import {
   updateAgent,
   deleteAgent,
   duplicateAgent,
+  isCompanyWhatsAppActive,
 } from '../services/agents.js';
 import { provisionAgentWorkspace, fetchSupervisorReviews } from '../api.js';
 import { withTimeout } from '../utils.js';
@@ -795,8 +796,8 @@ function collectFormPayload(container) {
     humanTakeover: container.querySelector('#empHumanTakeover').checked,
     officeHours: container.querySelector('#empOfficeHours').value.trim(),
     escalationRules: container.querySelector('#empEscalation').value.trim(),
-    whatsappNumber: company?.whatsappNumber || '',
-    whatsappConnected: Boolean(channels.whatsapp && company?.whatsappConnected),
+    whatsappNumber: '',
+    whatsappConnected: Boolean(channels.whatsapp && isCompanyWhatsAppActive(company)),
     status: 'active',
   };
 }

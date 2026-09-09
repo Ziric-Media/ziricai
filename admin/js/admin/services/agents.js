@@ -13,6 +13,7 @@ import {
 } from '../api.js';
 
 const COLLECTION = 'agents';
+export { isCompanyWhatsAppActive } from './agentDisplay.js';
 const DEMO_STORE_KEY = 'ziricai-demo-agents';
 const DEMO_DATA_VERSION = '2025-07-agents-v2';
 const DEMO_VERSION_KEY = 'ziricai-demo-agents-version';

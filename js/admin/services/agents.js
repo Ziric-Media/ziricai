@@ -14,7 +14,12 @@ import {
 } from '../api.js';
 
 const COLLECTION = 'agents';
-export { PRIMARY_PILOT_TENANT_ID, enrichAgentsForDisplay, isWhatsappChannelEnabled } from './agentDisplay.js';
+export {
+  PRIMARY_PILOT_TENANT_ID,
+  enrichAgentsForDisplay,
+  isWhatsappChannelEnabled,
+  isCompanyWhatsAppActive,
+} from './agentDisplay.js';
 const DEMO_STORE_KEY = 'ziricai-demo-agents';
 const DEMO_DATA_VERSION = '2025-07-agents-v2';
 const DEMO_VERSION_KEY = 'ziricai-demo-agents-version';

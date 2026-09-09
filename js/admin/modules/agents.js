@@ -18,6 +18,7 @@ import {
   duplicateAgent,
   enrichAgentsForDisplay,
   isWhatsappChannelEnabled,
+  isCompanyWhatsAppActive,
   PRIMARY_PILOT_TENANT_ID,
 } from '../services/agents.js';
 import { provisionAgentWorkspace, fetchSupervisorReviews } from '../api.js';
@@ -922,8 +923,8 @@ function collectFormPayload(container) {
     humanTakeover: container.querySelector('#empHumanTakeover').checked,
     officeHours: container.querySelector('#empOfficeHours').value.trim(),
     escalationRules: container.querySelector('#empEscalation').value.trim(),
-    whatsappNumber: company?.whatsappNumber || '',
-    whatsappConnected: Boolean(channels.whatsapp && company?.whatsappConnected),
+    whatsappNumber: '',
+    whatsappConnected: Boolean(channels.whatsapp && isCompanyWhatsAppActive(company)),
     status: 'active',
   };
 }

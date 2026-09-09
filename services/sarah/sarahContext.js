@@ -66,7 +66,7 @@ export async function buildSarahContext(req, overrides = {}) {
         integrations: {
             whatsapp: waIntegration || {
                 provider: "whatsapp",
-                status: resolvedCompany?.whatsappConnected ? "connected" : "pending",
+                status: "not_configured",
             },
         },
         plan: workspace?.company?.plan || resolvedCompany?.plan || "trial",

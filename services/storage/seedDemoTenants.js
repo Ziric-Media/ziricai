@@ -34,7 +34,6 @@ const DEMO_TENANTS = [
             status: "active",
             email: "info@centralmotors.co.za",
             phone: "+27 11 555 0100",
-            whatsappConnected: true,
         },
         agent: {
             id: "demo-agent-1",
@@ -78,7 +77,6 @@ const DEMO_TENANTS = [
             status: "active",
             email: "info@ecnfunerals.co.za",
             phone: "+27 31 555 0300",
-            whatsappConnected: true,
         },
         agent: {
             id: "demo-agent-3",

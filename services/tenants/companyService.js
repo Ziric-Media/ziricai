@@ -15,6 +15,24 @@ import { assessRuntimeReadiness } from "./platformWhatsAppIntegrationService.js"
 
 const ACTIVE_WHATSAPP_STATUSES = new Set(["active", "connected"]);
 
+/** @deprecated B-MC-5c-2d — legacy company-root fields; integration doc is authoritative. */
+export const LEGACY_WHATSAPP_ROOT_FIELDS = [
+    "whatsappConnected",
+    "whatsappNumber",
+    "whatsappBusinessId",
+    "whatsappWebhookUrl",
+];
+
+/** Remove obsolete root WhatsApp fields from API/write payloads (does not mutate stored docs). */
+export function stripLegacyWhatsAppRootFields(input = {}) {
+    if (!input || typeof input !== "object") return {};
+    const out = { ...input };
+    for (const key of LEGACY_WHATSAPP_ROOT_FIELDS) {
+        delete out[key];
+    }
+    return out;
+}
+
 class SettingsRepo extends ServiceBase {
     constructor() {
         super(TENANT_COLLECTIONS.SETTINGS);
@@ -50,8 +68,6 @@ function normalizeCompanyRecord(companyId, data = {}, existing = {}) {
         ownerEmail: data.ownerEmail ?? existing.ownerEmail ?? "",
         ownerId: data.ownerId ?? data.ownerUid ?? existing.ownerId ?? existing.ownerUid ?? null,
         ownerUid: data.ownerUid ?? data.ownerId ?? existing.ownerUid ?? existing.ownerId ?? null,
-        whatsappNumber: data.whatsappNumber ?? existing.whatsappNumber ?? "",
-        whatsappConnected: Boolean(data.whatsappConnected ?? existing.whatsappConnected),
         branding: data.branding ?? existing.branding ?? defaultBranding(name),
         settings: data.settings ?? existing.settings ?? {},
         createdAt: existing.createdAt ?? data.createdAt ?? timestamp,
@@ -109,7 +125,7 @@ export async function getCompany(companyId) {
 export async function createCompany(companyId, data = {}) {
     if (!companyId) throw new Error("companyId is required");
 
-    const record = normalizeCompanyRecord(companyId, data);
+    const record = normalizeCompanyRecord(companyId, stripLegacyWhatsAppRootFields(data));
     await persistCompanyRoot(companyId, record);
 
     if (data.branding) {
@@ -124,7 +140,7 @@ export async function createCompany(companyId, data = {}) {
 
 export async function updateCompany(companyId, patch) {
     const existing = (await getCompany(companyId)) || { id: companyId };
-    const updated = normalizeCompanyRecord(companyId, patch, existing);
+    const updated = normalizeCompanyRecord(companyId, stripLegacyWhatsAppRootFields(patch), existing);
     await persistCompanyRoot(companyId, updated, { merge: true });
     return updated;
 }
@@ -253,6 +269,9 @@ export async function listAllCompaniesFromStorage() {
  * Mission Control WhatsApp display — integration-derived only.
  * Company-root whatsappConnected must not make a tenant appear connected.
  * Lookup must be scoped to the same companyId as the company record.
+ *
+ * whatsappConnected / whatsappNumber on API responses are deprecated compatibility
+ * outputs derived from the integration — not Firestore source of truth (B-MC-5c-2d).
  */
 export function applyWhatsAppDisplayFromIntegration(company, wa) {
     if (!company) return company;
@@ -286,8 +305,6 @@ const PLATFORM_ADMIN_EXTRA_FIELDS = [
     "knowledgeBaseName",
     "knowledgeMaxDocs",
     "knowledgeAutoSync",
-    "whatsappBusinessId",
-    "whatsappWebhookUrl",
     "billing",
     "usage",
     "provisioningLinks",
@@ -307,16 +324,17 @@ export async function updatePlatformCompanyAdmin(companyId, body = {}) {
     if (!companyId) throw new Error("companyId is required");
 
     const existing = (await getCompany(companyId)) || { id: companyId };
-    if (body.status !== undefined) {
-        assertAllowedCompanyStatus(body.status);
+    const safeBody = stripLegacyWhatsAppRootFields(body);
+    if (safeBody.status !== undefined) {
+        assertAllowedCompanyStatus(safeBody.status);
     }
 
-    const core = normalizeCompanyRecord(companyId, body, existing);
+    const core = normalizeCompanyRecord(companyId, safeBody, existing);
     const record = { ...existing, ...core, id: companyId };
 
     for (const key of PLATFORM_ADMIN_EXTRA_FIELDS) {
-        if (body[key] !== undefined) {
-            record[key] = body[key];
+        if (safeBody[key] !== undefined) {
+            record[key] = safeBody[key];
         }
     }
 

@@ -1,4 +1,4 @@
-﻿rules_version = '2';
+rules_version = '2';
 
 // Production: set TENANT_SCOPE_ENFORCEMENT=strict on Express API.
 // Client reads/writes here must match membership in companies/{companyId}/users/{uid}.
@@ -66,7 +66,7 @@ service cloud.firestore {
         isCompanyMember(companyId)
         && request.resource.data.keys().hasOnly([
           'name', 'industry', 'plan', 'status', 'email', 'phone', 'website',
-          'owner', 'ownerEmail', 'ownerUid', 'whatsappNumber', 'whatsappConnected',
+          'owner', 'ownerEmail', 'ownerUid',
           'branding', 'createdAt', 'updatedAt', 'provisionedAt'
         ])
       );

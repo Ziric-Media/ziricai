@@ -26,8 +26,6 @@ export const PORTAL_DEMO_COMPANY = {
   email: 'info@centralmotors.co.za',
   phone: '+27 11 555 0100',
   website: 'https://centralmotors.co.za',
-  whatsappNumber: '+27 71 000 1234',
-  whatsappConnected: true,
   owner: 'John Smith',
   ownerEmail: 'john@centralmotors.co.za',
   branding: PORTAL_DEMO_BRANDING,
