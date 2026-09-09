@@ -81,6 +81,54 @@ export async function fetchPlatformWhatsAppIntegration(companyId) {
   );
 }
 
+/** Register WhatsApp integration (B-MC-5c-2b — not wired to UI until 5c-2c). */
+export async function registerPlatformWhatsAppIntegration(companyId, body = {}) {
+  return request(
+    `/api/platform/companies/${encodeURIComponent(companyId)}/integrations/whatsapp/register`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+/** Configure WhatsApp integration metadata (B-MC-5c-2b). */
+export async function configurePlatformWhatsAppIntegration(companyId, body = {}) {
+  return request(
+    `/api/platform/companies/${encodeURIComponent(companyId)}/integrations/whatsapp`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+/** Activate WhatsApp integration (B-MC-5c-2b). */
+export async function activatePlatformWhatsAppIntegration(companyId, body = {}) {
+  return request(
+    `/api/platform/companies/${encodeURIComponent(companyId)}/integrations/whatsapp/activate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+/** Deactivate WhatsApp integration (B-MC-5c-2b). */
+export async function deactivatePlatformWhatsAppIntegration(companyId, body = {}) {
+  return request(
+    `/api/platform/companies/${encodeURIComponent(companyId)}/integrations/whatsapp/deactivate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
 export async function fetchAdminConfig() {
   return request('/api/admin/config');
 }

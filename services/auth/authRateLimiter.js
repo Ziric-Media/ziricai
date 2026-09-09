@@ -8,6 +8,8 @@ const DEFAULTS = {
     provision: { windowMs: 60_000, max: 10 },
     onboarding: { windowMs: 60_000, max: 20 },
     auth: { windowMs: 60_000, max: 30 },
+    "platform-companies": { windowMs: 60_000, max: 30 },
+    "platform-integrations": { windowMs: 60_000, max: 20 },
 };
 
 function hit(key, { windowMs, max }) {

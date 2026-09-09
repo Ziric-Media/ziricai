@@ -143,6 +143,10 @@ export const ROUTE_CATALOG = [
     { method: "DELETE", path: "/api/platform/companies/:companyId", domain: "platform", tenantScoped: false, description: "Super Admin delete company root" },
     { method: "GET", path: "/api/platform/companies/:companyId/links", domain: "platform", tenantScoped: false, description: "Admin navigation links (platform auth)" },
     { method: "GET", path: "/api/platform/companies/:companyId/integrations/whatsapp", domain: "platform", tenantScoped: false, description: "Super Admin read WhatsApp integration (sanitized)" },
+    { method: "POST", path: "/api/platform/companies/:companyId/integrations/whatsapp/register", domain: "platform", tenantScoped: false, description: "Super Admin register WhatsApp integration" },
+    { method: "PATCH", path: "/api/platform/companies/:companyId/integrations/whatsapp", domain: "platform", tenantScoped: false, description: "Super Admin configure WhatsApp integration" },
+    { method: "POST", path: "/api/platform/companies/:companyId/integrations/whatsapp/activate", domain: "platform", tenantScoped: false, description: "Super Admin activate WhatsApp integration" },
+    { method: "POST", path: "/api/platform/companies/:companyId/integrations/whatsapp/deactivate", domain: "platform", tenantScoped: false, description: "Super Admin deactivate WhatsApp integration" },
 
     // Marketplace
     { method: "GET", path: "/api/marketplace/catalog", domain: "marketplace", tenantScoped: false, description: "Browse industry packs" },

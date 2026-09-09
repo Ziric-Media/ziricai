@@ -158,6 +158,12 @@ import {
 } from "../services/knowledge/platformKnowledgeLoader.js";
 import { getPlatformWhatsAppIntegration } from "../services/tenants/integrationService.js";
 import {
+    registerPlatformWhatsAppIntegration,
+    configurePlatformWhatsAppIntegration,
+    activatePlatformWhatsAppIntegration,
+    deactivatePlatformWhatsAppIntegration,
+} from "../services/tenants/platformWhatsAppIntegrationService.js";
+import {
     initIntegrationHub,
     mountIntegrationRoutes,
     handleWhatsAppWebhook,
@@ -758,6 +764,123 @@ app.get(
         } catch (err) {
             console.error("[api/platform/companies/:companyId/integrations/whatsapp] error:", err.message);
             res.status(500).json({ error: err.message || "Failed to load WhatsApp integration" });
+        }
+    }
+);
+
+function respondPlatformWhatsAppError(res, err, label) {
+    const status = err.status || 500;
+    if (status >= 500) {
+        console.error(`[${label}] error:`, err.message);
+    }
+    res.status(status).json({ error: err.message || "WhatsApp integration request failed" });
+}
+
+/** Super Admin — register WhatsApp integration (B-MC-5c-2b). */
+app.post(
+    "/api/platform/companies/:companyId/integrations/whatsapp/register",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const integration = await registerPlatformWhatsAppIntegration(companyId, req.body || {});
+            auditLog("platform_whatsapp_register", {
+                companyId,
+                integrationId: integration.id,
+                via: req.platformAuth?.via,
+                newStatus: integration.status,
+            });
+            res.status(201).json({ companyId, integration });
+        } catch (err) {
+            respondPlatformWhatsAppError(res, err, "api/platform/whatsapp/register");
+        }
+    }
+);
+
+/** Super Admin — configure WhatsApp integration metadata (B-MC-5c-2b). */
+app.patch(
+    "/api/platform/companies/:companyId/integrations/whatsapp",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const existing = await getPlatformWhatsAppIntegration(companyId);
+            const integration = await configurePlatformWhatsAppIntegration(companyId, req.body || {});
+            auditLog("platform_whatsapp_configure", {
+                companyId,
+                integrationId: integration.id,
+                via: req.platformAuth?.via,
+                previousStatus: existing?.status || null,
+                newStatus: integration.status,
+            });
+            res.json({ companyId, integration });
+        } catch (err) {
+            respondPlatformWhatsAppError(res, err, "api/platform/whatsapp/configure");
+        }
+    }
+);
+
+/** Super Admin — activate WhatsApp integration (B-MC-5c-2b). */
+app.post(
+    "/api/platform/companies/:companyId/integrations/whatsapp/activate",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const existing = await getPlatformWhatsAppIntegration(companyId);
+            const body = req.body || {};
+            const result = await activatePlatformWhatsAppIntegration(companyId, {
+                acknowledgeEnvCredentials: body.acknowledgeEnvCredentials === true,
+            });
+            auditLog("platform_whatsapp_activate", {
+                companyId,
+                integrationId: result.integration.id,
+                via: req.platformAuth?.via,
+                previousStatus: existing?.status || null,
+                newStatus: result.integration.status,
+                runtimeReady: result.runtimeReady,
+            });
+            res.json({ companyId, ...result });
+        } catch (err) {
+            respondPlatformWhatsAppError(res, err, "api/platform/whatsapp/activate");
+        }
+    }
+);
+
+/** Super Admin — deactivate WhatsApp integration (B-MC-5c-2b). */
+app.post(
+    "/api/platform/companies/:companyId/integrations/whatsapp/deactivate",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const body = req.body || {};
+            const result = await deactivatePlatformWhatsAppIntegration(companyId, {
+                reason: body.reason ? String(body.reason).trim() : null,
+            });
+            auditLog("platform_whatsapp_deactivate", {
+                companyId,
+                integrationId: result.integration.id,
+                via: req.platformAuth?.via,
+                previousStatus: result.previousStatus,
+                newStatus: result.integration.status,
+                reason: result.reason,
+            });
+            res.json({
+                companyId,
+                integration: result.integration,
+                deactivated: result.deactivated,
+            });
+        } catch (err) {
+            respondPlatformWhatsAppError(res, err, "api/platform/whatsapp/deactivate");
         }
     }
 );

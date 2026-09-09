@@ -66,6 +66,13 @@ export function clearPhoneResolutionCache() {
     phoneResolutionCache.clear();
 }
 
+/** Drop one cached phone_number_id → tenant mapping (e.g. after deactivate). */
+export function invalidatePhoneResolutionCache(phoneNumberId) {
+    if (phoneNumberId) {
+        phoneResolutionCache.delete(String(phoneNumberId));
+    }
+}
+
 function sanitizeIntegrationRecord(integration) {
     if (!integration) return null;
     const {
