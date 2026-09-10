@@ -1,7 +1,7 @@
 import { state } from '../core/dataStore.js';
 import { escapeHtml, pageHeader, emptyState, loadingState, statusBadge } from '../../admin/ui.js';
 import { can } from '../permissions.js';
-import { fetchTenantConversations, fetchConversationDetail, sendConversationReply } from '../api.js';
+import { fetchTenantConversations, fetchConversationDetail, sendConversationReply, setConversationTakeover } from '../api.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
 import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { invalidateHub } from '../core/dataService.js';
@@ -90,11 +90,8 @@ export async function renderConversations(container) {
       loadThread(conv);
     });
     container.querySelector('#takeoverBtn')?.addEventListener('click', async () => {
-      await fetch(`/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conv.id || conv.phone)}/takeover`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: true }),
-      });
+      await setConversationTakeover(companyId, conv.id || conv.phone, { enabled: true });
+      invalidateHub();
       loadThread(conv);
     });
   }

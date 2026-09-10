@@ -2,6 +2,7 @@
  * Portal BOS — unified API layer with request deduplication + TTL cache.
  */
 import { setState, state, invalidateCache } from './dataStore.js';
+import { apiRequest } from '../../shared/apiRequest.js';
 
 const HUB_TTL_MS = 60_000;
 const DEFAULT_TTL_MS = 60_000;
@@ -13,14 +14,7 @@ const inflight = new Map();
 const cache = new Map();
 
 async function request(path, options = {}) {
-  try {
-    const res = await fetch(path, options);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data.error || `Request failed (${res.status})` };
-    return { data };
-  } catch (error) {
-    return { error: error.message || 'Network error' };
-  }
+  return apiRequest(path, options);
 }
 
 /**

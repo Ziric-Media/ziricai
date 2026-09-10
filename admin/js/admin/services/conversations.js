@@ -6,15 +6,15 @@ import {
   limit,
   addDoc,
   serverTimestamp,
-} from 'firebase/firestore';
-import { listDocuments, getDocument, updateDocument, db } from './firestore-base.js';
+} from '../../firebase.js';
+import { listDocuments, getDocument, updateDocument, getDb } from './firestore-base.js';
 import {
-  DEMO_INBOX_CONVERSATIONS,
   filterDemoInboxByCompany,
   getDemoInboxConversation,
 } from '../demo-data.js';
 import { fetchConversationsFromApi, fetchConversationMessagesFromApi } from '../api.js';
 import { patchConversationOverride, getConversationOverride } from '../inbox-state.js';
+import { isDemoDataAllowed } from './dataMode.js';
 
 const COLLECTION = 'conversations';
 
@@ -84,12 +84,16 @@ export async function listConversations(companyId) {
     return { items: fsRes.items.map(normalizeApiConversation), source: 'firestore' };
   }
 
+  if (!isDemoDataAllowed()) {
+    return { items: [], source: 'api', error: apiRes.error || fsRes.error };
+  }
+
   const demo = filterDemoInboxByCompany(companyId);
   return { items: demo, source: 'demo', error: fsRes.error };
 }
 
-export async function getConversation(id) {
-  const apiRes = await fetchConversationMessagesFromApi(id);
+export async function getConversation(companyId, id) {
+  const apiRes = await fetchConversationMessagesFromApi(companyId, id);
   if (apiRes.data?.conversation) {
     return { item: normalizeApiConversation(apiRes.data.conversation), source: 'api' };
   }
@@ -99,24 +103,32 @@ export async function getConversation(id) {
     return { item: normalizeApiConversation(fsRes.item), source: 'firestore' };
   }
 
+  if (!isDemoDataAllowed()) {
+    return { error: apiRes.error || 'Conversation not found' };
+  }
+
   const demo = getDemoInboxConversation(id);
   if (demo) return { item: { ...demo }, source: 'demo' };
 
   return { error: 'Conversation not found' };
 }
 
-export async function getMessages(conversationId) {
+export async function getMessages(companyId, conversationId) {
   const override = getConversationOverride(conversationId);
   if (override.messages?.length) {
-    const seed = getDemoInboxConversation(conversationId);
-    const base = seed?.messages || [];
-    return { items: [...base, ...override.messages] };
+    if (isDemoDataAllowed()) {
+      const seed = getDemoInboxConversation(conversationId);
+      const base = seed?.messages || [];
+      return { items: [...base, ...override.messages] };
+    }
+    return { items: [...override.messages] };
   }
 
-  const apiRes = await fetchConversationMessagesFromApi(conversationId);
-  if (apiRes.data?.items?.length) {
+  const apiRes = await fetchConversationMessagesFromApi(companyId, conversationId);
+  const rawMessages = apiRes.data?.messages || apiRes.data?.items || [];
+  if (rawMessages.length) {
     return {
-      items: apiRes.data.items.map((m) => ({
+      items: rawMessages.map((m) => ({
         id: m.id || msgId(),
         role: m.role === 'assistant' ? 'ai' : m.role === 'user' ? 'customer' : m.role,
         message: m.message || m.content || m.text || '',
@@ -129,7 +141,7 @@ export async function getMessages(conversationId) {
 
   try {
     const q = query(
-      collection(db, 'customers', conversationId, 'messages'),
+      collection(getDb(), 'customers', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limit(100)
     );
@@ -143,7 +155,7 @@ export async function getMessages(conversationId) {
 
   try {
     const q = query(
-      collection(db, COLLECTION, conversationId, 'messages'),
+      collection(getDb(), COLLECTION, conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limit(100)
     );
@@ -153,6 +165,10 @@ export async function getMessages(conversationId) {
     }
   } catch (err) {
     /* fall through */
+  }
+
+  if (!isDemoDataAllowed()) {
+    return { items: [], source: 'api' };
   }
 
   const demo = getDemoInboxConversation(conversationId);
@@ -242,7 +258,7 @@ export async function sendMessage(conversationId, text, sender, meta = {}) {
   });
 
   try {
-    await addDoc(collection(db, COLLECTION, conversationId, 'messages'), {
+    await addDoc(collection(getDb(), COLLECTION, conversationId, 'messages'), {
       role: message.role,
       message: trimmed,
       senderName: meta.senderName || null,

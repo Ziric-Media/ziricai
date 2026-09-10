@@ -17,6 +17,7 @@ import {
     normalizePhone,
     syncCustomerToTenant,
 } from "../tenants/crmService.js";
+import { updateTask, deleteNote } from "../customerService.js";
 import {
     listTenantConversations,
     getTenantConversation,
@@ -186,6 +187,21 @@ export function mountCustomerOpsRoutes(app) {
             }
             if (body.task?.title) {
                 const task = await addTask(phone, body.task, { companyId });
+                return res.json({
+                    success: true,
+                    task,
+                    customer: await getCustomerProfile(phone, { companyId }),
+                });
+            }
+            if (body.deleteNoteId) {
+                await deleteNote(phone, body.deleteNoteId, { companyId });
+                return res.json({
+                    success: true,
+                    customer: await getCustomerProfile(phone, { companyId }),
+                });
+            }
+            if (body.updateTask?.id) {
+                const task = await updateTask(phone, body.updateTask.id, body.updateTask, { companyId });
                 return res.json({
                     success: true,
                     task,

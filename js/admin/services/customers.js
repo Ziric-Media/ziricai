@@ -64,15 +64,11 @@ export async function listCustomers(companyId) {
     return { items: [], source: 'api', loadState: 'scope_required' };
   }
 
-  const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
-  const api = await fetchCustomersFromApi(qs);
+  const api = await fetchCustomersFromApi(companyId);
 
   if (!isDemoDataAllowed()) {
     if (api.error) {
       return { items: [], source: 'api', error: api.error, loadState: 'error' };
-    }
-    if (api.data?.scopeRequired) {
-      return { items: [], source: 'api', loadState: 'scope_required' };
     }
     const items = api.data?.items || [];
     return {
@@ -93,9 +89,9 @@ export async function listCustomers(companyId) {
   };
 }
 
-export async function getCustomerProfile(phoneOrId) {
+export async function getCustomerProfile(companyId, phoneOrId) {
   const key = normalizeCustomerPhone(phoneOrId);
-  const api = await fetchCustomerFromApi(key);
+  const api = await fetchCustomerFromApi(companyId, key);
   if (!api.error && api.data?.customer) {
     return { customer: api.data.customer, source: 'api' };
   }
@@ -109,9 +105,9 @@ export async function getCustomerProfile(phoneOrId) {
   return { error: api.error || 'Customer not found' };
 }
 
-export async function getCustomerTimeline(phone) {
+export async function getCustomerTimeline(companyId, phone) {
   const key = normalizeCustomerPhone(phone);
-  const api = await fetchCustomerTimelineFromApi(key);
+  const api = await fetchCustomerTimelineFromApi(companyId, key);
   if (!api.error && api.data?.items) {
     return { items: api.data.items, source: 'api' };
   }
@@ -124,9 +120,9 @@ export async function getCustomerTimeline(phone) {
   return { items: demo?.timeline || [], source: 'demo' };
 }
 
-export async function patchCustomer(phone, body) {
+export async function patchCustomer(companyId, phone, body) {
   const key = normalizeCustomerPhone(phone);
-  const api = await patchCustomerFromApi(key, body);
+  const api = await patchCustomerFromApi(companyId, key, body);
   if (!api.error && api.data?.customer) {
     return { customer: api.data.customer, source: 'api' };
   }
@@ -138,8 +134,8 @@ export async function patchCustomer(phone, body) {
   return demoPatchCustomer(key, body);
 }
 
-export async function getCustomerMessages(phoneOrId) {
-  const profile = await getCustomerProfile(phoneOrId);
+export async function getCustomerMessages(companyId, phoneOrId) {
+  const profile = await getCustomerProfile(companyId, phoneOrId);
   if (profile.customer?.messages?.length) {
     return { items: profile.customer.messages };
   }

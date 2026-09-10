@@ -142,6 +142,14 @@ export async function sendConversationReply(companyId, conversationId, payload) 
   });
 }
 
+export async function setConversationTakeover(companyId, conversationId, { enabled = true, humanAgent = 'Staff' } = {}) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/takeover`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled, humanAgent }),
+  });
+}
+
 export async function fetchAppointments(companyId, { upcoming = true } = {}) {
   const qs = upcoming ? '?upcoming=true' : '';
   return request(`/api/companies/${encodeURIComponent(companyId)}/appointments${qs}`);

@@ -220,32 +220,37 @@ export async function deleteAiEmployeeFromApi(companyId, agentId) {
 }
 
 export async function fetchConversationsFromApi(companyId) {
-  const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
-  return request(`/api/conversations${qs}`);
+  if (!companyId) {
+    return { error: 'companyId is required', status: 400 };
+  }
+  return request(`/api/companies/${encodeURIComponent(companyId)}/conversations`);
 }
 
-export async function fetchConversationMessagesFromApi(conversationId) {
-  return request(`/api/conversations/${encodeURIComponent(conversationId)}/messages`);
+export async function fetchConversationMessagesFromApi(companyId, conversationId) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}`);
 }
 
-export async function fetchCustomersFromApi(query = '') {
-  return request(`/api/customers${query}`);
+export async function fetchCustomersFromApi(companyId) {
+  if (!companyId) {
+    return { error: 'companyId is required', status: 400 };
+  }
+  return request(`/api/companies/${encodeURIComponent(companyId)}/crm/customers`);
 }
 
-export async function fetchCustomerFromApi(phone) {
-  return request(`/api/customers/${encodeURIComponent(phone)}`);
+export async function fetchCustomerFromApi(companyId, phone) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/crm/customers/${encodeURIComponent(phone)}`);
 }
 
-export async function patchCustomerFromApi(phone, body) {
-  return request(`/api/customers/${encodeURIComponent(phone)}`, {
+export async function patchCustomerFromApi(companyId, phone, body) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/crm/customers/${encodeURIComponent(phone)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 
-export async function fetchCustomerTimelineFromApi(phone) {
-  return request(`/api/customers/${encodeURIComponent(phone)}/timeline`);
+export async function fetchCustomerTimelineFromApi(companyId, phone) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/crm/customers/${encodeURIComponent(phone)}/timeline`);
 }
 
 export async function provisionCompanyWorkspace(companyId, companyData = {}) {

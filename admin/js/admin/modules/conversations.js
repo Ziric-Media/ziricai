@@ -58,6 +58,7 @@ export async function renderConversations(container) {
 }
 
 async function paintInbox(container) {
+  const companyId = state.selectedCompanyId || null;
   const filtered = filterConversations(inboxState.conversations, {
     filter: inboxState.filter,
     search: inboxState.search,
@@ -69,7 +70,7 @@ async function paintInbox(container) {
     if (selected) setInboxState({ selectedConversationId: selected.id });
   }
 
-  const messagesRes = selected ? await getMessages(selected.id) : { items: [] };
+  const messagesRes = selected ? await getMessages(companyId, selected.id) : { items: [] };
   if (selected && messagesRes.items?.length) {
     selected = { ...selected, messages: messagesRes.items };
   }
@@ -155,7 +156,8 @@ function bindListClicks(container, filtered) {
       if (!conv) return;
 
       await markConversationRead(id);
-      const messagesRes = await getMessages(id);
+      const companyId = state.selectedCompanyId || null;
+      const messagesRes = await getMessages(companyId, id);
       const merged = { ...conv, messages: messagesRes.items || conv.messages || [] };
 
       const threadEl = container.querySelector('#inboxThread');

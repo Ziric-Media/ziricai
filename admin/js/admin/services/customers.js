@@ -8,8 +8,8 @@ import {
   getDemoCustomer,
   getDemoCustomerListRows,
   normalizeCustomerPhone,
-  DEMO_CUSTOMERS,
 } from '../demo-data.js';
+import { isDemoDataAllowed } from './dataMode.js';
 
 function demoPatchCustomer(phone, body) {
   const key = normalizeCustomerPhone(phone);
@@ -60,46 +60,82 @@ function demoPatchCustomer(phone, body) {
 }
 
 export async function listCustomers(companyId) {
-  const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
-  const api = await fetchCustomersFromApi(qs);
-  if (!api.error && api.data?.items?.length) {
-    return { items: api.data.items, source: 'api' };
+  if (!isDemoDataAllowed() && !companyId) {
+    return { items: [], source: 'api', loadState: 'scope_required' };
   }
-  return { items: getDemoCustomerListRows(companyId), source: 'demo', error: api.error };
+
+  const api = await fetchCustomersFromApi(companyId);
+
+  if (!isDemoDataAllowed()) {
+    if (api.error) {
+      return { items: [], source: 'api', error: api.error, loadState: 'error' };
+    }
+    const items = api.data?.items || [];
+    return {
+      items,
+      source: 'api',
+      loadState: items.length ? 'ok' : 'empty',
+    };
+  }
+
+  if (!api.error && api.data?.items?.length) {
+    return { items: api.data.items, source: 'api', loadState: 'ok' };
+  }
+  return {
+    items: getDemoCustomerListRows(companyId),
+    source: 'demo',
+    error: api.error,
+    loadState: 'demo',
+  };
 }
 
-export async function getCustomerProfile(phoneOrId) {
+export async function getCustomerProfile(companyId, phoneOrId) {
   const key = normalizeCustomerPhone(phoneOrId);
-  const api = await fetchCustomerFromApi(key);
+  const api = await fetchCustomerFromApi(companyId, key);
   if (!api.error && api.data?.customer) {
     return { customer: api.data.customer, source: 'api' };
   }
+
+  if (!isDemoDataAllowed()) {
+    return { error: api.error || 'Customer not found', source: 'api' };
+  }
+
   const demo = getDemoCustomer(key) || getDemoCustomer(phoneOrId);
   if (demo) return { customer: demo, source: 'demo' };
   return { error: api.error || 'Customer not found' };
 }
 
-export async function getCustomerTimeline(phone) {
+export async function getCustomerTimeline(companyId, phone) {
   const key = normalizeCustomerPhone(phone);
-  const api = await fetchCustomerTimelineFromApi(key);
+  const api = await fetchCustomerTimelineFromApi(companyId, key);
   if (!api.error && api.data?.items) {
     return { items: api.data.items, source: 'api' };
   }
+
+  if (!isDemoDataAllowed()) {
+    return { items: [], source: 'api', error: api.error };
+  }
+
   const demo = getDemoCustomer(key);
   return { items: demo?.timeline || [], source: 'demo' };
 }
 
-export async function patchCustomer(phone, body) {
+export async function patchCustomer(companyId, phone, body) {
   const key = normalizeCustomerPhone(phone);
-  const api = await patchCustomerFromApi(key, body);
+  const api = await patchCustomerFromApi(companyId, key, body);
   if (!api.error && api.data?.customer) {
     return { customer: api.data.customer, source: 'api' };
   }
+
+  if (!isDemoDataAllowed()) {
+    return { error: api.error || 'Unable to update customer', source: 'api' };
+  }
+
   return demoPatchCustomer(key, body);
 }
 
-export async function getCustomerMessages(phoneOrId) {
-  const profile = await getCustomerProfile(phoneOrId);
+export async function getCustomerMessages(companyId, phoneOrId) {
+  const profile = await getCustomerProfile(companyId, phoneOrId);
   if (profile.customer?.messages?.length) {
     return { items: profile.customer.messages };
   }
@@ -108,7 +144,7 @@ export async function getCustomerMessages(phoneOrId) {
 
 export async function countCustomers(companyId) {
   const result = await listCustomers(companyId);
-  return { count: result.items?.length || DEMO_CUSTOMERS.length };
+  return { count: result.items?.length || 0 };
 }
 
 /** Legacy Firestore CRUD stubs — list/detail uses API + demo. */

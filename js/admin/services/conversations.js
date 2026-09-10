@@ -92,8 +92,8 @@ export async function listConversations(companyId) {
   return { items: demo, source: 'demo', error: fsRes.error };
 }
 
-export async function getConversation(id) {
-  const apiRes = await fetchConversationMessagesFromApi(id);
+export async function getConversation(companyId, id) {
+  const apiRes = await fetchConversationMessagesFromApi(companyId, id);
   if (apiRes.data?.conversation) {
     return { item: normalizeApiConversation(apiRes.data.conversation), source: 'api' };
   }
@@ -113,7 +113,7 @@ export async function getConversation(id) {
   return { error: 'Conversation not found' };
 }
 
-export async function getMessages(conversationId) {
+export async function getMessages(companyId, conversationId) {
   const override = getConversationOverride(conversationId);
   if (override.messages?.length) {
     if (isDemoDataAllowed()) {
@@ -124,10 +124,11 @@ export async function getMessages(conversationId) {
     return { items: [...override.messages] };
   }
 
-  const apiRes = await fetchConversationMessagesFromApi(conversationId);
-  if (apiRes.data?.items?.length) {
+  const apiRes = await fetchConversationMessagesFromApi(companyId, conversationId);
+  const rawMessages = apiRes.data?.messages || apiRes.data?.items || [];
+  if (rawMessages.length) {
     return {
-      items: apiRes.data.items.map((m) => ({
+      items: rawMessages.map((m) => ({
         id: m.id || msgId(),
         role: m.role === 'assistant' ? 'ai' : m.role === 'user' ? 'customer' : m.role,
         message: m.message || m.content || m.text || '',

@@ -4,7 +4,7 @@
 import { state } from '../core/dataStore.js';
 import { navigateTo } from '../router.js';
 import { showToast } from '../../admin/ui.js';
-import { sendSarahMessage } from './sarah-chat.js';
+import { sarahChat } from '../api.js';
 import { invalidateHub } from '../core/dataService.js';
 
 let sessionId = null;
@@ -17,10 +17,6 @@ const SUGGESTIONS = [
   'Connect WhatsApp',
   'Help with ZiricAI setup',
 ];
-
-function getAuthToken() {
-  return state.user?.accessToken || null;
-}
 
 function applyUiHints(hints = []) {
   for (const hint of hints) {
@@ -145,11 +141,10 @@ async function submitMessage(text) {
   typing.innerHTML = '<span></span><span></span><span></span>';
   document.getElementById('portalSarahMessages')?.appendChild(typing);
 
-  const { data, error } = await sendSarahMessage({
+  const { data, error } = await sarahChat({
     message: trimmed,
     sessionId,
     companyId: state.companyId,
-    token: getAuthToken(),
   });
 
   typing.remove();

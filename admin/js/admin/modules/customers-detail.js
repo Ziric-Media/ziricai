@@ -11,6 +11,7 @@ import {
   renderTimelineFeed,
   renderMessageThread,
 } from './customers-ui.js';
+import { state } from '../state.js';
 import {
   getCustomerProfile,
   patchCustomer,
@@ -32,7 +33,8 @@ const TABS = [
 
 export async function renderCustomerDetail(container, phone, { onBack } = {}) {
   container.innerHTML = loadingState('Loading customer profile...');
-  const result = await getCustomerProfile(phone);
+  const companyId = state.selectedCompanyId || null;
+  const result = await getCustomerProfile(companyId, phone);
   if (result.error || !result.customer) {
     container.innerHTML = `<div class="empty-panel">${escapeHtml(result.error || 'Customer not found')}</div>`;
     return;
@@ -43,7 +45,7 @@ export async function renderCustomerDetail(container, phone, { onBack } = {}) {
   let messages = customer.messages || [];
 
   if (!messages.length) {
-    const msgRes = await getCustomerMessages(customer.phone || customer.id);
+    const msgRes = await getCustomerMessages(companyId, customer.phone || customer.id);
     messages = msgRes.items || [];
   }
 
@@ -92,7 +94,7 @@ export async function renderCustomerDetail(container, phone, { onBack } = {}) {
       </div>
     `;
 
-    bindDetailEvents(container, customer, messages, paint, onBack);
+    bindDetailEvents(container, customer, messages, companyId, paint, onBack);
   };
 
   paint();
@@ -259,7 +261,7 @@ function renderTasksList(tasks = []) {
     .join('');
 }
 
-function bindDetailEvents(container, customer, messages, repaint, onBack) {
+function bindDetailEvents(container, customer, messages, companyId, repaint, onBack) {
   const phone = normalizeCustomerPhone(customer.phone || customer.id);
 
   container.querySelector('#crmBackBtn')?.addEventListener('click', () => onBack?.());
@@ -270,14 +272,14 @@ function bindDetailEvents(container, customer, messages, repaint, onBack) {
       btn.classList.add('active');
       const tab = btn.dataset.tab;
       container.querySelector('#crmTabPanel').innerHTML = renderTabContent(tab, customer, messages);
-      bindTabSpecificEvents(container, customer, messages, phone, repaint);
+      bindTabSpecificEvents(container, customer, messages, phone, companyId, repaint);
     });
   });
 
-  bindTabSpecificEvents(container, customer, messages, phone, repaint);
+  bindTabSpecificEvents(container, customer, messages, phone, companyId, repaint);
 }
 
-function bindTabSpecificEvents(container, customer, messages, phone, repaint) {
+function bindTabSpecificEvents(container, customer, messages, phone, companyId, repaint) {
   container.querySelector('#openInInboxBtn')?.addEventListener('click', (e) => {
     e.preventDefault();
     import('../router.js').then(({ navigateTo }) => {
@@ -290,7 +292,7 @@ function bindTabSpecificEvents(container, customer, messages, phone, repaint) {
 
   container.querySelector('#saveSummaryBtn')?.addEventListener('click', async () => {
     const aiSummary = container.querySelector('#crmAiSummary')?.value || '';
-    const res = await patchCustomer(phone, { aiSummary });
+    const res = await patchCustomer(companyId, phone, { aiSummary });
     if (res.customer) {
       Object.assign(customer, res.customer);
       showToast('AI summary saved', 'success');
@@ -300,7 +302,7 @@ function bindTabSpecificEvents(container, customer, messages, phone, repaint) {
   container.querySelector('#addNoteBtn')?.addEventListener('click', async () => {
     const text = container.querySelector('#newNoteText')?.value?.trim();
     if (!text) return;
-    const res = await patchCustomer(phone, { note: { text, author: 'Admin' } });
+    const res = await patchCustomer(companyId, phone, { note: { text, author: 'Admin' } });
     if (res.customer) {
       customer.notesList = res.customer.notesList;
       container.querySelector('#crmNotesList').innerHTML = renderNotesList(customer.notesList);
@@ -311,7 +313,7 @@ function bindTabSpecificEvents(container, customer, messages, phone, repaint) {
 
   container.querySelectorAll('.crm-delete-note').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const res = await patchCustomer(phone, { deleteNoteId: btn.dataset.id });
+      const res = await patchCustomer(companyId, phone, { deleteNoteId: btn.dataset.id });
       if (res.customer) {
         customer.notesList = res.customer.notesList;
         container.querySelector('#crmNotesList').innerHTML = renderNotesList(customer.notesList);
@@ -326,7 +328,7 @@ function bindTabSpecificEvents(container, customer, messages, phone, repaint) {
     const deadline = container.querySelector('#newTaskDeadline')?.value;
     const priority = container.querySelector('#newTaskPriority')?.value;
     const assignedTo = container.querySelector('#newTaskAssignee')?.value?.trim() || 'Unassigned';
-    const res = await patchCustomer(phone, {
+    const res = await patchCustomer(companyId, phone, {
       task: {
         title,
         deadline: deadline ? `${deadline}T17:00:00.000Z` : null,
@@ -346,7 +348,7 @@ function bindTabSpecificEvents(container, customer, messages, phone, repaint) {
     chk.addEventListener('change', async () => {
       const task = (customer.tasks || []).find((t) => t.id === chk.dataset.id);
       if (!task) return;
-      const res = await patchCustomer(phone, { updateTask: { id: task.id, done: chk.checked } });
+      const res = await patchCustomer(companyId, phone, { updateTask: { id: task.id, done: chk.checked } });
       if (res.customer) {
         customer.tasks = res.customer.tasks;
         container.querySelector('#crmTasksList').innerHTML = renderTasksList(customer.tasks);
