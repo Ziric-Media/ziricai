@@ -71,12 +71,6 @@ import {
     enrichRecommendedVehiclesForOutbound,
     formatGalleryDeliveryReply,
 } from "../../conversation/vehicleOutboundPlan.js";
-import {
-    shouldPreloadInventorySearch,
-    buildInventorySearchArgs,
-    formatAuthoritativeInventoryBlock,
-} from "../../conversation/inventoryIntent.js";
-import { guardBookingConfirmationReply } from "../../conversation/appointmentScheduleAuthority.js";
 
 import { syncFromSalesTurn } from "../../integrations/crmSyncService.js";
 
@@ -239,7 +233,7 @@ async function processInboundMessage(job) {
     if (resolvedCompanyId) {
         const takeover = await getConversationTakeoverState(resolvedCompanyId, sender, outboundChannel);
         if (takeover.humanControlled) {
-            console.log("[whatsapp] Takeover early skip — inbound persisted, no AI/outbound", {
+            console.log("[whatsapp] Takeover early skip ? inbound persisted, no AI/outbound", {
                 jobId: job.id,
                 companyId: resolvedCompanyId,
                 from: sender,
@@ -266,8 +260,6 @@ async function processInboundMessage(job) {
                 channel: outboundChannel,
                 companyId: resolvedCompanyId,
                 externalId: metaMessageId,
-                customerName: contactName || customerDocId(sender),
-                contactName,
             });
         }
         return;
@@ -276,7 +268,6 @@ async function processInboundMessage(job) {
     if (outboundChannel === "whatsapp" && externalId) {
         await sendWhatsAppTypingIndicator(externalId);
     }
-
     const customer =
         (resolvedCompanyId
             ? await getCustomer(sender, { companyId: resolvedCompanyId })
@@ -379,7 +370,6 @@ async function processInboundMessage(job) {
         agentId: agent?.id || null,
         memoriesRetrieved: memoryRecords.length,
         recentMessagesRetrieved: history.length,
-        isNewConversation,
         knowledgeSkipped: isGreetingMessage(text),
         hasAiSummary: Boolean(refreshedCustomer?.aiSummary),
         customerDisplayName: customerDisplayName || null,
@@ -393,8 +383,12 @@ async function processInboundMessage(job) {
         });
     }
 
-    const inventoryBrowseIntent = shouldPreloadInventorySearch(text, {
-        isGreeting: isGreetingMessage(text),
+    const systemPrompt = buildWhatsAppSystemPrompt({
+        agent,
+        companyId: resolvedCompanyId,
+        companyName,
+        customer: refreshedCustomer,
+        contactName,
     });
 
     let schedulingContext =
@@ -433,7 +427,7 @@ async function processInboundMessage(job) {
             schedulingContext,
         }, { statusFilter: "upcoming" });
         authoritativeBookingContext = formatAuthoritativeBookingBlock(preloadedBookingResult);
-        console.log("[whatsapp] Booking recap intent — pre-loaded getCustomerBookings", {
+        console.log("[whatsapp] Booking recap intent ? pre-loaded getCustomerBookings", {
             companyId: resolvedCompanyId,
             customerId,
             count: preloadedBookingResult?.count ?? 0,
@@ -460,10 +454,10 @@ async function processInboundMessage(job) {
             galleryOutboundContext = [
                 "GALLERY OUTBOUND (platform will send native WhatsApp images automatically):",
                 `- Resolved ${galleryVehicleTargets.length} vehicle(s) from prior recommendations: ${labels}`,
-                "- Give a brief acknowledgment only — do NOT promise 'you'll see them shortly' or claim photos were sent.",
+                "- Give a brief acknowledgment only ? do NOT promise 'you'll see them shortly' or claim photos were sent.",
                 "- Platform sends images after your reply; if delivery fails, customer will be told honestly.",
             ].join("\n");
-            console.log("[whatsapp] Gallery image intent — resolved vehicles", {
+            console.log("[whatsapp] Gallery image intent ? resolved vehicles", {
                 companyId: resolvedCompanyId,
                 customerId,
                 count: galleryVehicleTargets.length,
@@ -492,8 +486,6 @@ async function processInboundMessage(job) {
 
     let authoritativeAvailabilityContext = "";
     let preloadedAvailabilityResult = null;
-    let authoritativeInventoryContext = "";
-    let preloadedInventoryResult = null;
 
     const schedulingVehicleRecommended =
         resolvedCompanyId && sender
@@ -574,10 +566,10 @@ async function processInboundMessage(job) {
                 }
             );
             authoritativeBookingContext = [
-                "AUTHORITATIVE BOOKING (bookTestDrive — cite ONLY if ok/success):",
+                "AUTHORITATIVE BOOKING (bookTestDrive ? cite ONLY if ok/success):",
                 preloadedBookingResult?.ok
                     ? `- BOOKING_SUCCESS: ${schedulingVehicleRef.title || schedulingVehicleRef.make || "vehicle"} at ${preloadedAvailabilityResult.slotLabel || preloadedAvailabilityResult.slotStart}`
-                    : `- BOOKING_FAILED: ${preloadedBookingResult?.code || preloadedBookingResult?.error || "unknown"} — vehicle may still be in inventory; offer nextAlternative.`,
+                    : `- BOOKING_FAILED: ${preloadedBookingResult?.code || preloadedBookingResult?.error || "unknown"} ? vehicle may still be in inventory; offer nextAlternative.`,
             ].join("\n");
             console.log("[whatsapp] Delegation auto-book", {
                 companyId: resolvedCompanyId,
@@ -617,29 +609,41 @@ async function processInboundMessage(job) {
         await saveTestDrivePlan(resolvedCompanyId, sender, outboundChannel, testDrivePlan);
 
         const lines = [
-            "AUTHORITATIVE PLAN FINALIZATION (bookTestDrive results — cite ONLY these):",
+            "AUTHORITATIVE PLAN FINALIZATION (bookTestDrive results ? cite ONLY these):",
         ];
         for (const r of finalize.results) {
             const entry = testDrivePlan.find((e) => e.vehicleId === r.vehicleId);
             const label = entry?.title || entry?.stockNumber || r.vehicleId;
             if (r.ok) {
-                lines.push(`- CONFIRMED: ${label} — ${entry?.slotLabel || "booked"}`);
+                lines.push(`- CONFIRMED: ${label} ? ${entry?.slotLabel || "booked"}`);
             } else {
-                lines.push(`- FAILED (slot issue): ${label} — ${r.error || r.reason || r.code}`);
-                lines.push("  • Vehicle may still be in inventory — offer nextAlternative/suggestedSlots, do NOT claim sold.");
+                lines.push(`- FAILED (slot issue): ${label} ? ${r.error || r.reason || r.code}`);
+                lines.push("  ? Vehicle may still be in inventory ? offer nextAlternative/suggestedSlots, do NOT claim sold.");
             }
         }
         const stillConfirmed = testDrivePlan.filter((e) => e.status === "CONFIRMED");
         if (stillConfirmed.length) {
-            lines.push(`- ${stillConfirmed.length} appointment(s) already CONFIRMED in plan — preserve these; never undo.`);
+            lines.push(`- ${stillConfirmed.length} appointment(s) already CONFIRMED in plan ? preserve these; never undo.`);
         }
         authoritativePlanFinalizeContext = lines.join("\n");
-        console.log("[whatsapp] Plan confirmation — finalized pending entries", {
+        console.log("[whatsapp] Plan confirmation ? finalized pending entries", {
             companyId: resolvedCompanyId,
             customerId,
             results: finalize.results.map((r) => ({ vehicleId: r.vehicleId, ok: r.ok, code: r.code })),
         });
     }
+
+    const knowledgeParts = [
+        knowledgeBundle.context || "",
+        memoryContext || "",
+        schedulingPrompt,
+        testDrivePlanPrompt,
+        authoritativeAvailabilityContext,
+        authoritativePlanFinalizeContext,
+        authoritativeBookingContext,
+        authoritativeVehicleContext,
+        galleryOutboundContext,
+    ].filter(Boolean);
 
     const toolCtx = {
         companyId: resolvedCompanyId,
@@ -655,45 +659,6 @@ async function processInboundMessage(job) {
         testDrivePlan,
     };
 
-    if (resolvedCompanyId && inventoryBrowseIntent) {
-        const inventoryArgs = buildInventorySearchArgs(text, salesContextForTurn);
-        preloadedInventoryResult = await runTool("searchInventory", toolCtx, inventoryArgs);
-        authoritativeInventoryContext = formatAuthoritativeInventoryBlock(preloadedInventoryResult);
-        console.log("[whatsapp] Pre-loaded searchInventory (inventory browse intent)", {
-            companyId: resolvedCompanyId,
-            customerId,
-            bodyType: inventoryArgs.bodyType || null,
-            count: preloadedInventoryResult?.vehicles?.length ?? 0,
-            ok: preloadedInventoryResult?.ok ?? preloadedInventoryResult?.success,
-        });
-    }
-
-    const systemPrompt = buildWhatsAppSystemPrompt({
-        agent,
-        companyId: resolvedCompanyId,
-        companyName,
-        customer: refreshedCustomer,
-        contactName,
-        isNewConversation,
-        inboundMessage: text,
-        inventoryBrowseIntent,
-        inventoryPreloaded: Boolean(preloadedInventoryResult?.ok ?? preloadedInventoryResult?.success),
-        historyLength: history.length,
-    });
-
-    const knowledgeParts = [
-        knowledgeBundle.context || "",
-        memoryContext || "",
-        schedulingPrompt,
-        testDrivePlanPrompt,
-        authoritativeAvailabilityContext,
-        authoritativePlanFinalizeContext,
-        authoritativeBookingContext,
-        authoritativeVehicleContext,
-        authoritativeInventoryContext,
-        galleryOutboundContext,
-    ].filter(Boolean);
-
     const aiTools = resolvedCompanyId ? getOpenAIToolDefinitions() : [];
     let reply;
     let toolResults = [];
@@ -704,15 +669,9 @@ async function processInboundMessage(job) {
             systemPrompt,
             knowledgeContext: knowledgeParts.join("\n\n"),
             tools: aiTools,
-            executeTool: (name, args) => {
-                if (name === "searchInventory" && preloadedInventoryResult?.ok) {
-                    return Promise.resolve(preloadedInventoryResult);
-                }
-                return runTool(name, toolCtx, args);
-            },
+            executeTool: (name, args) => runTool(name, toolCtx, args),
             authoritativeBookingData: Boolean(authoritativeBookingContext),
             preloadedBookingResult,
-            preloadedInventoryResult,
         });
         reply = aiResult.reply;
         toolResults = aiResult.toolResults || [];
@@ -734,23 +693,6 @@ async function processInboundMessage(job) {
                 code: r.code || null,
             })),
         });
-    }
-
-    if (resolvedCompanyId && toolResults.length) {
-        const bookingGuard = await guardBookingConfirmationReply({
-            reply,
-            toolResults,
-            ctx: toolCtx,
-        });
-        if (bookingGuard.overridden) {
-            console.log("[whatsapp] Booking reply guard override", {
-                companyId: resolvedCompanyId,
-                customerId,
-                reason: bookingGuard.reason,
-                mismatches: bookingGuard.mismatches || null,
-            });
-            reply = bookingGuard.reply;
-        }
     }
 
     let outboundPlan = null;
@@ -799,16 +741,12 @@ async function processInboundMessage(job) {
                         companyId: resolvedCompanyId,
                         externalId: metaMessageId,
                         mediaUrl: part.link,
-                        customerName: customerDisplayName,
-                        contactName,
                     });
                 } else {
                     await saveOutboundMessage(sender, part.text, {
                         channel: outboundChannel,
                         companyId: resolvedCompanyId,
                         externalId: metaMessageId,
-                        customerName: customerDisplayName,
-                        contactName,
                     });
                 }
                 wamidIndex++;
@@ -840,8 +778,6 @@ async function processInboundMessage(job) {
                         channel: outboundChannel,
                         companyId: resolvedCompanyId,
                         externalId: failureMetaId,
-                        customerName: customerDisplayName,
-                        contactName,
                     });
                 }
             }
@@ -853,8 +789,6 @@ async function processInboundMessage(job) {
                 channel: outboundChannel,
                 companyId: resolvedCompanyId,
                 externalId: metaMessageId,
-                customerName: customerDisplayName,
-                contactName,
             });
         }
     }
