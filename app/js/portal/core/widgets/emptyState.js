@@ -1,7 +1,5 @@
 import { emptyState as adminEmptyState } from '../../../admin/ui.js';
 
-export { adminEmptyState as renderEmptyState };
-
 /**
  * @param {{ title?: string, message?: string, actionHtml?: string }} [opts]
  */
