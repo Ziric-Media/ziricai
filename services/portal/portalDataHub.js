@@ -34,7 +34,7 @@ import { getWorkspaceSnapshot, getWorkspaceResourceCounts } from './workspaceSer
 
 import { getCompany } from '../tenants/companyService.js';
 
-import { isDemoTenant as isDemoTenantId } from '../core/dataMode.js';
+import { isDemoTenant as isDemoTenantId, shouldUseDemoFallback } from '../core/dataMode.js';
 
 const DEMO_COMPANY_ID = 'demo-central-motors';
 
@@ -194,11 +194,11 @@ function buildLiveMetrics({
 
   quickStats,
 
-  isDemoTenant,
+  useDemoContent,
 
 }) {
 
-  if (isDemoTenant) {
+  if (useDemoContent) {
 
     const demo = demoMetrics();
 
@@ -468,13 +468,15 @@ export async function getPortalHub(companyId) {
 
   const resourceCounts = workspace?.resources || (await getWorkspaceResourceCounts(companyId).catch(() => null));
 
-  const isDemoTenantFlag = isDemoTenantId(companyId) && (usagePayload.isDemo ?? true);
-
   const isProvisioned = Boolean(companyRecord || workspace?.company);
 
+  const useDemoContent = shouldUseDemoFallback({
+    companyId,
+    isDemo: isDemoTenantId(companyId),
+    isProvisioned,
+  });
 
-
-  const quickStats = isDemoTenantFlag
+  const quickStats = useDemoContent
 
     ? usagePayload.quickStats || getPortalQuickStats(companyId)
 
@@ -508,11 +510,9 @@ export async function getPortalHub(companyId) {
 
     quickStats,
 
-    isDemoTenant: isDemoTenantFlag,
+    useDemoContent,
 
   });
-
-
 
   const notifications = notificationsRaw.length ? notificationsRaw : [];
 
@@ -522,7 +522,7 @@ export async function getPortalHub(companyId) {
 
   let recentActivity = [];
 
-  if (isDemoTenantFlag) {
+  if (useDemoContent) {
 
     const activitySource = getPortalActivity(companyId);
 
@@ -584,7 +584,7 @@ export async function getPortalHub(companyId) {
 
       ? recentConversations
 
-      : isDemoTenantFlag
+      : useDemoContent
 
         ? DEMO_HUB_CONVERSATIONS
 
@@ -698,7 +698,7 @@ export async function getPortalHub(companyId) {
 
     },
 
-    isDemo: isDemoTenantFlag && !isProvisioned,
+    isDemo: useDemoContent,
 
     isProvisioned,
 

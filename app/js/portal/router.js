@@ -17,7 +17,12 @@ export function navigateTo(page, params = {}) {
     page = 'dashboard';
   }
 
-  if (params.phone) setState({ selectedCustomerPhone: params.phone });
+  if (params.phone) {
+    setState({ selectedCustomerPhone: params.phone });
+    if (state.companyId) {
+      sessionStorage.setItem(`portal-crm-selected-${state.companyId}`, params.phone);
+    }
+  }
 
   setState({ currentPage: page });
 

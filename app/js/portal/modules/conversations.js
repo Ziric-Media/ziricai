@@ -35,10 +35,6 @@ export async function renderConversations(container) {
   let conversations = apiRes.data?.items || [];
   const useDemo = shouldUseDemoFallback({ companyId, isDemo: state.hubData?.isDemo, isProvisioned: state.hubData?.isProvisioned });
 
-  if (!conversations.length && useDemo && state.hubData?.recentConversations?.length) {
-    conversations = state.hubData.recentConversations;
-  }
-
   if (apiRes.error && !conversations.length && !useDemo) {
     container.innerHTML = `${pageHeader('Unified Inbox', 'All channels in one place.')}
       ${errorState(apiRes.error)}

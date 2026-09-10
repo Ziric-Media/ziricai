@@ -74,10 +74,12 @@ async function loadTenantContext(profile) {
     companyRes.data?.company ||
     { id: companyId, name: workspace?.company?.name || 'Your Company' };
 
-  const storedBranding = localStorage.getItem(`ziric-portal-branding-${companyId}`);
+  const isProvisioned = Boolean(workspace?.company);
+  const useDemoBranding = shouldUseDemoFallback({ companyId, isDemo: isDemoTenant, isProvisioned });
+  const storedBranding = useDemoBranding ? localStorage.getItem(`ziric-portal-branding-${companyId}`) : null;
   const branding = storedBranding
     ? JSON.parse(storedBranding)
-    : workspace?.branding || companyRes.data?.branding || company.branding || (shouldUseDemoFallback({ companyId, isDemo: isDemoTenant }) ? DEMO_BRANDING : { primaryColor: '#1e40af', faviconUrl: 'assets/favicon-portal.svg' });
+    : workspace?.branding || companyRes.data?.branding || company.branding || (useDemoBranding ? DEMO_BRANDING : { primaryColor: '#1e40af', faviconUrl: 'assets/favicon-portal.svg' });
 
   const subscription = companyRes.data?.subscription || companyRes.data?.usage || null;
   const team = teamRes.data?.items?.length ? teamRes.data.items : workspace?.team || [];

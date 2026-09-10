@@ -108,7 +108,9 @@ export async function assertTenantAccess(ctx) {
  * @param {import('express').Request} req
  * @returns {Promise<{ via: 'api_key'|'superadmin'|'tenant' }>}
  */
-export async function assertIntegrationReadAccess(ctx, req) {
+export async function assertIntegrationReadAccess(ctx, req, deps = {}) {
+    const resolveMembership = deps.getTenantMembership ?? getTenantMembership;
+
     if (!ctx.companyId) {
         throw Object.assign(new Error("companyId is required"), { status: 400, code: "MISSING_COMPANY_ID" });
     }
@@ -126,10 +128,14 @@ export async function assertIntegrationReadAccess(ctx, req) {
     }
 
     if (!ctx.profile) {
-        throw Object.assign(new Error("User profile not found — complete onboarding or contact support"), {
-            status: 403,
-            code: "PROFILE_REQUIRED",
-        });
+        const membershipOnly = await resolveMembership(ctx.uid, ctx.companyId);
+        if (!membershipOnly) {
+            throw Object.assign(new Error("User profile not found — complete onboarding or contact support"), {
+                status: 403,
+                code: "PROFILE_REQUIRED",
+            });
+        }
+        return { via: "tenant" };
     }
 
     if (!userBelongsToCompany(ctx.profile, ctx.companyId)) {
@@ -142,7 +148,7 @@ export async function assertIntegrationReadAccess(ctx, req) {
         throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
     }
 
-    const membership = await getTenantMembership(ctx.uid, ctx.companyId);
+    const membership = await resolveMembership(ctx.uid, ctx.companyId);
     if (!membership) {
         throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
     }

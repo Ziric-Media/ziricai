@@ -3,6 +3,7 @@
  */
 import { setState, state, invalidateCache } from './dataStore.js';
 import { apiRequest } from '../../shared/apiRequest.js';
+import { shouldUseDemoFallback } from '../../shared/dataMode.js';
 
 const HUB_TTL_MS = 60_000;
 const DEFAULT_TTL_MS = 60_000;
@@ -71,7 +72,11 @@ export async function prefetchHub(companyId, opts = {}) {
 
   if (result.data) {
     const hub = result.data;
-    const useDemoFallback = hub.isDemo === true && !hub.isProvisioned;
+    const useDemoFallback = shouldUseDemoFallback({
+      companyId,
+      isDemo: hub.isDemo,
+      isProvisioned: hub.isProvisioned,
+    });
 
     setState({
       hubData: hub,

@@ -74,6 +74,7 @@ import {
     getPortalTeamAsync,
     getPortalNotificationsAsync,
     getPortalActivityAsync,
+    allowPortalDemoFallback,
     getPortalUsage,
     getPortalDashboard,
     PORTAL_DEMO_NOTIFICATIONS,
@@ -612,7 +613,7 @@ app.get("/api/portal/notifications/:companyId", requireTenantScope(), async (req
     try {
         const companyId = req.params.companyId;
         const items = await getPortalNotificationsAsync(companyId);
-        const isDemo = isDemoTenant(companyId) && items.length <= PORTAL_DEMO_NOTIFICATIONS.length;
+        const isDemo = await allowPortalDemoFallback(companyId);
         res.json({ items, isDemo });
     } catch (err) {
         console.error("[api/portal/notifications] error:", err.message);
@@ -622,8 +623,10 @@ app.get("/api/portal/notifications/:companyId", requireTenantScope(), async (req
 
 app.get("/api/portal/activity/:companyId", requireTenantScope(), async (req, res) => {
     try {
-        const items = await getPortalActivityAsync(req.params.companyId);
-        res.json({ items, isDemo: !items.length });
+        const companyId = req.params.companyId;
+        const items = await getPortalActivityAsync(companyId);
+        const isDemo = await allowPortalDemoFallback(companyId);
+        res.json({ items, isDemo });
     } catch (err) {
         console.error("[api/portal/activity] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load activity" });

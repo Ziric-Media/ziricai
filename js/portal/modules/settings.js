@@ -350,6 +350,12 @@ function collectBranding(container) {
 async function saveBranding(container) {
   const branding = collectBranding(container);
   const result = await patchPortalBranding(state.companyId, branding);
+
+  if (result.error) {
+    showToast(result.error, 'error');
+    return;
+  }
+
   setState({ branding, company: { ...state.company, branding } });
   applyBranding(branding);
 
@@ -358,9 +364,5 @@ async function saveBranding(container) {
     localStorage.setItem(`ziric-portal-branding-${state.companyId}`, JSON.stringify(branding));
   }
 
-  if (result.error) {
-    showToast(result.error, 'error');
-    return;
-  }
   showToast('Settings saved', 'success');
 }

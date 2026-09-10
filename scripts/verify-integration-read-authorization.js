@@ -135,4 +135,11 @@ console.log("✓ cross-tenant profile → 403 (generic message)");
 console.log("✓ superadmin → allowed");
 console.log("✓ platform API key → allowed");
 
+const tenantContextSource = read("services/core/tenantContext.js");
+const integrationBlock = tenantContextSource.slice(
+    tenantContextSource.indexOf("export async function assertIntegrationReadAccess")
+);
+assert.match(integrationBlock, /if \(!ctx\.profile\) \{[\s\S]*resolveMembership\(ctx\.uid, ctx\.companyId\)/);
+console.log("✓ missing profile may fall back to tenant membership for integration reads");
+
 console.log("\nAll B-MC-5c-2e-1 integration read authorization checks passed.");

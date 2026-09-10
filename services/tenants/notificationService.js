@@ -5,6 +5,7 @@ import { ServiceBase } from "../core/serviceBase.js";
 import { TENANT_COLLECTIONS } from "../database/schema.js";
 import { pushNotification, listNotifications } from "../messaging/messagingService.js";
 import { getStorageAdapter } from "../storage/storageAdapter.js";
+import { toIsoTimestamp } from "../core/timestampUtils.js";
 
 class NotificationService extends ServiceBase {
     constructor() {
@@ -21,6 +22,21 @@ class NotificationService extends ServiceBase {
 }
 
 const notificationService = new NotificationService();
+
+/** @param {object} notification */
+export function serializeNotificationRecord(notification) {
+    if (!notification || typeof notification !== "object") return notification;
+    const createdAt = toIsoTimestamp(notification.createdAt);
+    return {
+        ...notification,
+        ...(createdAt ? { createdAt } : {}),
+    };
+}
+
+/** @param {object[]} items */
+export function serializeNotificationItems(items) {
+    return (items || []).map(serializeNotificationRecord);
+}
 
 function uid(prefix = "n") {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -40,8 +56,9 @@ export async function createNotification(companyId, notification) {
 
 export async function listTenantNotifications(companyId) {
     const legacy = await listNotifications(companyId);
-    if (legacy.length) return legacy;
-    return notificationService.list(companyId, { orderByField: "createdAt" });
+    if (legacy.length) return serializeNotificationItems(legacy);
+    const items = await notificationService.list(companyId, { orderByField: "createdAt" });
+    return serializeNotificationItems(items);
 }
 
 export async function markNotificationRead(companyId, notificationId) {
@@ -59,8 +76,9 @@ export async function pushActivity(companyId, activity) {
 export async function listUnreadNotifications(companyId) {
     const legacy = await listNotifications(companyId);
     const unread = legacy.filter((n) => !n.read);
-    if (unread.length) return unread;
-    return notificationService.listUnread(companyId);
+    if (unread.length) return serializeNotificationItems(unread);
+    const items = await notificationService.listUnread(companyId);
+    return serializeNotificationItems(items);
 }
 
 export async function markAllNotificationsRead(companyId) {

@@ -18,6 +18,7 @@ export function shouldUseDemoFallback(ctx = {}) {
     const companyId = typeof ctx === "string" ? ctx : ctx?.companyId;
     if (!companyId) return true;
     if (isDemoTenant(companyId)) return true;
+    if (ctx?.isProvisioned === true) return false;
     if (process.env.DEMO_SEED === "true") return true;
     if (ctx?.isDemo === true && ctx?.isProvisioned !== true) return true;
     return false;

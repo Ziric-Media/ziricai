@@ -5,6 +5,8 @@
  */
 import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { getPlan, buildUsageFromPlan, getAllPlans, formatPrice } from "../platform/billingPlans.js";
+import { isDemoTenant, shouldUseDemoFallback } from "../core/dataMode.js";
+import { buildProductionUsageSnapshot } from "./portalUsageSnapshot.js";
 
 const businessPlan = getPlan("business");
 
@@ -83,6 +85,32 @@ export const PORTAL_DEMO_ACTIVITY = [
 /** In-memory branding overrides (demo persistence). */
 const brandingOverrides = new Map();
 
+async function resolveTenantProvisioned(companyId) {
+    try {
+        const { getCompany } = await import("../tenants/companyService.js");
+        if (await getCompany(companyId)) return true;
+    } catch {
+        /* ignore */
+    }
+    try {
+        const { getWorkspaceSnapshot } = await import("./workspaceService.js");
+        const workspace = await getWorkspaceSnapshot(companyId);
+        return Boolean(workspace?.company);
+    } catch {
+        return false;
+    }
+}
+
+/** Demo fallback only for explicit demo/unprovisioned tenants — never provisioned production. */
+export async function allowPortalDemoFallback(companyId) {
+    const isProvisioned = await resolveTenantProvisioned(companyId);
+    return shouldUseDemoFallback({
+        companyId,
+        isDemo: isDemoTenant(companyId),
+        isProvisioned,
+    });
+}
+
 async function loadProvisionedCompany(companyId) {
   try {
     const adapter = await getStorageAdapter();
@@ -149,7 +177,10 @@ export async function getPortalTeamAsync(companyId) {
   } catch {
     /* fall through */
   }
-  return { items: getPortalTeam(companyId), isDemo: true };
+  if (await allowPortalDemoFallback(companyId)) {
+    return { items: getPortalTeam(companyId), isDemo: true };
+  }
+  return { items: [], isDemo: false };
 }
 
 export async function getPortalNotificationsAsync(companyId) {
@@ -162,7 +193,10 @@ export async function getPortalNotificationsAsync(companyId) {
   } catch {
     /* ignore */
   }
-  return getPortalNotifications(companyId);
+  if (await allowPortalDemoFallback(companyId)) {
+    return getPortalNotifications(companyId);
+  }
+  return [];
 }
 
 export function getPortalNotifications(companyId) {
@@ -179,7 +213,10 @@ export async function getPortalActivityAsync(companyId) {
   } catch {
     /* ignore */
   }
-  return getPortalActivity(companyId);
+  if (await allowPortalDemoFallback(companyId)) {
+    return getPortalActivity(companyId);
+  }
+  return [];
 }
 
 export function getPortalActivity(companyId) {
@@ -235,6 +272,33 @@ export function generateMonthlyUsageSeries(companyId, messagesTotal = 342, token
     monthLabel: monthNames[month],
     year,
     currentDay,
+  };
+}
+
+function emptyQuickStats() {
+  return {
+    responseRate: 0,
+    avgResponseSec: 0,
+    activeConversations: 0,
+    leadsThisWeek: 0,
+    aiResolutionRate: 0,
+    humanTakeovers: 0,
+    workflowsRunning: 0,
+    testDrivesBooked: 0,
+    trends: {},
+  };
+}
+
+function emptyChartSeries() {
+  const now = new Date();
+  return {
+    labels: [],
+    messages: [],
+    tokens: [],
+    month: now.getMonth() + 1,
+    monthLabel: "",
+    year: now.getFullYear(),
+    currentDay: 0,
   };
 }
 
@@ -330,8 +394,8 @@ export function getPortalUsage(companyId) {
 export async function getPortalUsageAsync(companyId) {
   let usage;
   let invoices = [];
-  let isDemo = false;
   const seed = hashSeed(companyId || 'default');
+  const allowDemo = await allowPortalDemoFallback(companyId);
 
   if (companyId === 'demo-central-motors') {
     usage = {
@@ -352,22 +416,23 @@ export async function getPortalUsageAsync(companyId) {
       apiCallsLimit: 50000,
     };
     invoices = PORTAL_DEMO_INVOICES;
-    isDemo = true;
-  } else {
+  } else if (allowDemo) {
     const planId = await loadCompanyPlan(companyId);
     usage = { companyId, ...buildUsageFromPlan(planId, seed) };
-    isDemo = false;
+    invoices = [];
+  } else {
+    const planId = await loadCompanyPlan(companyId);
+    usage = await buildProductionUsageSnapshot(companyId, planId);
+    invoices = [];
   }
 
-  const chartSeries = generateMonthlyUsageSeries(
-    companyId,
-    usage.messagesUsed || 0,
-    usage.tokensUsed || 0
-  );
-  const quickStats = getPortalQuickStats(companyId);
+  const chartSeries = allowDemo
+    ? generateMonthlyUsageSeries(companyId, usage.messagesUsed || 0, usage.tokensUsed || 0)
+    : emptyChartSeries();
+  const quickStats = allowDemo ? getPortalQuickStats(companyId) : emptyQuickStats();
   const plans = getAllPlans();
 
-  return { usage, invoices, chartSeries, quickStats, plans, isDemo };
+  return { usage, invoices, chartSeries, quickStats, plans, isDemo: allowDemo };
 }
 
 /** Tenant-scoped analytics for portal Analytics module. */

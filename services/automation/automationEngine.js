@@ -8,6 +8,7 @@ import { publish } from "../events/eventBus.js";
 import { EventTypes } from "../events/eventTypes.js";
 import { TenantRepository } from "../database/tenantRepository.js";
 import { TENANT_COLLECTIONS } from "../database/schema.js";
+import { compareTimestampsDesc } from "../core/timestampUtils.js";
 
 const runsRepo = new TenantRepository(TENANT_COLLECTIONS.AUTOMATION_RUNS);
 
@@ -82,7 +83,7 @@ export async function runWorkflow(companyId, workflow, event, options = {}) {
 
 export async function listAutomationRuns(companyId, { limit = 50 } = {}) {
     const items = await runsRepo.list(companyId, { max: limit, orderByField: "startedAt" });
-    return items.sort((a, b) => (b.startedAt || "").localeCompare(a.startedAt || ""));
+    return items.sort((a, b) => compareTimestampsDesc(a.startedAt, b.startedAt));
 }
 
 export { runsRepo };

@@ -4,6 +4,7 @@
 import { EventTypes } from "../events/eventTypes.js";
 import { TenantRepository } from "../database/tenantRepository.js";
 import { TENANT_COLLECTIONS } from "../database/schema.js";
+import { compareTimestampsDesc } from "../core/timestampUtils.js";
 
 const workflowsRepo = new TenantRepository(TENANT_COLLECTIONS.AUTOMATIONS);
 
@@ -74,7 +75,7 @@ async function ensureBuiltinWorkflows(companyId) {
 export async function listWorkflows(companyId) {
     await ensureBuiltinWorkflows(companyId);
     const items = await workflowsRepo.list(companyId, { max: 100 });
-    return items.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+    return items.sort((a, b) => compareTimestampsDesc(a.updatedAt, b.updatedAt));
 }
 
 export async function getWorkflow(companyId, workflowId) {

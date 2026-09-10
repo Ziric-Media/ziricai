@@ -1,5 +1,5 @@
 import { requireCompanyId } from '../core/dataStore.js';
-import { escapeHtml, pageHeader, loadingState, showToast } from '../../admin/ui.js';
+import { escapeHtml, pageHeader, loadingState, showToast, errorState } from '../../admin/ui.js';
 import { renderEmptyState } from '../core/widgets/emptyState.js';
 import {
   fetchMarketplaceCatalog,
@@ -23,9 +23,20 @@ export async function renderMarketplace(container) {
     withTimeout(fetchPackUpdates(companyId)),
   ]);
 
-  const catalog = catalogRes.error ? { categories: [], packs: [] } : catalogRes.data;
-  const installed = instRes.data?.items || [];
-  const updates = updatesRes.data?.updates || [];
+  if (catalogRes.error) {
+    container.innerHTML = `
+      ${pageHeader('AI Marketplace', 'One-click install complete AI Employees — under 5 minutes.')}
+      ${errorState(catalogRes.error)}
+      <div style="text-align:center;margin-top:12px;">
+        <button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>
+      </div>`;
+    return;
+  }
+
+  const catalog = catalogRes.data || { categories: [], packs: [] };
+  const installed = instRes.error ? [] : (instRes.data?.items || []);
+  const updates = updatesRes.error ? [] : (updatesRes.data?.updates || []);
+  const partialErrors = [instRes.error, updatesRes.error].filter(Boolean);
   const installedIds = new Set(installed.map((p) => p.packId));
   const updateIds = new Set(updates.map((u) => u.packId));
 
@@ -34,6 +45,13 @@ export async function renderMarketplace(container) {
       'AI Marketplace',
       'One-click install complete AI Employees — under 5 minutes.',
     )}
+
+    ${partialErrors.length
+      ? `<div class="portal-module-notice" style="margin-bottom:16px;padding:12px 16px;border-radius:8px;background:rgba(245,158,11,0.12);color:#92400e;">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          Some marketplace data could not be loaded. Installed packs or updates may be incomplete.
+        </div>`
+      : ''}
 
     <div class="marketplace-toolbar">
       <div class="marketplace-search-wrap">
@@ -140,6 +158,10 @@ function bindMarketplaceEvents(container, companyId, catalog) {
     if (sort) params.set('sort', sort);
 
     const res = await fetchMarketplaceCatalog(params.toString());
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
     const packs = res.data?.packs || catalog.packs;
     const instRes = await fetchInstalledPacks(companyId);
     const installedIds = new Set((instRes.data?.items || []).map((p) => p.packId));

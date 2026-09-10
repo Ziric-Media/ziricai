@@ -1,11 +1,26 @@
 import { state, setState } from '../core/dataStore.js';
-import { escapeHtml, pageHeader, errorState } from '../../admin/ui.js';
+import { escapeHtml, pageHeader, errorState, showToast } from '../../admin/ui.js';
 import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { fetchTenantNotifications, markAllNotificationsRead } from '../api.js';
 import { updateNotificationBadge } from '../auth-guard.js';
 import { invalidateHub } from '../core/dataService.js';
 
 const RETRY_BTN = '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
+
+function formatNotificationTime(n) {
+  if (typeof n?.time === 'string' && n.time.trim()) return n.time.trim();
+  const raw = n?.createdAt;
+  if (typeof raw === 'string') return raw.slice(0, 16).replace('T', ' ');
+  if (raw && typeof raw === 'object') {
+    if (typeof raw.toDate === 'function') {
+      return raw.toDate().toISOString().slice(0, 16).replace('T', ' ');
+    }
+    if (raw._seconds != null) {
+      return new Date(raw._seconds * 1000).toISOString().slice(0, 16).replace('T', ' ');
+    }
+  }
+  return '';
+}
 
 export async function renderNotifications(container) {
   const companyId = state.companyId;
@@ -36,7 +51,11 @@ export async function renderNotifications(container) {
   `;
 
   container.querySelector('#markAllReadBtn')?.addEventListener('click', async () => {
-    await markAllNotificationsRead(companyId);
+    const result = await markAllNotificationsRead(companyId);
+    if (result.error) {
+      showToast(result.error, 'error');
+      return;
+    }
     invalidateHub();
     renderNotifications(container);
   });
@@ -68,7 +87,7 @@ function notificationItem(n, compact = false) {
       <div class="notification-icon"><i class="fa-solid ${escapeHtml(n.icon || 'fa-bell')}"></i></div>
       <div class="notification-content">
         <div class="notification-title">${escapeHtml(n.title || n.message || 'Notification')}</div>
-        <div class="notification-time">${escapeHtml(n.time || n.createdAt?.slice(0, 16) || '')}</div>
+        <div class="notification-time">${escapeHtml(formatNotificationTime(n))}</div>
       </div>
     </div>`;
 }

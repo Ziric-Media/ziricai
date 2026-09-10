@@ -23,17 +23,21 @@ export async function renderAnalytics(container) {
 
   const apiData = res.data;
   const useDemo = shouldUseDemoFallback({ companyId, isDemo: state.hubData?.isDemo, isProvisioned: state.hubData?.isProvisioned });
-  const fallback = useDemo ? demoAnalyticsData(companyId) : { series: {}, rows: [], summary: {}, kpis: {} };
-  const data = apiData?.series ? apiData : (res.error && useDemo ? fallback : apiData || fallback);
-  const { series, rows, summary } = data;
-  const kpis = apiData?.kpis || data.kpis || {};
 
-  if (res.error && !useDemo && !apiData?.series) {
+  if (res.error && !useDemo) {
     container.innerHTML = `${pageHeader('Analytics', 'Live BI for your company.')}
       ${errorState(res.error)}
       <div style="text-align:center;margin-top:12px;"><button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button></div>`;
     return;
   }
+
+  const data = res.error && useDemo
+    ? demoAnalyticsData(companyId)
+    : (apiData?.series ? apiData : { series: { labels: [] }, rows: [], summary: {}, kpis: apiData?.kpis || {} });
+  const showingDemo = Boolean(res.error && useDemo);
+  const { series, rows, summary } = data;
+  const kpis = data.kpis || apiData?.kpis || {};
+  const hasSeries = Boolean(series?.labels?.length);
   const popularQuestions = popularRes.data?.questions || [];
   const aiInsights = apiData?.aiInsights;
   const canExport = state.permissions.canExportData;
@@ -47,18 +51,24 @@ export async function renderAnalytics(container) {
         : ''
     )}
 
+    ${showingDemo ? `<div class="portal-module-notice" style="margin-bottom:16px;padding:12px 16px;border-radius:8px;background:rgba(59,130,246,0.12);color:#1e40af;">
+      <i class="fa-solid fa-flask"></i> Demo analytics — sample data for the showcase tenant.
+    </div>` : ''}
+
     <div class="kpi-grid kpi-grid-ops">
-      ${kpiCard('Conversations', formatNumber(kpis.conversations ?? summary.conversations7d), 'fa-comments', 'purple', summary.trends?.conversations)}
-      ${kpiCard('Leads', formatNumber(kpis.leads ?? 0), 'fa-user-plus', 'blue', summary.trends?.leads)}
-      ${kpiCard('Appointments', formatNumber(kpis.appointments ?? summary.appointments7d ?? 0), 'fa-calendar-check', 'green', summary.trends?.appointments)}
-      ${kpiCard('Revenue', formatNumber(kpis.revenue ?? summary.revenue7d ?? 0), 'fa-coins', 'yellow', summary.trends?.revenue)}
-      ${kpiCard('Conversions', formatNumber(kpis.conversions ?? 0), 'fa-chart-line', 'orange', null)}
-      ${kpiCard('AI Accuracy', `${kpis.aiAccuracy ?? summary.aiResolutionRate ?? 85}%`, 'fa-robot', 'purple', null)}
-      ${kpiCard('Response Time', `${kpis.responseTimeSec ?? summary.avgResponseSec ?? 1.8}s`, 'fa-bolt', 'yellow', summary.trends?.avgResponseSec, true)}
-      ${kpiCard('Satisfaction', `${kpis.customerSatisfaction ?? summary.avgSatisfaction ?? 4.2}`, 'fa-face-smile', 'blue', summary.trends?.satisfaction)}
-      ${kpiCard('Missed Opps', formatNumber(kpis.missedOpportunities ?? 0), 'fa-triangle-exclamation', 'red', null)}
-      ${kpiCard('Automation', `${kpis.automationSuccessRate ?? 0}%`, 'fa-diagram-project', 'green', null)}
+      ${kpiCard('Conversations', formatMetric(kpis.conversations ?? summary.conversations7d), 'fa-comments', 'purple', summary.trends?.conversations)}
+      ${kpiCard('Leads', formatMetric(kpis.leads ?? summary.leads7d), 'fa-user-plus', 'blue', summary.trends?.leads)}
+      ${kpiCard('Appointments', formatMetric(kpis.appointments ?? summary.appointments7d), 'fa-calendar-check', 'green', summary.trends?.appointments)}
+      ${kpiCard('Revenue', formatMetric(kpis.revenue ?? summary.revenue7d), 'fa-coins', 'yellow', summary.trends?.revenue)}
+      ${kpiCard('Conversions', formatMetric(kpis.conversions ?? summary.conversions7d), 'fa-chart-line', 'orange', null)}
+      ${kpiCard('AI Accuracy', formatPercentMetric(kpis.aiAccuracy ?? summary.aiResolutionRate), 'fa-robot', 'purple', null)}
+      ${kpiCard('Response Time', formatSecondsMetric(kpis.responseTimeSec ?? summary.avgResponseSec), 'fa-bolt', 'yellow', summary.trends?.avgResponseSec, true)}
+      ${kpiCard('Satisfaction', formatMetric(kpis.customerSatisfaction ?? summary.avgSatisfaction), 'fa-face-smile', 'blue', summary.trends?.satisfaction)}
+      ${kpiCard('Missed Opps', formatMetric(kpis.missedOpportunities ?? summary.missedOpportunities), 'fa-triangle-exclamation', 'red', null)}
+      ${kpiCard('Automation', formatPercentMetric(kpis.automationSuccessRate ?? summary.automationSuccessRate), 'fa-diagram-project', 'green', null)}
     </div>
+
+    ${!hasSeries && !showingDemo ? `<div class="empty-panel" style="padding:24px;margin-bottom:16px;">No analytics data yet for this period.</div>` : ''}
 
     <div class="portal-analytics-grid">
       <div class="portal-analytics-chart">
@@ -169,6 +179,21 @@ export async function renderAnalytics(container) {
   container.querySelector('#downloadReportBtn')?.addEventListener('click', () => {
     window.open(`/api/companies/${encodeURIComponent(companyId)}/reports/weekly?format=html`, '_blank');
   });
+}
+
+function formatMetric(value) {
+  if (value == null || value === '') return '—';
+  return formatNumber(value);
+}
+
+function formatPercentMetric(value) {
+  if (value == null || value === '') return '—';
+  return `${value}%`;
+}
+
+function formatSecondsMetric(value) {
+  if (value == null || value === '') return '—';
+  return `${value}s`;
 }
 
 function kpiCard(label, value, icon, color, trend, invertTrend = false) {

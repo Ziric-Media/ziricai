@@ -28,7 +28,8 @@ export async function renderBilling(container) {
 
   const res = await fetchPortalUsage(companyId);
   const useDemo = shouldUseDemoFallback({ companyId, isDemo: state.hubData?.isDemo, isProvisioned: state.hubData?.isProvisioned });
-  const usage = res.data?.usage || state.usage || (useDemo ? DEMO_USAGE : { plan: 'trial', planLabel: 'Trial', messagesUsed: 0, messagesLimit: 500, tokensUsed: 0, tokensLimit: 100000, storageUsedMb: 0, storageLimitMb: 512, renewalDate: '—', billingCycle: 'monthly', amount: 0, currency: 'ZAR' });
+  const usage = res.data?.usage || state.usage || (useDemo ? DEMO_USAGE : { plan: 'trial', planLabel: 'Trial', messagesUsed: 0, messagesLimit: 500, tokensUsed: 0, tokensLimit: 100000, storageUsedMb: 0, storageLimitMb: 512, renewalDate: '—', billingCycle: 'monthly', amount: 0, currency: 'ZAR', usageSource: 'recorded' });
+  const usageIsRecorded = usage.usageSource === 'recorded';
   const invoices = res.data?.invoices || (useDemo ? DEMO_INVOICES : []);
 
   if (res.error && !useDemo && !res.data?.usage) {
@@ -54,6 +55,10 @@ export async function renderBilling(container) {
       `Subscription and consumption for ${escapeHtml(state.company?.name || 'your company')}.`,
       `<button class="btn btn-secondary btn-sm" type="button" id="refreshBilling"><i class="fa-solid fa-rotate"></i> Refresh</button>`
     )}
+
+    ${usageIsRecorded && !useDemo ? `<div class="portal-module-notice" style="margin-bottom:16px;padding:12px 16px;border-radius:8px;background:rgba(59,130,246,0.08);color:#1e3a8a;">
+      <i class="fa-solid fa-circle-info"></i> Usage meters reflect recorded tenant activity. Token, storage, and API call meters stay at zero until those sources are tracked.
+    </div>` : ''}
 
     <div class="portal-billing-hero">
       <div class="portal-billing-hero-left">
@@ -98,8 +103,8 @@ export async function renderBilling(container) {
             <span class="legend-item"><span class="dot orange"></span> Tokens (÷100)</span>
           </div>
         </div>
-        <p class="portal-chart-subtitle">Daily breakdown · tenant-scoped demo data</p>
-        <div class="chart-canvas-wrap portal-chart-wrap"><canvas id="portalBillingChart"></canvas></div>
+        <p class="portal-chart-subtitle">${chartSeries?.labels?.length ? 'Daily breakdown for this billing period' : 'No daily usage history recorded yet'}</p>
+        <div class="chart-canvas-wrap portal-chart-wrap">${chartSeries?.labels?.length ? '<canvas id="portalBillingChart"></canvas>' : '<div class="empty-panel" style="padding:24px;">Usage charts appear once message activity is recorded.</div>'}</div>
       </div>
 
       <div class="portal-billing-meters">

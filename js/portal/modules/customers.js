@@ -7,6 +7,21 @@ import { navigateTo } from '../router.js';
 
 const RETRY_BTN = '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
 
+function crmSelectionKey(companyId) {
+  return `portal-crm-selected-${companyId}`;
+}
+
+function persistCrmSelection(companyId, phone) {
+  if (!companyId) return;
+  if (phone) sessionStorage.setItem(crmSelectionKey(companyId), phone);
+  else sessionStorage.removeItem(crmSelectionKey(companyId));
+}
+
+function restoreCrmSelection(companyId) {
+  if (!companyId) return null;
+  return sessionStorage.getItem(crmSelectionKey(companyId));
+}
+
 export async function renderCustomers(container) {
   if (!can(state.profile?.role, 'canViewInbox')) {
     container.innerHTML = errorState('You do not have permission to view customers.');
@@ -82,12 +97,15 @@ export async function renderCustomers(container) {
     btn.addEventListener('click', () => {
       const phone = btn.dataset.phone;
       setState({ selectedCustomerPhone: phone });
+      persistCrmSelection(companyId, phone);
       showCustomerDetail(container, phone, rows);
     });
   });
 
-  if (state.selectedCustomerPhone) {
-    showCustomerDetail(container, state.selectedCustomerPhone, rows);
+  const selectedPhone = state.selectedCustomerPhone || restoreCrmSelection(companyId);
+  if (selectedPhone) {
+    if (!state.selectedCustomerPhone) setState({ selectedCustomerPhone: selectedPhone });
+    showCustomerDetail(container, selectedPhone, rows);
   }
 }
 
