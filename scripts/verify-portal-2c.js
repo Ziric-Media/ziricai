@@ -19,6 +19,7 @@ console.log("verify-portal-2c");
 const marketplace = read("js/portal/modules/marketplace.js");
 const analytics = read("js/portal/modules/analytics.js");
 const portalDemo = read("services/portal/portalDemo.js");
+const dashboardService = read("services/analytics/dashboardService.js");
 const billing = read("js/portal/modules/billing.js");
 
 assert.match(marketplace, /if \(catalogRes\.error\)/);
@@ -33,6 +34,12 @@ assert.doesNotMatch(analytics, /\?\? 85\}/);
 assert.doesNotMatch(analytics, /\?\? 1\.8\}/);
 assert.doesNotMatch(analytics, /\?\? 4\.2\}/);
 console.log("✓ Analytics API failure never substitutes demo for provisioned tenants");
+
+assert.doesNotMatch(dashboardService, /aiResolutionRate: metrics\.aiAccuracy \?\? 85/);
+assert.doesNotMatch(dashboardService, /avgResponseSec: metrics\.avgResponseSec \?\? 1\.8/);
+assert.doesNotMatch(dashboardService, /avgSatisfaction: metrics\.customerSatisfaction \?\? 4\.2/);
+assert.doesNotMatch(dashboardService, /: 80\) \/ 100\)/);
+console.log("✓ dashboardService summary KPIs do not fabricate production fallbacks");
 
 assert.match(portalDemo, /emptyQuickStats/);
 assert.match(portalDemo, /emptyChartSeries/);

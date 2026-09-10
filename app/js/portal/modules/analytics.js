@@ -165,7 +165,7 @@ export async function renderAnalytics(container) {
                 <td>${formatNumber(r.leads ?? 0)}</td>
                 <td>${formatNumber(r.whatsappMessages)}</td>
                 <td>${formatNumber(r.revenue ?? 0)}</td>
-                <td><span class="score-badge">${r.satisfaction}</span></td>
+                <td><span class="score-badge">${r.satisfaction ?? '—'}</span></td>
               </tr>
             `).join('')}
           </tbody>

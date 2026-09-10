@@ -26,6 +26,7 @@ const workflowRegistry = read("services/automation/workflowRegistry.js");
 const automationEngine = read("services/automation/automationEngine.js");
 const notificationService = read("services/tenants/notificationService.js");
 const tenantContext = read("services/core/tenantContext.js");
+const authService = read("services/auth/authService.js");
 const notificationsModule = read("js/portal/modules/notifications.js");
 
 assert.match(workflowRegistry, /compareTimestampsDesc/);
@@ -47,6 +48,10 @@ assert.doesNotMatch(
     /if \(!ctx\.profile\) \{\s*throw Object\.assign\(new Error\("User profile not found/
 );
 console.log("✓ integration read auth allows membership when profile doc is missing");
+
+assert.match(authService, /import \{ getDoc, globalUserRef, tenantDocRef \} from "\.\.\/database\/firestoreClient\.js"/);
+assert.doesNotMatch(authService, /from "firebase\/firestore"/);
+console.log("✓ authService uses firestoreClient getDoc for admin-backed membership reads");
 
 assert.match(notificationsModule, /function formatNotificationTime/);
 assert.doesNotMatch(notificationsModule, /createdAt\?\.slice/);

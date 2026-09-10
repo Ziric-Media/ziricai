@@ -81,8 +81,8 @@ export async function renderBilling(container) {
         </div>
       </div>
       <div class="billing-plan-actions">
-        <button class="btn btn-secondary btn-sm" type="button" disabled>Change Plan (demo)</button>
-        <button class="btn btn-primary btn-sm" type="button" disabled><i class="fa-solid fa-arrow-up"></i> Upgrade (demo)</button>
+        <button class="btn btn-secondary btn-sm" type="button" disabled>Change Plan</button>
+        <button class="btn btn-primary btn-sm" type="button" disabled><i class="fa-solid fa-arrow-up"></i> Upgrade</button>
       </div>
     </div>
 
@@ -196,7 +196,7 @@ function planCard(name, price, features, current, isTrial = false) {
       <h4>${escapeHtml(name)}</h4>
       <div class="plan-price">${priceLabel}${price != null && price ? '<span>/mo</span>' : ''}</div>
       <p class="plan-features">${escapeHtml(features)}</p>
-      ${current ? '<span class="current-badge">Current</span>' : '<button class="btn btn-secondary btn-sm" type="button" disabled style="margin-top:12px;">Upgrade (demo)</button>'}
+      ${current ? '<span class="current-badge">Current</span>' : '<button class="btn btn-secondary btn-sm" type="button" disabled style="margin-top:12px;">Upgrade</button>'}
     </div>
   `;
 }

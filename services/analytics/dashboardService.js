@@ -29,7 +29,9 @@ function buildChartSeries(dailyRows) {
                 : 0
         ),
         aiHandled: dailyRows.map((r) =>
-            Math.round((r.conversations || 0) * ((r.aiAccuracyCount > 0 ? r.aiAccuracySum / r.aiAccuracyCount : 80) / 100))
+            r.aiAccuracyCount > 0
+                ? Math.round((r.conversations || 0) * ((r.aiAccuracySum / r.aiAccuracyCount) / 100))
+                : 0
         ),
         whatsappMessages: dailyRows.map((r) => (r.messagesReceived || 0) + (r.messagesSent || 0)),
         tokensUsed: dailyRows.map((r) => Math.round((r.messagesSent || 0) * 120)),
@@ -63,21 +65,24 @@ function buildSummary(metrics, dailyRows) {
         conversions7d: sum(last7, "conversions"),
         whatsapp7d: sum(last7, "messagesReceived") + sum(last7, "messagesSent"),
         tokens7d: Math.round((sum(last7, "messagesSent") + sum(last7, "messagesReceived")) * 120),
-        avgSatisfaction: metrics.customerSatisfaction ?? 4.2,
-        aiResolutionRate: metrics.aiAccuracy ?? 85,
-        avgResponseSec: metrics.avgResponseSec ?? 1.8,
-        automationSuccessRate: metrics.automationSuccessRate ?? 0,
+        avgSatisfaction: metrics.customerSatisfaction ?? null,
+        aiResolutionRate: metrics.aiAccuracy ?? null,
+        avgResponseSec: metrics.avgResponseSec ?? null,
+        automationSuccessRate: metrics.automationSuccessRate ?? null,
         missedOpportunities: metrics.missedOpportunities ?? 0,
         trends: {
             conversations: computeTrend(conv7, convPrev),
             leads: computeTrend(leads7, leadsPrev),
             appointments: computeTrend(appt7, apptPrev),
             revenue: computeTrend(rev7, revPrev),
-            satisfaction: computeTrend(
-                metrics.customerSatisfaction ?? 4.2,
-                (prev7.reduce((a, r) => a + (r.satisfactionSum || 0), 0) /
-                    Math.max(prev7.reduce((a, r) => a + (r.satisfactionCount || 0), 0), 1)) || 4
-            ),
+            satisfaction:
+                metrics.customerSatisfaction != null
+                    ? computeTrend(
+                          metrics.customerSatisfaction,
+                          prev7.reduce((a, r) => a + (r.satisfactionSum || 0), 0) /
+                              Math.max(prev7.reduce((a, r) => a + (r.satisfactionCount || 0), 0), 1) || null
+                      )
+                    : null,
             whatsapp: computeTrend(
                 sum(last7, "messagesReceived") + sum(last7, "messagesSent"),
                 sum(prev7, "messagesReceived") + sum(prev7, "messagesSent")
@@ -86,7 +91,7 @@ function buildSummary(metrics, dailyRows) {
                 sum(last7, "messagesSent") + sum(last7, "messagesReceived"),
                 sum(prev7, "messagesSent") + sum(prev7, "messagesReceived")
             ),
-            avgResponseSec: computeTrend(metrics.avgResponseSec ?? 1.8, (metrics.avgResponseSec ?? 1.8) + 0.2),
+            avgResponseSec: null,
         },
     };
 }
@@ -104,7 +109,7 @@ function buildTableRows(dailyRows) {
         satisfaction:
             r.satisfactionCount > 0
                 ? Math.round((r.satisfactionSum / r.satisfactionCount) * 10) / 10
-                : 4.0,
+                : null,
         revenue: r.revenue || 0,
         conversions: r.conversions || 0,
     }));

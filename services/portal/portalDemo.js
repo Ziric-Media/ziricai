@@ -174,8 +174,8 @@ export async function getPortalTeamAsync(companyId) {
     const { listTeamMembers } = await import("../tenants/userService.js");
     const items = await listTeamMembers(companyId);
     if (items.length) return { items, isDemo: false };
-  } catch {
-    /* fall through */
+  } catch (err) {
+    console.warn("[portalDemo] getPortalTeamAsync listTeamMembers failed:", err.message);
   }
   if (await allowPortalDemoFallback(companyId)) {
     return { items: getPortalTeam(companyId), isDemo: true };

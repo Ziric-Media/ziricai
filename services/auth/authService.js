@@ -2,11 +2,10 @@
  * Server-side auth helpers — wraps existing Firebase auth patterns.
  * Client auth remains in js/auth.js; this module supports API tenant scoping.
  */
-import { getDoc } from "firebase/firestore";
 import admin from "firebase-admin";
 import { app } from "../../js/firebase.js";
 import { getFirebaseProjectId, getFirebaseDatabaseId } from "../../js/firebase-config.js";
-import { globalUserRef, tenantDocRef } from "../database/firestoreClient.js";
+import { getDoc, globalUserRef, tenantDocRef } from "../database/firestoreClient.js";
 import { TENANT_COLLECTIONS } from "../database/schema.js";
 import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { upsertTenantUser } from "../tenants/userService.js";
@@ -304,6 +303,7 @@ export async function upsertOwnerMembership(uid, companyId, data = {}) {
             role: data.role || "owner",
             status: data.status || "active",
             createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
             lastLogin: serverTimestamp(),
         },
         { merge: true }
