@@ -95,11 +95,11 @@
 
     <div id="appShell" class="hidden">
         <aside class="sidebar portal-sidebar" id="sidebar">
-            <div class="sidebar-brand">
+            <div class="sidebar-brand portal-sidebar-brand">
                 <div class="logo-icon" id="sidebarLogo">CM</div>
                 <div class="logo-text">
-                    <span id="sidebarBrandName">Central Motors</span>
-                    <span>Company Portal</span>
+                    <span class="brand-company-name" id="sidebarBrandName">Central Motors</span>
+                    <span class="brand-portal-label">Company Portal</span>
                 </div>
             </div>
             <nav class="sidebar-nav" id="sidebarNav">
@@ -158,15 +158,12 @@
         <div class="main">
             <header class="topbar portal-topbar" id="topbar">
                 <div class="topbar-left">
-                    <div class="company-header-brand">
-                        <div class="company-logo" id="headerCompanyLogo"></div>
-                        <div>
-                            <div class="company-name" id="headerCompanyName">Central Motors</div>
-                            <div class="breadcrumb" id="breadcrumb">
-                                Portal / <span id="pageTitle">Dashboard</span>
-                            </div>
-                        </div>
-                    </div>
+                    <button type="button" class="bos-hamburger" id="sidebarToggle" aria-label="Open menu">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <nav class="breadcrumb bos-breadcrumb" id="breadcrumb" aria-label="Breadcrumb">
+                        <span id="pageTitle">Overview</span>
+                    </nav>
                 </div>
                 <div class="topbar-actions">
                     <button class="notification-bell" id="notificationBell" type="button" title="Notifications">

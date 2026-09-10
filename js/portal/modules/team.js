@@ -1,12 +1,13 @@
-import { state, setState } from '../state.js';
+import { state, setState } from '../core/dataStore.js';
 import {
   escapeHtml,
   pageHeader,
-  emptyState,
   loadingState,
   showToast,
   statusBadge,
+  errorState,
 } from '../../admin/ui.js';
+import { renderEmptyState } from '../core/widgets/emptyState.js';
 import {
   getPermissions,
   PERMISSION_LABELS,
@@ -16,9 +17,11 @@ import {
 } from '../permissions.js';
 import { fetchPortalTeam, inviteTeamMember } from '../api.js';
 
+const RETRY_BTN = '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
+
 export async function renderTeam(container) {
   if (!can(state.profile?.role, 'canManageStaff')) {
-    container.innerHTML = emptyState('You do not have permission to manage team members.');
+    container.innerHTML = errorState('You do not have permission to manage team members.');
     return;
   }
 
@@ -26,6 +29,15 @@ export async function renderTeam(container) {
   const companyId = state.companyId;
 
   const res = await fetchPortalTeam(companyId);
+
+  if (res.error && !res.data?.items?.length && !(state.team || []).length) {
+    container.innerHTML = `
+      ${pageHeader('Team Management', 'Members and roles for your company.')}
+      ${errorState(res.error)}
+      <div style="text-align:center;margin-top:12px;">${RETRY_BTN}</div>`;
+    return;
+  }
+
   const team = res.data?.items?.length ? res.data.items : state.team || [];
   const isDemo = res.data?.isDemo && !team.length;
   setState({ team });
@@ -41,7 +53,8 @@ export async function renderTeam(container) {
       <table class="org-table">
         <thead><tr><th>Member</th><th>Email</th><th>Role</th><th>Status</th><th>Last Active</th><th></th></tr></thead>
         <tbody>
-          ${team.map((m) => `
+          ${team.length
+            ? team.map((m) => `
             <tr>
               <td><div class="member-cell"><span class="avatar sm">${escapeHtml(m.avatar || m.name?.charAt(0) || '?')}</span> ${escapeHtml(m.name)}</div></td>
               <td>${escapeHtml(m.email)}</td>
@@ -50,7 +63,8 @@ export async function renderTeam(container) {
               <td>${escapeHtml(m.lastActive?.slice(0, 10) || '—')}</td>
               <td><button class="btn btn-secondary btn-sm" type="button" disabled>Edit</button></td>
             </tr>
-          `).join('')}
+          `).join('')
+            : `<tr><td colspan="6">${renderEmptyState({ message: 'No team members yet.', actionHtml: '<button class="btn btn-primary btn-sm" type="button" id="openInviteFromEmpty">Invite Member</button>' })}</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -109,6 +123,7 @@ function bindTeamEvents(container) {
   const close = () => modal?.classList.remove('open');
 
   container.querySelector('#openInviteModal')?.addEventListener('click', open);
+  container.querySelector('#openInviteFromEmpty')?.addEventListener('click', open);
   container.querySelector('#closeInviteModal')?.addEventListener('click', close);
   container.querySelector('#cancelInviteModal')?.addEventListener('click', close);
 

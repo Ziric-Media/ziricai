@@ -1,8 +1,11 @@
 import { state } from '../core/dataStore.js';
-import { escapeHtml, pageHeader } from '../../admin/ui.js';
+import { escapeHtml, pageHeader, loadingState, errorState } from '../../admin/ui.js';
+import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { renderQuickActions } from '../core/widgets/quickActions.js';
 import { navigateTo } from '../router.js';
 import { fetchIntegrationChannels } from '../api.js';
+
+const RETRY_BTN = '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
 
 const CHANNEL_ICONS = {
   whatsapp: { icon: 'fa-brands fa-whatsapp', color: 'green' },
@@ -43,25 +46,31 @@ export async function renderIntegrations(container) {
       '<p class="muted">Sign in to manage integrations for your company.</p>';
     return;
   }
-  let channels = [];
-  let loadError = null;
+
+  container.innerHTML = loadingState('Loading integrations...');
 
   const { data, error } = await fetchIntegrationChannels(companyId);
+
   if (error) {
-    loadError = error;
-  } else {
-    channels = (data?.channels || []).filter((ch) => ch.type === 'messaging' || ch.type === 'connector');
+    container.innerHTML = `
+      ${pageHeader('Integrations', 'Connect channels and third-party tools to your Business OS.')}
+      ${errorState(error)}
+      <div style="text-align:center;margin-top:12px;">${RETRY_BTN}</div>`;
+    return;
   }
+
+  const channels = (data?.channels || []).filter((ch) => ch.type === 'messaging' || ch.type === 'connector');
 
   container.innerHTML = `
     ${pageHeader('Integrations', 'Connect channels and third-party tools to your Business OS.')}
-    ${loadError ? `<div class="bos-alert warn">${escapeHtml(loadError)}</div>` : ''}
     ${renderQuickActions([
       { label: 'Connect WhatsApp', icon: 'fa-brands fa-whatsapp', action: 'connect-whatsapp', color: 'green' },
       { label: 'Ask Sarah to Connect', icon: 'fa-sparkles', action: 'sarah-connect', color: 'purple' },
     ])}
     <div class="bos-integrations-grid">
-      ${channels.length ? channels.map(renderChannelCard).join('') : '<p class="muted">Loading integration channels…</p>'}
+      ${channels.length
+        ? channels.map(renderChannelCard).join('')
+        : renderEmptyState({ message: 'No integration channels configured yet.', actionHtml: '<button class="btn btn-primary btn-sm" type="button" data-action="connect-whatsapp">Connect WhatsApp</button>' })}
     </div>
   `;
 

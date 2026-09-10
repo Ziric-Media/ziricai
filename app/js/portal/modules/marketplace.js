@@ -1,5 +1,6 @@
-import { requireCompanyId } from '../state.js';
-import { escapeHtml, pageHeader, loadingState, showToast, emptyState } from '../../admin/ui.js';
+import { requireCompanyId } from '../core/dataStore.js';
+import { escapeHtml, pageHeader, loadingState, showToast } from '../../admin/ui.js';
+import { renderEmptyState } from '../core/widgets/emptyState.js';
 import {
   fetchMarketplaceCatalog,
   fetchInstalledPacks,
@@ -87,7 +88,7 @@ export async function renderMarketplace(container) {
 
 function renderPackCards(packs, installedIds, companyId) {
   const visible = packs.filter((p) => p.installable !== false && p.status !== 'coming_soon');
-  if (!visible.length) return emptyState('No packs match your filters.');
+  if (!visible.length) return renderEmptyState({ message: 'No packs match your filters.' });
 
   return visible.map((pack) => {
     const installed = installedIds.has(pack.id) || installedIds.has(pack.canonicalId);

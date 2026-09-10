@@ -1,5 +1,6 @@
 import { state } from '../core/dataStore.js';
-import { escapeHtml, pageHeader, emptyState, loadingState, statusBadge } from '../../admin/ui.js';
+import { escapeHtml, pageHeader, loadingState, statusBadge, errorState } from '../../admin/ui.js';
+import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { can } from '../permissions.js';
 import {
   fetchAppointments,
@@ -7,9 +8,11 @@ import {
   cancelAppointmentApi,
 } from '../api.js';
 
+const RETRY_BTN = '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
+
 export async function renderAppointments(container) {
   if (!can(state.profile?.role, 'canViewInbox')) {
-    container.innerHTML = emptyState('You do not have permission to view appointments.');
+    container.innerHTML = errorState('You do not have permission to view appointments.');
     return;
   }
 
@@ -17,6 +20,15 @@ export async function renderAppointments(container) {
   const companyId = state.companyId;
 
   const res = await fetchAppointments(companyId, { upcoming: true });
+
+  if (res.error) {
+    container.innerHTML = `
+      ${pageHeader('Appointments', `Scheduling for ${escapeHtml(state.company?.name || 'your company')}.`)}
+      ${errorState(res.error)}
+      <div style="text-align:center;margin-top:12px;">${RETRY_BTN}</div>`;
+    return;
+  }
+
   const items = res.data?.items || [];
 
   const today = new Date().toISOString().slice(0, 10);
@@ -111,7 +123,7 @@ function renderSection(title, items) {
                 <td>${a.status === 'scheduled' ? `<button class="btn btn-secondary btn-sm" data-cancel="${escapeHtml(a.id)}" type="button">Cancel</button>` : '—'}</td>
               </tr>
             `).join('')
-            : `<tr><td colspan="5">${emptyState(`No ${title.toLowerCase()} appointments.`)}</td></tr>`}
+            : `<tr><td colspan="5">${renderEmptyState({ message: `No ${title.toLowerCase()} appointments.` })}</td></tr>`}
         </tbody>
       </table>
     </div>`;

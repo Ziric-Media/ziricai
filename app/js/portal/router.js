@@ -53,7 +53,7 @@ export function initRouter() {
 
   document.addEventListener('click', (e) => {
     const navEl = e.target.closest('[data-nav]');
-    if (!navEl || navEl.tagName === 'A') return;
+    if (!navEl) return;
     e.preventDefault();
     const target = navEl.dataset.nav;
     if (target) navigateTo(target);

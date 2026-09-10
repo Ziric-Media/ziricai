@@ -1,14 +1,16 @@
-import { state } from '../state.js';
-import { escapeHtml, pageHeader, emptyState, loadingState } from '../../admin/ui.js';
+import { state } from '../core/dataStore.js';
+import { escapeHtml, pageHeader, loadingState, errorState } from '../../admin/ui.js';
 import { fetchPortalActivity } from '../api.js';
 import { DEMO_ACTIVITY } from '../demo-data.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
 import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { can } from '../permissions.js';
 
+const RETRY_BTN = '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
+
 export async function renderActivity(container) {
   if (!can(state.profile?.role, 'canManageStaff')) {
-    container.innerHTML = emptyState('Activity log is restricted to Owner and Manager roles.');
+    container.innerHTML = errorState('Activity log is restricted to Owner and Manager roles.');
     return;
   }
 
@@ -17,6 +19,15 @@ export async function renderActivity(container) {
 
   const res = await fetchPortalActivity(companyId);
   const useDemo = shouldUseDemoFallback({ companyId, isDemo: state.hubData?.isDemo, isProvisioned: state.hubData?.isProvisioned });
+
+  if (res.error && !useDemo) {
+    container.innerHTML = `
+      ${pageHeader('Activity Log', `Audit trail for ${escapeHtml(state.company?.name || 'your company')}.`)}
+      ${errorState(res.error)}
+      <div style="text-align:center;margin-top:12px;">${RETRY_BTN}</div>`;
+    return;
+  }
+
   const items = res.data?.items?.length ? res.data.items : (useDemo ? DEMO_ACTIVITY : []);
 
   container.innerHTML = `

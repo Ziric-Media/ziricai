@@ -1,12 +1,15 @@
-import { state, setState } from '../state.js';
-import { escapeHtml, pageHeader, emptyState, loadingState } from '../../admin/ui.js';
+import { state, setState } from '../core/dataStore.js';
+import { escapeHtml, pageHeader, loadingState, errorState } from '../../admin/ui.js';
+import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { fetchCrmCustomers, fetchCrmLeads, fetchCrmPipeline } from '../api.js';
 import { can } from '../permissions.js';
 import { navigateTo } from '../router.js';
 
+const RETRY_BTN = '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
+
 export async function renderCustomers(container) {
   if (!can(state.profile?.role, 'canViewInbox')) {
-    container.innerHTML = emptyState('You do not have permission to view customers.');
+    container.innerHTML = errorState('You do not have permission to view customers.');
     return;
   }
 
@@ -18,6 +21,15 @@ export async function renderCustomers(container) {
     fetchCrmLeads(companyId),
     fetchCrmPipeline(companyId),
   ]);
+
+  const loadError = custRes.error || leadsRes.error || pipelineRes.error;
+  if (loadError) {
+    container.innerHTML = `
+      ${pageHeader('CRM', `Contacts, leads & customers for ${escapeHtml(state.company?.name || 'your company')}.`)}
+      ${errorState(loadError)}
+      <div style="text-align:center;margin-top:12px;">${RETRY_BTN}</div>`;
+    return;
+  }
 
   const rows = custRes.data?.items || [];
   const leads = leadsRes.data?.items || [];
@@ -59,7 +71,7 @@ export async function renderCustomers(container) {
                 <td><button class="btn btn-secondary btn-sm view-customer-btn" data-phone="${escapeHtml(c.phone || c.id)}" type="button">View</button></td>
               </tr>
             `).join('')
-            : `<tr><td colspan="7">${emptyState('No customers yet.')}</td></tr>`}
+            : `<tr><td colspan="7">${renderEmptyState({ message: 'No customers yet.' })}</td></tr>`}
         </tbody>
       </table>
     </div>

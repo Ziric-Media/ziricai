@@ -1,11 +1,14 @@
-import { state } from '../state.js';
-import { escapeHtml, pageHeader, emptyState, loadingState, statusBadge } from '../../admin/ui.js';
+import { state } from '../core/dataStore.js';
+import { escapeHtml, pageHeader, loadingState, statusBadge, errorState } from '../../admin/ui.js';
+import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { fetchAutomations, fetchAutomationRuns } from '../api.js';
 import { can } from '../permissions.js';
 
+const RETRY_BTN = '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
+
 export async function renderAutomation(container) {
   if (!can(state.profile?.role, 'canEditAI')) {
-    container.innerHTML = emptyState('You do not have permission to manage automation.');
+    container.innerHTML = errorState('You do not have permission to manage automation.');
     return;
   }
 
@@ -16,6 +19,15 @@ export async function renderAutomation(container) {
     fetchAutomations(companyId),
     fetchAutomationRuns(companyId, 15),
   ]);
+
+  const loadError = wfRes.error || runsRes.error;
+  if (loadError) {
+    container.innerHTML = `
+      ${pageHeader('Automation', `Event-driven workflows for ${escapeHtml(state.company?.name || 'your company')}.`)}
+      ${errorState(loadError)}
+      <div style="text-align:center;margin-top:12px;">${RETRY_BTN}</div>`;
+    return;
+  }
 
   const workflows = wfRes.data?.items || [];
   const runs = runsRes.data?.items || [];
@@ -77,7 +89,7 @@ export async function renderAutomation(container) {
                 <td>${escapeHtml(w.lastRunAt?.slice(0, 16) || '—')}</td>
               </tr>
             `).join('')
-            : `<tr><td colspan="6">${emptyState('No workflows yet.')}</td></tr>`}
+            : `<tr><td colspan="6">${renderEmptyState({ message: 'No workflows yet.' })}</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -97,7 +109,7 @@ export async function renderAutomation(container) {
                 <td>${escapeHtml(r.startedAt?.slice(0, 16) || '—')}</td>
               </tr>
             `).join('')
-            : `<tr><td colspan="5">${emptyState('No runs yet — workflows trigger on incoming events.')}</td></tr>`}
+            : `<tr><td colspan="5">${renderEmptyState({ message: 'No runs yet — workflows trigger on incoming events.' })}</td></tr>`}
         </tbody>
       </table>
     </div>

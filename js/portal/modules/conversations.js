@@ -1,5 +1,5 @@
 import { state } from '../core/dataStore.js';
-import { escapeHtml, pageHeader, emptyState, loadingState, statusBadge } from '../../admin/ui.js';
+import { escapeHtml, pageHeader, loadingState, statusBadge, errorState } from '../../admin/ui.js';
 import { can } from '../permissions.js';
 import { fetchTenantConversations, fetchConversationDetail, sendConversationReply, setConversationTakeover } from '../api.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
@@ -23,7 +23,7 @@ function channelBadge(channel) {
 
 export async function renderConversations(container) {
   if (!can(state.profile?.role, 'canViewInbox')) {
-    container.innerHTML = emptyState('You do not have permission to view the inbox.');
+    container.innerHTML = errorState('You do not have permission to view the inbox.');
     return;
   }
 
@@ -41,7 +41,8 @@ export async function renderConversations(container) {
 
   if (apiRes.error && !conversations.length && !useDemo) {
     container.innerHTML = `${pageHeader('Unified Inbox', 'All channels in one place.')}
-      ${renderEmptyState({ message: apiRes.error, actionHtml: '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>' })}`;
+      ${errorState(apiRes.error)}
+      <div style="text-align:center;margin-top:12px;"><button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button></div>`;
     return;
   }
 
@@ -60,7 +61,7 @@ export async function renderConversations(container) {
           : renderEmptyState({ message: 'No conversations yet.', actionHtml: '<button class="btn btn-primary btn-sm" type="button" data-nav="integrations">Connect WhatsApp</button>' })}
       </div>
       <div class="inbox-thread" id="inboxThread">
-        ${conversations[0] ? threadView(conversations[0], canReply, []) : emptyState('Select a conversation')}
+        ${conversations[0] ? threadView(conversations[0], canReply, []) : renderEmptyState({ message: 'Select a conversation' })}
       </div>
     </div>
   `;

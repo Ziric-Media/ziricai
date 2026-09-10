@@ -53,6 +53,7 @@
         "verify:phase-2b-1-2-auth-handoff": "node scripts/verify-phase-2b-1-2-auth-handoff.js",
         "verify:phase-2b-1-4-durable-crm": "node scripts/verify-phase-2b-1-4-durable-crm.js",
         "verify:phase-2b-2-appointments": "node scripts/verify-phase-2b-2-appointments.js",
+        "verify:portal-foundation": "node scripts/verify-portal-foundation.js",
         "verify:mission-control-data-mode": "node scripts/verify-mission-control-data-mode.js",
         "verify:mission-control-customers-scope": "node scripts/verify-mission-control-customers-scope.js",
         "verify:mission-control-agents-scope": "node scripts/verify-mission-control-agents-scope.js",

@@ -1,4 +1,4 @@
-import { state, setState } from '../state.js';
+import { state, setState } from '../core/dataStore.js';
 import {
   escapeHtml,
   pageHeader,
@@ -6,15 +6,47 @@ import {
   showToast,
 } from '../../admin/ui.js';
 import { applyBranding } from '../auth-guard.js';
-import { patchPortalBranding } from '../api.js';
+import { patchPortalBranding, fetchIntegrationChannels } from '../api.js';
 import { DEMO_BRANDING, DEMO_TEAM } from '../demo-data.js';
 import { PORTAL_ROLES, roleLabel, getPermissions } from '../permissions.js';
+
+const ACTIVE_WHATSAPP_STATUSES = new Set(['active', 'connected']);
+
+/** Portal WhatsApp row from tenant integration API (never uses phoneNumberId). */
+export function formatPortalWhatsAppDisplay(integrations = []) {
+  const wa =
+    integrations.find((i) => i.provider === 'whatsapp' || i.channel === 'whatsapp') ||
+    integrations[0];
+  if (!wa?.status) {
+    return { phone: '—', statusText: 'Not registered', icon: '⚠️' };
+  }
+  const status = String(wa.status).toLowerCase();
+  const phone = wa.displayPhoneNumber || '—';
+  if (ACTIVE_WHATSAPP_STATUSES.has(status)) {
+    return { phone, statusText: 'Active', icon: '✅' };
+  }
+  if (status === 'pending_configuration' || status === 'pending') {
+    return { phone, statusText: 'Pending configuration', icon: '⚠️' };
+  }
+  if (status === 'disconnected') {
+    return { phone, statusText: 'Disconnected', icon: '⚠️' };
+  }
+  return { phone, statusText: status, icon: '⚠️' };
+}
 
 export async function renderSettings(container) {
   container.innerHTML = loadingState('Loading settings...');
 
   const branding = state.branding || DEMO_BRANDING;
   const company = state.company || {};
+  const companyId = state.companyId || company.id;
+  let whatsappDisplay = { phone: '—', statusText: '—', icon: '⚠️' };
+  if (companyId) {
+    const { data, error } = await fetchIntegrationChannels(companyId);
+    if (!error) {
+      whatsappDisplay = formatPortalWhatsAppDisplay(data?.integrations || []);
+    }
+  }
   const workspace = state.workspace || state.hubData?.workspace || null;
   const resources = workspace?.resources || {};
   const links = workspace?.workspaceLinks || state.hubData?.workspace?.workspaceLinks || {};
@@ -200,7 +232,7 @@ export async function renderSettings(container) {
         <div class="info-row"><span class="label">Email</span><span class="value">${escapeHtml(company.email || '—')}</span></div>
         <div class="info-row"><span class="label">Phone</span><span class="value">${escapeHtml(company.phone || '—')}</span></div>
         <div class="info-row"><span class="label">Website</span><span class="value">${escapeHtml(company.website || '—')}</span></div>
-        <div class="info-row"><span class="label">WhatsApp</span><span class="value">${escapeHtml(company.whatsappNumber || '—')} ${company.whatsappConnected ? '✅' : '⚠️'}</span></div>
+        <div class="info-row"><span class="label">WhatsApp</span><span class="value">${escapeHtml(whatsappDisplay.phone)} · ${escapeHtml(whatsappDisplay.statusText)} ${whatsappDisplay.icon}</span></div>
         <div class="info-row"><span class="label">Company ID</span><span class="value"><code>${escapeHtml(state.companyId || '—')}</code></span></div>
       </div>
     </div>

@@ -1,14 +1,16 @@
-import { state } from '../state.js';
-import { escapeHtml, pageHeader, emptyState, loadingState, statusBadge } from '../../admin/ui.js';
+import { state } from '../core/dataStore.js';
+import { escapeHtml, pageHeader, loadingState, statusBadge, errorState } from '../../admin/ui.js';
 import { DEMO_KNOWLEDGE_ITEMS } from '../../admin/demo-data.js';
 import { fetchKnowledgeDocuments } from '../api.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
 import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { can } from '../permissions.js';
 
+const RETRY_BTN = '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
+
 export async function renderKnowledge(container) {
   if (!can(state.profile?.role, 'canEditAI')) {
-    container.innerHTML = emptyState('You do not have permission to view the Knowledge Base.');
+    container.innerHTML = errorState('You do not have permission to view the Knowledge Base.');
     return;
   }
 
@@ -17,6 +19,15 @@ export async function renderKnowledge(container) {
 
   const apiRes = await fetchKnowledgeDocuments(companyId);
   const useDemo = shouldUseDemoFallback({ companyId, isDemo: state.hubData?.isDemo, isProvisioned: state.hubData?.isProvisioned });
+
+  if (apiRes.error && !useDemo) {
+    container.innerHTML = `
+      ${pageHeader('Knowledge Base', 'Training content for your company.')}
+      ${errorState(apiRes.error)}
+      <div style="text-align:center;margin-top:12px;">${RETRY_BTN}</div>`;
+    return;
+  }
+
   let items = [];
   if (apiRes.data?.items?.length) {
     items = apiRes.data.items;

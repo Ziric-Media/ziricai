@@ -1,5 +1,5 @@
-import { state } from '../state.js';
-import { escapeHtml, pageHeader, emptyState, loadingState, statusBadge, formatNumber } from '../../admin/ui.js';
+import { state } from '../core/dataStore.js';
+import { escapeHtml, pageHeader, loadingState, statusBadge, formatNumber, errorState } from '../../admin/ui.js';
 import { DEMO_AGENTS } from '../../admin/demo-data.js';
 import { fetchAiEmployees } from '../api.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
@@ -32,7 +32,7 @@ let searchTerm = '';
 
 export async function renderAgents(container) {
   if (!can(state.profile?.role, 'canEditAI')) {
-    container.innerHTML = emptyState('You do not have permission to manage AI Employees.');
+    container.innerHTML = errorState('You do not have permission to manage AI Employees.');
     return;
   }
 
@@ -52,7 +52,8 @@ export async function renderAgents(container) {
 
   if (apiRes.error && !agents.length && !useDemo) {
     container.innerHTML = `${pageHeader('AI Employees', 'Your AI team.')}
-      ${renderEmptyState({ message: apiRes.error, actionHtml: '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>' })}`;
+      ${errorState(apiRes.error)}
+      <div style="text-align:center;margin-top:12px;"><button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button></div>`;
     return;
   }
 
@@ -94,7 +95,7 @@ export async function renderAgents(container) {
         ? filtered.map((a) => employeeCard(a)).join('')
         : agents.length === 0
           ? renderEmptyState({ message: 'No AI employees yet.', actionHtml: '<button class="btn btn-primary btn-sm" type="button" data-nav="integrations">Connect channels</button>' })
-          : emptyState('No AI employees match your search.', '<button class="btn btn-secondary btn-sm" type="button" id="clearAgentSearch">Clear search</button>')}
+          : renderEmptyState({ message: 'No AI employees match your search.', actionHtml: '<button class="btn btn-secondary btn-sm" type="button" id="clearAgentSearch">Clear search</button>' })}
     </div>
   `;
 

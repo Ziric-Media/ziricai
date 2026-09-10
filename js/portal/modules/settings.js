@@ -1,4 +1,4 @@
-import { state, setState } from '../state.js';
+import { state, setState } from '../core/dataStore.js';
 import {
   escapeHtml,
   pageHeader,

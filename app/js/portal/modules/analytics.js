@@ -1,16 +1,15 @@
-import { state } from '../state.js';
-import { escapeHtml, pageHeader, loadingState, formatNumber, emptyState, trendHtml } from '../../admin/ui.js';
+import { state } from '../core/dataStore.js';
+import { escapeHtml, pageHeader, loadingState, formatNumber, trendHtml, errorState } from '../../admin/ui.js';
 import { fetchPortalAnalytics, fetchPopularQuestions, downloadReport } from '../api.js';
 import { demoAnalyticsData } from '../demo-data.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
-import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { can } from '../permissions.js';
 
 let charts = {};
 
 export async function renderAnalytics(container) {
   if (!can(state.profile?.role, 'canExportData')) {
-    container.innerHTML = emptyState('You do not have permission to view analytics.');
+    container.innerHTML = errorState('You do not have permission to view analytics.');
     return;
   }
 
@@ -31,7 +30,8 @@ export async function renderAnalytics(container) {
 
   if (res.error && !useDemo && !apiData?.series) {
     container.innerHTML = `${pageHeader('Analytics', 'Live BI for your company.')}
-      ${renderEmptyState({ message: res.error, actionHtml: '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>' })}`;
+      ${errorState(res.error)}
+      <div style="text-align:center;margin-top:12px;"><button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button></div>`;
     return;
   }
   const popularQuestions = popularRes.data?.questions || [];

@@ -1,4 +1,4 @@
-import { state } from '../state.js';
+import { state } from '../core/dataStore.js';
 import {
   escapeHtml,
   pageHeader,
@@ -6,13 +6,12 @@ import {
   planBadge,
   statusBadge,
   formatNumber,
-  emptyState,
+  errorState,
 } from '../../admin/ui.js';
 import { fetchPortalUsage } from '../api.js';
 import { DEMO_INVOICES, DEMO_USAGE } from '../demo-data.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
 import { getAllPlans, getPlan, formatPrice } from '../../shared/billingPlans.js';
-import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { can } from '../permissions.js';
 
 let billingChart = null;
@@ -20,7 +19,7 @@ let storageChart = null;
 
 export async function renderBilling(container) {
   if (!can(state.profile?.role, 'canViewBilling')) {
-    container.innerHTML = emptyState('Billing is restricted to Owner and Finance roles.');
+    container.innerHTML = errorState('Billing is restricted to Owner and Finance roles.');
     return;
   }
 
@@ -34,7 +33,8 @@ export async function renderBilling(container) {
 
   if (res.error && !useDemo && !res.data?.usage) {
     container.innerHTML = `${pageHeader('Billing & Usage', 'Subscription and consumption.')}
-      ${renderEmptyState({ message: res.error, actionHtml: '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>' })}`;
+      ${errorState(res.error)}
+      <div style="text-align:center;margin-top:12px;"><button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button></div>`;
     return;
   }
   const chartSeries = res.data?.chartSeries || null;
