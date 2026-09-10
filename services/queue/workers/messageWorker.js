@@ -26,6 +26,7 @@ import {
 import { getCompany } from "../../tenants/companyService.js";
 import { getDefaultAiEmployee } from "../../tenants/aiEmployeeService.js";
 import { customerDocId, conversationDocId } from "../../storage/tenantStorage.js";
+import { getConversationTakeoverState } from "../../conversation/takeoverSafety.js";
 import { initAiTools, getOpenAIToolDefinitions, runTool } from "../../tools/index.js";
 import {
     extractSchedulingFromText,
@@ -70,6 +71,12 @@ import {
     enrichRecommendedVehiclesForOutbound,
     formatGalleryDeliveryReply,
 } from "../../conversation/vehicleOutboundPlan.js";
+import {
+    shouldPreloadInventorySearch,
+    buildInventorySearchArgs,
+    formatAuthoritativeInventoryBlock,
+} from "../../conversation/inventoryIntent.js";
+import { guardBookingConfirmationReply } from "../../conversation/appointmentScheduleAuthority.js";
 
 import { syncFromSalesTurn } from "../../integrations/crmSyncService.js";
 
@@ -86,6 +93,23 @@ async function sendViaIntegration(channel, companyId, to, payload) {
 }
 
 async function trySendOutbound(job, channel, companyId, to, text, responseSource = "ai") {
+    if (companyId && to) {
+        const takeover = await getConversationTakeoverState(companyId, to, channel || "whatsapp");
+        if (takeover.humanControlled) {
+            console.log("[whatsapp] Takeover outbound suppressed", {
+                jobId: job.id,
+                companyId,
+                to,
+                responseSource,
+                guard: "final_pre_outbound",
+                conversationId: takeover.conversationId,
+                humanTakeover: takeover.meta?.humanTakeover,
+                mode: takeover.meta?.mode,
+            });
+            return null;
+        }
+    }
+
     if (job.outboundPlanSent || (job.outboundSent && job.outboundMetaMessageId)) {
         console.log("[whatsapp] Outbound already sent (idempotent skip)", {
             jobId: job.id,
@@ -131,6 +155,23 @@ async function trySendOutbound(job, channel, companyId, to, text, responseSource
 }
 
 async function trySendOutboundPlan(job, channel, companyId, to, plan, responseSource = "ai") {
+    if (companyId && to) {
+        const takeover = await getConversationTakeoverState(companyId, to, channel || "whatsapp");
+        if (takeover.humanControlled) {
+            console.log("[whatsapp] Takeover outbound plan suppressed", {
+                jobId: job.id,
+                companyId,
+                to,
+                responseSource,
+                guard: "final_pre_outbound",
+                conversationId: takeover.conversationId,
+                humanTakeover: takeover.meta?.humanTakeover,
+                mode: takeover.meta?.mode,
+            });
+            return [];
+        }
+    }
+
     if (job.outboundPlanSent || (job.outboundSent && job.outboundMetaMessageIds?.length)) {
         console.log("[whatsapp] Outbound plan already sent (idempotent skip)", {
             jobId: job.id,
@@ -186,21 +227,49 @@ async function processInboundMessage(job) {
 
     const sender = from || phone;
     const outboundChannel = channel || "whatsapp";
+    const resolvedCompanyId = companyId || job.companyId || null;
 
     console.log("[whatsapp] Worker processing inbound", {
-        companyId,
+        companyId: resolvedCompanyId,
         from: sender,
         messageType,
         externalIdPrefix: externalId ? String(externalId).slice(0, 24) : null,
     });
 
+    if (resolvedCompanyId) {
+        const takeover = await getConversationTakeoverState(resolvedCompanyId, sender, outboundChannel);
+        if (takeover.humanControlled) {
+            console.log("[whatsapp] Takeover early skip — inbound persisted, no AI/outbound", {
+                jobId: job.id,
+                companyId: resolvedCompanyId,
+                from: sender,
+                guard: "early_pre_ai",
+                conversationId: takeover.conversationId,
+                humanTakeover: takeover.meta?.humanTakeover,
+                mode: takeover.meta?.mode,
+            });
+            return;
+        }
+    }
+
     if (messageType !== "text" || !String(text || "").trim()) {
-        const metaMessageId = await trySendOutbound(job, outboundChannel, companyId, sender, NON_TEXT_REPLY, "fallback");
-        await saveOutboundMessage(sender, NON_TEXT_REPLY, {
-            channel: outboundChannel,
-            companyId,
-            externalId: metaMessageId,
-        });
+        const metaMessageId = await trySendOutbound(
+            job,
+            outboundChannel,
+            resolvedCompanyId,
+            sender,
+            NON_TEXT_REPLY,
+            "fallback"
+        );
+        if (metaMessageId) {
+            await saveOutboundMessage(sender, NON_TEXT_REPLY, {
+                channel: outboundChannel,
+                companyId: resolvedCompanyId,
+                externalId: metaMessageId,
+                customerName: contactName || customerDocId(sender),
+                contactName,
+            });
+        }
         return;
     }
 
@@ -208,7 +277,6 @@ async function processInboundMessage(job) {
         await sendWhatsAppTypingIndicator(externalId);
     }
 
-    const resolvedCompanyId = companyId || job.companyId || null;
     const customer =
         (resolvedCompanyId
             ? await getCustomer(sender, { companyId: resolvedCompanyId })
@@ -311,6 +379,7 @@ async function processInboundMessage(job) {
         agentId: agent?.id || null,
         memoriesRetrieved: memoryRecords.length,
         recentMessagesRetrieved: history.length,
+        isNewConversation,
         knowledgeSkipped: isGreetingMessage(text),
         hasAiSummary: Boolean(refreshedCustomer?.aiSummary),
         customerDisplayName: customerDisplayName || null,
@@ -324,12 +393,8 @@ async function processInboundMessage(job) {
         });
     }
 
-    const systemPrompt = buildWhatsAppSystemPrompt({
-        agent,
-        companyId: resolvedCompanyId,
-        companyName,
-        customer: refreshedCustomer,
-        contactName,
+    const inventoryBrowseIntent = shouldPreloadInventorySearch(text, {
+        isGreeting: isGreetingMessage(text),
     });
 
     let schedulingContext =
@@ -427,6 +492,8 @@ async function processInboundMessage(job) {
 
     let authoritativeAvailabilityContext = "";
     let preloadedAvailabilityResult = null;
+    let authoritativeInventoryContext = "";
+    let preloadedInventoryResult = null;
 
     const schedulingVehicleRecommended =
         resolvedCompanyId && sender
@@ -574,18 +641,6 @@ async function processInboundMessage(job) {
         });
     }
 
-    const knowledgeParts = [
-        knowledgeBundle.context || "",
-        memoryContext || "",
-        schedulingPrompt,
-        testDrivePlanPrompt,
-        authoritativeAvailabilityContext,
-        authoritativePlanFinalizeContext,
-        authoritativeBookingContext,
-        authoritativeVehicleContext,
-        galleryOutboundContext,
-    ].filter(Boolean);
-
     const toolCtx = {
         companyId: resolvedCompanyId,
         customerId,
@@ -600,6 +655,45 @@ async function processInboundMessage(job) {
         testDrivePlan,
     };
 
+    if (resolvedCompanyId && inventoryBrowseIntent) {
+        const inventoryArgs = buildInventorySearchArgs(text, salesContextForTurn);
+        preloadedInventoryResult = await runTool("searchInventory", toolCtx, inventoryArgs);
+        authoritativeInventoryContext = formatAuthoritativeInventoryBlock(preloadedInventoryResult);
+        console.log("[whatsapp] Pre-loaded searchInventory (inventory browse intent)", {
+            companyId: resolvedCompanyId,
+            customerId,
+            bodyType: inventoryArgs.bodyType || null,
+            count: preloadedInventoryResult?.vehicles?.length ?? 0,
+            ok: preloadedInventoryResult?.ok ?? preloadedInventoryResult?.success,
+        });
+    }
+
+    const systemPrompt = buildWhatsAppSystemPrompt({
+        agent,
+        companyId: resolvedCompanyId,
+        companyName,
+        customer: refreshedCustomer,
+        contactName,
+        isNewConversation,
+        inboundMessage: text,
+        inventoryBrowseIntent,
+        inventoryPreloaded: Boolean(preloadedInventoryResult?.ok ?? preloadedInventoryResult?.success),
+        historyLength: history.length,
+    });
+
+    const knowledgeParts = [
+        knowledgeBundle.context || "",
+        memoryContext || "",
+        schedulingPrompt,
+        testDrivePlanPrompt,
+        authoritativeAvailabilityContext,
+        authoritativePlanFinalizeContext,
+        authoritativeBookingContext,
+        authoritativeVehicleContext,
+        authoritativeInventoryContext,
+        galleryOutboundContext,
+    ].filter(Boolean);
+
     const aiTools = resolvedCompanyId ? getOpenAIToolDefinitions() : [];
     let reply;
     let toolResults = [];
@@ -610,9 +704,15 @@ async function processInboundMessage(job) {
             systemPrompt,
             knowledgeContext: knowledgeParts.join("\n\n"),
             tools: aiTools,
-            executeTool: (name, args) => runTool(name, toolCtx, args),
+            executeTool: (name, args) => {
+                if (name === "searchInventory" && preloadedInventoryResult?.ok) {
+                    return Promise.resolve(preloadedInventoryResult);
+                }
+                return runTool(name, toolCtx, args);
+            },
             authoritativeBookingData: Boolean(authoritativeBookingContext),
             preloadedBookingResult,
+            preloadedInventoryResult,
         });
         reply = aiResult.reply;
         toolResults = aiResult.toolResults || [];
@@ -634,6 +734,23 @@ async function processInboundMessage(job) {
                 code: r.code || null,
             })),
         });
+    }
+
+    if (resolvedCompanyId && toolResults.length) {
+        const bookingGuard = await guardBookingConfirmationReply({
+            reply,
+            toolResults,
+            ctx: toolCtx,
+        });
+        if (bookingGuard.overridden) {
+            console.log("[whatsapp] Booking reply guard override", {
+                companyId: resolvedCompanyId,
+                customerId,
+                reason: bookingGuard.reason,
+                mismatches: bookingGuard.mismatches || null,
+            });
+            reply = bookingGuard.reply;
+        }
     }
 
     let outboundPlan = null;
@@ -675,21 +792,27 @@ async function processInboundMessage(job) {
 
         for (const part of outboundPlan.messages) {
             const metaMessageId = wamids[wamidIndex] || null;
-            if (part.type === "image") {
-                await saveOutboundMessage(sender, part.caption || "[image]", {
-                    channel: outboundChannel,
-                    companyId: resolvedCompanyId,
-                    externalId: metaMessageId,
-                    mediaUrl: part.link,
-                });
-            } else {
-                await saveOutboundMessage(sender, part.text, {
-                    channel: outboundChannel,
-                    companyId: resolvedCompanyId,
-                    externalId: metaMessageId,
-                });
+            if (metaMessageId) {
+                if (part.type === "image") {
+                    await saveOutboundMessage(sender, part.caption || "[image]", {
+                        channel: outboundChannel,
+                        companyId: resolvedCompanyId,
+                        externalId: metaMessageId,
+                        mediaUrl: part.link,
+                        customerName: customerDisplayName,
+                        contactName,
+                    });
+                } else {
+                    await saveOutboundMessage(sender, part.text, {
+                        channel: outboundChannel,
+                        companyId: resolvedCompanyId,
+                        externalId: metaMessageId,
+                        customerName: customerDisplayName,
+                        contactName,
+                    });
+                }
+                wamidIndex++;
             }
-            if (metaMessageId) wamidIndex++;
         }
 
         savedReply = outboundPlan.strippedReply || reply;
@@ -712,23 +835,37 @@ async function processInboundMessage(job) {
                     failureReply,
                     "ai_gallery_failure"
                 );
-                await saveOutboundMessage(sender, failureReply, {
-                    channel: outboundChannel,
-                    companyId: resolvedCompanyId,
-                    externalId: failureMetaId,
-                });
+                if (failureMetaId) {
+                    await saveOutboundMessage(sender, failureReply, {
+                        channel: outboundChannel,
+                        companyId: resolvedCompanyId,
+                        externalId: failureMetaId,
+                        customerName: customerDisplayName,
+                        contactName,
+                    });
+                }
             }
         }
     } else {
         const metaMessageId = await trySendOutbound(job, outboundChannel, resolvedCompanyId, sender, reply, "ai");
-        await saveOutboundMessage(sender, reply, {
-            channel: outboundChannel,
-            companyId: resolvedCompanyId,
-            externalId: metaMessageId,
-        });
+        if (metaMessageId) {
+            await saveOutboundMessage(sender, reply, {
+                channel: outboundChannel,
+                companyId: resolvedCompanyId,
+                externalId: metaMessageId,
+                customerName: customerDisplayName,
+                contactName,
+            });
+        }
     }
 
-    if (resolvedCompanyId) {
+    const outboundDelivered =
+        job.outboundSent ||
+        job.outboundPlanSent ||
+        Boolean(job.outboundMetaMessageId) ||
+        Boolean(job.outboundMetaMessageIds?.length);
+
+    if (resolvedCompanyId && outboundDelivered) {
         await publish(resolvedCompanyId, EventTypes.MESSAGE_SENT, {
             phone: sender,
             text: savedReply,

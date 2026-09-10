@@ -32,6 +32,13 @@ export function conversationDocId(customerId, channel = "whatsapp") {
     return `${channel}::${customerId}`;
 }
 
+/** Single canonical tenant conversation document id (e.g. whatsapp::27849000523). */
+export function resolveCanonicalConversationId(conversationIdOrPhone, channel = "whatsapp") {
+    const phone = normalizePhone(conversationIdOrPhone);
+    if (!phone) return conversationIdOrPhone;
+    return conversationDocId(phone, channel);
+}
+
 function memoryDocId(customerId, agentId) {
     return `${customerId}::${agentId || "default"}`;
 }
@@ -111,10 +118,12 @@ export async function getOrCreateConversation(companyId, phone, channel = "whats
     assertCompanyId(companyId);
     const customerId = customerDocId(phone);
     const conversationId = conversationDocId(customerId, channel);
+    const customerName = meta.customerName || meta.contactName || customerId;
+    const safeMeta = { ...meta, customerName };
     const existing = await conversationsRepo.get(companyId, conversationId);
     if (existing) {
-        if (Object.keys(meta).length) {
-            return conversationsRepo.update(companyId, conversationId, meta);
+        if (Object.keys(safeMeta).length) {
+            return conversationsRepo.update(companyId, conversationId, safeMeta);
         }
         return existing;
     }
@@ -126,10 +135,10 @@ export async function getOrCreateConversation(companyId, phone, channel = "whats
             channel,
             status: "in_progress",
             mode: "ai",
-            lastMessage: meta.lastMessage || "",
-            preview: meta.preview || meta.lastMessage || "",
-            customerName: meta.customerName || customerId,
-            ...meta,
+            lastMessage: safeMeta.lastMessage || "",
+            preview: safeMeta.preview || safeMeta.lastMessage || "",
+            customerName,
+            ...safeMeta,
         },
         conversationId
     );
@@ -155,10 +164,15 @@ export async function saveTenantMessage(companyId, phone, role, content, options
     const channel = options.channel || "whatsapp";
     const conversationId = conversationDocId(customerId, channel);
 
+    const resolvedCustomerName =
+        options.contactName ||
+        options.customerName ||
+        customerId;
+
     await getOrCreateConversation(companyId, phone, channel, {
         lastMessage: String(content).slice(0, 120),
         preview: String(content).slice(0, 120),
-        customerName: options.contactName || options.customerName,
+        customerName: resolvedCustomerName,
         status: "in_progress",
     });
 

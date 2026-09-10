@@ -99,6 +99,7 @@ export async function listConversations(options = {}) {
             preview: c.preview || c.lastMessage || "",
             status: c.status || "in_progress",
             mode: c.mode || "ai",
+            humanTakeover: Boolean(c.humanTakeover),
             channel: c.channel || "whatsapp",
             time: c.updatedAt || null,
         }));
@@ -107,9 +108,12 @@ export async function listConversations(options = {}) {
     return store.listConversations(options);
 }
 
-export async function upsertCustomerFromWhatsApp(phone, { contactName, companyId, messagePreview } = {}) {
+export async function upsertCustomerFromWhatsApp(
+    phone,
+    { contactName, companyId, messagePreview, mode, assignedHumanAgent } = {}
+) {
     const { upsertCustomerFromWhatsApp: upsert } = await import("./customerService.js");
-    return upsert(phone, { contactName, companyId, messagePreview });
+    return upsert(phone, { contactName, companyId, messagePreview, mode, assignedHumanAgent });
 }
 
 export async function appendAiSummary(phone, line) {

@@ -14,6 +14,7 @@ import { logInfo, logError } from "./integrationLogger.js";
 import { publish, EventTypes } from "../events/index.js";
 import { upsertConversationMeta } from "../tenants/conversationService.js";
 import { getOrCreateConversation, customerDocId, conversationDocId } from "../storage/tenantStorage.js";
+import { getConversationTakeoverState } from "../conversation/takeoverSafety.js";
 
 /**
  * Ingest a normalized UnifiedMessage into the existing conversation + queue pipeline.
@@ -108,6 +109,20 @@ export async function ingest(message) {
 
         const customerId = customerDocId(from);
         const resolvedConversationId = companyId ? conversationDocId(customerId, channel) : null;
+
+        if (companyId) {
+            const takeover = await getConversationTakeoverState(companyId, from, channel);
+            if (takeover.humanControlled) {
+                console.log("[whatsapp] Pipeline ingest skip enqueue — human takeover active", {
+                    companyId,
+                    from,
+                    conversationId: takeover.conversationId,
+                    humanTakeover: takeover.meta?.humanTakeover,
+                    mode: takeover.meta?.mode,
+                });
+                return { success: true, from, channel, companyId, aiSkipped: true, reason: "human_takeover" };
+            }
+        }
 
         await enqueue({
             type: JOB_TYPES.PROCESS_INBOUND_MESSAGE,

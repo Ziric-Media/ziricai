@@ -21,6 +21,10 @@ function channelBadge(channel) {
   return `<span class="channel-badge ${meta.cls}"><i class="fa-solid ${meta.icon}"></i> ${meta.label}</span>`;
 }
 
+function isHumanControlled(conv = {}) {
+  return Boolean(conv.humanTakeover) || (conv.mode || 'ai') === 'human';
+}
+
 export async function renderConversations(container) {
   if (!can(state.profile?.role, 'canViewInbox')) {
     container.innerHTML = errorState('You do not have permission to view the inbox.');
@@ -31,8 +35,9 @@ export async function renderConversations(container) {
   const companyId = state.companyId;
   const canReply = state.permissions.canReply;
 
+  let conversations = [];
   const apiRes = await fetchTenantConversations(companyId);
-  let conversations = apiRes.data?.items || [];
+  conversations = apiRes.data?.items || [];
   const useDemo = shouldUseDemoFallback({ companyId, isDemo: state.hubData?.isDemo, isProvisioned: state.hubData?.isProvisioned });
 
   if (apiRes.error && !conversations.length && !useDemo) {
@@ -64,14 +69,27 @@ export async function renderConversations(container) {
 
   let activeId = conversations[0]?.id;
 
+  async function refreshConversations() {
+    const res = await fetchTenantConversations(companyId);
+    conversations = res.data?.items || conversations;
+    return conversations;
+  }
+
   async function loadThread(conv) {
     const thread = container.querySelector('#inboxThread');
     if (!thread || !conv) return;
     thread.innerHTML = loadingState('Loading messages...');
     const detail = await fetchConversationDetail(companyId, conv.id || conv.phone);
+    const detailConv = detail.data?.conversation || {};
+    const merged = {
+      ...conv,
+      ...detailConv,
+      humanTakeover: detail.data?.humanTakeover ?? detailConv.humanTakeover ?? conv.humanTakeover,
+      mode: detailConv.mode ?? conv.mode,
+    };
     const messages = detail.data?.messages || [];
-    thread.innerHTML = threadView(conv, canReply, messages);
-    bindThreadActions(conv);
+    thread.innerHTML = threadView(merged, canReply, messages);
+    bindThreadActions(merged);
   }
 
   function bindThreadActions(conv) {
@@ -87,9 +105,12 @@ export async function renderConversations(container) {
       loadThread(conv);
     });
     container.querySelector('#takeoverBtn')?.addEventListener('click', async () => {
-      await setConversationTakeover(companyId, conv.id || conv.phone, { enabled: true });
+      const human = isHumanControlled(conv);
+      await setConversationTakeover(companyId, conv.id || conv.phone, { enabled: !human });
       invalidateHub();
-      loadThread(conv);
+      await refreshConversations();
+      const updated = conversations.find((c) => (c.id || c.phone) === (conv.id || conv.phone)) || conv;
+      loadThread(updated);
     });
   }
 
@@ -108,6 +129,7 @@ export async function renderConversations(container) {
 
 function inboxItem(c, active) {
   const ch = c.channel || 'whatsapp';
+  const human = isHumanControlled(c);
   return `
     <div class="inbox-item ${active ? 'active' : ''} ${c.unread ? 'unread' : ''}" data-id="${escapeHtml(c.id || c.phone)}">
       <div class="inbox-item-top">
@@ -115,11 +137,12 @@ function inboxItem(c, active) {
         <span class="inbox-time">${escapeHtml(c.time || '—')}</span>
       </div>
       <div class="inbox-preview">${escapeHtml(c.lastMessage || c.preview || '')}</div>
-      <div class="inbox-meta">${channelBadge(ch)} ${statusBadge(c.status)}</div>
+      <div class="inbox-meta">${channelBadge(ch)} ${statusBadge(c.status)} ${human ? '<span class="ops-tag">Human</span>' : ''}</div>
     </div>`;
 }
 
 function threadView(conv, canReply, messages) {
+  const human = isHumanControlled(conv);
   const msgHtml = messages.length
     ? messages.map((m) => `
         <div class="message ${m.role === 'customer' || m.role === 'user' ? 'customer' : 'agent'}">
@@ -132,7 +155,7 @@ function threadView(conv, canReply, messages) {
       <h3>${escapeHtml(conv.customerName || conv.name)}</h3>
       ${channelBadge(conv.channel || 'whatsapp')}
       ${statusBadge(conv.status)}
-      ${conv.humanTakeover ? '<span class="ops-tag">Human takeover</span>' : ''}
+      ${human ? '<span class="ops-tag">Human takeover</span>' : '<span class="demo-badge muted">AI active</span>'}
     </div>
     <div class="thread-messages">${msgHtml}</div>
     ${canReply ? `
@@ -140,7 +163,7 @@ function threadView(conv, canReply, messages) {
         <form id="replyForm">
           <input type="text" name="text" placeholder="Type a reply…" />
           <button class="btn btn-primary btn-sm" type="submit">Send</button>
-          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">Take over</button>
+          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">${human ? 'Release to AI' : 'Take over'}</button>
         </form>
       </div>` : ''}
   `;

@@ -188,7 +188,7 @@ export function calculateLeadScore(customer = {}, analysis = {}) {
 
 export async function upsertCustomerFromWhatsApp(
     phone,
-    { contactName, companyId, companyName, messagePreview, explicitName } = {}
+    { contactName, companyId, companyName, messagePreview, explicitName, mode, assignedHumanAgent } = {}
 ) {
     const key = normalizePhone(phone);
     const resolvedCompanyId =
@@ -202,7 +202,7 @@ export async function upsertCustomerFromWhatsApp(
         const patch = {
             channel: "whatsapp",
             status: existing.status || "in_progress",
-            mode: existing.mode || "ai",
+            mode: mode != null ? mode : existing.mode || "ai",
             tags: existing.tags || [],
             leadScore: existing.leadScore ?? 50,
             notesList: existing.notesList || [],
@@ -230,6 +230,9 @@ export async function upsertCustomerFromWhatsApp(
         }
 
         if (messagePreview) patch.lastMessage = messagePreview;
+        if (assignedHumanAgent !== undefined) {
+            patch.assignedHumanAgent = assignedHumanAgent;
+        }
         if (!existing.createdAt) {
             patch.createdAt = now;
             patch.customerSince = now;
