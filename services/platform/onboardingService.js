@@ -85,18 +85,19 @@ export function getOnboardingSession(sessionId) {
  * @param {string} sessionId
  */
 export async function assertOnboardingSessionAccess(req, sessionId) {
+    const auth = await resolveAuthFromRequest(req);
+
+    if (!auth.isSuperAdmin && !auth.uid) {
+        throw Object.assign(new Error("Authentication required"), { status: 401, code: "UNAUTHORIZED" });
+    }
+
     const session = sessions.get(sessionId);
     if (!session) {
         throw Object.assign(new Error("Onboarding session not found"), { status: 404, code: "SESSION_NOT_FOUND" });
     }
 
-    const auth = await resolveAuthFromRequest(req);
     if (auth.isSuperAdmin) {
         return { session, auth };
-    }
-
-    if (!auth.uid) {
-        throw Object.assign(new Error("Authentication required"), { status: 401, code: "UNAUTHORIZED" });
     }
 
     if (session.uid && session.uid !== auth.uid) {
