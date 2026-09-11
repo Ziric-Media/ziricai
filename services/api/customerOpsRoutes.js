@@ -23,7 +23,9 @@ import {
     getTenantConversation,
     sendConversationReply,
     setHumanTakeover,
+    markConversationRead,
 } from "../tenants/conversationService.js";
+import { resolveStaffSenderName } from "../conversation/inboxStaffIdentity.js";
 import {
     listAppointments,
     listUpcomingAppointments,
@@ -250,10 +252,21 @@ export function mountCustomerOpsRoutes(app) {
             const result = await sendConversationReply(req.params.companyId, req.params.conversationId, {
                 text,
                 channel,
+                senderName: resolveStaffSenderName(req.tenant),
             });
             res.json(result);
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to send reply" });
+        }
+    });
+
+    app.post("/api/companies/:companyId/conversations/:conversationId/read", requireAuthenticatedTenantMember(), async (req, res) => {
+        try {
+            const result = await markConversationRead(req.params.companyId, req.params.conversationId);
+            res.json(result);
+        } catch (err) {
+            const status = err.status || 500;
+            res.status(status).json({ error: err.message || "Failed to mark conversation read" });
         }
     });
 

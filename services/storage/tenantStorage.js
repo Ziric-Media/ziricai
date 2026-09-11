@@ -177,6 +177,8 @@ export async function saveTenantMessage(companyId, phone, role, content, options
     });
 
     const messageId = options.externalId || uid("msg");
+    const resolvedSource =
+        options.source || (role === "user" ? "customer" : role === "assistant" ? null : null);
     const entry = {
         conversationId,
         customerId,
@@ -184,6 +186,8 @@ export async function saveTenantMessage(companyId, phone, role, content, options
         role,
         message: content,
         content,
+        source: resolvedSource,
+        senderName: options.senderName || null,
         externalId: options.externalId || null,
         mediaUrl: options.mediaUrl || null,
         createdAt: now(),
@@ -229,8 +233,16 @@ export async function getTenantConversationHistory(companyId, phone, channel = "
         .filter((m) => m.conversationId === conversationId)
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     return filtered.slice(-max).map((m) => ({
+        id: m.id || null,
         role: m.role === "assistant" ? "assistant" : m.role,
         content: m.content || m.message,
+        message: m.content || m.message,
+        source: m.source || null,
+        senderName: m.senderName || null,
+        createdAt: m.createdAt || null,
+        channel: m.channel || channel,
+        externalId: m.externalId || null,
+        mediaUrl: m.mediaUrl || null,
     }));
 }
 

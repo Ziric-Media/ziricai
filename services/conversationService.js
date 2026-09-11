@@ -15,7 +15,10 @@ async function adapter() {
 
 export async function saveInboundMessage(phone, text, options = {}) {
     if (options.companyId) {
-        return saveTenantMessage(options.companyId, phone, "user", text, options);
+        return saveTenantMessage(options.companyId, phone, "user", text, {
+            ...options,
+            source: options.source || "customer",
+        });
     }
     const store = await adapter();
     return store.saveMessage(phone, "user", text, options);
@@ -23,7 +26,10 @@ export async function saveInboundMessage(phone, text, options = {}) {
 
 export async function saveOutboundMessage(phone, text, options = {}) {
     if (options.companyId) {
-        return saveTenantMessage(options.companyId, phone, "assistant", text, options);
+        return saveTenantMessage(options.companyId, phone, "assistant", text, {
+            ...options,
+            source: options.source || "ai",
+        });
     }
     const store = await adapter();
     return store.saveMessage(phone, "assistant", text, options);
