@@ -474,10 +474,14 @@ async function handleAccountStep() {
 async function handleIndustryStep() {
   if (!state.selectedIndustry) throw new Error('Please select an industry.');
   if (!state.sessionId) throw new Error('Session expired — refresh and try again.');
-  setStatus('Installing industry pack...');
+  setStatus('Saving industry selection...');
   const { completeStep } = await loadOnboardingApi();
-  await completeStep(state.sessionId, 'industry', { industryId: state.selectedIndustry });
-  setStatus('Industry pack installed!', 'success');
+  const result = await completeStep(state.sessionId, 'industry', { industryId: state.selectedIndustry });
+  if (result?.packInstall?.skipped) {
+    setStatus(result.packInstall.reason || 'Industry saved — install your pack from Portal Marketplace', 'success');
+  } else {
+    setStatus('Industry pack installed!', 'success');
+  }
 }
 
 async function handleWhatsAppStep() {

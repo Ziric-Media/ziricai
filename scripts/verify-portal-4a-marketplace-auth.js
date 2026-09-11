@@ -124,9 +124,9 @@ assert.doesNotMatch(portalApi, /demoMode:\s*true/);
 assert.doesNotMatch(marketplaceJs, /demoMode:\s*true/);
 console.log("✓ Portal API caller no longer forces demoMode:true");
 
-assert.match(installBlock, /demoMode === true/);
+assert.match(installBlock, /resolveMarketplacePaymentBypass/);
 assert.doesNotMatch(installBlock, /demoMode !== false/);
-console.log("✓ backend install only enables demoMode when explicitly true");
+console.log("✓ backend install uses trusted payment bypass resolver (not client-controlled demoMode)");
 
 assert.doesNotMatch(appJs, /TENANT_SCOPE_ENFORCEMENT\s*=\s*["']strict["']/);
 console.log("✓ no global TENANT_SCOPE_ENFORCEMENT override in api/app.js");
@@ -250,8 +250,8 @@ if (LIVE) {
                 demoMode: true,
             },
         });
-        assert.notEqual(paidWithDemo.status, 402, "explicit demoMode:true may still bypass for internal/test callers");
-        console.log("✓ explicit demoMode:true remains available for authorized internal callers");
+        assert.equal(paidWithDemo.status, 402, "tenant demoMode:true must not bypass payment");
+        console.log("✓ tenant demoMode:true does not bypass paid-pack gate");
     }
 
     const catalogAfter = await apiFetch("GET", "/api/marketplace/catalog");
@@ -269,8 +269,9 @@ console.log("✓ I sales role lacks canManageStaff (403 expected at middleware w
 
 /* ── Legacy onboarding classification ── */
 const onboarding = read("services/platform/onboardingService.js");
-assert.match(onboarding, /installIndustryPack\(session\.companyId/);
-assert.doesNotMatch(read("api/app.js").slice(0, 720), /complete-step.*requireAuthenticatedTenantMember/s);
-console.log("✓ legacy onboarding industry install path documented (no tenant auth middleware — follow-up gate)");
+assert.match(read("api/app.js"), /assertOnboardingSessionAccess/);
+assert.match(onboarding, /runInstallWizard/);
+assert.doesNotMatch(onboarding, /installIndustryPack\(session\.companyId/);
+console.log("✓ onboarding industry step uses session auth + marketplace wizard (no direct installIndustryPack)");
 
 console.log("\nPORTAL-4A marketplace auth verification passed");

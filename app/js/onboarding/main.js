@@ -1,11 +1,3 @@
-import { registerUser } from '../auth.js';
-import { createUserProfile, createTenantMembership } from '../users.js';
-import {
-  fetchIndustries,
-  startOnboarding,
-  completeStep,
-  uploadKnowledge,
-} from './api.js';
 import { portalUrl, marketingUrl } from '../shared/siteUrls.js';
 
 const STEPS = [
@@ -42,24 +34,37 @@ const el = {
   progressLabel: document.getElementById('progressLabel'),
 };
 
+/** Paint step UI immediately; Firebase/API modules load on demand. */
+export function initOnboarding() {
+  render();
+}
+
 if (!el.stepContent) {
   /* Wizard markup not on this page */
 } else if (location.protocol === 'file:') {
   el.stepContent.innerHTML =
     '<p>Run <code>npm run dev</code> and open <a href="' + marketingUrl() + '">' + marketingUrl() + '</a></p>';
 } else {
+  initOnboarding();
   bootstrap();
+  window.addEventListener('ziric:wizard-open', () => initOnboarding());
 }
+
+window.initOnboarding = initOnboarding;
 
 async function bootstrap() {
   try {
+    const { fetchIndustries } = await import('./api.js');
     const data = await fetchIndustries();
     state.industries = data.industries || [];
     state.whatsapp = data.whatsapp || state.whatsapp;
+    renderStepList();
+    if (STEPS[state.stepIndex]?.id === 'industry') {
+      renderStepContent();
+    }
   } catch {
     /* industries load optional */
   }
-  render();
 }
 
 function render() {
@@ -412,6 +417,10 @@ async function handleNext() {
   }
 }
 
+async function loadOnboardingApi() {
+  return import('./api.js');
+}
+
 async function handleAccountStep() {
   const companyName = document.getElementById('companyName')?.value?.trim();
   const ownerName = document.getElementById('ownerName')?.value?.trim();
@@ -422,7 +431,11 @@ async function handleAccountStep() {
     throw new Error('Please fill in all fields.');
   }
 
+  state.companyName = companyName;
+
   setStatus('Creating your account...');
+  const [{ registerUser }, { createUserProfile, createTenantMembership }, { startOnboarding }] =
+    await Promise.all([import('../auth.js'), import('../users.js'), loadOnboardingApi()]);
   const authResult = await registerUser(ownerEmail, password);
   if (authResult.error) throw new Error(authResult.error);
 
@@ -461,9 +474,14 @@ async function handleAccountStep() {
 async function handleIndustryStep() {
   if (!state.selectedIndustry) throw new Error('Please select an industry.');
   if (!state.sessionId) throw new Error('Session expired — refresh and try again.');
-  setStatus('Installing industry pack...');
-  await completeStep(state.sessionId, 'industry', { industryId: state.selectedIndustry });
-  setStatus('Industry pack installed!', 'success');
+  setStatus('Saving industry selection...');
+  const { completeStep } = await loadOnboardingApi();
+  const result = await completeStep(state.sessionId, 'industry', { industryId: state.selectedIndustry });
+  if (result?.packInstall?.skipped) {
+    setStatus(result.packInstall.reason || 'Industry saved — install your pack from Portal Marketplace', 'success');
+  } else {
+    setStatus('Industry pack installed!', 'success');
+  }
 }
 
 async function handleWhatsAppStep() {
@@ -475,6 +493,7 @@ async function handleWhatsAppStep() {
     rows[i].classList.remove('running');
     rows[i].classList.add('done');
   }
+  const { completeStep } = await loadOnboardingApi();
   await completeStep(state.sessionId, 'whatsapp', {});
   setStatus('WhatsApp connected!', 'success');
 }
@@ -483,6 +502,7 @@ async function handleKnowledgeStep() {
   if (!state.sessionId) throw new Error('Session expired.');
   setStatus('Uploading knowledge...');
 
+  const { completeStep, uploadKnowledge } = await loadOnboardingApi();
   if (state.companyId && state.uploadedFiles.length) {
     for (const file of state.uploadedFiles) {
       try {
@@ -516,6 +536,7 @@ async function handleTrainStep() {
     stages[i].classList.add('done');
   }
 
+  const { completeStep } = await loadOnboardingApi();
   await completeStep(state.sessionId, 'train', {});
   setStatus('Training complete!', 'success');
   state.stepIndex += 1;
@@ -524,11 +545,13 @@ async function handleTrainStep() {
 
 async function handleTestStep() {
   if (!state.sessionId) throw new Error('Session expired.');
+  const { completeStep } = await loadOnboardingApi();
   await completeStep(state.sessionId, 'test', {});
 }
 
 async function handleCompleteStep() {
   if (state.sessionId) {
+    const { completeStep } = await loadOnboardingApi();
     await completeStep(state.sessionId, 'complete', {});
   }
 }

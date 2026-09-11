@@ -129,6 +129,7 @@ import {
 import {
     startOnboarding,
     completeOnboardingStep,
+    assertOnboardingSessionAccess,
     provisionOnboarding,
     listOnboardingIndustries,
     getOnboardingSession,
@@ -142,6 +143,7 @@ import { attachTenantContext, requireTenantScope, requireAuthenticatedTenantMemb
 import { resolveAuthFromRequest } from "../services/auth/authService.js";
 import { trackSession, invalidateSession, buildSessionResponse } from "../services/auth/sessionService.js";
 import { checkPermission } from "../services/auth/permissionsService.js";
+import { resolveMarketplacePaymentBypass } from "../services/platform/marketplaceAuth.js";
 import { requirePlatformAccess } from "../services/auth/platformAuth.js";
 import { validateCompanyIdParam, requireBodyFields, isValidCompanyId } from "../services/auth/validateInput.js";
 import { authRateLimit } from "../services/auth/authRateLimiter.js";
@@ -693,11 +695,16 @@ app.post("/api/onboarding/complete-step", authRateLimit("onboarding"), async (re
         const { sessionId, step, data } = req.body || {};
         if (!sessionId) return res.status(400).json({ error: "sessionId is required" });
         if (!step) return res.status(400).json({ error: "step is required" });
+        await assertOnboardingSessionAccess(req, sessionId);
         const result = await completeOnboardingStep(sessionId, step, data || {});
         res.json(result);
     } catch (err) {
         console.error("[api/onboarding/complete-step] error:", err.message);
-        res.status(400).json({ error: err.message || "Failed to complete step" });
+        const status = err.status || 400;
+        res.status(status).json({
+            error: err.message || "Failed to complete step",
+            code: err.code || "ONBOARDING_ERROR",
+        });
     }
 });
 
@@ -1491,15 +1498,15 @@ app.post(
         }
         if (!packId) return res.status(400).json({ error: "packId is required" });
 
-        const installDemoMode = demoMode === true;
+        const paymentBypass = resolveMarketplacePaymentBypass(req, { demoMode, skipPayment });
 
         if (step && step !== "install") {
             const result = await runInstallWizard(companyId, packId, {
                 step,
                 customizations: { branding },
                 integrations,
-                demoMode: installDemoMode,
-                skipPayment,
+                demoMode: paymentBypass.demoMode,
+                skipPayment: paymentBypass.skipPayment,
             });
             return res.json(result);
         }
@@ -1508,8 +1515,8 @@ app.post(
             step: "install",
             branding,
             integrations,
-            demoMode: installDemoMode,
-            skipPayment,
+            demoMode: paymentBypass.demoMode,
+            skipPayment: paymentBypass.skipPayment,
         });
 
         if (result.requiresPayment) {

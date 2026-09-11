@@ -2,8 +2,15 @@
  * SaaS onboarding orchestration — multi-step wizard backend.
  * Provisions tenants, installs industry packs, tracks wizard progress.
  */
-import { provisionCompany, installIndustryPack } from "./provisioningService.js";
+import { provisionCompany } from "./provisioningService.js";
 import { getPackById } from "./marketplaceRegistry.js";
+import { buildPackManifest } from "./marketplaceTemplate.js";
+import { runInstallWizard } from "./marketplaceInstaller.js";
+import {
+    resolveAuthFromRequest,
+    getTenantMembership,
+    userBelongsToCompany,
+} from "../auth/authService.js";
 import { getPlan, buildUsageFromPlan } from "./billingPlans.js";
 import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { saveKnowledgeDocument } from "../knowledgeService.js";
@@ -70,6 +77,42 @@ function hashSeed(str) {
 
 export function getOnboardingSession(sessionId) {
     return sessions.get(sessionId) || null;
+}
+
+/**
+ * Authenticated onboarding session access — session owner or superadmin only.
+ * @param {import('express').Request} req
+ * @param {string} sessionId
+ */
+export async function assertOnboardingSessionAccess(req, sessionId) {
+    const session = sessions.get(sessionId);
+    if (!session) {
+        throw Object.assign(new Error("Onboarding session not found"), { status: 404, code: "SESSION_NOT_FOUND" });
+    }
+
+    const auth = await resolveAuthFromRequest(req);
+    if (auth.isSuperAdmin) {
+        return { session, auth };
+    }
+
+    if (!auth.uid) {
+        throw Object.assign(new Error("Authentication required"), { status: 401, code: "UNAUTHORIZED" });
+    }
+
+    if (session.uid && session.uid !== auth.uid) {
+        throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
+    }
+
+    if (auth.profile && !userBelongsToCompany(auth.profile, session.companyId)) {
+        throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
+    }
+
+    const membership = await getTenantMembership(auth.uid, session.companyId);
+    if (!membership) {
+        throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
+    }
+
+    return { session, auth };
 }
 
 export function getWhatsAppConfig() {
@@ -216,15 +259,41 @@ export async function completeOnboardingStep(sessionId, step, data = {}) {
 
             if (industryDef.packId) {
                 const pack = getPackById(industryDef.packId);
-                if (pack?.installable !== false) {
-                    try {
-                        const installResult = await installIndustryPack(session.companyId, industryDef.packId);
-                        result.packInstall = installResult;
-                    } catch (err) {
-                        result.packInstall = { skipped: true, reason: err.message };
-                    }
-                } else {
+                if (pack?.installable === false) {
                     result.packInstall = { skipped: true, reason: "Pack coming soon — base workspace provisioned" };
+                } else if (!pack) {
+                    result.packInstall = {
+                        skipped: true,
+                        reason: "Industry pack not found — install from Portal Marketplace after onboarding",
+                    };
+                } else {
+                    const manifest = buildPackManifest(pack);
+                    if (manifest.isPaid) {
+                        result.packInstall = {
+                            skipped: true,
+                            reason: "Paid Industry Pack — install from Portal Marketplace after onboarding",
+                            requiresPayment: true,
+                            packId: manifest.canonicalId || pack.id,
+                        };
+                    } else {
+                        try {
+                            const installResult = await runInstallWizard(session.companyId, pack.id, {
+                                step: "install",
+                                demoMode: false,
+                            });
+                            if (installResult.requiresPayment) {
+                                result.packInstall = {
+                                    skipped: true,
+                                    reason: installResult.message || "Payment required for this Industry Pack",
+                                    requiresPayment: true,
+                                };
+                            } else {
+                                result.packInstall = installResult;
+                            }
+                        } catch (err) {
+                            result.packInstall = { skipped: true, reason: err.message };
+                        }
+                    }
                 }
             } else {
                 result.packInstall = { skipped: true, reason: "Generic workspace — no industry pack required" };
