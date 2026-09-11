@@ -138,7 +138,7 @@ import {
 import { completeOnboarding } from "../services/platform/onboardingOrchestrator.js";
 import { getAllPlans, getPlan, checkPlanLimit } from "../services/platform/billingPlans.js";
 import { getCommandCenterDashboard } from "../services/operations/commandCenterService.js";
-import { attachTenantContext, requireTenantScope } from "../services/core/tenantContext.js";
+import { attachTenantContext, requireTenantScope, requireAuthenticatedTenantMember } from "../services/core/tenantContext.js";
 import { resolveAuthFromRequest } from "../services/auth/authService.js";
 import { trackSession, invalidateSession, buildSessionResponse } from "../services/auth/sessionService.js";
 import { checkPermission } from "../services/auth/permissionsService.js";
@@ -1455,7 +1455,7 @@ app.get("/api/marketplace/pack/:packId", async (req, res) => {
 });
 
 /** AI Marketplace — installed packs for a tenant */
-app.get("/api/marketplace/installed/:companyId", requireTenantScope(), async (req, res) => {
+app.get("/api/marketplace/installed/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const data = await getInstalledPacks(req.params.companyId);
         res.json(data);
@@ -1466,7 +1466,7 @@ app.get("/api/marketplace/installed/:companyId", requireTenantScope(), async (re
 });
 
 /** AI Marketplace — check for pack updates */
-app.get("/api/marketplace/installed/:companyId/updates", requireTenantScope(), async (req, res) => {
+app.get("/api/marketplace/installed/:companyId/updates", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const { packId } = req.query;
         const data = await checkForUpdates(req.params.companyId, packId || null);
@@ -1478,21 +1478,27 @@ app.get("/api/marketplace/installed/:companyId/updates", requireTenantScope(), a
 });
 
 /** AI Marketplace — install industry pack (supports wizard steps) */
-app.post("/api/marketplace/install", requireTenantScope({ optional: true }), async (req, res) => {
+app.post(
+    "/api/marketplace/install",
+    requireAuthenticatedTenantMember(),
+    checkPermission("canManageStaff"),
+    async (req, res) => {
     try {
         const body = req.body || {};
         const { companyId, packId, step, branding, integrations, demoMode, skipPayment } = body;
-        if (!companyId && step !== "preview") {
+        if (!companyId) {
             return res.status(400).json({ error: "companyId is required" });
         }
         if (!packId) return res.status(400).json({ error: "packId is required" });
+
+        const installDemoMode = demoMode === true;
 
         if (step && step !== "install") {
             const result = await runInstallWizard(companyId, packId, {
                 step,
                 customizations: { branding },
                 integrations,
-                demoMode,
+                demoMode: installDemoMode,
                 skipPayment,
             });
             return res.json(result);
@@ -1502,12 +1508,16 @@ app.post("/api/marketplace/install", requireTenantScope({ optional: true }), asy
             step: "install",
             branding,
             integrations,
-            demoMode: demoMode !== false,
+            demoMode: installDemoMode,
             skipPayment,
         });
 
         if (result.requiresPayment) {
-            return res.status(402).json(result);
+            return res.status(402).json({
+                ...result,
+                error: result.message || "Payment required for this Industry Pack",
+                code: "PAYMENT_REQUIRED",
+            });
         }
 
         res.status(result.alreadyInstalled ? 200 : 201).json(result);
@@ -1518,7 +1528,11 @@ app.post("/api/marketplace/install", requireTenantScope({ optional: true }), asy
 });
 
 /** AI Marketplace — apply pack version update */
-app.post("/api/marketplace/update", requireTenantScope(), async (req, res) => {
+app.post(
+    "/api/marketplace/update",
+    requireAuthenticatedTenantMember(),
+    checkPermission("canManageStaff"),
+    async (req, res) => {
     try {
         const { companyId, packId, targetVersion } = req.body || {};
         if (!companyId) return res.status(400).json({ error: "companyId is required" });
@@ -1533,7 +1547,7 @@ app.post("/api/marketplace/update", requireTenantScope(), async (req, res) => {
 });
 
 /** AI Marketplace — submit tenant review */
-app.post("/api/marketplace/review", requireTenantScope(), async (req, res) => {
+app.post("/api/marketplace/review", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const { companyId, packId, rating, title, body, author } = req.body || {};
         if (!companyId) return res.status(400).json({ error: "companyId is required" });

@@ -257,7 +257,7 @@ export async function installMarketplacePack(companyId, packId, options = {}) {
   const result = await request('/api/marketplace/install', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ companyId, packId, demoMode: true, ...options }),
+    body: JSON.stringify({ companyId, packId, ...options }),
   });
 
   if (result.data && !result.error && companyId) {

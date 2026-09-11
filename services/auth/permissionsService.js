@@ -34,8 +34,8 @@ export const ROUTE_PERMISSIONS = {
     "PATCH /api/portal/company/:companyId": "canManageStaff",
     "POST /api/automations/:companyId": "canRunAutomations",
     "POST /api/automations/:companyId/:workflowId/run": "canRunAutomations",
-    "POST /api/marketplace/install": "canManageIntegrations",
-    "POST /api/marketplace/update": "canManageIntegrations",
+    "POST /api/marketplace/install": "canManageStaff",
+    "POST /api/marketplace/update": "canManageStaff",
 };
 
 export function normalizeRole(role) {

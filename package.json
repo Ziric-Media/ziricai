@@ -63,6 +63,7 @@
         "verify:portal-3a-auth": "node scripts/verify-portal-3a-takeover-auth.js",
         "verify:portal-3c-inbox-contract": "node scripts/verify-portal-3c-inbox-contract.js",
         "verify:portal-3d-inbox-ui-smoke": "node scripts/verify-portal-3d-inbox-ui-smoke.mjs",
+        "verify:portal-4a-marketplace-auth": "node scripts/verify-portal-4a-marketplace-auth.js",
         "verify:mission-control-data-mode": "node scripts/verify-mission-control-data-mode.js",
         "verify:mission-control-customers-scope": "node scripts/verify-mission-control-customers-scope.js",
         "verify:mission-control-agents-scope": "node scripts/verify-mission-control-agents-scope.js",

@@ -342,10 +342,13 @@ async function renderWizardStep(container, modal) {
       step: 'install',
       branding: wizardState.branding,
       integrations: wizardState.integrations,
-      demoMode: true,
     });
     if (result.error) {
-      body.innerHTML = `<p class="mp-error">${escapeHtml(result.error)}</p>
+      const paymentRequired = result.status === 402 || result.code === 'PAYMENT_REQUIRED';
+      const message = paymentRequired
+        ? 'This Industry Pack requires payment before installation. Please contact sales to purchase access.'
+        : result.error;
+      body.innerHTML = `<p class="mp-error">${escapeHtml(message)}</p>
         <button type="button" class="btn btn-secondary" id="mpBack4">Back</button>`;
       body.querySelector('#mpBack4')?.addEventListener('click', () => { wizardState.step = 3; renderWizardStep(container, modal); });
       return;
