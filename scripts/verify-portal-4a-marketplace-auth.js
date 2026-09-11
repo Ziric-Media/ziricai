@@ -211,7 +211,7 @@ if (LIVE) {
     if (!existsSync(credPath)) {
         console.warn("⚠ skipping authenticated live tests — missing .portal-rtb-smoke-credentials.json");
     } else {
-        const creds = JSON.parse(readFileSync(credPath, "utf8"));
+        const creds = JSON.parse(readFileSync(credPath, "utf8").replace(/^\uFEFF/, ""));
         const ownerToken = await firebaseToken(creds.email, creds.password);
 
         const authInstalled = await apiFetch("GET", `/api/marketplace/installed/${COMPANY_ID}`, { token: ownerToken });
