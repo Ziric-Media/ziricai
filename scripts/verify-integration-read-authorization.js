@@ -136,10 +136,14 @@ console.log("✓ superadmin → allowed");
 console.log("✓ platform API key → allowed");
 
 const tenantContextSource = read("services/core/tenantContext.js");
-const integrationBlock = tenantContextSource.slice(
-    tenantContextSource.indexOf("export async function assertIntegrationReadAccess")
+const memberBlock = tenantContextSource.slice(
+    tenantContextSource.indexOf("export async function assertAuthenticatedTenantMemberAccess")
 );
-assert.match(integrationBlock, /if \(!ctx\.profile\) \{[\s\S]*resolveMembership\(ctx\.uid, ctx\.companyId\)/);
-console.log("✓ missing profile may fall back to tenant membership for integration reads");
+assert.match(memberBlock, /if \(!ctx\.profile\) \{[\s\S]*resolveMembership\(ctx\.uid, ctx\.companyId\)/);
+assert.match(
+    tenantContextSource.slice(tenantContextSource.indexOf("export async function assertIntegrationReadAccess")),
+    /assertAuthenticatedTenantMemberAccess\(ctx/
+);
+console.log("✓ missing profile may fall back to tenant membership (shared tenant-member access)");
 
 console.log("\nAll B-MC-5c-2e-1 integration read authorization checks passed.");

@@ -2,7 +2,7 @@
  * Phase 3–6 tenant-scoped Customer Operations API routes.
  * CRM, Conversations, Appointments, Notifications, Reports.
  */
-import { requireTenantScope } from "../core/tenantContext.js";
+import { requireTenantScope, requireAuthenticatedTenantMember } from "../core/tenantContext.js";
 import {
     listTenantCustomers,
     listContacts,
@@ -243,7 +243,7 @@ export function mountCustomerOpsRoutes(app) {
         }
     });
 
-    app.post("/api/companies/:companyId/conversations/:conversationId/reply", requireTenantScope(), async (req, res) => {
+    app.post("/api/companies/:companyId/conversations/:conversationId/reply", requireAuthenticatedTenantMember(), async (req, res) => {
         try {
             const { text, channel } = req.body || {};
             if (!text?.trim()) return res.status(400).json({ error: "text is required" });
@@ -257,7 +257,7 @@ export function mountCustomerOpsRoutes(app) {
         }
     });
 
-    app.post("/api/companies/:companyId/conversations/:conversationId/takeover", requireTenantScope(), async (req, res) => {
+    app.post("/api/companies/:companyId/conversations/:conversationId/takeover", requireAuthenticatedTenantMember(), async (req, res) => {
         try {
             const { humanAgent, enabled = true } = req.body || {};
             const result = await setHumanTakeover(req.params.companyId, req.params.conversationId, {

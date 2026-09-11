@@ -102,21 +102,18 @@ export async function assertTenantAccess(ctx) {
 }
 
 /**
- * Integration read authorization — always enforced (independent of TENANT_SCOPE_ENFORCEMENT=lax).
- * Allows: platform API key, superadmin Firebase session, or authenticated tenant member.
+ * Authenticated tenant-member authorization — always enforced (independent of lax/strict).
+ * Used for privileged customer-ops mutations (takeover, human reply).
  * @param {{ companyId: string|null, uid: string|null, isSuperAdmin: boolean, profile?: object }} ctx
- * @param {import('express').Request} req
- * @returns {Promise<{ via: 'api_key'|'superadmin'|'tenant' }>}
+ * @param {{ getTenantMembership?: typeof getTenantMembership, auditSurface?: string }} [deps]
+ * @returns {Promise<{ via: 'superadmin'|'tenant' }>}
  */
-export async function assertIntegrationReadAccess(ctx, req, deps = {}) {
+export async function assertAuthenticatedTenantMemberAccess(ctx, deps = {}) {
     const resolveMembership = deps.getTenantMembership ?? getTenantMembership;
+    const auditSurface = deps.auditSurface || "tenant_mutation";
 
     if (!ctx.companyId) {
         throw Object.assign(new Error("companyId is required"), { status: 400, code: "MISSING_COMPANY_ID" });
-    }
-
-    if (hasPlatformApiKeyAccess(req)) {
-        return { via: "api_key" };
     }
 
     if (ctx.isSuperAdmin) {
@@ -143,7 +140,7 @@ export async function assertIntegrationReadAccess(ctx, req, deps = {}) {
             uid: ctx.uid,
             requestedCompanyId: ctx.companyId,
             profileCompanyId: ctx.profile.companyId || ctx.profile.company,
-            surface: "integration_read",
+            surface: auditSurface,
         });
         throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
     }
@@ -155,6 +152,54 @@ export async function assertIntegrationReadAccess(ctx, req, deps = {}) {
 
     assertMfaIfRequired(ctx.profile);
     return { via: "tenant" };
+}
+
+/**
+ * Integration read authorization — always enforced (independent of TENANT_SCOPE_ENFORCEMENT=lax).
+ * Allows: platform API key, superadmin Firebase session, or authenticated tenant member.
+ * @param {{ companyId: string|null, uid: string|null, isSuperAdmin: boolean, profile?: object }} ctx
+ * @param {import('express').Request} req
+ * @returns {Promise<{ via: 'api_key'|'superadmin'|'tenant' }>}
+ */
+export async function assertIntegrationReadAccess(ctx, req, deps = {}) {
+    if (!ctx.companyId) {
+        throw Object.assign(new Error("companyId is required"), { status: 400, code: "MISSING_COMPANY_ID" });
+    }
+
+    if (hasPlatformApiKeyAccess(req)) {
+        return { via: "api_key" };
+    }
+
+    if (ctx.isSuperAdmin) {
+        return { via: "superadmin" };
+    }
+
+    const member = await assertAuthenticatedTenantMemberAccess(ctx, {
+        ...deps,
+        auditSurface: "integration_read",
+    });
+    return member;
+}
+
+/**
+ * Middleware for privileged tenant mutations (takeover, human reply).
+ * Enforces authenticated tenant membership regardless of TENANT_SCOPE_ENFORCEMENT=lax.
+ */
+export function requireAuthenticatedTenantMember() {
+    return async (req, res, next) => {
+        try {
+            const ctx = await resolveTenantContext(req);
+            req.tenant = ctx;
+            req.tenantMemberAuth = await assertAuthenticatedTenantMemberAccess(ctx);
+            next();
+        } catch (err) {
+            const status = err.status || 403;
+            res.status(status).json({
+                error: err.message || "Access denied",
+                code: err.code || "TENANT_ERROR",
+            });
+        }
+    };
 }
 
 /**
