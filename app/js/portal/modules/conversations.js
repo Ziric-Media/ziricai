@@ -1,28 +1,32 @@
 import { state } from '../core/dataStore.js';
-import { escapeHtml, pageHeader, loadingState, statusBadge, errorState } from '../../admin/ui.js';
+import { errorState } from '../../admin/ui.js';
 import { can } from '../permissions.js';
-import { fetchTenantConversations, fetchConversationDetail, sendConversationReply, setConversationTakeover } from '../api.js';
+import {
+  fetchTenantConversations,
+  fetchConversationDetail,
+  sendConversationReply,
+  setConversationTakeover,
+  markConversationRead,
+} from '../api.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
-import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { invalidateHub } from '../core/dataService.js';
-
-const CHANNEL_BADGE = {
-  whatsapp: { icon: 'fa-brands fa-whatsapp', cls: 'green', label: 'WhatsApp' },
-  facebook: { icon: 'fa-brands fa-facebook', cls: 'blue', label: 'Facebook' },
-  instagram: { icon: 'fa-brands fa-instagram', cls: 'purple', label: 'Instagram' },
-  telegram: { icon: 'fa-brands fa-telegram', cls: 'blue', label: 'Telegram' },
-  webchat: { icon: 'fa-comments', cls: 'purple', label: 'Web' },
-  email: { icon: 'fa-envelope', cls: 'yellow', label: 'Email' },
-  sms: { icon: 'fa-mobile-screen', cls: 'grey', label: 'SMS' },
-};
-
-function channelBadge(channel) {
-  const meta = CHANNEL_BADGE[channel] || CHANNEL_BADGE.whatsapp;
-  return `<span class="channel-badge ${meta.cls}"><i class="fa-solid ${meta.icon}"></i> ${meta.label}</span>`;
-}
+import { navigateTo } from '../router.js';
+import {
+  computeInboxMetrics,
+  filterInboxConversations,
+  renderInboxLayout,
+  renderInboxPage,
+  scrollThreadToBottom,
+  setActiveFilterButton,
+  conversationPhone,
+} from './inbox-ui.js';
 
 function isHumanControlled(conv = {}) {
   return Boolean(conv.humanTakeover) || (conv.mode || 'ai') === 'human';
+}
+
+function conversationKey(conv) {
+  return conv?.id || conv?.phone || '';
 }
 
 export async function renderConversations(container) {
@@ -31,140 +35,216 @@ export async function renderConversations(container) {
     return;
   }
 
-  container.innerHTML = loadingState('Loading unified inbox...');
   const companyId = state.companyId;
   const canReply = state.permissions.canReply;
 
-  let conversations = [];
+  container.innerHTML = renderInboxPage({
+    metrics: {},
+    layoutHtml: '<div class="empty-panel">Loading inbox…</div>',
+    unreadCount: 0,
+  });
+
   const apiRes = await fetchTenantConversations(companyId);
-  conversations = apiRes.data?.items || [];
-  const useDemo = shouldUseDemoFallback({ companyId, isDemo: state.hubData?.isDemo, isProvisioned: state.hubData?.isProvisioned });
+  let conversations = apiRes.data?.items || [];
+  const useDemo = shouldUseDemoFallback({
+    companyId,
+    isDemo: state.hubData?.isDemo,
+    isProvisioned: state.hubData?.isProvisioned,
+  });
 
   if (apiRes.error && !conversations.length && !useDemo) {
-    container.innerHTML = `${pageHeader('Unified Inbox', 'All channels in one place.')}
-      ${errorState(apiRes.error)}
-      <div style="text-align:center;margin-top:12px;"><button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button></div>`;
+    container.innerHTML = renderInboxPage({
+      metrics: {},
+      layoutHtml: `<div class="inbox-thread-error">${errorState(apiRes.error)}<div style="text-align:center;margin-top:12px;"><button class="btn btn-secondary btn-sm" type="button" id="inboxRetryBtn">Retry</button></div></div>`,
+      unreadCount: 0,
+    });
+    container.querySelector('#inboxRetryBtn')?.addEventListener('click', () => location.reload());
     return;
   }
 
-  container.innerHTML = `
-    ${pageHeader(
-      'Unified Inbox',
-      `All channels in one place — ${escapeHtml(state.company?.name || 'your company')}.`,
-      apiRes.data?.unreadCount
-        ? `<span class="ops-tag">${apiRes.data.unreadCount} unread</span>`
-        : `<span class="demo-badge muted">All channels</span>`
-    )}
-    <div class="inbox-layout portal-inbox">
-      <div class="inbox-list">
-        ${conversations.length
-          ? conversations.map((c, i) => inboxItem(c, i === 0)).join('')
-          : renderEmptyState({ message: 'No conversations yet.', actionHtml: '<button class="btn btn-primary btn-sm" type="button" data-nav="integrations">Connect WhatsApp</button>' })}
-      </div>
-      <div class="inbox-thread" id="inboxThread">
-        ${conversations[0] ? threadView(conversations[0], canReply, []) : renderEmptyState({ message: 'Select a conversation' })}
-      </div>
-    </div>
-  `;
+  let filter = 'all';
+  let search = '';
+  let selected = null;
+  let messages = [];
+  let context = null;
+  let contextError = null;
+  let threadError = null;
+  let threadLoading = false;
+  let unreadCount = apiRes.data?.unreadCount ?? conversations.filter((c) => c.unread).length;
 
-  let activeId = conversations[0]?.id;
+  function aiEmployeeNameFromContext() {
+    return context?.aiEmployee?.name || null;
+  }
+
+  function paint() {
+    const filtered = filterInboxConversations(conversations, { filter, search });
+    const metrics = computeInboxMetrics(conversations);
+    const layoutHtml = renderInboxLayout({
+      conversations: filtered,
+      selected,
+      messages,
+      context,
+      contextError,
+      filter,
+      search,
+      canReply,
+      aiEmployeeName: aiEmployeeNameFromContext(),
+      threadError,
+      threadLoading,
+    });
+    container.innerHTML = renderInboxPage({ metrics, layoutHtml, unreadCount });
+    bindEvents(filtered);
+    if (!threadLoading && selected && !threadError) {
+      scrollThreadToBottom(container);
+    }
+  }
 
   async function refreshConversations() {
     const res = await fetchTenantConversations(companyId);
-    conversations = res.data?.items || conversations;
+    if (!res.error) {
+      conversations = res.data?.items || conversations;
+      unreadCount = res.data?.unreadCount ?? conversations.filter((c) => c.unread).length;
+    }
     return conversations;
   }
 
   async function loadThread(conv) {
-    const thread = container.querySelector('#inboxThread');
-    if (!thread || !conv) return;
-    thread.innerHTML = loadingState('Loading messages...');
+    if (!conv) {
+      selected = null;
+      messages = [];
+      context = null;
+      contextError = null;
+      threadError = null;
+      threadLoading = false;
+      paint();
+      return;
+    }
+
+    selected = conv;
+    threadLoading = true;
+    threadError = null;
+    contextError = null;
+    paint();
+
     const detail = await fetchConversationDetail(companyId, conv.id || conv.phone);
+    threadLoading = false;
+
+    if (detail.error) {
+      threadError = detail.error;
+      contextError = detail.error;
+      messages = [];
+      context = null;
+      paint();
+      return;
+    }
+
     const detailConv = detail.data?.conversation || {};
-    const merged = {
+    selected = {
       ...conv,
       ...detailConv,
       humanTakeover: detail.data?.humanTakeover ?? detailConv.humanTakeover ?? conv.humanTakeover,
       mode: detailConv.mode ?? conv.mode,
     };
-    const messages = detail.data?.messages || [];
-    thread.innerHTML = threadView(merged, canReply, messages);
-    bindThreadActions(merged);
+    messages = detail.data?.messages || [];
+    context = detail.data?.context || null;
+    contextError = null;
+    threadError = null;
+
+    const readRes = await markConversationRead(companyId, selected.id || selected.phone);
+    if (!readRes.error) {
+      const key = conversationKey(selected);
+      conversations = conversations.map((c) =>
+        conversationKey(c) === key ? { ...c, unread: false } : c
+      );
+      unreadCount = Math.max(0, conversations.filter((c) => c.unread).length);
+    }
+
+    paint();
   }
 
-  function bindThreadActions(conv) {
-    const form = container.querySelector('#replyForm');
-    form?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const input = form.querySelector('input[name="text"]');
+  function bindEvents(filteredRows) {
+    container.querySelector('#inboxSearch')?.addEventListener('input', (e) => {
+      search = e.target.value;
+      paint();
+    });
+
+    container.querySelectorAll('.inbox-filter-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        filter = btn.dataset.filter || 'all';
+        setActiveFilterButton(container, filter);
+        paint();
+      });
+    });
+
+    container.querySelectorAll('.inbox-item').forEach((el) => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.id;
+        const conv = conversations.find((c) => conversationKey(c) === id);
+        loadThread(conv);
+      });
+    });
+
+    container.querySelector('#sendReplyBtn')?.addEventListener('click', async () => {
+      const input = container.querySelector('#replyInput');
       const text = input?.value?.trim();
-      if (!text) return;
-      await sendConversationReply(companyId, conv.id || conv.phone, { text, channel: conv.channel });
+      if (!text || !selected) return;
+      const res = await sendConversationReply(companyId, selected.id || selected.phone, {
+        text,
+        channel: selected.channel,
+      });
+      if (res.error) {
+        threadError = res.error;
+        paint();
+        return;
+      }
       input.value = '';
       invalidateHub();
-      loadThread(conv);
+      await loadThread(selected);
     });
+
+    container.querySelector('#replyInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        container.querySelector('#sendReplyBtn')?.click();
+      }
+    });
+
     container.querySelector('#takeoverBtn')?.addEventListener('click', async () => {
-      const human = isHumanControlled(conv);
-      await setConversationTakeover(companyId, conv.id || conv.phone, { enabled: !human });
+      if (!selected) return;
+      const human = isHumanControlled(selected);
+      const res = await setConversationTakeover(companyId, selected.id || selected.phone, {
+        enabled: !human,
+      });
+      if (res.error) {
+        threadError = res.error;
+        paint();
+        return;
+      }
       invalidateHub();
       await refreshConversations();
-      const updated = conversations.find((c) => (c.id || c.phone) === (conv.id || conv.phone)) || conv;
-      loadThread(updated);
+      const key = conversationKey(selected);
+      const updated = conversations.find((c) => conversationKey(c) === key) || selected;
+      await loadThread({ ...updated, humanTakeover: !human, mode: human ? 'ai' : 'human' });
     });
+
+    container.querySelector('#retryContextBtn')?.addEventListener('click', () => {
+      if (selected) loadThread(selected);
+    });
+
+    container.querySelector('#openInCrmBtn')?.addEventListener('click', () => {
+      const phone = conversationPhone(selected);
+      if (phone) navigateTo('customers', { phone });
+    });
+
+    container.querySelector('#mobileShowProfileBtn')?.addEventListener('click', () => {
+      const panel = container.querySelector('#inboxCustomerPanel');
+      panel?.classList.toggle('mobile-visible');
+    });
+
+    if (!selected && filteredRows[0]) {
+      loadThread(filteredRows[0]);
+    }
   }
 
-  container.querySelectorAll('.inbox-item').forEach((el) => {
-    el.addEventListener('click', () => {
-      container.querySelectorAll('.inbox-item').forEach((x) => x.classList.remove('active'));
-      el.classList.add('active');
-      activeId = el.dataset.id;
-      const conv = conversations.find((c) => (c.id || c.phone) === activeId);
-      loadThread(conv);
-    });
-  });
-
-  if (conversations[0]) loadThread(conversations[0]);
-}
-
-function inboxItem(c, active) {
-  const ch = c.channel || 'whatsapp';
-  const human = isHumanControlled(c);
-  return `
-    <div class="inbox-item ${active ? 'active' : ''} ${c.unread ? 'unread' : ''}" data-id="${escapeHtml(c.id || c.phone)}">
-      <div class="inbox-item-top">
-        <span class="inbox-name">${escapeHtml(c.customerName || c.name)}</span>
-        <span class="inbox-time">${escapeHtml(c.time || '—')}</span>
-      </div>
-      <div class="inbox-preview">${escapeHtml(c.lastMessage || c.preview || '')}</div>
-      <div class="inbox-meta">${channelBadge(ch)} ${statusBadge(c.status)} ${human ? '<span class="ops-tag">Human</span>' : ''}</div>
-    </div>`;
-}
-
-function threadView(conv, canReply, messages) {
-  const human = isHumanControlled(conv);
-  const msgHtml = messages.length
-    ? messages.map((m) => `
-        <div class="message ${m.role === 'customer' || m.role === 'user' ? 'customer' : 'agent'}">
-          ${escapeHtml(m.content || m.message || '')}
-        </div>`).join('')
-    : `<div class="message customer">${escapeHtml(conv.lastMessage || conv.preview || 'No messages yet.')}</div>`;
-
-  return `
-    <div class="thread-header">
-      <h3>${escapeHtml(conv.customerName || conv.name)}</h3>
-      ${channelBadge(conv.channel || 'whatsapp')}
-      ${statusBadge(conv.status)}
-      ${human ? '<span class="ops-tag">Human takeover</span>' : '<span class="demo-badge muted">AI active</span>'}
-    </div>
-    <div class="thread-messages">${msgHtml}</div>
-    ${canReply ? `
-      <div class="thread-compose">
-        <form id="replyForm">
-          <input type="text" name="text" placeholder="Type a reply…" />
-          <button class="btn btn-primary btn-sm" type="submit">Send</button>
-          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">${human ? 'Release to AI' : 'Take over'}</button>
-        </form>
-      </div>` : ''}
-  `;
+  paint();
 }

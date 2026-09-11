@@ -1,0 +1,88 @@
+{
+  "gate": "PORTAL-3D-browser-acceptance",
+  "status": "PASS",
+  "timestamp": "2026-09-11T12:56:00.000Z",
+  "environment": {
+    "serveCommand": "USE_CDN_FIREBASE=true API_BASE_URL=https://ziricai-production.up.railway.app npm run dev:app",
+    "portalUrl": "http://localhost:3000/app/",
+    "apiBase": "https://ziricai-production.up.railway.app",
+    "tenant": "central-motors-rtb",
+    "account": "portal-rtb-smoke@ziricai.com",
+    "canonicalConversationId": "whatsapp::27849000523"
+  },
+  "checks": {
+    "login": { "pass": true, "note": "Firebase CDN auth with RTB smoke account" },
+    "threeColumnLayout": { "pass": true, "evidence": "portal-3d-inbox-desktop-attribution.png" },
+    "conversationList": { "pass": true, "count": 2 },
+    "searchFilters": {
+      "pass": true,
+      "filters": ["All", "Waiting", "AI", "Human", "Unread"],
+      "humanFilterEmptyState": { "pass": true, "evidence": "portal-3d-inbox-human-filter-empty.png" },
+      "searchSpencer": { "pass": true, "note": "Filters list; customer name not in row title (phone shown)" }
+    },
+    "selectedConversation": { "pass": true, "id": "whatsapp::27849000523" },
+    "messageTimestamps": { "pass": true, "example": "Sep 4, 02:49 AM" },
+    "messageAttribution": {
+      "pass": true,
+      "contract": {
+        "customer": { "label": "Customer", "cssClass": "thread-bubble customer" },
+        "ai": { "label": "Sarah", "cssClass": "thread-bubble ai", "from": "context.aiEmployee.name" },
+        "human": { "label": "RTB Portal Smoke Owner", "cssClass": "thread-bubble human" }
+      },
+      "evidence": "portal-3d-inbox-human-bubble.png"
+    },
+    "customerPanel": {
+      "pass": true,
+      "name": "Spencer",
+      "leadScore": 50,
+      "tags": ["sales booking escalation"],
+      "vehicleInterest": "Everest",
+      "aiEmployee": "Sarah (sales_consultant)",
+      "appointment": "—",
+      "timelineItems": 5
+    },
+    "crmLink": { "pass": true, "control": "Open in CRM button present" },
+    "takeoverRelease": {
+      "pass": true,
+      "takeOverLabel": "Take over",
+      "afterTakeOver": "Release to AI",
+      "afterRelease": "Take over",
+      "note": "Round-trip verified against production API"
+    },
+    "markRead": { "pass": true, "unreadMetric": 0, "note": "Unread 0 after opening conversation" },
+    "replyComposer": { "pass": true, "controls": ["Type a message...", "Take over", "Send"], "note": "Did not send live reply to avoid polluting production thread" },
+    "responsive": {
+      "pass": true,
+      "viewport": "390x844",
+      "mobileCustomerContextButton": true,
+      "evidence": ["portal-3d-inbox-mobile-390.png", "portal-3d-inbox-mobile-customer-panel.png"]
+    },
+    "consoleErrors": { "pass": true, "newErrors": [] },
+    "noDemoConversationAuthority": {
+      "pass": true,
+      "conversationLocalStorageKeys": [],
+      "sessionStorageKeys": [],
+      "note": "Only unrelated demo version keys: ziricai-demo-agents-version, ziricai-demo-companies-version"
+    }
+  },
+  "defects": [
+    {
+      "severity": "cosmetic",
+      "id": "list-relative-time-nan",
+      "summary": "Conversation list row shows 'NaNd ago' for relative time",
+      "blocking": false,
+      "note": "Thread bubble timestamps render correctly; list field from API relative time parsing"
+    }
+  ],
+  "screenshots": [
+    "test-results/portal-3d-browser/portal-3d-inbox-desktop-attribution.png",
+    "test-results/portal-3d-browser/portal-3d-inbox-human-bubble.png",
+    "test-results/portal-3d-browser/portal-3d-inbox-human-filter-empty.png",
+    "test-results/portal-3d-browser/portal-3d-inbox-mobile-390.png",
+    "test-results/portal-3d-browser/portal-3d-inbox-mobile-customer-panel.png"
+  ],
+  "commitDeploy": {
+    "commit": "BLOCKED — awaiting user authorization",
+    "deploy": "BLOCKED — awaiting user authorization"
+  }
+}

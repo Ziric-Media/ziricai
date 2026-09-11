@@ -33,6 +33,7 @@ const tenantStorage = read("services/storage/tenantStorage.js");
 const conversationService = read("services/conversationService.js");
 const customerService = read("services/customerService.js");
 const portalConversations = read("js/portal/modules/conversations.js");
+const portalInboxUi = read("js/portal/modules/inbox-ui.js");
 
 assert.match(tenantStorage, /export function resolveCanonicalConversationId/);
 assert.match(tenantStorage, /whatsapp::/);
@@ -95,10 +96,12 @@ assert.match(conversationPipeline, /getConversationTakeoverState/);
 assert.match(conversationPipeline, /skip enqueue — human takeover active/);
 console.log("✓ optional ingest-time enqueue skip when human takeover active");
 
-assert.match(portalConversations, /Release to AI/);
+assert.match(portalInboxUi, /Release to AI/);
+assert.match(portalInboxUi, /Take over/);
 assert.match(portalConversations, /enabled: !human/);
 assert.match(portalConversations, /isHumanControlled/);
-console.log("✓ Portal conversations module exposes Take over / Release to AI toggle");
+assert.match(portalConversations, /markConversationRead/);
+console.log("✓ Portal inbox exposes Take over / Release to AI toggle");
 
 assert.equal(isHumanControlledConversation({ humanTakeover: true, mode: "ai" }), true);
 assert.equal(isHumanControlledConversation({ humanTakeover: false, mode: "human" }), true);

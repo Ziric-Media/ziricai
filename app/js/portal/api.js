@@ -150,6 +150,14 @@ export async function setConversationTakeover(companyId, conversationId, { enabl
   });
 }
 
+export async function markConversationRead(companyId, conversationId) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+}
+
 export async function fetchAppointments(companyId, { upcoming = true } = {}) {
   const qs = upcoming ? '?upcoming=true' : '';
   return request(`/api/companies/${encodeURIComponent(companyId)}/appointments${qs}`);

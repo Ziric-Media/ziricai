@@ -67,11 +67,14 @@ async function firebaseToken(email, password) {
     return data.idToken;
 }
 
-async function postRead(token, companyId) {
+async function apiFetch(method, path, { token, body } = {}) {
     const headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
-    const path = `/api/companies/${companyId}/conversations/${encodeURIComponent(CANONICAL_ID)}/read`;
-    const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: "{}" });
+    const res = await fetch(`${API_BASE}${path}`, {
+        method,
+        headers,
+        body: body != null ? JSON.stringify(body) : undefined,
+    });
     const text = await res.text();
     let data = {};
     try {
@@ -80,6 +83,33 @@ async function postRead(token, companyId) {
         data = { raw: text };
     }
     return { status: res.status, data };
+}
+
+async function postRead(token, companyId, conversationId = CANONICAL_ID) {
+    const path = `/api/companies/${companyId}/conversations/${encodeURIComponent(conversationId)}/read`;
+    return apiFetch("POST", path, { token, body: {} });
+}
+
+async function getConversation(token, companyId, conversationId = CANONICAL_ID) {
+    const path = `/api/companies/${companyId}/conversations/${encodeURIComponent(conversationId)}`;
+    return apiFetch("GET", path, { token });
+}
+
+async function postTakeover(token, companyId, enabled) {
+    const path = `/api/companies/${companyId}/conversations/${encodeURIComponent(CANONICAL_ID)}/takeover`;
+    return apiFetch("POST", path, {
+        token,
+        body: { enabled, humanAgent: enabled ? "3C Live Verify" : undefined },
+    });
+}
+
+async function postReply(token, companyId, text) {
+    const path = `/api/companies/${companyId}/conversations/${encodeURIComponent(CANONICAL_ID)}/reply`;
+    return apiFetch("POST", path, { token, body: { text } });
+}
+
+function isIsoTimestamp(value) {
+    return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
 console.log("verify-portal-3c-inbox-contract");
@@ -332,13 +362,93 @@ execSync("node scripts/verify-portal-3a-takeover.js", { cwd: ROOT, stdio: "inher
 execSync("node scripts/verify-portal-3a-takeover-auth.js", { cwd: ROOT, stdio: "inherit" });
 
 if (LIVE) {
-    console.log("\n--- Live mark-read authorization matrix ---");
+    console.log("\n--- Live production acceptance matrix ---");
     if (!fs.existsSync(credPath)) {
         throw new Error("Missing .portal-rtb-smoke-credentials.json for --live tests");
     }
     const creds = JSON.parse(fs.readFileSync(credPath, "utf8").replace(/^\uFEFF/, ""));
     const token = await firebaseToken(creds.email, creds.password);
 
+    /* Message contract + context from existing RTB conversation */
+    const detailRes = await getConversation(token, COMPANY_ID);
+    assert.equal(detailRes.status, 200, `conversation detail expected 200, got ${detailRes.status}`);
+    const detail = detailRes.data;
+    assert.ok(Array.isArray(detail.messages), "messages array required");
+    assert.ok(detail.messages.length > 0, "expected existing production messages");
+    assert.ok(detail.context, "context required");
+    assert.ok("customer" in detail.context);
+    assert.ok("aiEmployee" in detail.context);
+    assert.ok("nextUpcomingAppointment" in detail.context);
+    assert.ok(Array.isArray(detail.context.timeline));
+    assert.ok(detail.context.timeline.length <= 5, "timeline must be bounded");
+    assert.doesNotMatch(JSON.stringify(detail), /central-motors-rtb hardcoded/i);
+
+    const sources = new Set(detail.messages.map((m) => m.source));
+    assert.ok(sources.has("customer"), `expected customer source in messages, got ${[...sources].join(",")}`);
+    assert.ok(
+        sources.has("ai") || detail.messages.some((m) => m.role === "ai"),
+        "expected ai messages or historical assistant fallback"
+    );
+    assert.ok(detail.messages.every((m) => isIsoTimestamp(m.createdAt) || m.createdAt === null));
+    console.log("✓ Live: message contract — customer/ai sources + ISO createdAt on existing messages");
+
+    for (const m of detail.messages) {
+        assert.ok(["customer", "ai", "human"].includes(m.role), `unexpected role ${m.role}`);
+        assert.ok(["customer", "ai", "human"].includes(m.source), `unexpected source ${m.source}`);
+        if (m.externalId != null) assert.equal(typeof m.externalId, "string");
+        if (m.mediaUrl != null) assert.equal(typeof m.mediaUrl, "string");
+    }
+    console.log("✓ Live: externalId/media metadata does not break existing messages");
+
+    const historicAi = detail.messages.filter((m) => m.source === "ai" && m.role === "ai");
+    assert.ok(historicAi.length > 0, "expected at least one ai/historical assistant message");
+    console.log("✓ Live: historical assistant messages readable as ai");
+
+    if (detail.context.customer) {
+        assert.ok(detail.context.customer.phone || detail.context.customer.name);
+        console.log("✓ Live: real RTB customer context present");
+    } else {
+        console.log("✓ Live: customer context null (honest, not fabricated)");
+    }
+
+    if (detail.context.aiEmployee) {
+        assert.ok(detail.context.aiEmployee.name || detail.context.aiEmployee.id);
+        console.log("✓ Live: tenant-specific AI employee in context");
+    }
+
+    assert.ok(
+        detail.context.nextUpcomingAppointment === null ||
+            typeof detail.context.nextUpcomingAppointment === "object",
+        "appointment must be object or null"
+    );
+    console.log("✓ Live: appointment correctly returned or null");
+
+    const missingCustomer = await getConversation(token, COMPANY_ID, "whatsapp::27849999999");
+    assert.equal(missingCustomer.status, 200);
+    assert.equal(missingCustomer.data?.context?.customer, null);
+    console.log("✓ Live: missing customer → null context");
+
+    /* Human source — controlled reply on RTB test conversation only if none exists */
+    const existingHuman = detail.messages.find((m) => m.source === "human");
+    if (existingHuman) {
+        assert.equal(existingHuman.role, "human");
+        console.log("✓ Live: human reply source=human from existing production data");
+    } else {
+        const takeover = await postTakeover(token, COMPANY_ID, true);
+        assert.equal(takeover.status, 200, `takeover for human reply test failed: ${takeover.status}`);
+        const reply = await postReply(token, COMPANY_ID, "[PORTAL-3C verify] controlled human reply — safe to ignore");
+        assert.equal(reply.status, 200, `human reply failed: ${reply.status}`);
+        const afterReply = await getConversation(token, COMPANY_ID);
+        const humanMsg = afterReply.data.messages.find((m) => m.source === "human");
+        assert.ok(humanMsg, "expected human message after controlled reply");
+        assert.equal(humanMsg.role, "human");
+        assert.ok(humanMsg.createdAt);
+        console.log("✓ Live: controlled human reply persisted source=human (no customer WhatsApp traffic)");
+        await postTakeover(token, COMPANY_ID, false);
+        console.log("✓ Live: release to AI after human reply probe");
+    }
+
+    /* Mark-read authorization matrix */
     const noHeader = await postRead(undefined, COMPANY_ID);
     assert.equal(noHeader.status, 401, `expected 401, got ${noHeader.status}`);
     console.log("✓ Live: mark-read no auth → 401");
@@ -347,13 +457,40 @@ if (LIVE) {
     assert.equal(wrongTenant.status, 403, `expected 403, got ${wrongTenant.status}`);
     console.log("✓ Live: mark-read wrong tenant → 403");
 
+    const invalidConversation = await postRead(token, COMPANY_ID, "whatsapp::00000000000");
+    assert.equal(invalidConversation.status, 404, `expected 404, got ${invalidConversation.status}`);
+    console.log("✓ Live: mark-read invalid/nonexistent conversation → 404");
+
     const ownerRead = await postRead(token, COMPANY_ID);
     assert.equal(ownerRead.status, 200, `expected 200, got ${ownerRead.status}`);
     assert.equal(ownerRead.data?.unread, false);
-    assert.ok(ownerRead.data?.readAt);
-    console.log("✓ Live: RTB member mark-read → 200 + unread:false");
+    assert.ok(isIsoTimestamp(ownerRead.data?.readAt));
+    const afterReadDetail = await getConversation(token, COMPANY_ID);
+    assert.equal(afterReadDetail.data?.conversation?.unread, false);
+    console.log("✓ Live: RTB member mark-read → 200 + canonical unread:false persisted");
+
+    /* PORTAL-3A / 3A-B regression on production */
+    const takeoverOn = await postTakeover(token, COMPANY_ID, true);
+    assert.equal(takeoverOn.status, 200);
+    assert.equal(takeoverOn.data?.humanTakeover, true);
+    console.log("✓ Live: PORTAL-3A takeover still works → 200");
+
+    const takeoverOff = await postTakeover(token, COMPANY_ID, false);
+    assert.equal(takeoverOff.status, 200);
+    assert.equal(takeoverOff.data?.humanTakeover, false);
+    console.log("✓ Live: Release to AI still works → 200");
+
+    const takeoverNoAuth = await postTakeover(undefined, COMPANY_ID, true);
+    assert.equal(takeoverNoAuth.status, 401);
+    const takeoverWrongTenant = await postTakeover(token, "wrong-tenant-xyz", true);
+    assert.equal(takeoverWrongTenant.status, 403);
+    console.log("✓ Live: PORTAL-3A-B authorization remains 401/403/200");
+
+    assert.ok(detail.messages.every((m) => typeof m.content === "string"));
+    assert.ok(!detail.messages.some((m) => m.content === "" && m.role === "assistant" && !m.source));
+    console.log("✓ Live: no phantom assistant messages in production detail");
 } else {
-    console.log("\n(Skipping live mark-read matrix — run with --live after deploy)");
+    console.log("\n(Skipping live production matrix — run with --live after deploy)");
 }
 
 console.log("\nAll PORTAL-3C inbox contract checks passed.");
