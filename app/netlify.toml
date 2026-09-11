@@ -40,6 +40,32 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# Portal static ES-module graph — revalidate after deploy (PORTAL-3E-CACHE).
+[[headers]]
+  for = "/js/portal/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/js/admin/ui.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/js/admin/utils.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/css/company-portal.css"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/css/admin-dashboard.css"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
 [[headers]]
   for = "/js/*"
   [headers.values]

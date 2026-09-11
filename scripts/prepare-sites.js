@@ -71,6 +71,11 @@ function firebaseConfigFromEnv() {
 const PRODUCTION_API_URL =
   process.env.PRODUCTION_API_URL || 'https://ziricai-production.up.railway.app';
 
+/** Deployment identity for Portal asset cache busting (Netlify build env). */
+function resolveAssetVersion() {
+  return process.env.COMMIT_REF || process.env.NETLIFY || 'dev';
+}
+
 function siteConfigBlock(site) {
   const apiBase =
     process.env.API_BASE_URL !== undefined
@@ -85,6 +90,7 @@ function siteConfigBlock(site) {
   const admin = process.env.ADMIN_BASE_URL || 'https://admin.ziricai.com';
   return `<script>window.__ZIRICAI_CONFIG__=${JSON.stringify({
     apiBase,
+    assetVersion: resolveAssetVersion(),
     sites: { marketing, app, admin, api: apiBase || PRODUCTION_API_URL },
     firebase: firebaseConfigFromEnv(),
   })};</script>`;
@@ -200,6 +206,7 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
   }
 
   if (site === 'app') {
+    const assetVersion = resolveAssetVersion();
     out = out.replace(
       /Platform admin\? Use <a href="index\.html">Super Admin Console<\/a>/,
       'Platform admin? Use <a href="#" data-site-link="admin">Super Admin Console</a>'
@@ -207,6 +214,18 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
     out = out.replace(
       /open http:\/\/localhost:3000\/index\.html/,
       'open http://localhost:3000/app/'
+    );
+    out = out.replace(
+      /href="css\/admin-dashboard\.css"/,
+      `href="css/admin-dashboard.css?v=${assetVersion}"`
+    );
+    out = out.replace(
+      /href="css\/company-portal\.css"/,
+      `href="css/company-portal.css?v=${assetVersion}"`
+    );
+    out = out.replace(
+      /src="js\/portal\/main\.js"/,
+      `src="js/portal/main.js?v=${assetVersion}"`
     );
   }
 

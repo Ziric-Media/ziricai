@@ -25,6 +25,11 @@ const MODULE_IDS = [
   'activity',
 ];
 
+function portalAssetVersion() {
+  const v = globalThis.__ZIRICAI_CONFIG__?.assetVersion;
+  return v ? String(v) : '';
+}
+
 const EXPORT_MAP = {
   dashboard: 'renderDashboard',
   agents: 'renderAgents',
@@ -54,7 +59,7 @@ export async function loadModule(moduleId) {
   if (!moduleCache.has(id)) {
     moduleCache.set(
       id,
-      import(`../modules/${id}.js`).then((mod) => {
+      import(`../modules/${id}.js?v=${portalAssetVersion()}`).then((mod) => {
         const exportName = EXPORT_MAP[id];
         const render = mod[exportName];
         if (typeof render !== 'function') {
