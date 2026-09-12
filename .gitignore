@@ -4,6 +4,12 @@ node_modules/
 # Environment variables
 .env
 .env.local
+.portal-rtb-smoke-credentials.json
+.portal-4b-disposable-credentials.json
+.portal-4c1-disposable-credentials.json
+.portal-4c2-disposable-credentials.json
+.portal-4c3-disposable-credentials.json
+test-results/
 
 # Firebase
 .firebase/
@@ -26,3 +32,5 @@ Thumbs.db
 
 # VS Code
 .vscode/
+# Local Netlify folder
+.netlify

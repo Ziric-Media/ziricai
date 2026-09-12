@@ -4,11 +4,10 @@
  */
 import { getPackById, resolvePackId } from "./marketplaceRegistry.js";
 import { buildPackManifest, getDemoReviews, resolveCanonicalPackId } from "./marketplaceTemplate.js";
-import { installIndustryPack, isPackInstalled, getInstalledPacks } from "./industryPackService.js";
+import { installIndustryPack, getInstalledPacks } from "./industryPackService.js";
 import { checkForUpdates } from "./marketplaceVersioning.js";
-import { validatePackInstall } from "./marketplaceInstallValidator.js";
-import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { publish, EventTypes } from "../events/index.js";
+import { getStorageAdapter } from "../storage/storageAdapter.js";
 
 const WIZARD_STEPS = ["preview", "branding", "integrations", "install", "success"];
 
@@ -128,26 +127,8 @@ export async function executeInstall(companyId, packId, options = {}) {
         disabledIntegrations: options.disabledIntegrations || [],
     };
 
-    const result = await installIndustryPack(companyId, resolved, customizations);
-
-    if (!result.alreadyInstalled) {
-        const validation = await validatePackInstall(companyId, result, resolved);
-        if (!validation.valid) {
-            throw new Error(
-                `Install validation failed: ${validation.errors.join("; ")}`
-            );
-        }
-        result.validation = validation;
-        result.verifiedSummary = validation.summary;
-    }
-
-    const store = await adapter();
-    if (store.updateInstalledPack && !result.alreadyInstalled) {
-        await store.updateInstalledPack(companyId, resolved, {
-            customizations,
-            enabledIntegrations: customizations.enabledIntegrations,
-        });
-    }
+    const installedBy = options.installedBy || "system";
+    const result = await installIndustryPack(companyId, resolved, customizations, { installedBy });
 
     if (!result.alreadyInstalled) {
         await publish(companyId, EventTypes.KNOWLEDGE_UPLOADED, {

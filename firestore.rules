@@ -163,6 +163,11 @@ service cloud.firestore {
         }
       }
 
+      match /marketplaceInstalls/{packId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+
       match /analytics/{metricId} {
         allow read: if tenantSubcollection(companyId);
         allow write: if isSuperAdmin();

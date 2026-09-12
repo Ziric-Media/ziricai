@@ -12,6 +12,20 @@ import { upsertWorkflow } from "../automation/workflowRegistry.js";
 import { EventTypes } from "../events/eventTypes.js";
 import { recordEvent } from "../analytics/analyticsService.js";
 import { getStorageAdapter } from "../storage/storageAdapter.js";
+import { validatePackInstall } from "./marketplaceInstallValidator.js";
+import {
+    claimInstall,
+    completeInstall,
+    failInstall,
+    listInstalled,
+    isInstalled,
+    assertInstallClaimResult,
+} from "./marketplaceInstallService.js";
+import {
+    sanitizeInstallErrorMessage,
+    slimRegistryLinks,
+    MarketplaceInstallError,
+} from "./marketplaceInstallErrors.js";
 
 function uid(prefix = "id") {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -67,13 +81,15 @@ export function convertPackWorkflowToAutomation(wfDef = {}) {
                 });
             }
             if (stepType === "update_crm") {
-                actions.push({
-                    type: "update_crm",
-                    config: {
-                        status: node.config?.stage || node.config?.status,
-                        tags: node.config?.tags,
-                    },
-                });
+                const config = {};
+                const status = node.config?.stage ?? node.config?.status;
+                if (status !== undefined) {
+                    config.status = status;
+                }
+                if (node.config?.tags !== undefined) {
+                    config.tags = node.config.tags;
+                }
+                actions.push({ type: "update_crm", config });
             }
         }
     }
@@ -96,30 +112,26 @@ export function getCatalogWithFilters(filters = {}) {
 
 export async function getInstalledPacks(companyId) {
     if (!companyId) return { items: [] };
-    const store = await adapter();
-    if (store.getInstalledPacks) {
-        const items = await store.getInstalledPacks(companyId);
-        return { items: items || [] };
-    }
-    return { items: [] };
+    const items = await listInstalled(companyId);
+    return { items: items || [] };
 }
 
 export async function isPackInstalled(companyId, packId) {
+    if (await isInstalled(companyId, packId)) return true;
     const resolved = resolvePackId(packId);
-    const store = await adapter();
-    if (store.isPackInstalled) {
-        if (await store.isPackInstalled(companyId, resolved)) return true;
-        if (resolved !== packId && (await store.isPackInstalled(companyId, packId))) return true;
+    if (resolved !== packId) {
+        return isInstalled(companyId, resolved);
     }
-    const { items } = await getInstalledPacks(companyId);
-    return items.some((p) => p.packId === resolved || p.packId === packId);
+    return false;
 }
 
 /**
- * Install an industry pack for a tenant — instant provisioning of all bundled resources.
+ * Install an industry pack — claim → provision → validate → registry (single orchestration path).
+ * @param {object} [installOptions]
+ * @param {string} [installOptions.installedBy] Audit metadata (uid or "system") — not authorization.
  * @returns {Promise<object>} Install result with cross-links for admin UI navigation
  */
-export async function installIndustryPack(companyId, packId, customizations = {}) {
+export async function installIndustryPack(companyId, packId, customizations = {}, installOptions = {}) {
     if (!companyId) throw new Error("companyId is required");
     if (!packId) throw new Error("packId is required");
 
@@ -128,14 +140,15 @@ export async function installIndustryPack(companyId, packId, customizations = {}
     if (!pack) throw new Error(`Pack not found: ${packId}`);
     if (pack.installable === false) throw new Error(`Pack "${pack.name}" is not yet available for install`);
 
-    if (await isPackInstalled(companyId, resolvedId)) {
-        const existing = (await getInstalledPacks(companyId)).items.find(
-            (p) => p.packId === resolvedId || p.packId === packId
-        );
+    const installedBy = installOptions.installedBy || "system";
+    const claim = await claimInstall(companyId, resolvedId, { installedBy });
+
+    if (claim.outcome === "alreadyInstalled") {
+        const existing = claim.record;
         return {
             companyId,
             packId: resolvedId,
-            packName: pack.name,
+            packName: existing?.packName || pack.name,
             alreadyInstalled: true,
             installedAt: existing?.installedAt,
             links: existing?.links || {},
@@ -143,8 +156,14 @@ export async function installIndustryPack(companyId, packId, customizations = {}
         };
     }
 
+    assertInstallClaimResult(claim);
+    const attemptId = claim.installAttemptId;
+
     const store = await adapter();
     const timestamp = now();
+    let provisionFailed = false;
+
+    try {
     const company =
         (store.getPortalCompany && (await store.getPortalCompany(companyId))) ||
         { id: companyId, name: companyId };
@@ -273,31 +292,45 @@ export async function installIndustryPack(companyId, packId, customizations = {}
     };
 
     const manifest = buildPackManifest(pack);
-    const installRecord = {
-        id: uid("install"),
+    const registryCustomizations = {
+        branding: branding || {},
+        enabledIntegrations: customizations.enabledIntegrations || manifest.suggestedIntegrations,
+        disabledIntegrations: customizations.disabledIntegrations || [],
+    };
+
+    const installResultForValidation = {
+        success: true,
+        companyId,
         packId: resolvedId,
+        packName: manifest.name || pack.name,
+        installedAt: timestamp,
+        links,
+    };
+
+    const validation = await validatePackInstall(companyId, installResultForValidation, resolvedId);
+    if (!validation.valid) {
+        provisionFailed = true;
+        const msg = validation.errors.join("; ");
+        await failInstall(companyId, resolvedId, attemptId, sanitizeInstallErrorMessage(msg));
+        throw new Error(`Install validation failed: ${msg}`);
+    }
+
+    await completeInstall(companyId, resolvedId, attemptId, {
         packName: manifest.name || pack.name,
         category: pack.category,
         version: pack.version,
         companyId,
-        installedAt: timestamp,
+        customizations: registryCustomizations,
+        enabledIntegrations: registryCustomizations.enabledIntegrations || [],
+        disabledIntegrations: registryCustomizations.disabledIntegrations || [],
         agentIds,
         knowledgeDocIds,
         workflowIds,
         reportIds,
-        customizations: {
-            branding: branding || {},
-            enabledIntegrations: customizations.enabledIntegrations || manifest.suggestedIntegrations,
-            disabledIntegrations: customizations.disabledIntegrations || [],
-        },
         mergedKnowledgeTitles: (pack.knowledge || []).map((k) => k.title),
         mergedWorkflowNames: (pack.workflows || []).map((w) => w.name),
-        links,
-    };
-
-    if (store.saveInstalledPack) {
-        await store.saveInstalledPack(companyId, installRecord);
-    }
+        links: slimRegistryLinks(links),
+    });
 
     const companyLinks = await getCompanyLinks(companyId);
     if (store.saveProvisioning && companyLinks?.links) {
@@ -337,7 +370,9 @@ export async function installIndustryPack(companyId, packId, customizations = {}
         packId: resolvedId,
         packName: manifest.name || pack.name,
         installedAt: timestamp,
-        customizations: installRecord.customizations,
+        customizations: registryCustomizations,
+        validation,
+        verifiedSummary: validation.summary,
         provisioned: {
             agents: agentIds.length,
             knowledgeDocs: knowledgeDocIds.length,
@@ -347,4 +382,22 @@ export async function installIndustryPack(companyId, packId, customizations = {}
         links,
         message: `${manifest.name || pack.name} installed successfully for ${companyName}.`,
     };
+    } catch (err) {
+        if (err instanceof MarketplaceInstallError) {
+            throw err;
+        }
+        if (!provisionFailed && attemptId) {
+            try {
+                await failInstall(
+                    companyId,
+                    resolvedId,
+                    attemptId,
+                    sanitizeInstallErrorMessage(err)
+                );
+            } catch {
+                /* best-effort failed state */
+            }
+        }
+        throw err;
+    }
 }

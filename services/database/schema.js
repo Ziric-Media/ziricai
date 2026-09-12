@@ -37,6 +37,8 @@ export const TENANT_COLLECTIONS = {
     SETTINGS: "settings",
     PROVISIONING: "provisioning",
     MARKETPLACE: "marketplace",
+    /** Tenant Industry Pack installation registry (metadata + references). */
+    MARKETPLACE_INSTALLS: "marketplaceInstalls",
 };
 
 /** Subcollections under companies/{companyId}/analytics (flat names for TenantRepository) */
@@ -54,8 +56,9 @@ export const TENANT_MARKETPLACE = {
     INSTALLED: "installed",
 };
 
-/** Platform-level marketplace collections */
+/** Platform-level marketplace collections (under platform/marketplace/…) */
 export const PLATFORM_MARKETPLACE = {
+    ROOT: "marketplace",
     PACKS: "packs",
     REVIEWS: "reviews",
     RATINGS: "ratings",
@@ -156,15 +159,27 @@ export const FIELD_SCHEMA = {
     installedPack: {
         packId: "string",
         packName: "string",
+        category: "string",
+        companyId: "string",
         version: "string",
+        status: "string",
         installedAt: "timestamp",
         updatedAt: "timestamp",
+        installedBy: "string",
+        installAttemptId: "string",
         customizations: "map",
         enabledIntegrations: "array",
+        disabledIntegrations: "array",
         agentIds: "array",
         knowledgeDocIds: "array",
         workflowIds: "array",
+        reportIds: "array",
+        mergedKnowledgeTitles: "array",
+        mergedWorkflowNames: "array",
         links: "map",
+        lastError: "string|null",
+        failedAt: "timestamp|null",
+        installedCompletedAt: "timestamp|null",
     },
     integration: {
         id: "string",
@@ -351,12 +366,23 @@ export function tenantCollectionPath(companyId, collection) {
     return `${companyPath(companyId)}/${collection}`;
 }
 
+/** @deprecated Use tenantMarketplaceInstallPath — legacy path did not match Firestore rules. */
 export function tenantMarketplaceInstalledPath(companyId, packId) {
-    return `${tenantCollectionPath(companyId, TENANT_COLLECTIONS.MARKETPLACE)}/${TENANT_MARKETPLACE.INSTALLED}/${packId}`;
+    return tenantMarketplaceInstallPath(companyId, packId);
 }
 
+export function tenantMarketplaceInstallPath(companyId, packId) {
+    return `${tenantCollectionPath(companyId, TENANT_COLLECTIONS.MARKETPLACE_INSTALLS)}/${packId}`;
+}
+
+/** Collection path: platform/marketplace/packs/{packId}/versions */
+export function platformPackVersionCollectionPath(packId) {
+    return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.PACKS}/${packId}/versions`;
+}
+
+/** Document path: platform/marketplace/packs/{packId}/versions/{version} */
 export function platformPackVersionPath(packId, version) {
-    return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.PACKS}/${packId}/versions/${version}`;
+    return `${platformPackVersionCollectionPath(packId)}/${version}`;
 }
 
 export function platformReviewPath(reviewId) {

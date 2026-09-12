@@ -120,7 +120,9 @@ import {
     applyUpdate,
     runInstallWizard,
 } from "../services/platform/industryPackService.js";
+import { listMarketplaceInstallLifecycle } from "../services/platform/marketplaceInstallLifecycle.js";
 import { submitReview } from "../services/platform/marketplaceInstaller.js";
+import { MarketplaceInstallError, INSTALL_IN_PROGRESS } from "../services/platform/marketplaceInstallErrors.js";
 import { seedPackVersions } from "../services/platform/marketplaceVersioning.js";
 import {
     listSupervisorReviews,
@@ -1472,6 +1474,17 @@ app.get("/api/marketplace/installed/:companyId", requireAuthenticatedTenantMembe
     }
 });
 
+/** AI Marketplace — install lifecycle (installing / installed / failed metadata only) */
+app.get("/api/marketplace/lifecycle/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
+    try {
+        const data = await listMarketplaceInstallLifecycle(req.params.companyId);
+        res.json(data);
+    } catch (err) {
+        console.error("[api/marketplace/lifecycle] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load marketplace lifecycle" });
+    }
+});
+
 /** AI Marketplace — check for pack updates */
 app.get("/api/marketplace/installed/:companyId/updates", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
@@ -1500,13 +1513,19 @@ app.post(
 
         const paymentBypass = resolveMarketplacePaymentBypass(req, { demoMode, skipPayment });
 
+        const installedBy = req.tenant?.uid || req.tenant?.userId || "system";
+        const wizardBase = {
+            customizations: { branding },
+            integrations,
+            demoMode: paymentBypass.demoMode,
+            skipPayment: paymentBypass.skipPayment,
+            installedBy,
+        };
+
         if (step && step !== "install") {
             const result = await runInstallWizard(companyId, packId, {
                 step,
-                customizations: { branding },
-                integrations,
-                demoMode: paymentBypass.demoMode,
-                skipPayment: paymentBypass.skipPayment,
+                ...wizardBase,
             });
             return res.json(result);
         }
@@ -1517,6 +1536,7 @@ app.post(
             integrations,
             demoMode: paymentBypass.demoMode,
             skipPayment: paymentBypass.skipPayment,
+            installedBy,
         });
 
         if (result.requiresPayment) {
@@ -1529,6 +1549,13 @@ app.post(
 
         res.status(result.alreadyInstalled ? 200 : 201).json(result);
     } catch (err) {
+        if (err instanceof MarketplaceInstallError && err.code === INSTALL_IN_PROGRESS) {
+            return res.status(409).json({
+                error: err.message,
+                code: INSTALL_IN_PROGRESS,
+                packId: err.details?.packId,
+            });
+        }
         console.error("[api/marketplace/install] error:", err.message);
         res.status(400).json({ error: err.message || "Failed to install pack" });
     }
@@ -1549,7 +1576,15 @@ app.post(
         res.json(result);
     } catch (err) {
         console.error("[api/marketplace/update] error:", err.message);
-        res.status(400).json({ error: err.message || "Failed to apply update" });
+        const isVersionMismatch = /Version mismatch:/i.test(err.message || "");
+        const status =
+            isVersionMismatch || err.code === "MARKETPLACE_UPDATE_REGISTRY_COMMIT_FAILED"
+                ? 409
+                : 400;
+        res.status(status).json({
+            error: err.message || "Failed to apply update",
+            code: err.code || (isVersionMismatch ? "MARKETPLACE_VERSION_CONFLICT" : undefined),
+        });
     }
 });
 

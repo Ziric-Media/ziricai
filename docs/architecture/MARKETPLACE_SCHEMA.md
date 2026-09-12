@@ -4,27 +4,39 @@ Tenant-scoped installs and platform-level pack templates. Works with `STORAGE_BA
 
 ## Firestore Paths
 
-### Tenant Installs
+### Tenant Installs (PORTAL-4B registry)
 
 ```
-companies/{companyId}/marketplace/installed/{packId}
+companies/{companyId}/marketplaceInstalls/{packId}
 ```
+
+Document ID = canonical `packId` (after `resolvePackId()`).
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `packId` | string | Canonical pack ID |
 | `packName` | string | Display name at install time |
+| `category` | string | Catalog category |
+| `companyId` | string | Tenant id |
 | `version` | string | Installed semver (e.g. `1.0.0`) |
-| `installedAt` | timestamp | First install time |
-| `updatedAt` | timestamp | Last update time |
+| `status` | string | `installing` \| `installed` \| `failed` |
+| `installedAt` | timestamp | First claim / install start |
+| `updatedAt` | timestamp | Last state change |
+| `installedBy` | string | Audit uid or `system` |
+| `installAttemptId` | string | UUID per install attempt |
 | `customizations` | map | Branding, integration selections |
 | `enabledIntegrations` | array | Active integration IDs |
-| `agentIds` | array | Provisioned AI employee IDs |
-| `knowledgeDocIds` | array | Provisioned KB document IDs |
-| `workflowIds` | array | Provisioned automation IDs |
+| `disabledIntegrations` | array | Disabled integration IDs |
+| `agentIds` | array | Reference — AI employee IDs |
+| `knowledgeDocIds` | array | Reference — KB document IDs |
+| `workflowIds` | array | Reference — automation IDs |
+| `reportIds` | array | Reference — report template IDs |
 | `mergedKnowledgeTitles` | array | Titles merged from updates |
 | `mergedWorkflowNames` | array | Workflow names merged from updates |
-| `links` | map | Navigation links for UI |
+| `links` | map | Small navigation hints (no resource bodies) |
+| `lastError` | string | When `status === failed` only |
+| `failedAt` | timestamp | Optional |
+| `installedCompletedAt` | timestamp | When moved to `installed` |
 
 ### Platform Pack Versions
 
@@ -73,15 +85,15 @@ platform/marketplace/ratings/{packId}
 
 Defined in `services/database/schema.js`:
 
-- `TENANT_COLLECTIONS.MARKETPLACE` → `"marketplace"`
-- `TENANT_MARKETPLACE.INSTALLED` → `"installed"`
+- `TENANT_COLLECTIONS.MARKETPLACE_INSTALLS` → `"marketplaceInstalls"`
+- `TENANT_COLLECTIONS.MARKETPLACE` → `"marketplace"` (legacy nested path — do not use for new writes)
 - `PLATFORM_MARKETPLACE.PACKS` → `"packs"`
 - `PLATFORM_MARKETPLACE.REVIEWS` → `"reviews"`
 - `PLATFORM_MARKETPLACE.RATINGS` → `"ratings"`
 
 Helper paths:
 
-- `tenantMarketplaceInstalledPath(companyId, packId)`
+- `tenantMarketplaceInstallPath(companyId, packId)`
 - `platformPackVersionPath(packId, version)`
 - `platformReviewPath(reviewId)`
 - `platformRatingPath(packId)`

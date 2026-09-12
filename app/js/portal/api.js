@@ -249,6 +249,10 @@ export async function fetchInstalledPacks(companyId) {
   return request(`/api/marketplace/installed/${encodeURIComponent(companyId)}`);
 }
 
+export async function fetchMarketplaceLifecycle(companyId) {
+  return request(`/api/marketplace/lifecycle/${encodeURIComponent(companyId)}`);
+}
+
 export async function fetchPackUpdates(companyId) {
   return request(`/api/marketplace/installed/${encodeURIComponent(companyId)}/updates`);
 }
