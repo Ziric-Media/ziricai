@@ -245,6 +245,17 @@ export async function fetchPackDetail(packId) {
   return request(`/api/marketplace/pack/${encodeURIComponent(packId)}`);
 }
 
+/** Published customer reviews (public GET — 4C-4B-3). */
+export async function fetchPackReviews(packId, { limit = 20, cursor = null } = {}) {
+  const params = new URLSearchParams();
+  if (limit != null) params.set('limit', String(limit));
+  if (cursor) params.set('cursor', cursor);
+  const qs = params.toString();
+  return request(
+    `/api/marketplace/packs/${encodeURIComponent(packId)}/reviews${qs ? `?${qs}` : ''}`
+  );
+}
+
 export async function fetchInstalledPacks(companyId) {
   return request(`/api/marketplace/installed/${encodeURIComponent(companyId)}`);
 }

@@ -385,10 +385,17 @@ export function platformPackVersionPath(packId, version) {
     return `${platformPackVersionCollectionPath(packId)}/${version}`;
 }
 
-export function platformReviewPath(reviewId) {
-    return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.REVIEWS}/${reviewId}`;
+/** Collection path: platform/marketplace/reviews */
+export function platformMarketplaceReviewsCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.REVIEWS}`;
 }
 
+/** Document path: platform/marketplace/reviews/{reviewId} */
+export function platformReviewPath(reviewId) {
+    return `${platformMarketplaceReviewsCollectionPath()}/${reviewId}`;
+}
+
+/** Document path: platform/marketplace/ratings/{packId} */
 export function platformRatingPath(packId) {
-    return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.RATINGS}/${packId}`;
+    return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.RATINGS}/${packId}`;
 }

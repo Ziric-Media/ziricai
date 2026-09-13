@@ -2,9 +2,9 @@
  * Industry pack install orchestration — provisions agents, knowledge, workflows,
  * CRM templates, analytics seed, and reports from marketplace pack definitions.
  */
-import { getPackById, getMarketplaceCatalog, resolvePackId } from "./marketplaceRegistry.js";
+import { getPackById, getCustomerMarketplaceCatalog, resolvePackId } from "./marketplaceRegistry.js";
 import { buildPackManifest } from "./marketplaceTemplate.js";
-import { getPackDetail, runInstallWizard } from "./marketplaceInstaller.js";
+import { getCustomerPackDetail, runInstallWizard } from "./marketplaceInstaller.js";
 import { checkForUpdates, applyUpdate } from "./marketplaceVersioning.js";
 import { provisionAgent, getCompanyLinks } from "./provisioningService.js";
 import { saveKnowledgeDocument, ensureKnowledgeBase } from "../tenants/knowledgeService.js";
@@ -104,10 +104,10 @@ export function convertPackWorkflowToAutomation(wfDef = {}) {
     return { trigger, actions };
 }
 
-export { getMarketplaceCatalog, getPackDetail, checkForUpdates, applyUpdate, runInstallWizard };
+export { getCustomerMarketplaceCatalog, getCustomerPackDetail, checkForUpdates, applyUpdate, runInstallWizard };
 
-export function getCatalogWithFilters(filters = {}) {
-    return getMarketplaceCatalog(filters);
+export async function getCatalogWithFilters(filters = {}) {
+    return getCustomerMarketplaceCatalog(filters);
 }
 
 export async function getInstalledPacks(companyId) {

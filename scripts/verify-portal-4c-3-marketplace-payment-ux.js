@@ -87,32 +87,20 @@ assert.match(read("services/platform/marketplaceTemplate.js"), /PACK_PRICING/);
 assert.match(read("services/platform/marketplaceInstaller.js"), /requiresPayment/);
 console.log("✓ backend pricing gate unchanged");
 
-execSync("node scripts/verify-portal-4a-marketplace-auth.js", {
-    cwd: ROOT,
-    stdio: "pipe",
-    env: { ...process.env, STORAGE_BACKEND: "memory" },
-});
-execSync("node scripts/verify-portal-4a-r1-marketplace-security.js", {
-    cwd: ROOT,
-    stdio: "pipe",
-    env: { ...process.env, STORAGE_BACKEND: "memory" },
-});
-execSync("node scripts/verify-portal-4b-marketplace-registry.js", {
-    cwd: ROOT,
-    stdio: "pipe",
-    env: { ...process.env, STORAGE_BACKEND: "memory" },
-});
-execSync("node scripts/verify-portal-4c-1-marketplace-update.js", {
-    cwd: ROOT,
-    stdio: "pipe",
-    env: { ...process.env, STORAGE_BACKEND: "memory" },
-});
-execSync("node scripts/verify-portal-4c-2-marketplace-lifecycle.js", {
-    cwd: ROOT,
-    stdio: "pipe",
-    env: { ...process.env, STORAGE_BACKEND: "memory" },
-});
-console.log("✓ 4A / 4A-R1 / 4B / 4C-1 / 4C-2 regressions passed");
+if (process.env.PORTAL_ACCEPTANCE_LEAF === "1") {
+    console.log("✓ nested regressions skipped (PORTAL_ACCEPTANCE_LEAF)");
+} else {
+    const regressionEnv = { ...process.env, STORAGE_BACKEND: "memory" };
+    const runRegression = (script) => {
+        execSync(`node scripts/${script}`, { cwd: ROOT, stdio: "inherit", env: regressionEnv });
+    };
+    runRegression("verify-portal-4a-marketplace-auth.js");
+    runRegression("verify-portal-4a-r1-marketplace-security.js");
+    runRegression("verify-portal-4b-marketplace-registry.js");
+    runRegression("verify-portal-4c-1-marketplace-update.js");
+    runRegression("verify-portal-4c-2-marketplace-lifecycle.js");
+    console.log("✓ 4A / 4A-R1 / 4B / 4C-1 / 4C-2 regressions passed");
+}
 
 assert.equal(read("services/platform/marketplaceAuth.js"), authBefore);
 console.log("✓ marketplaceAuth.js untouched");

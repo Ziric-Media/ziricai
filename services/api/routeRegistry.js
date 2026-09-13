@@ -153,6 +153,8 @@ export const ROUTE_CATALOG = [
 
     // Marketplace
     { method: "GET", path: "/api/marketplace/catalog", domain: "marketplace", tenantScoped: false, description: "Browse industry packs" },
+    { method: "GET", path: "/api/marketplace/packs/:packId/reviews", domain: "marketplace", tenantScoped: false, description: "Published customer reviews for pack" },
+    { method: "GET", path: "/api/marketplace/packs/:packId/rating", domain: "marketplace", tenantScoped: false, description: "Durable rating aggregate for pack" },
     { method: "GET", path: "/api/marketplace/installed/:companyId", domain: "marketplace", tenantScoped: true, description: "Installed packs for tenant" },
     { method: "GET", path: "/api/marketplace/lifecycle/:companyId", domain: "marketplace", tenantScoped: true, description: "Marketplace install lifecycle (all registry statuses)" },
     { method: "POST", path: "/api/marketplace/install", domain: "marketplace", tenantScoped: true, tenantOptional: true, description: "Install industry pack" },

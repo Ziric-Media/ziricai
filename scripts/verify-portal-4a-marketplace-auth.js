@@ -104,6 +104,10 @@ for (const [name, block] of [
 }
 console.log("✓ tenant-scoped read/review routes use requireAuthenticatedTenantMember()");
 
+assert.match(reviewBlock, /submitMarketplacePackReview/);
+assert.doesNotMatch(reviewBlock, /checkPermission\("canManageStaff"\)/);
+console.log("✓ review POST uses tenant member auth without canManageStaff");
+
 assert.match(installBlock, /requireAuthenticatedTenantMember\(\)/);
 assert.match(installBlock, /checkPermission\("canManageStaff"\)/);
 assert.match(updateBlock, /requireAuthenticatedTenantMember\(\)/);

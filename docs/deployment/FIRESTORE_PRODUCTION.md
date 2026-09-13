@@ -44,7 +44,7 @@ Step-by-step guide to connect your Firebase Firestore collections to ZiricAI pro
 | `files` | auto | Upload metadata |
 | `settings` | key | Tenant config blobs |
 | `provisioning` | e.g. `links` | Workspace links |
-| `marketplace/installed/{packId}` | pack id | Installed marketplace packs |
+| `marketplaceInstalls/{packId}` | canonical pack id | Marketplace install registry (metadata + references) |
 
 ### Legacy root collections (Phase 1 — migrate away)
 

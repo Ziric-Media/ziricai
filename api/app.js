@@ -113,15 +113,23 @@ import {
     getCompanyLinks,
 } from "../services/platform/provisioningService.js";
 import {
-    getMarketplaceCatalog,
+    getCustomerMarketplaceCatalog,
     getInstalledPacks,
-    getPackDetail,
+    getCustomerPackDetail,
     checkForUpdates,
     applyUpdate,
     runInstallWizard,
 } from "../services/platform/industryPackService.js";
+import {
+    getPublicPackRating,
+    listPublicPackReviews,
+    MarketplacePackNotFoundError,
+} from "../services/platform/marketplaceReviewReadService.js";
 import { listMarketplaceInstallLifecycle } from "../services/platform/marketplaceInstallLifecycle.js";
-import { submitReview } from "../services/platform/marketplaceInstaller.js";
+import {
+    submitMarketplacePackReview,
+    mapMarketplaceReviewSubmitHttpStatus,
+} from "../services/platform/marketplaceReviewService.js";
 import { MarketplaceInstallError, INSTALL_IN_PROGRESS } from "../services/platform/marketplaceInstallErrors.js";
 import { seedPackVersions } from "../services/platform/marketplaceVersioning.js";
 import {
@@ -1440,26 +1448,62 @@ app.get("/api/platform/companies/:companyId/links", requirePlatformAccess(), asy
     }
 });
 
-/** AI Marketplace — browse curated industry packs */
+function sendMarketplaceReadJson(res, payload, status = 200) {
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(status).json(payload);
+}
+
+/** AI Marketplace — browse curated industry packs (real rating aggregates) */
 app.get("/api/marketplace/catalog", async (req, res) => {
     try {
         const { q, category, price, sort } = req.query;
-        const data = getMarketplaceCatalog({ q, category, price, sort });
-        res.json(data);
+        const data = await getCustomerMarketplaceCatalog({ q, category, price, sort });
+        sendMarketplaceReadJson(res, data);
     } catch (err) {
         console.error("[api/marketplace/catalog] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load marketplace catalog" });
     }
 });
 
-/** AI Marketplace — pack detail with contents, reviews, inheritance */
+/** AI Marketplace — pack detail with contents and real aggregate (no demo review list) */
 app.get("/api/marketplace/pack/:packId", async (req, res) => {
     try {
-        const data = getPackDetail(req.params.packId);
-        res.json(data);
+        const data = await getCustomerPackDetail(req.params.packId);
+        sendMarketplaceReadJson(res, data);
     } catch (err) {
+        const status = err instanceof MarketplacePackNotFoundError || err.message?.includes("not found") ? 404 : 500;
         console.error("[api/marketplace/pack] error:", err.message);
-        res.status(err.message?.includes("not found") ? 404 : 500).json({ error: err.message });
+        res.status(status).json({ error: err.message, code: err.code || undefined });
+    }
+});
+
+/** AI Marketplace — published customer reviews for a pack */
+app.get("/api/marketplace/packs/:packId/reviews", async (req, res) => {
+    try {
+        const limit = req.query.limit;
+        const cursor = req.query.cursor;
+        const data = await listPublicPackReviews(req.params.packId, { limit, cursor });
+        sendMarketplaceReadJson(res, data);
+    } catch (err) {
+        if (err instanceof MarketplacePackNotFoundError) {
+            return sendMarketplaceReadJson(res, { error: err.message, code: err.code }, 404);
+        }
+        console.error("[api/marketplace/packs/reviews] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load pack reviews" });
+    }
+});
+
+/** AI Marketplace — durable rating aggregate for a pack */
+app.get("/api/marketplace/packs/:packId/rating", async (req, res) => {
+    try {
+        const data = await getPublicPackRating(req.params.packId);
+        sendMarketplaceReadJson(res, data);
+    } catch (err) {
+        if (err instanceof MarketplacePackNotFoundError) {
+            return sendMarketplaceReadJson(res, { error: err.message, code: err.code }, 404);
+        }
+        console.error("[api/marketplace/packs/rating] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load pack rating" });
     }
 });
 
@@ -1588,17 +1632,32 @@ app.post(
     }
 });
 
-/** AI Marketplace — submit tenant review */
+/** AI Marketplace — submit tenant review (installed pack only; server-resolved author) */
 app.post("/api/marketplace/review", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
-        const { companyId, packId, rating, title, body, author } = req.body || {};
-        if (!companyId) return res.status(400).json({ error: "companyId is required" });
-        if (!packId) return res.status(400).json({ error: "packId is required" });
-        const result = await submitReview(companyId, packId, { rating, title, body, author });
-        res.status(201).json(result);
+        const { companyId, packId, rating, title, body } = req.body || {};
+        if (!companyId) return res.status(400).json({ error: "companyId is required", code: "MISSING_COMPANY_ID" });
+        if (!packId) return res.status(400).json({ error: "packId is required", code: "MISSING_PACK_ID" });
+        if (req.body?.author != null && String(req.body.author).trim()) {
+            return res.status(400).json({
+                error: "author must not be supplied by the client",
+                code: "CLIENT_AUTHOR_FORBIDDEN",
+            });
+        }
+        const result = await submitMarketplacePackReview(req.tenant, { packId, rating, title, body });
+        res.status(201).json({ success: true, review: result.publicReview });
     } catch (err) {
-        console.error("[api/marketplace/review] error:", err.message);
-        res.status(400).json({ error: err.message || "Failed to submit review" });
+        if (err?.status === 401 || err?.code === "UNAUTHORIZED") {
+            return res.status(401).json({ error: err.message || "Authentication required", code: "UNAUTHORIZED" });
+        }
+        if (err?.status === 400 && err?.code === "MISSING_COMPANY_ID") {
+            return res.status(400).json({ error: err.message, code: err.code });
+        }
+        const mapped = mapMarketplaceReviewSubmitHttpStatus(err);
+        if (mapped.status >= 500) {
+            console.error("[api/marketplace/review] error:", err.message);
+        }
+        res.status(mapped.status).json({ error: mapped.message, code: mapped.code });
     }
 });
 

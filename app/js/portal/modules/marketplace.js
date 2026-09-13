@@ -6,6 +6,7 @@ import {
   fetchMarketplaceLifecycle,
   fetchPackUpdates,
   fetchPackDetail,
+  fetchPackReviews,
   installMarketplacePack,
 } from '../api.js';
 import { withTimeout } from '../../admin/utils.js';
@@ -44,6 +45,103 @@ function isPaymentRequiredResult(result) {
 
 function contactSalesHref(packId, packName, companyId) {
   return buildIndustryPackAccessMailto({ packId, packName, companyId });
+}
+
+function resolvePackApiId(packOrId) {
+  if (typeof packOrId === 'string') return packOrId;
+  return packOrId?.canonicalId || packOrId?.id || '';
+}
+
+/** Stars from API aggregate only — never demo constants. */
+function renderStarsFromApi(rating = 0) {
+  const n = Number(rating);
+  const full = Number.isFinite(n) ? Math.min(5, Math.max(0, Math.round(n))) : 0;
+  return `<span class="mp-stars" aria-hidden="true">${'★'.repeat(full)}${'☆'.repeat(5 - full)}</span>`;
+}
+
+function renderCatalogRatingSummary(pack) {
+  const count = Math.max(0, Number(pack?.ratingCount) || 0);
+  if (count === 0) {
+    return `<span class="mp-reviews-empty-inline text-muted"><i class="fa-regular fa-comment"></i> No reviews yet</span>`;
+  }
+  const avg = Number(pack?.rating) || 0;
+  return `<span class="mp-rating-summary">${renderStarsFromApi(avg)} <span class="mp-rating-count">(${count})</span></span>`;
+}
+
+/** Successful API with zero published reviews (4C-4A honest empty). */
+function renderCustomerReviewsEmptyState() {
+  return `<p class="mp-reviews-empty text-muted"><i class="fa-regular fa-comment"></i> No customer reviews yet</p>`;
+}
+
+function renderCustomerReviewsLoadError(packId) {
+  return `<div class="mp-reviews-error" role="alert">
+    <p><i class="fa-solid fa-circle-exclamation"></i> Reviews couldn't be loaded.</p>
+    <button type="button" class="btn btn-secondary btn-sm mp-reviews-retry" data-pack-id="${escapeHtml(packId)}">Retry</button>
+  </div>`;
+}
+
+function renderCustomerReviewsLoadingState() {
+  return `<p class="mp-reviews-loading text-muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading reviews…</p>`;
+}
+
+function renderPublicReviewCard(review) {
+  const stars = renderStarsFromApi(review.rating);
+  const when = formatWhen(review.createdAt);
+  return `<article class="mp-review">
+    <div class="mp-review-head">
+      ${stars}
+      <strong>${escapeHtml(review.authorDisplayName || 'Customer')}</strong>
+      ${when ? `<span class="text-muted mp-review-date">${escapeHtml(when)}</span>` : ''}
+    </div>
+    ${review.title ? `<h5 class="mp-review-title">${escapeHtml(review.title)}</h5>` : ''}
+    ${review.body ? `<p class="mp-review-body">${escapeHtml(review.body)}</p>` : ''}
+  </article>`;
+}
+
+async function loadPackReviewsIntoMount(mountEl, packId, { cursor = null, append = false } = {}) {
+  if (!mountEl) return { ok: false };
+  if (append) {
+    mountEl.querySelector('.mp-reviews-load-more-wrap')?.remove();
+  } else {
+    mountEl.innerHTML = renderCustomerReviewsLoadingState();
+  }
+  const res = await fetchPackReviews(packId, { limit: 20, cursor });
+  if (res.error || !res.data) {
+    mountEl.innerHTML = renderCustomerReviewsLoadError(packId);
+    mountEl.querySelector('.mp-reviews-retry')?.addEventListener('click', () => {
+      loadPackReviewsIntoMount(mountEl, packId);
+    });
+    return { ok: false, error: res.error };
+  }
+  const reviews = res.data.reviews || [];
+  const nextCursor = res.data.pagination?.nextCursor || null;
+  if (!append) {
+    if (!reviews.length) {
+      mountEl.innerHTML = renderCustomerReviewsEmptyState();
+    } else {
+      mountEl.innerHTML = reviews.map((r) => renderPublicReviewCard(r)).join('');
+    }
+  } else if (reviews.length) {
+    mountEl.insertAdjacentHTML('beforeend', reviews.map((r) => renderPublicReviewCard(r)).join(''));
+  }
+  const existingMore = mountEl.querySelector('.mp-reviews-load-more-wrap');
+  if (existingMore) existingMore.remove();
+  if (nextCursor) {
+    mountEl.insertAdjacentHTML(
+      'beforeend',
+      `<div class="mp-reviews-load-more-wrap">
+        <button type="button" class="btn btn-secondary btn-sm mp-reviews-load-more" data-cursor="${escapeHtml(nextCursor)}">Load more reviews</button>
+      </div>`
+    );
+    mountEl.querySelector('.mp-reviews-load-more')?.addEventListener('click', (e) => {
+      const c = e.currentTarget.dataset.cursor;
+      e.currentTarget.disabled = true;
+      loadPackReviewsIntoMount(mountEl, packId, { cursor: c, append: true }).finally(() => {
+        e.currentTarget.disabled = false;
+      });
+    });
+  }
+  return { ok: true, reviews, nextCursor };
 }
 
 function renderContactSalesButton(packId, packName, companyId, { primary = true } = {}) {
@@ -141,7 +239,6 @@ export async function renderMarketplace(container) {
       </select>
       <select id="mpSort" class="marketplace-filter-select">
         <option value="">Featured</option>
-        <option value="rating">Top rated</option>
       </select>
     </div>
 
@@ -239,7 +336,6 @@ function renderPackCards(packs, companyId) {
 
   return visible.map((pack) => {
     const lc = resolveLifecycleForPack(pack);
-    const stars = renderStars(pack.rating);
     const priceBadge = pack.isPaid
       ? `<span class="mp-price paid">Paid</span>`
       : `<span class="mp-price free">Free</span>`;
@@ -271,7 +367,7 @@ function renderPackCards(packs, companyId) {
           <span class="pack-icon">${pack.icon || '📦'}</span>
           <div>
             <h4>${escapeHtml(pack.name)}</h4>
-            <div class="mp-card-meta">${stars} <span class="mp-rating-count">(${pack.ratingCount || 0})</span> ${priceBadge}</div>
+            <div class="mp-card-meta">${renderCatalogRatingSummary(pack)} ${priceBadge}</div>
             <p class="pack-tagline">${escapeHtml(pack.tagline || pack.description || '')}</p>
           </div>
         </div>
@@ -284,11 +380,6 @@ function renderPackCards(packs, companyId) {
         </div>
       </article>`;
   }).join('');
-}
-
-function renderStars(rating = 0) {
-  const full = Math.round(rating);
-  return `<span class="mp-stars">${'★'.repeat(full)}${'☆'.repeat(5 - full)}</span>`;
 }
 
 function bindMarketplaceEvents(container, companyId, catalog) {
@@ -424,7 +515,8 @@ async function openDetailModal(container, packId) {
           <span class="pack-icon">${d.pack?.icon || '📦'}</span>
           <div>
             <h3>${escapeHtml(d.pack?.name || '')}</h3>
-            <p>${renderStars(d.pack?.rating)} v${escapeHtml(d.pack?.version || '1.0')} · ${escapeHtml(d.pack?.priceLabel || 'Free')}</p>
+            <p>v${escapeHtml(d.pack?.version || '1.0')} · ${escapeHtml(d.pack?.priceLabel || 'Free')}</p>
+            <div class="mp-detail-rating">${renderCatalogRatingSummary(d.pack || {})}</div>
             ${d.pack?.extends ? `<p class="text-muted"><i class="fa-solid fa-sitemap"></i> Extends ${escapeHtml(d.pack.extends)}</p>` : ''}
           </div>
         </div>
@@ -433,15 +525,8 @@ async function openDetailModal(container, packId) {
         <p>${escapeHtml(d.pack?.description || '')}</p>
         <h4>Pack Contents</h4>
         <div class="mp-checklist-grid">${checklist}</div>
-        <h4>Reviews</h4>
-        <div class="mp-reviews">
-          ${(d.reviews || []).map((r) => `
-            <div class="mp-review">
-              ${renderStars(r.rating)} <strong>${escapeHtml(r.title)}</strong>
-              <p>${escapeHtml(r.body)}</p>
-              <span class="text-muted">— ${escapeHtml(r.author)}</span>
-            </div>`).join('')}
-        </div>
+        <h4>Customer reviews</h4>
+        <div class="mp-reviews" id="mpDetailReviews" data-pack-id="${escapeHtml(resolvePackApiId(packId))}">${renderCustomerReviewsLoadingState()}</div>
         <div class="mp-modal-actions">
           ${lc?.status === 'installed'
             ? `<button type="button" class="btn btn-secondary mp-installed-detail" data-pack-id="${escapeHtml(packId)}">Installed details</button>`
@@ -469,6 +554,12 @@ async function openDetailModal(container, packId) {
   modal.querySelector('.mp-installed-detail')?.addEventListener('click', (e) => {
     openInstalledDetailModal(container, e.target.dataset.packId);
   });
+
+  const reviewsMount = modal.querySelector('#mpDetailReviews');
+  const apiPackId = resolvePackApiId(packId);
+  if (reviewsMount && apiPackId) {
+    loadPackReviewsIntoMount(reviewsMount, apiPackId);
+  }
 }
 
 function openWizardModal(container, companyId, packId) {
@@ -516,6 +607,7 @@ async function renderWizardStep(container, modal) {
       ${paidBlock}
       <h3>${escapeHtml(d?.pack?.name || 'Pack Preview')}</h3>
       <p class="text-muted">${escapeHtml(d?.pack?.priceLabel || 'Free')} · Estimated install: ${d?.estimatedMinutes || 4} minutes</p>
+      <div class="mp-detail-rating mp-wizard-rating">${renderCatalogRatingSummary(d?.pack || {})}</div>
       <div class="mp-checklist-grid">
         ${(d?.contentsChecklist || []).map((c) => `
           <div class="mp-checklist-group">

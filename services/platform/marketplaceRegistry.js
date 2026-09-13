@@ -637,7 +637,7 @@ export function getPackById(packId) {
 
 export function getCatalogPacks() {
     const full = INDUSTRY_PACKS.map((p) => {
-        const manifest = buildPackManifest(p);
+        const manifest = buildPackManifest(p, { useDemoSocialProof: false });
         return {
             id: manifest.id,
             canonicalId: manifest.canonicalId,
@@ -679,13 +679,13 @@ export function getPacksByCategory(categoryId) {
     return getCatalogPacks().filter((p) => p.category === categoryId);
 }
 
-export function getMarketplaceCatalog(filters = {}) {
-    let packs = getCatalogPacks();
+function filterAndSortCatalogPacks(packs, filters = {}) {
     const { q, category, price, sort } = filters;
+    let filtered = [...packs];
 
     if (q) {
         const query = String(q).toLowerCase();
-        packs = packs.filter(
+        filtered = filtered.filter(
             (p) =>
                 p.name?.toLowerCase().includes(query) ||
                 p.description?.toLowerCase().includes(query) ||
@@ -693,23 +693,34 @@ export function getMarketplaceCatalog(filters = {}) {
         );
     }
     if (category) {
-        packs = packs.filter(
-            (p) => p.category === category || p.legacyCategory === category
-        );
+        filtered = filtered.filter((p) => p.category === category || p.legacyCategory === category);
     }
-    if (price === "free") packs = packs.filter((p) => p.isFree);
-    if (price === "paid") packs = packs.filter((p) => p.isPaid);
+    if (price === "free") filtered = filtered.filter((p) => p.isFree);
+    if (price === "paid") filtered = filtered.filter((p) => p.isPaid);
 
     if (sort === "rating") {
-        packs.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        filtered.sort((a, b) => {
+            const countDiff = (b.ratingCount || 0) - (a.ratingCount || 0);
+            if (countDiff !== 0) return countDiff;
+            return (b.rating || 0) - (a.rating || 0);
+        });
     } else {
-        packs.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+        filtered.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
     }
 
+    return filtered;
+}
+
+/** Customer-facing catalog — real rating aggregates only (no demo social proof). */
+export async function getCustomerMarketplaceCatalog(filters = {}) {
+    const { hydrateCatalogRatings } = await import("./marketplaceReviewReadService.js");
+    const packs = await hydrateCatalogRatings(getCatalogPacks());
+    const filtered = filterAndSortCatalogPacks(packs, filters);
     return {
         categories: MARKETPLACE_CATEGORIES,
-        packs,
+        packs: filtered,
         thirdParty: THIRD_PARTY_REGISTRY,
-        featured: packs.filter((p) => p.featured && p.installable),
+        featured: filtered.filter((p) => p.featured && p.installable),
     };
 }
+

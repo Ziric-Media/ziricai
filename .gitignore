@@ -9,6 +9,10 @@ node_modules/
 .portal-4c1-disposable-credentials.json
 .portal-4c2-disposable-credentials.json
 .portal-4c3-disposable-credentials.json
+.portal-4c4a-disposable-credentials.json
+.portal-4c4b2-disposable-credentials.json
+.portal-4c4b3-disposable-credentials.json
+.portal-4c4b4-disposable-credentials.json
 test-results/
 
 # Firebase

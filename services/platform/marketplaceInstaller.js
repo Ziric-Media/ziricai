@@ -3,28 +3,37 @@
  * Step 1: Preview → 2: Branding → 3: Integrations → 4: Install → 5: Success
  */
 import { getPackById, resolvePackId } from "./marketplaceRegistry.js";
-import { buildPackManifest, getDemoReviews, resolveCanonicalPackId } from "./marketplaceTemplate.js";
+import { buildPackManifest, resolveCanonicalPackId } from "./marketplaceTemplate.js";
+import { getPublicPackRating, resolveCustomerCatalogPackId } from "./marketplaceReviewReadService.js";
 import { installIndustryPack, getInstalledPacks } from "./industryPackService.js";
 import { checkForUpdates } from "./marketplaceVersioning.js";
 import { publish, EventTypes } from "../events/index.js";
-import { getStorageAdapter } from "../storage/storageAdapter.js";
-
 const WIZARD_STEPS = ["preview", "branding", "integrations", "install", "success"];
-
-async function adapter() {
-    return getStorageAdapter();
-}
 
 /**
  * Step 1 — Preview pack contents checklist.
  */
-export function previewPack(packId) {
-    const resolved = resolvePackId(packId);
+function buildPreviewChecklist(manifest) {
+    return [
+        { key: "knowledge", label: "Knowledge Base", items: manifest.contents.knowledge, count: manifest.contents.knowledge.length },
+        { key: "flows", label: "Conversation Flows", items: manifest.contents.flows, count: manifest.contents.flows.length },
+        { key: "automations", label: "Automations", items: manifest.contents.automations, count: manifest.contents.automations.length },
+        { key: "integrations", label: "Suggested Integrations", items: manifest.contents.integrations, count: manifest.contents.integrations.length },
+        { key: "prompts", label: "Prompt Templates", items: manifest.contents.prompts, count: manifest.contents.prompts.length },
+        { key: "faqs", label: "Industry FAQs", items: manifest.contents.faqs, count: manifest.contents.faqs.length },
+        { key: "actions", label: "Suggested Actions", items: manifest.contents.actions, count: manifest.contents.actions.length },
+        { key: "analytics", label: "Default Analytics", items: manifest.contents.analytics, count: manifest.contents.analytics.length },
+    ];
+}
+
+/** Customer-facing preview/detail — real aggregate only; no demo review list. */
+export async function previewPackForCustomer(packId) {
+    const resolved = resolveCustomerCatalogPackId(packId);
     const pack = getPackById(resolved);
     if (!pack) throw new Error(`Pack not found: ${packId}`);
 
-    const manifest = buildPackManifest(pack);
-    const reviews = getDemoReviews(resolved);
+    const manifest = buildPackManifest(pack, { useDemoSocialProof: false });
+    const rating = await getPublicPackRating(resolved);
 
     return {
         step: 1,
@@ -41,23 +50,13 @@ export function previewPack(packId) {
             isFree: manifest.isFree,
             isPaid: manifest.isPaid,
             version: manifest.version,
-            rating: manifest.rating,
-            ratingCount: manifest.ratingCount,
+            rating: rating.average,
+            ratingCount: rating.count,
             inheritanceChain: manifest.inheritanceChain,
             extends: manifest.extends,
         },
         contents: manifest.contents,
-        contentsChecklist: [
-            { key: "knowledge", label: "Knowledge Base", items: manifest.contents.knowledge, count: manifest.contents.knowledge.length },
-            { key: "flows", label: "Conversation Flows", items: manifest.contents.flows, count: manifest.contents.flows.length },
-            { key: "automations", label: "Automations", items: manifest.contents.automations, count: manifest.contents.automations.length },
-            { key: "integrations", label: "Suggested Integrations", items: manifest.contents.integrations, count: manifest.contents.integrations.length },
-            { key: "prompts", label: "Prompt Templates", items: manifest.contents.prompts, count: manifest.contents.prompts.length },
-            { key: "faqs", label: "Industry FAQs", items: manifest.contents.faqs, count: manifest.contents.faqs.length },
-            { key: "actions", label: "Suggested Actions", items: manifest.contents.actions, count: manifest.contents.actions.length },
-            { key: "analytics", label: "Default Analytics", items: manifest.contents.analytics, count: manifest.contents.analytics.length },
-        ],
-        reviews: reviews.slice(0, 5),
+        contentsChecklist: buildPreviewChecklist(manifest),
         wizardSteps: WIZARD_STEPS,
         estimatedMinutes: 4,
     };
@@ -86,8 +85,11 @@ export function validateBranding(customizations = {}) {
  * Step 3 — Select integrations to enable.
  */
 export function selectIntegrations(packId, selected = []) {
-    const preview = previewPack(packId);
-    const available = preview.contents.integrations;
+    const resolved = resolvePackId(packId);
+    const pack = getPackById(resolved);
+    if (!pack) throw new Error(`Pack not found: ${packId}`);
+    const manifest = buildPackManifest(pack, { useDemoSocialProof: false });
+    const available = manifest.contents.integrations;
     const enabled = selected.length ? selected.filter((id) => available.includes(id)) : available;
 
     return {
@@ -107,7 +109,7 @@ export async function executeInstall(companyId, packId, options = {}) {
     if (!packId) throw new Error("packId is required");
 
     const resolved = resolvePackId(packId);
-    const manifest = buildPackManifest(getPackById(resolved));
+    const manifest = buildPackManifest(getPackById(resolved), { useDemoSocialProof: false });
 
     if (manifest.isPaid && options.demoMode !== true && options.skipPayment !== true) {
         return {
@@ -193,7 +195,7 @@ export async function runInstallWizard(companyId, packId, options = {}) {
 
     switch (step) {
         case "preview":
-            return previewPack(packId);
+            return previewPackForCustomer(packId);
         case "branding":
             return validateBranding(options.customizations);
         case "integrations":
@@ -210,8 +212,8 @@ export async function runInstallWizard(companyId, packId, options = {}) {
 /**
  * Get full pack detail for pack detail modal.
  */
-export function getPackDetail(packId) {
-    return previewPack(packId);
+export async function getCustomerPackDetail(packId) {
+    return previewPackForCustomer(packId);
 }
 
 /**
@@ -244,32 +246,6 @@ export function filterCatalogPacks(packs, { q = "", category = "", price = "" } 
     }
 
     return filtered;
-}
-
-export async function submitReview(companyId, packId, review, author = "Tenant User") {
-    if (!companyId) throw new Error("companyId is required");
-    if (!packId) throw new Error("packId is required");
-    if (!review?.rating) throw new Error("rating is required");
-
-    const resolved = resolvePackId(packId);
-    const entry = {
-        id: `rev-${Date.now()}`,
-        packId: resolved,
-        companyId,
-        author: review.author || author,
-        rating: Math.min(5, Math.max(1, Number(review.rating))),
-        title: review.title || "",
-        body: review.body || "",
-        createdAt: new Date().toISOString(),
-    };
-
-    const store = await adapter();
-    if (store.saveMarketplaceReview) {
-        await store.saveMarketplaceReview(resolved, entry);
-        await store.updatePackRating(resolved, entry.rating);
-    }
-
-    return { success: true, review: entry };
 }
 
 export { WIZARD_STEPS };

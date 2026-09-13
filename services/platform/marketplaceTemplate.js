@@ -262,13 +262,20 @@ function extractPrompts(agents = [], extra = []) {
 /**
  * Build normalized pack manifest from legacy pack definition.
  */
-export function buildPackManifest(pack) {
+/**
+ * @param {object} pack
+ * @param {{ useDemoSocialProof?: boolean }} [options]
+ */
+export function buildPackManifest(pack, options = {}) {
     if (!pack) return null;
 
+    const useDemoSocialProof = options.useDemoSocialProof !== false;
     const canonicalId = resolveCanonicalPackId(pack.id);
     const browseCategory = pack.browseCategory || resolveBrowseCategory(pack.category);
     const price = pack.price ?? PACK_PRICING[canonicalId] ?? PACK_PRICING[pack.id] ?? 0;
-    const ratingData = PACK_DEMO_RATINGS[canonicalId] || PACK_DEMO_RATINGS[pack.id] || { average: 4.5, count: 12 };
+    const ratingData = useDemoSocialProof
+        ? PACK_DEMO_RATINGS[canonicalId] || PACK_DEMO_RATINGS[pack.id] || { average: 4.5, count: 12 }
+        : { average: 0, count: 0 };
     const integrations =
         pack.suggestedIntegrations ||
         CATEGORY_INTEGRATIONS[pack.category] ||

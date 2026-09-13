@@ -276,16 +276,20 @@ if (repo.docs) {
     }
 }
 
-execSync("node scripts/verify-portal-4a-marketplace-auth.js", {
-    cwd: ROOT,
-    stdio: "pipe",
-    env: { ...process.env, STORAGE_BACKEND: "memory" },
-});
-execSync("node scripts/verify-portal-4a-r1-marketplace-security.js", {
-    cwd: ROOT,
-    stdio: "pipe",
-    env: { ...process.env, STORAGE_BACKEND: "memory" },
-});
+if (process.env.PORTAL_ACCEPTANCE_LEAF === "1") {
+    console.log("✓ nested regressions skipped (PORTAL_ACCEPTANCE_LEAF)");
+} else {
+if (process.env.PORTAL_ACCEPTANCE_LEAF === "1") {
+    console.log("✓ nested regressions skipped (PORTAL_ACCEPTANCE_LEAF)");
+} else {
+const regressionEnv = { ...process.env, STORAGE_BACKEND: "memory" };
+const runRegression = (script) => {
+    execSync(`node scripts/${script}`, { cwd: ROOT, stdio: "inherit", env: regressionEnv });
+};
+runRegression("verify-portal-4a-marketplace-auth.js");
+runRegression("verify-portal-4a-r1-marketplace-security.js");
 console.log("✓ PORTAL-4A / 4A-R1 static regression passed");
+}
+}
 
 console.log("\nPORTAL-4C-1 marketplace update foundation verification passed");

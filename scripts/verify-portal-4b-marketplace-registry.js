@@ -209,17 +209,22 @@ assert.equal(agentsFinal.length, agentCountAfterDup);
 console.log("✓ duplicate install did not duplicate agents");
 
 // --- 4A static regression ---
-execSync("node scripts/verify-portal-4a-marketplace-auth.js", {
-    cwd: ROOT,
-    stdio: "pipe",
-    env: { ...process.env, STORAGE_BACKEND: "memory" },
-});
-execSync("node scripts/verify-portal-4a-r1-marketplace-security.js", {
-    cwd: ROOT,
-    stdio: "pipe",
-    env: { ...process.env, STORAGE_BACKEND: "memory" },
-});
-console.log("✓ PORTAL-4A static verify scripts pass");
+if (process.env.PORTAL_ACCEPTANCE_LEAF === "1") {
+    console.log("✓ nested regressions skipped (PORTAL_ACCEPTANCE_LEAF)");
+} else {
+    const regressionEnv = { ...process.env, STORAGE_BACKEND: "memory" };
+    execSync("node scripts/verify-portal-4a-marketplace-auth.js", {
+        cwd: ROOT,
+        stdio: "inherit",
+        env: regressionEnv,
+    });
+    execSync("node scripts/verify-portal-4a-r1-marketplace-security.js", {
+        cwd: ROOT,
+        stdio: "inherit",
+        env: regressionEnv,
+    });
+    console.log("✓ PORTAL-4A static verify scripts pass");
+}
 
 const firestoreTest = process.argv.includes("--firestore");
 if (firestoreTest && process.env.STORAGE_BACKEND === "firestore") {
