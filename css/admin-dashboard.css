@@ -6528,6 +6528,41 @@ ul { list-style: none; }
     line-height: 1.45;
 }
 
+.mp-review-eligibility {
+    margin: 16px 0;
+    padding: 14px 16px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+    background: var(--surface-muted, #f8fafc);
+}
+
+.mp-review-eligibility h4 {
+    margin: 0 0 10px;
+    font-size: 15px;
+}
+
+.mp-review-contract p {
+    margin: 0 0 8px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-muted, #64748b);
+}
+
+.mp-review-contract p:last-child {
+    margin-bottom: 12px;
+}
+
+.mp-review-write-disabled {
+    pointer-events: none;
+    opacity: 0.72;
+}
+
+.mp-review-eligibility-note {
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0 0 10px;
+}
+
 .mp-reviews-load-more-wrap {
     text-align: center;
     padding-top: 4px;

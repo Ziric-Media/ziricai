@@ -43,7 +43,12 @@ assert.match(mp, /mp-reviews-load-more/);
 assert.match(mp, /loadPackReviewsIntoMount/);
 assert.match(mp, /renderCustomerReviewsLoadingState/);
 assert.doesNotMatch(mp, /submitPackReview/);
-assert.doesNotMatch(mp, /Write a Review/i);
+assert.doesNotMatch(mp, /\/api\/marketplace\/review/i);
+if (/Write a review/i.test(mp)) {
+    assert.match(mp, /mp-review-write-disabled/);
+} else {
+    assert.doesNotMatch(mp, /Write a review/i);
+}
 assert.doesNotMatch(mp, /getDemoReviews/);
 assert.doesNotMatch(mp, /PACK_DEMO_RATINGS/);
 assert.doesNotMatch(mp, /Top rated/i);

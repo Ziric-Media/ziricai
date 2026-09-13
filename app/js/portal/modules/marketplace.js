@@ -84,6 +84,27 @@ function renderCustomerReviewsLoadingState() {
   return `<p class="mp-reviews-loading text-muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading reviews…</p>`;
 }
 
+/** 4C-4C-1 — installed-pack context only; disabled until 4C-4C-2 wires POST. */
+function renderInstalledPackReviewEligibilityBlock() {
+  return `<section class="mp-review-eligibility" aria-labelledby="mp-review-eligibility-title">
+    <h4 id="mp-review-eligibility-title">Your review</h4>
+    <div class="mp-review-contract">
+      <p>One review per workspace per pack. Any signed-in team member may submit a review.</p>
+      <p>Rating is required. Title and review text are optional.</p>
+      <p>Reviews publish immediately and contribute to the marketplace rating.</p>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm mp-review-write-disabled" disabled aria-disabled="true">Write a review</button>
+  </section>`;
+}
+
+/** Catalog detail — steer only; no write control (4C-4C-1). */
+function renderCatalogReviewSubmitGuidance(lifecycleRecord) {
+  if (lifecycleRecord?.status === 'installed') {
+    return `<p class="mp-review-eligibility-note text-muted"><i class="fa-regular fa-comment-dots"></i> To submit a review, open <strong>Installed packs → Details</strong> for this pack.</p>`;
+  }
+  return `<p class="mp-review-eligibility-note text-muted"><i class="fa-regular fa-comment-dots"></i> Install this pack in your workspace to submit a review.</p>`;
+}
+
 function renderPublicReviewCard(review) {
   const stars = renderStarsFromApi(review.rating);
   const when = formatWhen(review.createdAt);
@@ -457,6 +478,7 @@ function openInstalledDetailModal(container, packId) {
           <dt>Installed</dt><dd>${escapeHtml(formatWhen(record.installedCompletedAt || record.installedAt))}</dd>
           <dt>Last updated</dt><dd>${escapeHtml(formatWhen(record.updatedAt))}</dd>
         </dl>
+        ${renderInstalledPackReviewEligibilityBlock()}
         ${upd ? `
           <h4>Update available</h4>
           <p>Version <strong>${escapeHtml(record.version || '1.0')}</strong> → <strong>${escapeHtml(upd.latestVersion)}</strong></p>
@@ -526,6 +548,7 @@ async function openDetailModal(container, packId) {
         <h4>Pack Contents</h4>
         <div class="mp-checklist-grid">${checklist}</div>
         <h4>Customer reviews</h4>
+        ${renderCatalogReviewSubmitGuidance(lc)}
         <div class="mp-reviews" id="mpDetailReviews" data-pack-id="${escapeHtml(resolvePackApiId(packId))}">${renderCustomerReviewsLoadingState()}</div>
         <div class="mp-modal-actions">
           ${lc?.status === 'installed'

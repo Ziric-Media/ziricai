@@ -158,6 +158,7 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/marketplace/installed/:companyId", domain: "marketplace", tenantScoped: true, description: "Installed packs for tenant" },
     { method: "GET", path: "/api/marketplace/lifecycle/:companyId", domain: "marketplace", tenantScoped: true, description: "Marketplace install lifecycle (all registry statuses)" },
     { method: "POST", path: "/api/marketplace/install", domain: "marketplace", tenantScoped: true, tenantOptional: true, description: "Install industry pack" },
+    { method: "POST", path: "/api/marketplace/review", domain: "marketplace", tenantScoped: true, description: "Submit pack review (installed tenant; server-resolved author)" },
 
     // Webhooks (no tenant middleware)
     { method: "GET", path: "/webhook", domain: "integrations", tenantScoped: false, description: "Legacy WhatsApp verify" },
