@@ -1,4 +1,4 @@
-import { requireCompanyId } from '../core/dataStore.js';
+import { requireCompanyId, state } from '../core/dataStore.js';
 import { escapeHtml, pageHeader, loadingState, showToast, errorState } from '../../admin/ui.js';
 import { renderEmptyState } from '../core/widgets/emptyState.js';
 import {
@@ -9,10 +9,14 @@ import {
   fetchPackReviews,
   installMarketplacePack,
   submitPackReview,
+  applyPackUpdate,
+  invalidateHub,
+  prefetchHub,
 } from '../api.js';
 import { withTimeout } from '../../admin/utils.js';
 import { navigateTo } from '../router.js';
 import { buildIndustryPackAccessMailto } from '../../shared/marketplaceSalesContact.js';
+import { can } from '../permissions.js';
 
 let wizardState = {};
 /** @type {Map<string, object>} */
@@ -34,6 +38,89 @@ function indexLifecycle(items = [], updates = []) {
   for (const item of items) lifecycleByPackId.set(item.packId, item);
   updatesByPackId = new Map();
   for (const u of updates) updatesByPackId.set(u.packId, u);
+}
+
+/** Re-fetch lifecycle + updates after a proven apply success; no optimistic version state. */
+async function refreshMarketplaceAuthoritativeState(companyId) {
+  const [lifecycleRes, updatesRes] = await Promise.all([
+    withTimeout(fetchMarketplaceLifecycle(companyId)),
+    withTimeout(fetchPackUpdates(companyId)),
+  ]);
+
+  const lifecycleError = lifecycleRes.error || null;
+  const updatesError = updatesRes.error || null;
+
+  if (lifecycleError) {
+    return { ok: false, lifecycleError, updatesError, lifecycleItems: null };
+  }
+
+  const lifecycleItems = lifecycleRes.data?.items || [];
+
+  if (updatesError) {
+    for (const item of lifecycleItems) lifecycleByPackId.set(item.packId, item);
+    return { ok: false, lifecycleError: null, updatesError, lifecycleItems, partial: true };
+  }
+
+  const updates = updatesRes.data?.updates || [];
+  indexLifecycle(lifecycleItems, updates);
+
+  let hubError = null;
+  try {
+    invalidateHub();
+    await prefetchHub(companyId, { force: true });
+  } catch (err) {
+    hubError = err?.message || String(err);
+  }
+
+  if (hubError) {
+    return {
+      ok: false,
+      lifecycleError: null,
+      updatesError: null,
+      hubError,
+      lifecycleItems,
+      updates,
+      dataRefreshed: true,
+    };
+  }
+
+  return { ok: true, lifecycleItems, updates };
+}
+
+function syncInstalledDetailLifecycleMeta(modal, packId) {
+  const record = lifecycleByPackId.get(packId);
+  const meta = modal.querySelector('.mp-installed-meta');
+  if (!record || !meta) return;
+  meta.querySelectorAll('dt').forEach((dt) => {
+    const label = dt.textContent?.trim();
+    const dd = dt.nextElementSibling;
+    if (!dd) return;
+    if (label === 'Version') dd.textContent = `v${record.version || '1.0'}`;
+    if (label === 'Last updated') dd.textContent = formatWhen(record.updatedAt);
+  });
+}
+
+function patchMarketplaceLifecycleMount(container, lifecycleItems) {
+  const mount = container.querySelector('#mpLifecycleMount');
+  if (!mount || !Array.isArray(lifecycleItems)) return;
+  const installing = lifecycleItems.filter((i) => i.status === 'installing');
+  const failed = lifecycleItems.filter((i) => i.status === 'failed');
+  const installed = lifecycleItems.filter((i) => i.status === 'installed');
+  mount.innerHTML = renderLifecycleSections(installing, failed, installed);
+}
+
+function rebindLifecycleMountEvents(container, companyId) {
+  const mount = container.querySelector('#mpLifecycleMount');
+  if (!mount) return;
+  mount.querySelectorAll('.installed-actions [data-nav]').forEach((btn) => {
+    btn.addEventListener('click', () => navigateTo(btn.dataset.nav));
+  });
+  mount.querySelectorAll('.mp-retry-install').forEach((btn) => {
+    btn.addEventListener('click', () => openWizardModal(container, companyId, btn.dataset.packId));
+  });
+  mount.querySelectorAll('.mp-installed-detail').forEach((btn) => {
+    btn.addEventListener('click', () => openInstalledDetailModal(container, btn.dataset.packId));
+  });
 }
 
 function resolveLifecycleForPack(pack) {
@@ -177,6 +264,217 @@ function mapInstalledReviewSubmitError(res) {
     return { message: error || 'Something went wrong. Your text was kept — try again shortly.' };
   }
   return { message: error || 'Could not submit review. Your text was kept — try again.' };
+}
+
+/** 4C-5C — installed-pack details only; catalog stays read-only. */
+function renderInstalledPackUpdateReadOnlyBlock(record, upd) {
+  const current = record.version || '1.0';
+  return `<section class="mp-pack-update mp-pack-update-readonly" aria-labelledby="mp-pack-update-title">
+    <h4 id="mp-pack-update-title">Update available</h4>
+    <p>Version <strong>v${escapeHtml(current)}</strong> → <strong>v${escapeHtml(upd.latestVersion)}</strong></p>
+    ${upd.changelog?.length ? `<ul class="mp-update-changelog">${upd.changelog.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : ''}
+    <p class="mp-pack-update-permission text-muted"><i class="fa-solid fa-lock"></i> Only workspace owners and managers can apply pack updates.</p>
+  </section>`;
+}
+
+function renderInstalledPackUpdateApplyBlock(record, upd, packId) {
+  const current = record.version || '1.0';
+  const target = upd.latestVersion;
+  return `<section class="mp-pack-update mp-pack-update-wrap" data-pack-id="${escapeHtml(packId)}" data-target-version="${escapeHtml(target)}" aria-labelledby="mp-pack-update-title">
+    <h4 id="mp-pack-update-title">Update available</h4>
+    <div class="mp-pack-update-preview">
+      <p>Version <strong>v${escapeHtml(current)}</strong> → <strong>v${escapeHtml(target)}</strong></p>
+      ${upd.changelog?.length ? `<ul class="mp-update-changelog">${upd.changelog.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : ''}
+      <p class="mp-pack-update-warning"><i class="fa-solid fa-triangle-exclamation"></i> Applying this update adds new knowledge and workflows to your workspace. Existing customizations are preserved.</p>
+      <button type="button" class="btn btn-primary btn-sm mp-pack-update-start">Review and apply update</button>
+    </div>
+    <div class="mp-pack-update-confirm hidden" aria-live="polite">
+      <p class="mp-pack-update-confirm-lede"><strong>Confirm pack update</strong></p>
+      <dl class="mp-pack-update-confirm-meta">
+        <dt>Current version</dt><dd>v${escapeHtml(current)}</dd>
+        <dt>Target version</dt><dd>v${escapeHtml(target)}</dd>
+      </dl>
+      ${upd.changelog?.length ? `<div class="mp-pack-update-confirm-changelog"><strong>Changes</strong><ul class="mp-update-changelog">${upd.changelog.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul></div>` : ''}
+      <p class="mp-pack-update-warning">This will modify your installed pack by merging additive content. You cannot undo from the Portal.</p>
+      <div class="mp-pack-update-actions">
+        <button type="button" class="btn btn-secondary btn-sm mp-pack-update-back">Back</button>
+        <button type="button" class="btn btn-primary btn-sm mp-pack-update-apply">Confirm apply update</button>
+      </div>
+    </div>
+    <p class="mp-pack-update-form-error hidden" role="alert"></p>
+  </section>`;
+}
+
+function renderInstalledPackUpdateSection(record, upd, packId, canApply) {
+  if (!upd) return '<p class="text-muted">This pack is up to date with published versions.</p>';
+  return canApply
+    ? renderInstalledPackUpdateApplyBlock(record, upd, packId)
+    : renderInstalledPackUpdateReadOnlyBlock(record, upd);
+}
+
+function renderInstalledPackUpdateSuccessBlock(result, refreshOutcome = {}) {
+  const merged = result.merged || {};
+  const kb = Number(merged.knowledgeAdded) || 0;
+  const wf = Number(merged.workflowsAdded) || 0;
+  const delta =
+    kb || wf
+      ? `<p class="text-muted">Added ${kb} knowledge document${kb === 1 ? '' : 's'} and ${wf} workflow${wf === 1 ? '' : 's'}.</p>`
+      : '';
+  let refreshNote = '';
+  if (refreshOutcome.attempted && !refreshOutcome.ok) {
+    refreshNote = `<p class="mp-pack-update-refresh-warn" role="alert">Update succeeded on the server, but Marketplace could not refresh installed data. Reopen Marketplace or reload the page to see the latest version and update badges.</p>`;
+    if (refreshOutcome.hubError) {
+      refreshNote += `<p class="text-muted mp-pack-update-refresh-note">Workspace hub sync: ${escapeHtml(refreshOutcome.hubError)}</p>`;
+    }
+  }
+  return `<section class="mp-pack-update mp-pack-update-success" aria-live="polite">
+    <h4>Update applied</h4>
+    <p class="mp-pack-update-success-lede">${escapeHtml(result.message || 'Pack update completed successfully.')}</p>
+    <p class="text-muted">Installed version is now <strong>v${escapeHtml(result.newVersion || '')}</strong> (was v${escapeHtml(result.previousVersion || '')}).</p>
+    ${delta}
+    ${refreshNote}
+  </section>`;
+}
+
+function renderInstalledPackUpdateRegistryConflictBlock(error, code) {
+  return `<section class="mp-pack-update mp-pack-update-failed" role="alert">
+    <h4>Update not completed</h4>
+    <p class="mp-pack-update-registry-msg">${escapeHtml(error || 'The installed pack registry could not be updated.')}</p>
+    <p class="text-muted">Do not assume this update succeeded. If content changed but the version still looks old, contact support.</p>
+    ${code ? `<p class="text-muted mp-pack-update-error-code"><code>${escapeHtml(code)}</code></p>` : ''}
+  </section>`;
+}
+
+function mapInstalledPackUpdateError(res) {
+  const { status, code, error } = res;
+  if (status === 403) {
+    return { message: error || 'You do not have permission to apply pack updates.' };
+  }
+  if (
+    status === 409 &&
+    (code === 'MARKETPLACE_UPDATE_REGISTRY_COMMIT_FAILED' || code === 'MARKETPLACE_VERSION_CONFLICT')
+  ) {
+    return { terminal: true, html: renderInstalledPackUpdateRegistryConflictBlock(error, code) };
+  }
+  if (status === 409) {
+    return { message: error || 'This update could not be applied due to a version conflict.' };
+  }
+  if (status === 401) {
+    return { message: error || 'Sign in again to apply this update.' };
+  }
+  if (status === 400) {
+    if (code === 'MARKETPLACE_UPDATE_RESOURCE_FAILED') {
+      return { message: error || 'Could not apply update resources. Your installed version was not changed.' };
+    }
+    if (code === 'MARKETPLACE_UPDATE_VALIDATION_FAILED') {
+      return { message: error || 'Update validation failed. Your installed version was not changed.' };
+    }
+    return { message: error || 'This update could not be applied. Your installed version was not changed.' };
+  }
+  if (status === 503) {
+    return { message: error || 'Updates are temporarily unavailable. Try again shortly.' };
+  }
+  if (status >= 500) {
+    return { message: error || 'Something went wrong. Your installed version was not changed.' };
+  }
+  return { message: error || 'Could not apply update.' };
+}
+
+function wireInstalledPackUpdateForm(container, modal, packId, record, upd, canApply) {
+  const wrap = modal.querySelector('.mp-pack-update-wrap');
+  if (!wrap || !upd || !canApply) return;
+
+  const targetVersion = upd.latestVersion;
+  let applying = false;
+
+  const preview = wrap.querySelector('.mp-pack-update-preview');
+  const confirm = wrap.querySelector('.mp-pack-update-confirm');
+  const formError = wrap.querySelector('.mp-pack-update-form-error');
+  const startBtn = wrap.querySelector('.mp-pack-update-start');
+  const backBtn = wrap.querySelector('.mp-pack-update-back');
+  const applyBtn = wrap.querySelector('.mp-pack-update-apply');
+
+  const showFormError = (msg) => {
+    if (!formError) return;
+    if (msg) {
+      formError.textContent = msg;
+      formError.classList.remove('hidden');
+    } else {
+      formError.textContent = '';
+      formError.classList.add('hidden');
+    }
+  };
+
+  const setApplying = (on) => {
+    applying = on;
+    [startBtn, backBtn, applyBtn].forEach((btn) => {
+      if (btn) {
+        btn.disabled = on;
+        btn.classList.toggle('mp-pack-update-applying', on && btn === applyBtn);
+      }
+    });
+  };
+
+  const mountTerminalState = (html) => {
+    wrap.outerHTML = html;
+  };
+
+  startBtn?.addEventListener('click', () => {
+    showFormError('');
+    preview?.classList.add('hidden');
+    confirm?.classList.remove('hidden');
+  });
+
+  backBtn?.addEventListener('click', () => {
+    showFormError('');
+    confirm?.classList.add('hidden');
+    preview?.classList.remove('hidden');
+  });
+
+  applyBtn?.addEventListener('click', async () => {
+    if (applying) return;
+    showFormError('');
+
+    let companyId;
+    try {
+      companyId = requireCompanyId();
+    } catch {
+      showFormError('Select a workspace before applying an update.');
+      return;
+    }
+
+    setApplying(true);
+    const res = await applyPackUpdate(companyId, packId, targetVersion);
+
+    if (res.data?.success === true) {
+      const refresh = await refreshMarketplaceAuthoritativeState(companyId);
+      if (refresh.lifecycleItems) {
+        patchMarketplaceLifecycleMount(container, refresh.lifecycleItems);
+        rebindLifecycleMountEvents(container, companyId);
+      }
+      syncInstalledDetailLifecycleMeta(modal, packId);
+      setApplying(false);
+      mountTerminalState(
+        renderInstalledPackUpdateSuccessBlock(res.data, {
+          attempted: true,
+          ok: refresh.ok,
+          hubError: refresh.hubError,
+          lifecycleError: refresh.lifecycleError,
+          updatesError: refresh.updatesError,
+        }),
+      );
+      return;
+    }
+
+    setApplying(false);
+
+    const mapped = mapInstalledPackUpdateError(res);
+    if (mapped.terminal && mapped.html) {
+      mountTerminalState(mapped.html);
+      return;
+    }
+    showFormError(mapped.message || 'Could not apply update.');
+  });
 }
 
 function wireInstalledPackReviewForm(container, modal, packId) {
@@ -452,7 +750,9 @@ export async function renderMarketplace(container) {
       </select>
     </div>
 
-    ${renderLifecycleSections(installing, failed, installed)}
+    <div id="mpLifecycleMount">
+      ${renderLifecycleSections(installing, failed, installed)}
+    </div>
 
     <div class="marketplace-pack-grid" id="mpPackGrid">
       ${renderPackCards(catalog.packs || [], companyId)}
@@ -650,6 +950,7 @@ function openInstalledDetailModal(container, packId) {
   const modal = container.querySelector('#mpDetailModal');
   const record = lifecycleByPackId.get(packId);
   const upd = updatesByPackId.get(packId);
+  const canApplyUpdate = can(state.profile?.role, 'canManageStaff');
   if (!record) {
     showToast('Installed pack details are not available.', 'error');
     return;
@@ -668,12 +969,7 @@ function openInstalledDetailModal(container, packId) {
           <dt>Last updated</dt><dd>${escapeHtml(formatWhen(record.updatedAt))}</dd>
         </dl>
         ${renderInstalledPackReviewFormBlock(packId)}
-        ${upd ? `
-          <h4>Update available</h4>
-          <p>Version <strong>${escapeHtml(record.version || '1.0')}</strong> → <strong>${escapeHtml(upd.latestVersion)}</strong></p>
-          ${upd.changelog?.length ? `<ul class="mp-update-changelog">${upd.changelog.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : ''}
-          <p class="text-muted mp-read-only-note"><i class="fa-solid fa-lock"></i> Applying updates from the Portal will be enabled in a later release.</p>
-        ` : '<p class="text-muted">This pack is up to date with published versions.</p>'}
+        ${renderInstalledPackUpdateSection(record, upd, packId, canApplyUpdate)}
         <div class="mp-modal-actions">
           <button type="button" class="btn btn-secondary" data-close="1">Close</button>
         </div>
@@ -685,6 +981,7 @@ function openInstalledDetailModal(container, packId) {
     });
   });
   wireInstalledPackReviewForm(container, modal, packId);
+  wireInstalledPackUpdateForm(container, modal, packId, record, upd, canApplyUpdate);
 }
 
 async function openDetailModal(container, packId) {

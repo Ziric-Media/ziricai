@@ -51,9 +51,11 @@ console.log("✓ update engine uses version repo + authoritative services (no le
 
 for (const rel of ["js/portal/modules/marketplace.js", "app/js/portal/modules/marketplace.js"]) {
     const portalMarketplace = read(rel);
-    assert.doesNotMatch(portalMarketplace, /applyMarketplaceUpdate|Apply Update|\/api\/marketplace\/update/i);
+    assert.doesNotMatch(portalMarketplace, /applyMarketplaceUpdate\b/);
+    assert.doesNotMatch(portalMarketplace, /request\s*\(\s*['"]\/api\/marketplace\/update['"]/);
+    assert.doesNotMatch(portalMarketplace, /fetch\s*\(\s*['"][^'"]*\/api\/marketplace\/update/);
 }
-console.log("✓ Portal marketplace module has no Apply Update / update POST helper");
+console.log("✓ Portal marketplace module has no duplicate update POST helper (apply via api.js only)");
 
 const apiSrc = read("api/app.js");
 const updateRoute = extractRouteBlock(apiSrc, "post", "/api/marketplace/update");

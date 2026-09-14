@@ -45,8 +45,8 @@ for (const rel of ["js/portal/modules/marketplace.js"]) {
     assert.match(src, /mp-preview-btn/);
     assert.match(src, /Preview pack/);
     assert.match(src, /isPaymentRequiredResult/);
-    assert.doesNotMatch(src, /\/api\/marketplace\/update/i);
-    assert.doesNotMatch(src, /Apply Update/i);
+    assert.doesNotMatch(src, /request\s*\(\s*['"]\/api\/marketplace\/update['"]/);
+    assert.doesNotMatch(src, /applyMarketplaceUpdate\b/);
     assert.doesNotMatch(src, /stripe|payfast|paystack|flutterwave|checkout/i);
     assert.doesNotMatch(src, /sales@ziricai\.com/);
 }

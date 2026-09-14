@@ -268,6 +268,15 @@ export async function fetchPackUpdates(companyId) {
   return request(`/api/marketplace/installed/${encodeURIComponent(companyId)}/updates`);
 }
 
+/** Apply published pack version update (4C-5 — POST only; server merge-additive; canManageStaff). */
+export async function applyPackUpdate(companyId, packId, targetVersion) {
+  return request('/api/marketplace/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companyId, packId, targetVersion }),
+  });
+}
+
 export async function installMarketplacePack(companyId, packId, options = {}) {
   const result = await request('/api/marketplace/install', {
     method: 'POST',

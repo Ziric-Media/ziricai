@@ -83,14 +83,15 @@ console.log("✓ Portal api exposes fetchMarketplaceLifecycle");
 for (const rel of ["js/portal/modules/marketplace.js", "app/js/portal/modules/marketplace.js"]) {
     const src = read(rel);
     assert.match(src, /fetchMarketplaceLifecycle/);
-    assert.doesNotMatch(src, /applyMarketplaceUpdate|Apply Update|\/api\/marketplace\/update/i);
+    assert.doesNotMatch(src, /applyMarketplaceUpdate\b/);
+    assert.doesNotMatch(src, /request\s*\(\s*['"]\/api\/marketplace\/update['"]/);
     assert.match(src, /INSTALL_IN_PROGRESS/);
     assert.match(src, /402|PAYMENT_REQUIRED/);
     assert.match(src, /mp-read-only-note|read-only/i);
     assert.match(src, /installMarketplacePack/);
     assert.doesNotMatch(src, /demoLifecycle|fakeLifecycle|MOCK_LIFECYCLE/i);
 }
-console.log("✓ Portal lifecycle UI wired; no Apply Update; wizard error distinctions; no fake lifecycle");
+console.log("✓ Portal lifecycle UI wired; no duplicate update POST; wizard error distinctions; no fake lifecycle");
 
 const companyId = process.env.PORTAL_4C2_TEST_COMPANY || `portal-4c2-lc-${Date.now()}`;
 
