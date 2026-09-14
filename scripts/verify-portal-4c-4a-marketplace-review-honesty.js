@@ -40,20 +40,14 @@ assert.doesNotMatch(mp, /Top rated/i);
 assert.doesNotMatch(mp, /d\.reviews/);
 assert.doesNotMatch(mp, /getDemoReviews/);
 assert.doesNotMatch(mp, /PACK_DEMO_RATINGS/);
-assert.doesNotMatch(mp, /submitPackReview/);
-if (/Write a review/i.test(mp)) {
-    assert.match(mp, /mp-review-write-disabled/);
-    assert.match(mp, /mp-review-write-disabled[\s\S]*disabled|disabled[\s\S]*mp-review-write-disabled/);
-} else {
-    assert.doesNotMatch(mp, /Write a review/i);
-}
 assert.doesNotMatch(mp, /\/api\/marketplace\/review/i);
+assert.doesNotMatch(mp, /method:\s*['"]POST['"][\s\S]*marketplace\/review/i);
 console.log("✓ Portal uses API-backed ratings; demo fiction forbidden");
 
 assert.match(api, /fetchPackReviews/);
 assert.match(api, /submitPackReview/);
-assert.doesNotMatch(mp, /import[\s\S]*submitPackReview/);
-console.log("✓ submitPackReview remains unused by Portal module (API stub only)");
+assert.match(mp, /import[\s\S]*submitPackReview[\s\S]*from\s+['"]\.\.\/api\.js['"]/);
+console.log("✓ submitPackReview wired via api.js helper (no inline POST path)");
 
 assert.match(read("services/platform/marketplaceTemplate.js"), /PACK_DEMO_RATINGS/);
 assert.match(read("services/platform/marketplaceTemplate.js"), /getDemoReviews/);

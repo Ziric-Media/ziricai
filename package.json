@@ -83,6 +83,7 @@
         "verify:portal-4c-4b-4-portal-marketplace-review-read": "node scripts/verify-portal-4c-4b-4-portal-marketplace-review-read.js",
         "verify:portal-4c-4b-4-production-acceptance": "node scripts/verify-portal-4c-4b-4-production-acceptance.mjs",
         "verify:portal-4c-4c-1-marketplace-review-eligibility": "node scripts/verify-portal-4c-4c-1-marketplace-review-eligibility.js",
+        "verify:portal-4c-4c-2-marketplace-review-submit": "node scripts/verify-portal-4c-4c-2-marketplace-review-submit.js",
         "verify:mission-control-data-mode": "node scripts/verify-mission-control-data-mode.js",
         "verify:mission-control-customers-scope": "node scripts/verify-mission-control-customers-scope.js",
         "verify:mission-control-agents-scope": "node scripts/verify-mission-control-agents-scope.js",

@@ -8,6 +8,7 @@ import {
   fetchPackDetail,
   fetchPackReviews,
   installMarketplacePack,
+  submitPackReview,
 } from '../api.js';
 import { withTimeout } from '../../admin/utils.js';
 import { navigateTo } from '../router.js';
@@ -84,17 +85,205 @@ function renderCustomerReviewsLoadingState() {
   return `<p class="mp-reviews-loading text-muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading reviews…</p>`;
 }
 
-/** 4C-4C-1 — installed-pack context only; disabled until 4C-4C-2 wires POST. */
-function renderInstalledPackReviewEligibilityBlock() {
-  return `<section class="mp-review-eligibility" aria-labelledby="mp-review-eligibility-title">
+const REVIEW_TITLE_MAX = 200;
+const REVIEW_BODY_MAX = 4000;
+
+function renderInstalledPackReviewRatingInput() {
+  const stars = [1, 2, 3, 4, 5]
+    .map(
+      (n) =>
+        `<button type="button" class="mp-rating-star" data-rating="${n}" aria-pressed="false" aria-label="${n} out of 5 stars">★</button>`
+    )
+    .join('');
+  return `<fieldset class="mp-rating-input">
+      <legend>Rating <span class="mp-required">(required)</span></legend>
+      <div class="mp-rating-stars" role="group" aria-label="Star rating">${stars}</div>
+      <p class="mp-review-field-error mp-rating-error hidden" role="alert"></p>
+    </fieldset>`;
+}
+
+/** 4C-4C-2 — installed-pack context only; catalog detail stays read-only. */
+function renderInstalledPackReviewFormBlock(packId) {
+  return `<section class="mp-review-eligibility mp-review-form-wrap" data-pack-id="${escapeHtml(packId)}" aria-labelledby="mp-review-eligibility-title">
     <h4 id="mp-review-eligibility-title">Your review</h4>
     <div class="mp-review-contract">
       <p>One review per workspace per pack. Any signed-in team member may submit a review.</p>
       <p>Rating is required. Title and review text are optional.</p>
       <p>Reviews publish immediately and contribute to the marketplace rating.</p>
     </div>
-    <button type="button" class="btn btn-secondary btn-sm mp-review-write-disabled" disabled aria-disabled="true">Write a review</button>
+    <form class="mp-review-form" novalidate>
+      ${renderInstalledPackReviewRatingInput()}
+      <label class="mp-review-field">
+        <span>Title <span class="text-muted">(optional)</span></span>
+        <input type="text" class="mp-review-title-input" maxlength="${REVIEW_TITLE_MAX}" autocomplete="off" />
+      </label>
+      <label class="mp-review-field">
+        <span>Review text <span class="text-muted">(optional)</span></span>
+        <textarea class="mp-review-body-input" rows="4" maxlength="${REVIEW_BODY_MAX}"></textarea>
+      </label>
+      <p class="mp-review-form-error hidden" role="alert"></p>
+      <button type="submit" class="btn btn-primary btn-sm mp-review-submit">Submit review</button>
+    </form>
   </section>`;
+}
+
+function renderInstalledPackReviewSuccessBlock(review) {
+  return `<section class="mp-review-eligibility mp-review-submitted" aria-live="polite">
+    <h4>Review submitted</h4>
+    <p class="mp-review-success-lede">Your review has been published and is now contributing to this pack's marketplace rating.</p>
+    <div class="mp-review-your-card">${renderPublicReviewCard(review)}</div>
+    <button type="button" class="btn btn-secondary btn-sm mp-review-view-catalog">View pack reviews</button>
+  </section>`;
+}
+
+function renderInstalledPackReviewDuplicateBlock() {
+  return `<section class="mp-review-eligibility mp-review-already-submitted" aria-live="polite">
+    <h4>Review already submitted</h4>
+    <p class="mp-review-duplicate-msg">Your workspace already reviewed this pack.</p>
+    <button type="button" class="btn btn-secondary btn-sm mp-review-view-catalog">View pack reviews</button>
+  </section>`;
+}
+
+function renderInstalledPackReviewIneligibleBlock(message) {
+  return `<section class="mp-review-eligibility mp-review-ineligible" aria-live="polite">
+    <h4>Review not available</h4>
+    <p class="mp-review-ineligible-msg">${escapeHtml(message)}</p>
+  </section>`;
+}
+
+function mapInstalledReviewSubmitError(res) {
+  const { status, code, error } = res;
+  if (status === 403 && code === 'REVIEW_NOT_ELIGIBLE') {
+    return {
+      terminal: true,
+      html: renderInstalledPackReviewIneligibleBlock(
+        error || 'This pack must be fully installed in your workspace before you can submit a review.'
+      ),
+    };
+  }
+  if (status === 409 && code === 'DUPLICATE_REVIEW') {
+    return { terminal: true, html: renderInstalledPackReviewDuplicateBlock() };
+  }
+  if (status === 401) {
+    return { message: error || 'Sign in again to submit a review.' };
+  }
+  if (status === 400) {
+    return { message: error || 'Check your rating and review text, then try again.' };
+  }
+  if (status === 503 || code === 'REVIEW_PERSISTENCE_FAILED') {
+    return { message: error || 'Reviews are temporarily unavailable. Your text was kept — try again shortly.' };
+  }
+  if (status >= 500) {
+    return { message: error || 'Something went wrong. Your text was kept — try again shortly.' };
+  }
+  return { message: error || 'Could not submit review. Your text was kept — try again.' };
+}
+
+function wireInstalledPackReviewForm(container, modal, packId) {
+  const wrap = modal.querySelector('.mp-review-form-wrap');
+  const form = wrap?.querySelector('.mp-review-form');
+  if (!wrap || !form) return;
+
+  let selectedRating = 0;
+  let submitting = false;
+
+  const ratingError = form.querySelector('.mp-rating-error');
+  const formError = form.querySelector('.mp-review-form-error');
+  const submitBtn = form.querySelector('.mp-review-submit');
+  const titleInput = form.querySelector('.mp-review-title-input');
+  const bodyInput = form.querySelector('.mp-review-body-input');
+
+  const showFormError = (msg) => {
+    if (!formError) return;
+    if (msg) {
+      formError.textContent = msg;
+      formError.classList.remove('hidden');
+    } else {
+      formError.textContent = '';
+      formError.classList.add('hidden');
+    }
+  };
+
+  form.querySelectorAll('.mp-rating-star').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      selectedRating = Number(btn.dataset.rating) || 0;
+      form.querySelectorAll('.mp-rating-star').forEach((star) => {
+        const n = Number(star.dataset.rating) || 0;
+        const on = n > 0 && n <= selectedRating;
+        star.classList.toggle('is-selected', on);
+        star.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      ratingError?.classList.add('hidden');
+      showFormError('');
+    });
+  });
+
+  const mountTerminalState = (html) => {
+    wrap.outerHTML = html;
+    modal.querySelector('.mp-review-view-catalog')?.addEventListener('click', () => {
+      closeModal(modal);
+      openDetailModal(container, packId);
+    });
+  };
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+
+    showFormError('');
+    if (!selectedRating || selectedRating < 1 || selectedRating > 5) {
+      if (ratingError) {
+        ratingError.textContent = 'Select a rating from 1 to 5 stars.';
+        ratingError.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const title = (titleInput?.value || '').trim();
+    const body = (bodyInput?.value || '').trim();
+    if (title.length > REVIEW_TITLE_MAX || body.length > REVIEW_BODY_MAX) {
+      showFormError('Title or review text is too long.');
+      return;
+    }
+
+    let companyId;
+    try {
+      companyId = requireCompanyId();
+    } catch {
+      showFormError('Select a workspace before submitting a review.');
+      return;
+    }
+
+    submitting = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('mp-review-submitting');
+    }
+
+    const res = await submitPackReview(companyId, packId, {
+      rating: selectedRating,
+      ...(title ? { title } : {}),
+      ...(body ? { body } : {}),
+    });
+
+    submitting = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('mp-review-submitting');
+    }
+
+    if (res.data?.review) {
+      mountTerminalState(renderInstalledPackReviewSuccessBlock(res.data.review));
+      return;
+    }
+
+    const mapped = mapInstalledReviewSubmitError(res);
+    if (mapped.terminal && mapped.html) {
+      mountTerminalState(mapped.html);
+      return;
+    }
+    showFormError(mapped.message || 'Could not submit review.');
+  });
 }
 
 /** Catalog detail — steer only; no write control (4C-4C-1). */
@@ -478,7 +667,7 @@ function openInstalledDetailModal(container, packId) {
           <dt>Installed</dt><dd>${escapeHtml(formatWhen(record.installedCompletedAt || record.installedAt))}</dd>
           <dt>Last updated</dt><dd>${escapeHtml(formatWhen(record.updatedAt))}</dd>
         </dl>
-        ${renderInstalledPackReviewEligibilityBlock()}
+        ${renderInstalledPackReviewFormBlock(packId)}
         ${upd ? `
           <h4>Update available</h4>
           <p>Version <strong>${escapeHtml(record.version || '1.0')}</strong> → <strong>${escapeHtml(upd.latestVersion)}</strong></p>
@@ -495,6 +684,7 @@ function openInstalledDetailModal(container, packId) {
       if (e.target.dataset.close) closeModal(modal);
     });
   });
+  wireInstalledPackReviewForm(container, modal, packId);
 }
 
 async function openDetailModal(container, packId) {

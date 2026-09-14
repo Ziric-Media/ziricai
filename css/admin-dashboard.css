@@ -6557,6 +6557,99 @@ ul { list-style: none; }
     opacity: 0.72;
 }
 
+.mp-review-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mp-review-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.mp-review-field input,
+.mp-review-field textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    font: inherit;
+}
+
+.mp-rating-input {
+    border: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.mp-rating-input legend {
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.mp-rating-stars {
+    display: flex;
+    gap: 4px;
+}
+
+.mp-rating-star {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted, #94a3b8);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+}
+
+.mp-rating-star.is-selected {
+    color: #eab308;
+}
+
+.mp-review-field-error,
+.mp-review-form-error {
+    margin: 0;
+    font-size: 13px;
+    color: var(--danger, #dc2626);
+}
+
+.mp-review-field-error.hidden,
+.mp-review-form-error.hidden {
+    display: none;
+}
+
+.mp-review-submit.mp-review-submitting,
+.mp-review-submit:disabled {
+    opacity: 0.65;
+    pointer-events: none;
+}
+
+.mp-review-success-lede,
+.mp-review-duplicate-msg,
+.mp-review-ineligible-msg {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-muted, #64748b);
+    margin: 0 0 12px;
+}
+
+.mp-review-your-card {
+    margin-bottom: 12px;
+}
+
+.mp-review-submitted .mp-review-view-catalog,
+.mp-review-already-submitted .mp-review-view-catalog {
+    margin-top: 4px;
+}
+
+.mp-required {
+    font-weight: normal;
+    color: var(--text-muted, #64748b);
+}
+
 .mp-review-eligibility-note {
     font-size: 13px;
     line-height: 1.45;

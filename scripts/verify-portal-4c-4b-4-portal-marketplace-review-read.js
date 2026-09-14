@@ -42,13 +42,15 @@ assert.match(mp, /mp-reviews-retry/);
 assert.match(mp, /mp-reviews-load-more/);
 assert.match(mp, /loadPackReviewsIntoMount/);
 assert.match(mp, /renderCustomerReviewsLoadingState/);
-assert.doesNotMatch(mp, /submitPackReview/);
+assert.match(mp, /import[\s\S]*submitPackReview[\s\S]*from\s+['"]\.\.\/api\.js['"]/);
 assert.doesNotMatch(mp, /\/api\/marketplace\/review/i);
-if (/Write a review/i.test(mp)) {
-    assert.match(mp, /mp-review-write-disabled/);
-} else {
-    assert.doesNotMatch(mp, /Write a review/i);
-}
+const catalogDetailStart = mp.indexOf("async function openDetailModal");
+const wizardStart = mp.indexOf("function openWizardModal");
+const catalogDetailBody = mp.slice(catalogDetailStart, wizardStart);
+assert.doesNotMatch(catalogDetailBody, /mp-review-form/);
+assert.doesNotMatch(catalogDetailBody, /mp-review-submit/);
+assert.doesNotMatch(catalogDetailBody, /wireInstalledPackReviewForm/);
+assert.match(catalogDetailBody, /renderCatalogReviewSubmitGuidance/);
 assert.doesNotMatch(mp, /getDemoReviews/);
 assert.doesNotMatch(mp, /PACK_DEMO_RATINGS/);
 assert.doesNotMatch(mp, /Top rated/i);
