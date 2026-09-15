@@ -144,6 +144,12 @@ export async function listKnowledgeDocuments(companyId, options = {}) {
 
     if (tenantDocs.length) return tenantDocs;
 
+    const adapter = await getStorageAdapter();
+    // Legacy flat `knowledge` collection uses browser client SDK — not valid on Railway/Admin paths.
+    if (adapter.name === "firestore") {
+        return tenantDocs;
+    }
+
     const legacy = await legacyList(companyId);
     return legacy;
 }

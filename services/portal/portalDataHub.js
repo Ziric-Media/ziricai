@@ -36,6 +36,8 @@ import { getCompany } from '../tenants/companyService.js';
 
 import { isDemoTenant as isDemoTenantId, shouldUseDemoFallback } from '../core/dataMode.js';
 
+import { resolvePilotDataCompanyId } from '../storage/centralMotorsPilot.js';
+
 const DEMO_COMPANY_ID = 'demo-central-motors';
 
 
@@ -414,6 +416,8 @@ const DEMO_HUB_CONVERSATIONS = [
 
 export async function getPortalHub(companyId) {
 
+  const dataCompanyId = resolvePilotDataCompanyId(companyId);
+
   const today = new Date().toISOString().slice(0, 10);
 
 
@@ -442,37 +446,37 @@ export async function getPortalHub(companyId) {
 
   ] = await Promise.all([
 
-    getPortalUsageAsync(companyId),
+    getPortalUsageAsync(dataCompanyId),
 
-    listTenantConversations(companyId, { limit: 50 }).catch(() => []),
+    listTenantConversations(dataCompanyId, { limit: 50 }).catch(() => []),
 
-    getDashboardSnapshot(companyId, { days: 7 }).catch(() => null),
+    getDashboardSnapshot(dataCompanyId, { days: 7 }).catch(() => null),
 
-    getWorkspaceSnapshot(companyId).catch(() => null),
+    getWorkspaceSnapshot(dataCompanyId).catch(() => null),
 
-    getCompany(companyId).catch(() => null),
+    getCompany(dataCompanyId).catch(() => null),
 
-    listTenantCustomers(companyId, { limit: 500 }).catch(() => []),
+    listTenantCustomers(dataCompanyId, { limit: 500 }).catch(() => []),
 
-    listLeads(companyId).catch(() => []),
+    listLeads(dataCompanyId).catch(() => []),
 
-    listUpcomingAppointments(companyId).catch(() => []),
+    listUpcomingAppointments(dataCompanyId).catch(() => []),
 
-    listAutomationRuns(companyId, { limit: 10 }).catch(() => []),
+    listAutomationRuns(dataCompanyId, { limit: 10 }).catch(() => []),
 
-    listTenantNotifications(companyId).catch(() => []),
+    listTenantNotifications(dataCompanyId).catch(() => []),
 
   ]);
 
 
 
-  const resourceCounts = workspace?.resources || (await getWorkspaceResourceCounts(companyId).catch(() => null));
+  const resourceCounts = workspace?.resources || (await getWorkspaceResourceCounts(dataCompanyId).catch(() => null));
 
   const isProvisioned = Boolean(companyRecord || workspace?.company);
 
   const useDemoContent = shouldUseDemoFallback({
-    companyId,
-    isDemo: isDemoTenantId(companyId),
+    companyId: dataCompanyId,
+    isDemo: isDemoTenantId(companyId) && dataCompanyId === companyId,
     isProvisioned,
   });
 

@@ -84,6 +84,32 @@ async function adapter() {
     return getStorageAdapter();
 }
 
+/** Resources written by a successful full provisionCompany() run (saveProvisioningLinks). */
+const CANONICAL_PROVISIONING_RESOURCES = [
+    "company",
+    "departments",
+    "default_agent",
+    "knowledge_base",
+    "crm_workspace",
+    "billing",
+    "workflow_workspace",
+];
+
+/**
+ * True when the durable provisioning record from saveProvisioningLinks represents a completed run.
+ * Does not infer completeness from orphan agents/KB docs alone.
+ * @param {object|null|undefined} record
+ */
+export function isCanonicalProvisioningComplete(record) {
+    if (!record || typeof record !== "object") return false;
+    if (!record.provisionedAt) return false;
+    const links = record.links;
+    if (!links || typeof links !== "object") return false;
+    if (!links.agentId || !links.knowledgeBaseId) return false;
+    const resources = Array.isArray(record.resources) ? record.resources : [];
+    return CANONICAL_PROVISIONING_RESOURCES.every((key) => resources.includes(key));
+}
+
 /**
  * Provision full tenant workspace when a company is created.
  * @returns {{ companyId, links, provisioned, agent, knowledgeBaseId, workflowIds }}
@@ -92,19 +118,17 @@ export async function provisionCompany(companyId, companyData = {}) {
     if (!companyId) throw new Error("companyId is required");
 
     const store = await adapter();
-    if (store.getProvisioning) {
-        const existing = await store.getProvisioning(companyId);
-        if (existing?.links) {
-            return {
-                companyId,
-                links: existing.links,
-                provisioned: existing.resources || [],
-                agentId: existing.links.agentId,
-                knowledgeBaseId: existing.links.knowledgeBaseId,
-                workflowIds: existing.links.workflowIds || [],
-                alreadyProvisioned: true,
-            };
-        }
+    const existingRecord = await getStoredLinks(companyId);
+    if (isCanonicalProvisioningComplete(existingRecord)) {
+        return {
+            companyId,
+            links: existingRecord.links,
+            provisioned: existingRecord.resources || [],
+            agentId: existingRecord.links.agentId,
+            knowledgeBaseId: existingRecord.links.knowledgeBaseId,
+            workflowIds: existingRecord.links.workflowIds || [],
+            alreadyProvisioned: true,
+        };
     }
 
     const name = String(companyData.name || companyId).trim();

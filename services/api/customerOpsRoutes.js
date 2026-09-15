@@ -26,6 +26,7 @@ import {
     markConversationRead,
 } from "../tenants/conversationService.js";
 import { resolveStaffSenderName } from "../conversation/inboxStaffIdentity.js";
+import { resolvePilotDataCompanyId } from "../storage/centralMotorsPilot.js";
 import {
     listAppointments,
     listUpcomingAppointments,
@@ -224,7 +225,8 @@ export function mountCustomerOpsRoutes(app) {
     /* ── Conversations (unified inbox) ── */
     app.get("/api/companies/:companyId/conversations", requireTenantScope(), async (req, res) => {
         try {
-            const items = await listTenantConversations(req.params.companyId, {
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const items = await listTenantConversations(dataCompanyId, {
                 limit: parseInt(req.query.limit || "50", 10),
             });
             const unreadCount = items.filter((c) => c.unread).length;
@@ -237,7 +239,8 @@ export function mountCustomerOpsRoutes(app) {
 
     app.get("/api/companies/:companyId/conversations/:conversationId", requireTenantScope(), async (req, res) => {
         try {
-            const detail = await getTenantConversation(req.params.companyId, req.params.conversationId);
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const detail = await getTenantConversation(dataCompanyId, req.params.conversationId);
             if (!detail) return res.status(404).json({ error: "Conversation not found" });
             res.json(detail);
         } catch (err) {
@@ -249,7 +252,8 @@ export function mountCustomerOpsRoutes(app) {
         try {
             const { text, channel } = req.body || {};
             if (!text?.trim()) return res.status(400).json({ error: "text is required" });
-            const result = await sendConversationReply(req.params.companyId, req.params.conversationId, {
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const result = await sendConversationReply(dataCompanyId, req.params.conversationId, {
                 text,
                 channel,
                 senderName: resolveStaffSenderName(req.tenant),
@@ -262,7 +266,8 @@ export function mountCustomerOpsRoutes(app) {
 
     app.post("/api/companies/:companyId/conversations/:conversationId/read", requireAuthenticatedTenantMember(), async (req, res) => {
         try {
-            const result = await markConversationRead(req.params.companyId, req.params.conversationId);
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const result = await markConversationRead(dataCompanyId, req.params.conversationId);
             res.json(result);
         } catch (err) {
             const status = err.status || 500;
@@ -273,7 +278,8 @@ export function mountCustomerOpsRoutes(app) {
     app.post("/api/companies/:companyId/conversations/:conversationId/takeover", requireAuthenticatedTenantMember(), async (req, res) => {
         try {
             const { humanAgent, enabled = true } = req.body || {};
-            const result = await setHumanTakeover(req.params.companyId, req.params.conversationId, {
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const result = await setHumanTakeover(dataCompanyId, req.params.conversationId, {
                 enabled,
                 humanAgent: humanAgent || "Staff",
             });
@@ -336,10 +342,11 @@ export function mountCustomerOpsRoutes(app) {
     /* ── Notifications ── */
     app.get("/api/companies/:companyId/notifications", requireTenantScope(), async (req, res) => {
         try {
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
             const unreadOnly = req.query.unread === "true";
             const items = unreadOnly
-                ? await listUnreadNotifications(req.params.companyId)
-                : await listTenantNotifications(req.params.companyId);
+                ? await listUnreadNotifications(dataCompanyId)
+                : await listTenantNotifications(dataCompanyId);
             res.json({
                 items,
                 unreadCount: items.filter((n) => !n.read).length,
@@ -352,7 +359,8 @@ export function mountCustomerOpsRoutes(app) {
 
     app.post("/api/companies/:companyId/notifications", requireTenantScope(), async (req, res) => {
         try {
-            const notification = await createNotification(req.params.companyId, req.body || {});
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const notification = await createNotification(dataCompanyId, req.body || {});
             res.status(201).json({ notification });
         } catch (err) {
             res.status(400).json({ error: err.message || "Failed to create notification" });
@@ -361,7 +369,8 @@ export function mountCustomerOpsRoutes(app) {
 
     app.patch("/api/companies/:companyId/notifications/:notificationId/read", requireTenantScope(), async (req, res) => {
         try {
-            const notification = await markNotificationRead(req.params.companyId, req.params.notificationId);
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const notification = await markNotificationRead(dataCompanyId, req.params.notificationId);
             res.json({ notification });
         } catch (err) {
             res.status(400).json({ error: err.message || "Failed to mark notification read" });
@@ -370,7 +379,8 @@ export function mountCustomerOpsRoutes(app) {
 
     app.post("/api/companies/:companyId/notifications/mark-all-read", requireTenantScope(), async (req, res) => {
         try {
-            const count = await markAllNotificationsRead(req.params.companyId);
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const count = await markAllNotificationsRead(dataCompanyId);
             res.json({ success: true, marked: count });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to mark all read" });
@@ -415,13 +425,14 @@ export function mountCustomerOpsRoutes(app) {
     app.get("/api/companies/:companyId/ops/summary", requireTenantScope(), async (req, res) => {
         try {
             const companyId = req.params.companyId;
+            const dataCompanyId = resolvePilotDataCompanyId(companyId);
             const today = new Date().toISOString().slice(0, 10);
             const [customers, conversations, appointments, runs, workflows] = await Promise.all([
-                listTenantCustomers(companyId, { limit: 500 }),
-                listTenantConversations(companyId, { limit: 100 }),
-                listUpcomingAppointments(companyId),
-                listAutomationRuns(companyId, { limit: 20 }),
-                listWorkflows(companyId),
+                listTenantCustomers(dataCompanyId, { limit: 500 }),
+                listTenantConversations(dataCompanyId, { limit: 100 }),
+                listUpcomingAppointments(dataCompanyId),
+                listAutomationRuns(dataCompanyId, { limit: 20 }),
+                listWorkflows(dataCompanyId),
             ]);
             const appointmentsToday = appointments.filter(
                 (a) => a.scheduledAt?.slice(0, 10) === today && a.status === "scheduled"

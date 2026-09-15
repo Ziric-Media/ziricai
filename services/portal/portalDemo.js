@@ -6,7 +6,10 @@
 import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { getPlan, buildUsageFromPlan, getAllPlans, formatPrice } from "../platform/billingPlans.js";
 import { isDemoTenant, shouldUseDemoFallback } from "../core/dataMode.js";
-import { buildProductionUsageSnapshot } from "./portalUsageSnapshot.js";
+import { buildProductionUsageSnapshot, buildRecordedUsageChartSeries } from "./portalUsageSnapshot.js";
+import { resolvePilotDataCompanyId } from "../storage/centralMotorsPilot.js";
+import { getTenantBilling } from "../payments/billingService.js";
+import { listTenantNotifications } from "../tenants/notificationService.js";
 
 const businessPlan = getPlan("business");
 
@@ -103,10 +106,11 @@ async function resolveTenantProvisioned(companyId) {
 
 /** Demo fallback only for explicit demo/unprovisioned tenants — never provisioned production. */
 export async function allowPortalDemoFallback(companyId) {
-    const isProvisioned = await resolveTenantProvisioned(companyId);
+    const dataCompanyId = resolvePilotDataCompanyId(companyId);
+    const isProvisioned = await resolveTenantProvisioned(dataCompanyId);
     return shouldUseDemoFallback({
-        companyId,
-        isDemo: isDemoTenant(companyId),
+        companyId: dataCompanyId,
+        isDemo: isDemoTenant(companyId) && dataCompanyId === companyId,
         isProvisioned,
     });
 }
@@ -184,14 +188,12 @@ export async function getPortalTeamAsync(companyId) {
 }
 
 export async function getPortalNotificationsAsync(companyId) {
+  const dataCompanyId = resolvePilotDataCompanyId(companyId);
   try {
-    const adapter = await getStorageAdapter();
-    if (adapter.getPortalNotifications) {
-      const live = await adapter.getPortalNotifications(companyId);
-      if (live.length) return live;
-    }
-  } catch {
-    /* ignore */
+    const items = await listTenantNotifications(dataCompanyId);
+    if (items.length) return items;
+  } catch (err) {
+    console.warn("[portalDemo] getPortalNotificationsAsync:", err.message);
   }
   if (await allowPortalDemoFallback(companyId)) {
     return getPortalNotifications(companyId);
@@ -376,6 +378,8 @@ function activityColorForIcon(icon) {
 
 async function loadCompanyPlan(companyId) {
   try {
+    const billing = await getTenantBilling(companyId);
+    if (billing?.planId) return billing.planId;
     const adapter = await getStorageAdapter();
     if (adapter.getPortalCompany) {
       const company = await adapter.getPortalCompany(companyId);
@@ -384,7 +388,8 @@ async function loadCompanyPlan(companyId) {
   } catch {
     /* ignore */
   }
-  return companyId === 'demo-central-motors' ? 'business' : 'trial';
+  if (companyId === "demo-central-motors") return "business";
+  return "starter";
 }
 
 export function getPortalUsage(companyId) {
@@ -395,9 +400,11 @@ export async function getPortalUsageAsync(companyId) {
   let usage;
   let invoices = [];
   const seed = hashSeed(companyId || 'default');
+  const dataCompanyId = resolvePilotDataCompanyId(companyId);
   const allowDemo = await allowPortalDemoFallback(companyId);
+  const showStaticDemo = allowDemo && companyId === "demo-central-motors" && dataCompanyId === companyId;
 
-  if (companyId === 'demo-central-motors') {
+  if (showStaticDemo) {
     usage = {
       ...PORTAL_DEMO_USAGE,
       aiEmployeesUsed: 1,
@@ -417,18 +424,26 @@ export async function getPortalUsageAsync(companyId) {
     };
     invoices = PORTAL_DEMO_INVOICES;
   } else if (allowDemo) {
-    const planId = await loadCompanyPlan(companyId);
-    usage = { companyId, ...buildUsageFromPlan(planId, seed) };
+    const planId = await loadCompanyPlan(dataCompanyId);
+    usage = { companyId: dataCompanyId, ...buildUsageFromPlan(planId, seed) };
     invoices = [];
   } else {
-    const planId = await loadCompanyPlan(companyId);
-    usage = await buildProductionUsageSnapshot(companyId, planId);
+    const planId = await loadCompanyPlan(dataCompanyId);
+    usage = await buildProductionUsageSnapshot(dataCompanyId, planId);
+    usage.companyId = companyId;
     invoices = [];
   }
 
-  const chartSeries = allowDemo
-    ? generateMonthlyUsageSeries(companyId, usage.messagesUsed || 0, usage.tokensUsed || 0)
-    : emptyChartSeries();
+  let chartSeries;
+  if (showStaticDemo || allowDemo) {
+    chartSeries = generateMonthlyUsageSeries(
+      companyId,
+      usage.messagesUsed || 0,
+      usage.tokensUsed || 0
+    );
+  } else {
+    chartSeries = (await buildRecordedUsageChartSeries(dataCompanyId)) || emptyChartSeries();
+  }
   const quickStats = allowDemo ? getPortalQuickStats(companyId) : emptyQuickStats();
   const plans = getAllPlans();
 

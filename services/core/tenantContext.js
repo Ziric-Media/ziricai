@@ -11,6 +11,7 @@ import {
 } from "../auth/authService.js";
 import { hasPlatformApiKeyAccess } from "../auth/platformAuth.js";
 import { auditLog } from "../audit/auditLog.js";
+import { tryPilotShowcaseTenantAccess } from "../storage/centralMotorsPilot.js";
 
 const ENFORCEMENT = (process.env.TENANT_SCOPE_ENFORCEMENT || "lax").toLowerCase();
 
@@ -122,6 +123,10 @@ export async function assertAuthenticatedTenantMemberAccess(ctx, deps = {}) {
 
     if (!ctx.uid) {
         throw Object.assign(new Error("Authentication required"), { status: 401, code: "UNAUTHORIZED" });
+    }
+
+    if (await tryPilotShowcaseTenantAccess(ctx, ctx.companyId, deps)) {
+        return { via: "tenant" };
     }
 
     if (!ctx.profile) {
