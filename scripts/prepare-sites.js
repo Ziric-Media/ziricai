@@ -5,6 +5,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { resolveWebFirebaseConfig } from '../js/firebase-config.js';
 
@@ -376,6 +377,9 @@ syncMarketplacePacksShared();
 
 if (target && runners[target]) {
   runners[target]();
+  if (target === 'app') {
+    execSync('node scripts/verify-portal-ui-styling.mjs --app', { cwd: ROOT, stdio: 'inherit' });
+  }
   console.log(`Prepared ${target}/`);
 } else {
   prepareMarketing();

@@ -54,6 +54,7 @@
         "verify:phase-2b-1-4-durable-crm": "node scripts/verify-phase-2b-1-4-durable-crm.js",
         "verify:phase-2b-2-appointments": "node scripts/verify-phase-2b-2-appointments.js",
         "verify:portal-foundation": "node scripts/verify-portal-foundation.js",
+        "verify:portal-ui-styling": "node scripts/verify-portal-ui-styling.mjs",
         "verify:portal-2a": "node scripts/verify-portal-2a.js",
         "verify:portal-2b": "node scripts/verify-portal-2b.js",
         "verify:portal-2c": "node scripts/verify-portal-2c.js",
