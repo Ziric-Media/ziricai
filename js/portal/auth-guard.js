@@ -106,6 +106,12 @@ async function loadTenantContext(profile) {
   updateNotificationBadge();
 
   prefetchHub(companyId).catch((err) => console.warn('[portal] hub prefetch:', err.message));
+  import('./core/notificationPolling.js')
+    .then((m) => {
+      m.registerNotificationRefresh?.(() => updateNotificationBadge());
+      m.startNotificationPolling?.();
+    })
+    .catch(() => {});
 }
 
 async function completeLoginSession(user, profile) {

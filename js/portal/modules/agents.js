@@ -5,6 +5,7 @@ import { fetchAiEmployees } from '../api.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
 import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { can } from '../permissions.js';
+import { formatAgentModelLabel } from '../../shared/aiEmployeeDisplay.js';
 
 const ROLE_COLORS = {
   sales_consultant: 'purple',
@@ -110,7 +111,7 @@ function filterAgents(agents) {
   const term = searchTerm.toLowerCase();
   if (!term) return agents;
   return agents.filter((a) =>
-    [a.name, a.roleLabel, a.role, a.department, a.model, a.personality]
+    [a.name, a.roleLabel, a.role, a.department, a.model, a.modelVersion, formatAgentModelLabel(a), a.personality]
       .some((v) => String(v || '').toLowerCase().includes(term))
   );
 }
@@ -144,7 +145,7 @@ function employeeCard(agent) {
       </div>
 
       <div class="portal-employee-stats">
-        <div><span class="label">Model</span><span class="value">${escapeHtml(agent.model || 'gpt-4o-mini')}</span></div>
+        <div><span class="label">Model</span><span class="value">${escapeHtml(formatAgentModelLabel(agent))}</span></div>
         <div><span class="label">Knowledge</span><span class="value">${kbLabel}</span></div>
         <div><span class="label">Conversations</span><span class="value">${formatNumber(agent.conversations || 0)}</span></div>
       </div>

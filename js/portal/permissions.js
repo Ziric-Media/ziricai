@@ -61,6 +61,8 @@ export const MODULE_PERMISSIONS = {
 
   dashboard: null,
 
+  sarah: null,
+
   agents: 'canEditAI',
 
   knowledge: 'canEditAI',

@@ -8,10 +8,13 @@ import {
   MODULE_LABELS,
   renderSidebarNav,
 } from './core/appShell.js';
+import { dismissShellOverlays } from './core/shellOverlay.js';
 
 export { MODULE_LABELS, applySidebarVisibility };
 
 export function navigateTo(page, params = {}) {
+  dismissShellOverlays();
+
   const role = state.profile?.role;
   if (!canAccessModule(role, page)) {
     page = 'dashboard';

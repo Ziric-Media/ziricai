@@ -2,7 +2,11 @@ import { state } from '../core/dataStore.js';
 import { escapeHtml, pageHeader, loadingState, statusBadge, errorState } from '../../admin/ui.js';
 import { DEMO_KNOWLEDGE_ITEMS } from '../../admin/demo-data.js';
 import { fetchKnowledgeDocuments } from '../api.js';
-import { shouldUseDemoFallback } from '../../shared/dataMode.js';
+import { getHubData } from '../core/dataService.js';
+import {
+  shouldUsePortalDemoContentFallback,
+  resolvePortalProvisionedFlag,
+} from '../../shared/dataMode.js';
 import { renderEmptyState } from '../core/widgets/emptyState.js';
 import { can } from '../permissions.js';
 
@@ -17,8 +21,15 @@ export async function renderKnowledge(container) {
   container.innerHTML = loadingState('Loading knowledge base...');
   const companyId = state.companyId;
 
+  await getHubData(companyId).catch(() => {});
+
   const apiRes = await fetchKnowledgeDocuments(companyId);
-  const useDemo = shouldUseDemoFallback({ companyId, isDemo: state.hubData?.isDemo, isProvisioned: state.hubData?.isProvisioned });
+  const isProvisioned = resolvePortalProvisionedFlag(state);
+  const useDemo = shouldUsePortalDemoContentFallback({
+    companyId,
+    isDemo: state.hubData?.isDemo,
+    isProvisioned,
+  });
 
   if (apiRes.error && !useDemo) {
     container.innerHTML = `

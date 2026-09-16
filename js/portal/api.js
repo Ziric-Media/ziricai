@@ -237,8 +237,10 @@ export async function fetchDepartments(companyId) {
 }
 
 export async function fetchMarketplaceCatalog(queryString = '') {
-  const qs = queryString ? `?${queryString}` : '';
-  return request(`/api/marketplace/catalog${qs}`);
+  const params = new URLSearchParams(queryString);
+  if (!params.has('audience')) params.set('audience', 'portal');
+  const qs = params.toString();
+  return request(`/api/marketplace/catalog?${qs}`);
 }
 
 export async function fetchPackDetail(packId) {

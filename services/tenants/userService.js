@@ -4,6 +4,7 @@
  */
 import { ServiceBase } from "../core/serviceBase.js";
 import { TENANT_COLLECTIONS } from "../database/schema.js";
+import { toIsoTimestamp } from "../core/timestampUtils.js";
 
 class UserService extends ServiceBase {
     constructor() {
@@ -41,7 +42,7 @@ function formatTeamMember(record) {
         role: record.role || "agent",
         departmentId: record.departmentId || null,
         status: record.status || "active",
-        lastActive: record.lastLogin || record.lastActive || record.updatedAt || null,
+        lastActive: toIsoTimestamp(record.lastLogin || record.lastActive || record.updatedAt),
         avatar: record.avatar || name.split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase(),
     };
 }

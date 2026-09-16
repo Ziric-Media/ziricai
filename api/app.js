@@ -1456,8 +1456,8 @@ function sendMarketplaceReadJson(res, payload, status = 200) {
 /** AI Marketplace — browse curated industry packs (real rating aggregates) */
 app.get("/api/marketplace/catalog", async (req, res) => {
     try {
-        const { q, category, price, sort } = req.query;
-        const data = await getCustomerMarketplaceCatalog({ q, category, price, sort });
+        const { q, category, price, sort, audience } = req.query;
+        const data = await getCustomerMarketplaceCatalog({ q, category, price, sort, audience });
         sendMarketplaceReadJson(res, data);
     } catch (err) {
         console.error("[api/marketplace/catalog] error:", err.message);

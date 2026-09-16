@@ -18,6 +18,9 @@ import { navigateTo } from '../router.js';
 import { buildIndustryPackAccessMailto } from '../../shared/marketplaceSalesContact.js';
 import { can } from '../permissions.js';
 
+/** Lifecycle Firestore read can exceed default 4s on cold production paths (~5–6s observed). */
+const MARKETPLACE_LIFECYCLE_TIMEOUT_MS = 10000;
+
 let wizardState = {};
 /** @type {Map<string, object>} */
 let lifecycleByPackId = new Map();
@@ -43,7 +46,7 @@ function indexLifecycle(items = [], updates = []) {
 /** Re-fetch lifecycle + updates after a proven apply success; no optimistic version state. */
 async function refreshMarketplaceAuthoritativeState(companyId) {
   const [lifecycleRes, updatesRes] = await Promise.all([
-    withTimeout(fetchMarketplaceLifecycle(companyId)),
+    withTimeout(fetchMarketplaceLifecycle(companyId), MARKETPLACE_LIFECYCLE_TIMEOUT_MS),
     withTimeout(fetchPackUpdates(companyId)),
   ]);
 
@@ -693,7 +696,7 @@ export async function renderMarketplace(container) {
 
   const [catalogRes, lifecycleRes, updatesRes] = await Promise.all([
     withTimeout(fetchMarketplaceCatalog()),
-    withTimeout(fetchMarketplaceLifecycle(companyId)),
+    withTimeout(fetchMarketplaceLifecycle(companyId), MARKETPLACE_LIFECYCLE_TIMEOUT_MS),
     withTimeout(fetchPackUpdates(companyId)),
   ]);
 
