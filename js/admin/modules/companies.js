@@ -7,6 +7,7 @@ import {
   errorState,
   planBadge,
   statusBadge,
+  tenantClassBadge,
   showToast,
 } from '../ui.js';
 import {
@@ -38,8 +39,14 @@ import {
   integrationCardState,
   isActiveIntegrationStatus,
 } from '../services/whatsappIntegrationDisplay.js';
+import {
+  classifyTenant,
+  summarizeByClassification,
+  tenantClassFilterOptions,
+  TENANT_CLASS,
+} from '../../shared/tenantClassification.js';
 
-let filters = { search: '', plan: '', status: '' };
+let filters = { search: '', plan: '', status: '', tenantClass: '' };
 let deleteTargetId = null;
 let listLoadState = 'ok';
 let listSource = 'api';
@@ -48,7 +55,7 @@ let listError = null;
 let waModalCompanyId = null;
 
 export async function renderCompanies(container) {
-  container.innerHTML = loadingState('Loading companies...');
+  container.innerHTML = loadingState('Loading tenants...');
   const result = await withTimeout(listCompanies());
 
   listLoadState = result.loadState || (result.isDemo ? 'demo' : result.items?.length ? 'ok' : 'empty');
@@ -58,11 +65,11 @@ export async function renderCompanies(container) {
   if (listLoadState === 'error') {
     container.innerHTML = `
       ${pageHeader(
-        'Companies',
-        'Manage tenant workspaces — the root of your multi-tenant AI platform.',
+        'Tenants',
+        'Tenant records — not production customer count.',
         '<span class="crm-source-badge">Live API</span>'
       )}
-      ${errorState('Unable to load companies. Please check your connection and try again.')}
+      ${errorState('Unable to load tenants. Please check your connection and try again.')}
       <div style="text-align:center;margin-top:-24px;padding-bottom:32px;">
         <button class="btn btn-primary" type="button" id="retryCompanies">
           <i class="fa-solid fa-rotate-right"></i> Retry
@@ -86,20 +93,66 @@ export async function renderCompanies(container) {
   bindListEvents(container);
 }
 
+function buildTenantSummaryStrip(companies) {
+  const summary = summarizeByClassification(companies);
+  const cells = [
+    { label: 'Production', value: summary[TENANT_CLASS.PRODUCTION_CUSTOMER], key: 'production' },
+    { label: 'Pilot', value: summary[TENANT_CLASS.PILOT], key: 'pilot' },
+    { label: 'Acceptance', value: summary[TENANT_CLASS.ACCEPTANCE], key: 'acceptance' },
+    { label: 'Demo', value: summary[TENANT_CLASS.DEMO_SHOWCASE], key: 'demo' },
+    { label: 'Test', value: summary[TENANT_CLASS.TEST], key: 'test' },
+    { label: 'Unknown', value: summary[TENANT_CLASS.UNKNOWN], key: 'unknown' },
+  ];
+  return `
+    <div class="tenant-summary-grid" aria-label="Tenant classification summary">
+      <div class="tenant-summary-total">
+        <span class="tenant-summary-total-value">${companies.length}</span>
+        <span class="tenant-summary-total-label">Tenant records</span>
+      </div>
+      ${cells
+        .map(
+          (c) => `
+        <div class="tenant-summary-cell ${c.key}">
+          <span class="tenant-summary-value">${c.value}</span>
+          <span class="tenant-summary-label">${c.label}</span>
+        </div>`
+        )
+        .join('')}
+    </div>`;
+}
+
+function buildClassFilterMarkup() {
+  const options = tenantClassFilterOptions();
+  return `
+    <div class="tenant-class-filter segmented-control" role="group" aria-label="Filter by tenant class">
+      ${options
+        .map(
+          (opt) => `
+        <button type="button" class="segment tenant-class-filter-btn ${filters.tenantClass === opt.value ? 'active' : ''}"
+          data-tenant-class="${escapeHtml(opt.value)}">${escapeHtml(opt.label)}</button>`
+        )
+        .join('')}
+    </div>`;
+}
+
 function buildListMarkup(companies, isDemo, sourceBadge = '', loadState = 'ok') {
   const filtered = applyFilters(companies);
   const emptyMessage = loadState === 'empty'
-    ? 'No companies yet. Add your first tenant workspace to get started.'
-    : 'No companies match your filters.';
+    ? 'No tenants yet. Add your first tenant workspace to get started.'
+    : 'No tenants match your filters.';
+  const hasFilters = Boolean(filters.search || filters.plan || filters.status || filters.tenantClass);
   return `
     ${pageHeader(
-      'Companies',
-      'Manage tenant workspaces — the root of your multi-tenant AI platform.',
+      'Tenants',
+      'Tenant records — not production customer count.',
       `<button class="btn btn-primary btn-sm" type="button" id="openCompanyForm">
         <i class="fa-solid fa-plus"></i> Add Company
       </button>${sourceBadge ? ` ${sourceBadge}` : ''}`
     )}
     ${isDemo ? `<div class="demo-banner"><i class="fa-solid fa-flask"></i> Showing demo data — Firestore unavailable or empty. Changes persist locally.</div>` : ''}
+
+    ${buildTenantSummaryStrip(companies)}
+    ${buildClassFilterMarkup()}
 
     <div class="companies-toolbar table-toolbar">
       <div class="search-wrapper">
@@ -126,7 +179,7 @@ function buildListMarkup(companies, isDemo, sourceBadge = '', loadState = 'ok') 
     <div id="companiesContent">
       ${filtered.length
         ? renderTable(filtered)
-        : emptyState(emptyMessage, filters.search || filters.plan || filters.status
+        : emptyState(emptyMessage, hasFilters
           ? '<button class="btn btn-primary btn-sm" type="button" id="clearCompanyFilters">Clear filters</button>'
           : '<button class="btn btn-primary btn-sm" type="button" id="openCompanyFormEmpty"><i class="fa-solid fa-plus"></i> Add Company</button>')}
     </div>
@@ -141,11 +194,13 @@ function applyFilters(companies) {
   const term = filters.search.toLowerCase();
   return companies.filter((c) => {
     const matchesSearch = !term || [
-      c.name, c.industry, c.owner, c.ownerEmail, c.email,
+      c.name, c.industry, c.owner, c.ownerEmail, c.email, c.id,
     ].some((v) => String(v || '').toLowerCase().includes(term));
     const matchesPlan = !filters.plan || c.plan === filters.plan;
     const matchesStatus = !filters.status || c.status === filters.status;
-    return matchesSearch && matchesPlan && matchesStatus;
+    const { classification } = classifyTenant(c);
+    const matchesClass = !filters.tenantClass || classification === filters.tenantClass;
+    return matchesSearch && matchesPlan && matchesStatus && matchesClass;
   });
 }
 
@@ -201,7 +256,7 @@ function renderTable(companies) {
       <table class="org-table companies-table">
         <thead>
           <tr>
-            <th>Company Name</th>
+            <th>Tenant</th>
             <th>Industry</th>
             <th>Plan</th>
             <th>Status</th>
@@ -215,7 +270,7 @@ function renderTable(companies) {
         </tbody>
       </table>
       <div class="table-footer">
-        <div class="info">${companies.length} compan${companies.length === 1 ? 'y' : 'ies'}</div>
+        <div class="info">${companies.length} tenant record${companies.length === 1 ? '' : 's'} shown</div>
       </div>
     </div>
   `;
@@ -224,13 +279,15 @@ function renderTable(companies) {
 function renderRow(company) {
   const links = company.provisioningLinks || {};
   const portalUrl = links.portalUrl || `/company-portal.html?company=${encodeURIComponent(company.id)}`;
+  const classInfo = classifyTenant(company);
+  const classTitle = `${classInfo.classificationSource} · ${classInfo.classificationConfidence} — ${classInfo.evidence.slice(0, 2).join('; ')}`;
   return `
     <tr data-id="${escapeHtml(company.id)}" class="company-row">
       <td>
         <div class="org-name">
           <div class="avatar company-table-avatar">${logoCell(company)}</div>
           <div>
-            <div class="company-name-text">${escapeHtml(company.name)}</div>
+            <div class="company-name-text">${tenantClassBadge(classInfo.classification, classTitle)} ${escapeHtml(company.name)}</div>
             <div class="company-cross-links">
               <a href="${escapeHtml(portalUrl)}" target="_blank" rel="noopener" class="cross-link" title="Open Company Portal"><i class="fa-solid fa-arrow-up-right-from-square"></i> Portal</a>
               <button type="button" class="cross-link-btn nav-agents" data-company-id="${escapeHtml(company.id)}" title="View AI Employees"><i class="fa-solid fa-robot"></i> Agents</button>
@@ -811,8 +868,15 @@ function bindListEvents(container) {
   container.querySelector('#cancelCompanyForm')?.addEventListener('click', closeForm);
 
   container.querySelector('#clearCompanyFilters')?.addEventListener('click', () => {
-    filters = { search: '', plan: '', status: '' };
-    refreshContent(container);
+    clearAllCompanyFilters(container);
+  });
+
+  container.querySelectorAll('.tenant-class-filter-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      filters.tenantClass = btn.dataset.tenantClass || '';
+      syncTenantClassFilterActive(container);
+      refreshContent(container);
+    });
   });
 
   container.querySelector('#companySearch')?.addEventListener('input', (e) => {
@@ -979,23 +1043,38 @@ function bindDelegatedActions(container, { openForm, openDeleteModal }) {
   });
 }
 
+function syncTenantClassFilterActive(container) {
+  container.querySelectorAll('.tenant-class-filter-btn').forEach((btn) => {
+    const value = btn.dataset.tenantClass || '';
+    btn.classList.toggle('active', value === filters.tenantClass);
+  });
+}
+
+function clearAllCompanyFilters(container) {
+  filters = { search: '', plan: '', status: '', tenantClass: '' };
+  const search = container.querySelector('#companySearch');
+  const planFilter = container.querySelector('#companyPlanFilter');
+  const statusFilter = container.querySelector('#companyStatusFilter');
+  if (search) search.value = '';
+  if (planFilter) planFilter.value = '';
+  if (statusFilter) statusFilter.value = '';
+  syncTenantClassFilterActive(container);
+  refreshContent(container);
+}
+
 function refreshContent(container) {
   const filtered = applyFilters(state.companies);
   const content = container.querySelector('#companiesContent');
   if (!content) return;
+  const hasFilters = Boolean(filters.search || filters.plan || filters.status || filters.tenantClass);
   content.innerHTML = filtered.length
     ? renderTable(filtered)
-    : emptyState('No companies match your filters.', '<button class="btn btn-primary btn-sm" type="button" id="clearCompanyFilters">Clear filters</button>');
+    : emptyState('No tenants match your filters.', hasFilters
+      ? '<button class="btn btn-primary btn-sm" type="button" id="clearCompanyFilters">Clear filters</button>'
+      : '');
 
   container.querySelector('#clearCompanyFilters')?.addEventListener('click', () => {
-    filters = { search: '', plan: '', status: '' };
-    const search = container.querySelector('#companySearch');
-    const planFilter = container.querySelector('#companyPlanFilter');
-    const statusFilter = container.querySelector('#companyStatusFilter');
-    if (search) search.value = '';
-    if (planFilter) planFilter.value = '';
-    if (statusFilter) statusFilter.value = '';
-    refreshContent(container);
+    clearAllCompanyFilters(container);
   });
 }
 

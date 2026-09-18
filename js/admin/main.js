@@ -49,7 +49,10 @@ async function refreshCompanies() {
   setState({ companies: items });
   updateCompanySelector();
   const companyCount = document.getElementById('companyCount');
-  if (companyCount) companyCount.textContent = String(state.companies.length || '—');
+  if (companyCount) {
+    companyCount.textContent = String(state.companies.length || '—');
+    companyCount.title = 'Tenant records (not production customer count)';
+  }
   const agentCount = document.getElementById('agentCount');
   if (agentCount) agentCount.textContent = '—';
   const knowledgeCount = document.getElementById('knowledgeCount');
@@ -92,7 +95,7 @@ function updateCompanySelector() {
   const select = document.getElementById('companySelector');
   if (!select) return;
   select.innerHTML = `
-    <option value="">All Companies</option>
+    <option value="">All Tenants</option>
     ${state.companies.map((c) => `<option value="${c.id}" ${state.selectedCompanyId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
   `;
 }
@@ -111,7 +114,7 @@ function bindShellEvents() {
       updateAgentCountBadge({ detail: { loadState: 'scope_required', count: null } });
       updateKnowledgeCountBadge({ detail: { loadState: 'scope_required', count: null } });
     }
-    showToast(value ? `Scoped to selected company` : 'Showing all companies', 'info');
+    showToast(value ? 'Scoped to selected tenant' : 'Showing all tenants', 'info');
     navigateTo(state.currentPage);
   });
 

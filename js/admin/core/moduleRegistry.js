@@ -20,7 +20,7 @@ export const MODULES = [
 export const MODULE_LABELS = {
   dashboard: 'Mission Control',
   commandCenter: 'Command Center',
-  companies: 'Companies',
+  companies: 'Tenants',
   marketplace: 'Marketplace',
   agents: 'AI Employees',
   knowledge: 'Knowledge Base',
