@@ -1,11 +1,12 @@
 import { state, setState } from './state.js';
-import { applyTheme, toggleTheme, showToast } from './ui.js';
+import { applyTheme, toggleTheme, showToast, escapeHtml } from './ui.js';
 import { initRouter, navigateTo } from './router.js';
 import { initAuthGuard, bindLoginForm, bindLogout } from './auth-guard.js';
 import { listCompanies } from './services/companies.js';
 import { withTimeout } from './utils.js';
 import { DEMO_COMPANIES } from './demo-data.js';
 import { isDemoDataAllowed, resolveListItems } from './services/dataMode.js';
+import { formatScopeOptionLabel } from './services/scopeDisplay.js';
 
 export async function bootstrap() {
   if (location.protocol === 'file:') {
@@ -96,7 +97,12 @@ function updateCompanySelector() {
   if (!select) return;
   select.innerHTML = `
     <option value="">All Tenants</option>
-    ${state.companies.map((c) => `<option value="${c.id}" ${state.selectedCompanyId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+    ${state.companies
+      .map(
+        (c) =>
+          `<option value="${escapeHtml(c.id)}" ${state.selectedCompanyId === c.id ? 'selected' : ''}>${escapeHtml(formatScopeOptionLabel(c))}</option>`
+      )
+      .join('')}
   `;
 }
 

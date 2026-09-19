@@ -159,7 +159,10 @@ function renderPilotSpotlight(spotlight) {
         ${miniStat('Appts today', ops.appointments?.today, availabilityForValue(ops.appointments?.today))}
       </div>
       <p class="welcome-text ops-subtitle" style="margin-top:0.75rem">
-        Select this tenant in the top bar for full hub-aligned KPIs, or open <a href="#" data-nav="companies">Tenants</a>.
+        <button type="button" class="btn btn-primary btn-sm" id="openPilotTenant" data-company-id="${escapeHtml(spotlight.companyId)}">
+          <i class="fa-solid fa-crosshairs"></i> Open pilot tenant
+        </button>
+        <span style="margin-left:8px">Or pick the same row in the scope dropdown · <a href="#" data-nav="companies">Tenants</a></span>
       </p>
     </div>`;
 }
@@ -557,8 +560,19 @@ function initHourlyChart(container, hourlyData) {
 
 const DEMO_HOURLY_FALLBACK = Array.from({ length: 24 }, () => 0);
 
+function applyTenantScopeFromDashboard(companyId) {
+  const select = document.getElementById('companySelector');
+  if (!select) return;
+  select.value = companyId || '';
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 function bindDashboardEvents(container) {
   container.querySelector('#refreshDashboard')?.addEventListener('click', () => renderDashboard(container));
+  container.querySelector('#openPilotTenant')?.addEventListener('click', (e) => {
+    const id = e.currentTarget?.dataset?.companyId;
+    if (id) applyTenantScopeFromDashboard(id);
+  });
   container.querySelectorAll('[data-nav]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.preventDefault();

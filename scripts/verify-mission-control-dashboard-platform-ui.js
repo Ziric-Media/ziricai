@@ -34,5 +34,15 @@ assert.match(ops, /portal_hub/);
 
 assert.match(main, /All Tenants/);
 assert.match(main, /selectedCompanyId/);
+assert.match(main, /formatScopeOptionLabel/);
+
+assert.match(dashboard, /openPilotTenant/);
+assert.match(dashboard, /applyTenantScopeFromDashboard/);
+
+const scopeDisplay = readFileSync(join(ROOT, 'js', 'admin', 'services', 'scopeDisplay.js'), 'utf8');
+assert.match(scopeDisplay, /classifyTenant/);
+
+const shell = readFileSync(join(ROOT, 'ziric-superadmin-console.html'), 'utf8');
+assert.match(shell, /favicon-superadmin\.svg/);
 
 console.log('✓ MC-U-2C dashboard platform view wiring verified');

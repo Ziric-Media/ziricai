@@ -2070,6 +2070,8 @@ input[type="color"] {
             background: var(--bg-card);
             color: var(--text-primary);
             font-size: 13px;
+            min-width: min(420px, 42vw);
+            max-width: 520px;
         }
 
 /* ===== SIDEBAR FOOTER ===== */
