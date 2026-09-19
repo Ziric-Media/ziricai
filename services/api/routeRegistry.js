@@ -29,6 +29,7 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/integrations/health", domain: "integrations", tenantScoped: false, description: "Integration hub diagnostics (platform auth)" },
 
     // Operations (superadmin)
+    { method: "GET", path: "/api/operations/platform-dashboard", domain: "operations", tenantScoped: false, description: "MC platform dashboard read facade (?scope=platform|tenant&companyId= when tenant)" },
     { method: "GET", path: "/api/operations/metrics", domain: "operations", tenantScoped: false, description: "Platform metrics (optional ?companyId= for tenant CRM aggregation)" },
     { method: "GET", path: "/api/operations/tenant/:companyId/metrics", domain: "operations", tenantScoped: false, description: "Read-only tenant CRM metrics for Mission Control" },
     { method: "GET", path: "/api/operations/tenant/:companyId/analytics/timeseries", domain: "operations", tenantScoped: false, description: "Read-only tenant analytics time-series for Mission Control" },

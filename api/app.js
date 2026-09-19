@@ -57,6 +57,11 @@ import {
     TimeSeriesValidationError,
 } from "../services/operations/tenantTimeSeries.js";
 import {
+    getPlatformDashboard,
+    parsePlatformDashboardQuery,
+    PlatformDashboardValidationError,
+} from "../services/operations/platformDashboardService.js";
+import {
     listWorkflows,
     getWorkflow,
     createWorkflow,
@@ -385,6 +390,22 @@ app.post("/api/auth/logout", attachTenantContext(), async (req, res) => {
     } catch (err) {
         console.error("[api/auth/logout] error:", err.message);
         res.status(500).json({ error: err.message || "Logout failed" });
+    }
+});
+
+/** MC-U-2B — Platform dashboard read facade (platform or tenant scope) */
+app.get("/api/operations/platform-dashboard", requirePlatformAccess(), async (req, res) => {
+    try {
+        const query = parsePlatformDashboardQuery(req.query);
+        const data = await getPlatformDashboard(query);
+        res.json(data);
+    } catch (err) {
+        if (err instanceof PlatformDashboardValidationError) {
+            const status = err.statusCode === 404 ? 404 : 400;
+            return res.status(status).json({ error: err.message, code: err.code });
+        }
+        console.error("[api/operations/platform-dashboard] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load platform dashboard" });
     }
 });
 

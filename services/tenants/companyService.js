@@ -262,6 +262,10 @@ export async function listAllCompaniesFromStorage() {
         }
     }
 
+    if (adapter.name === "memory" && typeof adapter.listPortalCompanies === "function") {
+        return adapter.listPortalCompanies();
+    }
+
     return [];
 }
 
