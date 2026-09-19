@@ -6,9 +6,8 @@ import {
   trendHtml,
 } from '../ui.js';
 import {
-  getMetrics,
-  getActivityFeed,
-  getSystemHealth,
+  getPlatformDashboardView,
+  healthFromPlatformSnapshot,
 } from '../services/operationsService.js';
 
 let hourlyChart = null;
@@ -16,23 +15,29 @@ let hourlyChart = null;
 export async function renderDashboard(container) {
   container.innerHTML = loadingState('Loading Mission Control...');
 
-  let ops;
-  let activity;
-  let health;
+  const scopedId = state.selectedCompanyId || null;
 
+  let view;
   try {
-    [ops, activity, health] = await Promise.all([
-      getMetrics(),
-      getActivityFeed(),
-      getSystemHealth(),
-    ]);
+    view = await getPlatformDashboardView(scopedId);
   } catch (err) {
     console.error('Mission Control load error:', err);
     container.innerHTML = loadingState('Failed to load Mission Control. Retrying...');
     return;
   }
 
-  setState({ operationsData: ops, backendHealth: health });
+  const health =
+    view.mode === 'platform'
+      ? healthFromPlatformSnapshot(view.platformHealth) || {
+          whatsapp: false,
+          openai: false,
+          firebase: 'offline',
+          queue: { pending: 0, active: 0 },
+          timestamp: new Date().toISOString(),
+        }
+      : null;
+
+  setState({ operationsData: view, backendHealth: health });
 
   const userName =
     state.profile?.fullName ||
@@ -40,123 +45,155 @@ export async function renderDashboard(container) {
     state.user?.email?.split('@')[0] ||
     'Super Admin';
 
-  const isLiveCrm =
-    ops.dataSource === 'crm' ||
-    (!ops.isDemo && (ops.tenantMetrics || ops.dataSources?.crm === 'tenant_crm_apis'));
+  if (view.mode === 'platform') {
+    renderPlatformDashboard(container, view, userName, health);
+  } else {
+    renderTenantDashboard(container, view, userName);
+  }
+}
 
-  const demoNote = ops.authRequired
-    ? '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-lock"></i> Sign in required for live CRM</span>'
-    : ops.authForbidden
-      ? '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-user-shield"></i> Super Admin authorization required</span>'
-      : ops.apiError
-        ? '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-triangle-exclamation"></i> Live CRM temporarily unavailable</span>'
-        : isLiveCrm
-          ? '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-database"></i> Live CRM · central-motors-rtb</span>'
-          : ops.isDemo
-            ? '<span class="demo-badge"><i class="fa-solid fa-flask"></i> Sample data</span>'
-            : '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-database"></i> Live CRM · central-motors-rtb</span>';
+function scopeBadge(view) {
+  if (view.authRequired) {
+    return '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-lock"></i> Sign in required</span>';
+  }
+  if (view.authForbidden) {
+    return '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-user-shield"></i> Super Admin authorization required</span>';
+  }
+  if (view.apiError) {
+    return '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-triangle-exclamation"></i> Data temporarily unavailable</span>';
+  }
+  if (view.mode === 'platform') {
+    return '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-globe"></i> All tenants · tenant records (not production customers)</span>';
+  }
+  const name = escapeHtml(view.company?.name || view.companyId || 'Tenant');
+  const cls = classificationBadgeClass(view.company?.classification);
+  const classBadge = view.company?.classification
+    ? `<span class="tenant-class-badge ${cls}">${escapeHtml(view.company.classification)}</span>`
+    : '';
+  const demo = view.isDemo
+    ? ' <span class="demo-badge"><i class="fa-solid fa-flask"></i> Demo content</span>'
+    : '';
+  return `<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-database"></i> Portal hub · ${name}</span> ${classBadge}${demo}`;
+}
 
-  const { metrics, trends, metricAvailability = {}, tenantMetrics } = ops;
-
-  container.innerHTML = `
+function dashboardHeader(userName, view) {
+  return `
     <div class="dashboard-header ops-header">
       <div class="dashboard-header-left">
         <h1>Mission Control</h1>
-        <p class="welcome-text ops-subtitle">AI Operations Center — Welcome back, <strong>${escapeHtml(userName)}</strong> ${demoNote}</p>
+        <p class="welcome-text ops-subtitle">AI Operations Center — Welcome back, <strong>${escapeHtml(userName)}</strong> ${scopeBadge(view)}</p>
       </div>
       <div class="dashboard-header-actions">
-        <div class="date-range-picker">
-          <i class="fa-solid fa-calendar"></i>
-          <input type="date" id="dashDateFrom" value="${new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10)}" />
-          <span>to</span>
-          <input type="date" id="dashDateTo" value="${new Date().toISOString().slice(0, 10)}" />
-        </div>
         <button class="btn btn-secondary btn-sm" type="button" id="refreshDashboard">
           <i class="fa-solid fa-rotate"></i> Refresh
         </button>
       </div>
+    </div>`;
+}
+
+function classificationBadgeClass(classification) {
+  const map = {
+    'PRODUCTION CUSTOMER': 'production',
+    PILOT: 'pilot',
+    ACCEPTANCE: 'acceptance',
+    'DEMO/SHOWCASE': 'demo',
+    TEST: 'test',
+    UNKNOWN: 'unknown',
+  };
+  return map[classification] || 'unknown';
+}
+
+function renderPlatformCensus(census) {
+  if (!census?.byClass) return '';
+  const b = census.byClass;
+  const cells = [
+    { label: 'Production', value: b.productionCustomer ?? 0 },
+    { label: 'Pilot', value: b.pilot ?? 0 },
+    { label: 'Acceptance', value: b.acceptance ?? 0 },
+    { label: 'Demo', value: b.demoShowcase ?? 0 },
+    { label: 'Test', value: b.test ?? 0 },
+    { label: 'Unknown', value: b.unknown ?? 0 },
+  ];
+  return `
+    <div class="tenant-summary-grid" aria-label="Tenant classification summary">
+      <div class="tenant-summary-total">
+        <span class="tenant-summary-total-value">${formatNumber(census.total ?? 0)}</span>
+        <span class="tenant-summary-total-label">Tenant records</span>
+      </div>
+      ${cells
+        .map(
+          (c) => `
+        <div class="tenant-summary-cell">
+          <span class="tenant-summary-value">${formatNumber(c.value)}</span>
+          <span class="tenant-summary-label">${escapeHtml(c.label)}</span>
+        </div>`
+        )
+        .join('')}
     </div>
+  `;
+}
 
-    ${renderCentralMotorsPanel(tenantMetrics, metricAvailability, ops)}
+function viewPartialNote() {
+  return '<p class="welcome-text ops-subtitle">Cross-tenant operational KPI rollups are partial in this release — use tenant scope or pilot spotlight for hub-aligned metrics.</p>';
+}
 
+function renderPilotSpotlight(spotlight) {
+  if (!spotlight?.companyId) return '';
+  const kpis = spotlight.kpis || {};
+  const ops = kpis.ops || {};
+  const cls = classificationBadgeClass(spotlight.classification);
+  const badge = spotlight.classification
+    ? `<span class="tenant-class-badge ${cls}">${escapeHtml(spotlight.classification)}</span>`
+    : '';
+  return `
+    <div class="panel-card" style="margin-bottom:1rem">
+      <div class="panel-header">
+        <h3><i class="fa-solid fa-star"></i> Pilot spotlight — ${escapeHtml(spotlight.name || spotlight.companyId)}</h3>
+        <span class="ops-tag">${escapeHtml(spotlight.companyId)} ${badge}</span>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem">
+        ${miniStat('Inbox total', ops.inbox?.total, availabilityForValue(ops.inbox?.total))}
+        ${miniStat('Unread', ops.inbox?.unread, availabilityForValue(ops.inbox?.unread))}
+        ${miniStat('CRM customers', ops.crm?.customers, availabilityForValue(ops.crm?.customers))}
+        ${miniStat('Leads', ops.crm?.leads, availabilityForValue(ops.crm?.leads))}
+        ${miniStat('Appts today', ops.appointments?.today, availabilityForValue(ops.appointments?.today))}
+      </div>
+      <p class="welcome-text ops-subtitle" style="margin-top:0.75rem">
+        Select this tenant in the top bar for full hub-aligned KPIs, or open <a href="#" data-nav="companies">Tenants</a>.
+      </p>
+    </div>`;
+}
+
+function availabilityForValue(value) {
+  if (value == null || Number.isNaN(Number(value))) return 'unavailable';
+  return 'real';
+}
+
+function renderPlatformDashboard(container, view, userName, health) {
+  const reg = view.registryKpis || {};
+  const partial = view.meta?.partial ? viewPartialNote() : '';
+
+  container.innerHTML = `
+    ${dashboardHeader(userName, view)}
+    ${renderPlatformCensus(view.census)}
+    ${partial}
     <div class="kpi-grid kpi-grid-ops">
-      ${kpiCard('Active Conversations', formatMetric(metrics.activeConversations, metricAvailability.activeConversations), 'fa-comments', 'purple', trends.activeConversations)}
-      ${kpiCard('CRM Leads', formatMetric(metrics.crmLeads, metricAvailability.leads), 'fa-user-plus', 'blue', null)}
-      ${kpiCard('Qualified Leads', formatMetric(metrics.crmQualifiedLeads, metricAvailability.pipeline), 'fa-filter', 'purple', null)}
-      ${kpiCard('Test Drives Booked', formatMetric(metrics.crmTestDrivesBooked, metricAvailability.testDrivesBooked), 'fa-car', 'green', null)}
-      ${kpiCard('Finance Enquiries', formatMetric(metrics.crmFinanceEnquiries, metricAvailability.financeEnquiries), 'fa-coins', 'yellow', null)}
-      ${kpiCard('Deals Won', formatMetric(metrics.crmDealsWon, metricAvailability.pipeline), 'fa-trophy', 'green', null)}
-      ${kpiCard('Messages (CRM total)', formatMetric(metrics.messagesTotal, metricAvailability.messagesTotal), 'fa-fire', 'orange', null)}
-      ${kpiCard('Human Takeovers', formatMetric(metrics.humanTakeovers, metricAvailability.humanTakeovers), 'fa-user-shield', 'red', trends.humanTakeovers)}
-      ${kpiCard('AI Employees Online', formatMetric(metrics.aiEmployeesOnline, 'derived'), 'fa-robot', 'green', trends.aiEmployeesOnline)}
-      ${kpiCard('Est. Revenue', formatMetric(metrics.estimatedRevenue, metricAvailability.estimatedRevenue), 'fa-money-bill', 'green', trends.estimatedRevenue)}
+      ${kpiCard('Tenants (directory)', formatNumber(reg.companiesRegistered ?? view.census?.total ?? 0), 'fa-building', 'blue', null)}
+      ${kpiCard('Active (registry)', formatMetric(reg.companiesActive, reg.companiesActive != null ? 'real' : 'unavailable'), 'fa-circle-check', 'green', null)}
+      ${kpiCard('Trialing', formatMetric(reg.companiesTrialing, reg.companiesTrialing != null ? 'real' : 'unavailable'), 'fa-hourglass-half', 'yellow', null)}
+      ${kpiCard('Onboarded today', formatMetric(reg.onboardedToday, reg.onboardedToday != null ? 'real' : 'unavailable'), 'fa-user-plus', 'purple', null)}
     </div>
-
+    ${renderPilotSpotlight(view.pilotSpotlight)}
     <div class="ops-grid ops-row-1">
       <div class="activity-section ops-activity">
         <div class="header">
-          <h3><i class="fa-solid fa-satellite-dish"></i> Live Activity Feed</h3>
+          <h3><i class="fa-solid fa-satellite-dish"></i> Platform activity</h3>
           <span class="live-indicator"><span class="pulse"></span> Live</span>
         </div>
         <div class="activity-feed ops-activity-scroll">
-          ${renderActivityFeed(activity.items)}
+          ${renderActivityFeed(view.activity?.items)}
         </div>
       </div>
-
-      <div class="panel-card">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-user-shield"></i> Recent Human Takeovers</h3>
-          <a href="#" class="panel-link" data-nav="conversations">View inbox</a>
-        </div>
-        <div class="takeover-list">
-          ${renderTakeovers(ops.humanTakeovers)}
-        </div>
-      </div>
-    </div>
-
-    <div class="ops-grid ops-row-2">
-      <div class="panel-card">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-circle-question"></i> Trending Questions</h3>
-          <span class="ops-tag">Unavailable</span>
-        </div>
-        <div class="trending-list">
-          ${renderTrendingQuestions(ops.trendingQuestions)}
-        </div>
-      </div>
-
-      <div class="panel-card">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-trophy"></i> AI Performance Leaderboard</h3>
-          <a href="#" class="panel-link" data-nav="agents">Manage</a>
-        </div>
-        <div class="agent-rank-list">
-          ${renderAgentLeaderboard(ops.leaderboards?.agents)}
-        </div>
-      </div>
-
-      <div class="panel-card">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-building"></i> Company Performance</h3>
-          <a href="#" class="panel-link" data-nav="companies">View all</a>
-        </div>
-        <div class="company-rank-list">
-          ${renderCompanyLeaderboard(ops.leaderboards?.companies)}
-        </div>
-      </div>
-    </div>
-
-    <div class="ops-grid ops-row-3">
-      <div class="chart-card chart-card-line ops-heatmap">
-        <div class="chart-card-header">
-          <h3><i class="fa-solid fa-chart-bar"></i> Hourly Conversations (24h)</h3>
-          <div class="chart-legend">
-            <span class="legend-item"><span class="dot purple"></span> Unavailable</span>
-          </div>
-        </div>
-        <div class="chart-canvas-wrap ops-chart-wrap"><canvas id="hourlyConversationsChart"></canvas></div>
-      </div>
-
       <div class="panel-card">
         <div class="panel-header">
           <h3><i class="fa-solid fa-heart-pulse"></i> System Health</h3>
@@ -167,14 +204,62 @@ export async function renderDashboard(container) {
         </div>
       </div>
     </div>
+    <footer class="dashboard-footer">
+      <span>&copy; 2026 ZiricAI Mission Control</span>
+      <span class="version">v1.1.0 · platform view</span>
+    </footer>
+  `;
+  bindDashboardEvents(container);
+}
+
+function renderTenantDashboard(container, view, userName) {
+  const { metrics, trends, metricAvailability = {}, tenantHub } = view;
+  const ops = tenantHub?.ops || {};
+
+  container.innerHTML = `
+    ${dashboardHeader(userName, view)}
+    ${renderTenantHubPanel(view, ops, metricAvailability)}
+
+    <div class="kpi-grid kpi-grid-ops">
+      ${kpiCard('Active Conversations', formatMetric(metrics.activeConversations, metricAvailability.activeConversations), 'fa-comments', 'purple', trends.activeConversations)}
+      ${kpiCard('CRM Leads', formatMetric(metrics.crmLeads, metricAvailability.leads), 'fa-user-plus', 'blue', null)}
+      ${kpiCard('Qualified Leads', formatMetric(metrics.crmQualifiedLeads, metricAvailability.pipeline), 'fa-filter', 'purple', null)}
+      ${kpiCard('Test Drives Booked', formatMetric(metrics.crmTestDrivesBooked, metricAvailability.testDrivesBooked), 'fa-car', 'green', null)}
+      ${kpiCard('Finance Enquiries', formatMetric(metrics.crmFinanceEnquiries, metricAvailability.financeEnquiries), 'fa-coins', 'yellow', null)}
+      ${kpiCard('Deals Won', formatMetric(metrics.crmDealsWon, metricAvailability.pipeline), 'fa-trophy', 'green', null)}
+      ${kpiCard('Messages (total)', formatMetric(metrics.messagesTotal, metricAvailability.messagesTotal), 'fa-fire', 'orange', null)}
+      ${kpiCard('Human Takeovers', formatMetric(metrics.humanTakeovers, metricAvailability.humanTakeovers), 'fa-user-shield', 'red', trends.humanTakeovers)}
+      ${kpiCard('AI Employees Online', formatMetric(metrics.aiEmployeesOnline, metricAvailability.aiEmployeesOnline), 'fa-robot', 'green', trends.aiEmployeesOnline)}
+      ${kpiCard('Est. Revenue', formatMetric(metrics.estimatedRevenue, metricAvailability.estimatedRevenue), 'fa-money-bill', 'green', trends.estimatedRevenue)}
+    </div>
+
+    <div class="ops-grid ops-row-1">
+      <div class="activity-section ops-activity">
+        <div class="header">
+          <h3><i class="fa-solid fa-satellite-dish"></i> Tenant activity</h3>
+          <span class="live-indicator"><span class="pulse"></span> Live</span>
+        </div>
+        <div class="activity-feed ops-activity-scroll">
+          ${renderActivityFeed(view.activity?.items)}
+        </div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-header">
+          <h3><i class="fa-solid fa-inbox"></i> Inbox snapshot</h3>
+          <a href="#" class="panel-link" data-nav="conversations">View inbox</a>
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(2,1fr);gap:0.75rem;padding:0.5rem">
+          ${miniStat('Total threads', ops.inbox?.total, availabilityForValue(ops.inbox?.total))}
+          ${miniStat('Unread', ops.inbox?.unread, availabilityForValue(ops.inbox?.unread))}
+        </div>
+      </div>
+    </div>
 
     <footer class="dashboard-footer">
       <span>&copy; 2026 ZiricAI Mission Control</span>
-      <span class="version">v1.1.0</span>
+      <span class="version">v1.1.0 · tenant hub</span>
     </footer>
   `;
-
-  initHourlyChart(container, ops.hourlyConversations);
   bindDashboardEvents(container);
 }
 
@@ -199,72 +284,46 @@ function formatMetric(value, availability, { currency = false } = {}) {
   return formatNumber(value);
 }
 
-function renderCentralMotorsPanel(tenantMetrics, availability, ops = {}) {
-  if (ops.authRequired) {
+function renderTenantHubPanel(view, ops = {}, availability = {}) {
+  const companyId = view.companyId || view.company?.id || '—';
+  const companyName = view.company?.name || companyId;
+  const cls = classificationBadgeClass(view.company?.classification);
+  const classBadge = view.company?.classification
+    ? `<span class="tenant-class-badge ${cls}">${escapeHtml(view.company.classification)}</span>`
+    : '';
+
+  if (view.authRequired || view.authForbidden || view.apiError) {
+    const msg = view.authRequired
+      ? 'Sign in with your Super Admin account to load tenant hub metrics.'
+      : view.authForbidden
+        ? 'Your account does not have Super Admin access to this tenant hub.'
+        : 'Tenant hub data is temporarily unavailable.';
     return `
       <div class="panel-card" style="margin-bottom:1rem">
         <div class="panel-header">
-          <h3><i class="fa-solid fa-building"></i> Central Motors (central-motors-rtb)</h3>
-          <span class="ops-tag">Sign in required</span>
+          <h3><i class="fa-solid fa-building"></i> ${escapeHtml(companyName)}</h3>
+          <span class="ops-tag">${escapeHtml(companyId)}</span>
         </div>
-        <p class="welcome-text ops-subtitle">Sign in with your Super Admin account to load live CRM metrics for central-motors-rtb.</p>
+        <p class="welcome-text ops-subtitle">${msg}</p>
       </div>`;
   }
-
-  if (ops.authForbidden) {
-    return `
-      <div class="panel-card" style="margin-bottom:1rem">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-building"></i> Central Motors (central-motors-rtb)</h3>
-          <span class="ops-tag">Authorization required</span>
-        </div>
-        <p class="welcome-text ops-subtitle">Your account is signed in but does not have Super Admin access to Mission Control CRM data.</p>
-      </div>`;
-  }
-
-  if (ops.apiError) {
-    return `
-      <div class="panel-card" style="margin-bottom:1rem">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-building"></i> Central Motors (central-motors-rtb)</h3>
-          <span class="ops-tag">Temporarily unavailable</span>
-        </div>
-        <p class="welcome-text ops-subtitle">Live CRM is temporarily unavailable. Refresh in a moment or check platform API health.</p>
-      </div>`;
-  }
-
-  if (!tenantMetrics) {
-    return `
-      <div class="panel-card" style="margin-bottom:1rem">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-building"></i> Central Motors (central-motors-rtb)</h3>
-          <span class="ops-tag">No CRM data yet</span>
-        </div>
-        <p class="welcome-text ops-subtitle">Sarah → CRM metrics will appear here once WhatsApp sales activity is recorded for the production tenant.</p>
-      </div>`;
-  }
-
-  const c = tenantMetrics.counts || {};
-  const s = tenantMetrics.sarah || {};
-  const p = tenantMetrics.pipeline || {};
 
   return `
     <div class="panel-card" style="margin-bottom:1rem">
       <div class="panel-header">
-        <h3><i class="fa-solid fa-building"></i> ${escapeHtml(tenantMetrics.companyName || 'Central Motors')}</h3>
-        <span class="ops-tag">${escapeHtml(tenantMetrics.companyId)} · Sarah 🟢</span>
+        <h3><i class="fa-solid fa-building"></i> ${escapeHtml(companyName)}</h3>
+        <span class="ops-tag">${escapeHtml(companyId)} ${classBadge}</span>
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem">
-        ${miniStat('Conversations', c.conversations, availability.conversations)}
-        ${miniStat('New Leads', c.newLeads, availability.leads)}
-        ${miniStat('Qualified', c.qualifiedLeads, availability.pipeline)}
-        ${miniStat('Test Drives', c.testDrivesBooked, availability.testDrivesBooked)}
-        ${miniStat('Finance', c.financeEnquiries, availability.financeEnquiries)}
-        ${miniStat('Deals Won', c.dealsWon, availability.pipeline)}
+        ${miniStat('Customers', ops.crm?.customers, availabilityForValue(ops.crm?.customers))}
+        ${miniStat('Leads', ops.crm?.leads, availability.leads || availabilityForValue(ops.crm?.leads))}
+        ${miniStat('Inbox total', ops.inbox?.total, availabilityForValue(ops.inbox?.total))}
+        ${miniStat('Unread', ops.inbox?.unread, availability.activeConversations || availabilityForValue(ops.inbox?.unread))}
+        ${miniStat('Appts today', ops.appointments?.today, availability.testDrivesBooked || availabilityForValue(ops.appointments?.today))}
+        ${miniStat('Upcoming appts', ops.appointments?.upcoming, availabilityForValue(ops.appointments?.upcoming))}
       </div>
       <p class="welcome-text ops-subtitle" style="margin-top:0.75rem">
-        Pipeline: new ${p.new || 0} · contacted ${p.contacted || 0} · qualified ${p.qualified || 0} · proposal ${p.proposal || 0} · won ${p.won || 0}
-        ${s.conversionPct != null ? ` · Sarah conversion ${s.conversionPct}%` : ''}
+        KPIs sourced from Portal hub read model (<code>portal_hub</code>). Switch to <strong>All Tenants</strong> for platform census and health.
       </p>
     </div>`;
 }

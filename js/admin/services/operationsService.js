@@ -227,4 +227,141 @@ export async function getTenantMetrics(companyId = PRIMARY_TENANT) {
   return request(`/api/operations/tenant/${encodeURIComponent(companyId)}/metrics`);
 }
 
+function platformDashboardPath(selectedCompanyId) {
+  if (selectedCompanyId) {
+    return `/api/operations/platform-dashboard?scope=tenant&companyId=${encodeURIComponent(selectedCompanyId)}`;
+  }
+  return '/api/operations/platform-dashboard?scope=platform';
+}
+
+function availabilityForValue(value) {
+  if (value == null || Number.isNaN(Number(value))) return 'unavailable';
+  return 'real';
+}
+
+function normalizePlatformDashboardPayload(data) {
+  return {
+    mode: 'platform',
+    scope: 'platform',
+    census: data.tenantCensus || null,
+    pilotSpotlight: data.pilotSpotlight || null,
+    platformHealth: data.platformHealth || null,
+    registryKpis: data.kpis?.registry || null,
+    operationalMeta: data.kpis?.operational || null,
+    activity: data.activity || { items: [], isDemo: false },
+    meta: data.meta || {},
+    authRequired: false,
+    authForbidden: false,
+    apiError: false,
+    source: 'platform-dashboard-api',
+  };
+}
+
+function normalizeTenantDashboardPayload(data) {
+  const kpis = data.kpis || {};
+  const ops = kpis.ops || {};
+  const metrics = kpis.metrics || {};
+  const quickStats = kpis.quickStats || {};
+  const companyId = data.meta?.companyId || data.company?.id || null;
+
+  const mappedMetrics = {
+    activeConversations: ops.inbox?.unread ?? metrics.activeConversations ?? null,
+    crmLeads: ops.crm?.leads ?? null,
+    crmQualifiedLeads: metrics.qualifiedLeads ?? null,
+    crmTestDrivesBooked: ops.appointments?.today ?? null,
+    crmFinanceEnquiries: metrics.financeEnquiries ?? null,
+    crmDealsWon: metrics.dealsWon ?? null,
+    messagesTotal: metrics.messagesTotal ?? quickStats.messagesTotal ?? null,
+    humanTakeovers: metrics.humanTakeovers ?? null,
+    aiEmployeesOnline: metrics.aiEmployeesOnline ?? null,
+    estimatedRevenue: metrics.estimatedRevenue ?? null,
+  };
+
+  const metricAvailability = {
+    ...UNAVAILABLE_AVAILABILITY,
+    activeConversations: availabilityForValue(mappedMetrics.activeConversations),
+    leads: availabilityForValue(mappedMetrics.crmLeads),
+    pipeline: availabilityForValue(mappedMetrics.crmQualifiedLeads ?? mappedMetrics.crmDealsWon),
+    testDrivesBooked: availabilityForValue(mappedMetrics.crmTestDrivesBooked),
+    financeEnquiries: availabilityForValue(mappedMetrics.crmFinanceEnquiries),
+    messagesTotal: availabilityForValue(mappedMetrics.messagesTotal),
+    humanTakeovers: availabilityForValue(mappedMetrics.humanTakeovers),
+    aiEmployeesOnline: availabilityForValue(mappedMetrics.aiEmployeesOnline),
+    estimatedRevenue: 'unavailable',
+  };
+
+  return {
+    mode: 'tenant',
+    scope: 'tenant',
+    companyId,
+    company: data.company || null,
+    metrics: mappedMetrics,
+    trends: {},
+    metricAvailability,
+    leaderboards: { agents: [], companies: [] },
+    trendingQuestions: [],
+    humanTakeovers: [],
+    hourlyConversations: Array.from({ length: 24 }, () => null),
+    queue: null,
+    storage: null,
+    isDemo: Boolean(data.activity?.isDemo),
+    dataSource: 'portal_hub',
+    primaryCompanyId: companyId,
+    tenantMetrics: null,
+    tenantHub: kpis,
+    activity: data.activity || { items: [], isDemo: false },
+    meta: data.meta || {},
+    authRequired: false,
+    authForbidden: false,
+    apiError: false,
+    source: 'platform-dashboard-api',
+  };
+}
+
+function unavailablePlatformDashboardView(selectedCompanyId, authStatus) {
+  const base = buildUnavailableMetricsBundle({ authStatus, source: 'platform-dashboard-api' });
+  return {
+    ...base,
+    mode: selectedCompanyId ? 'tenant' : 'platform',
+    scope: selectedCompanyId ? 'tenant' : 'platform',
+    census: null,
+    pilotSpotlight: null,
+    platformHealth: null,
+    registryKpis: null,
+    operationalMeta: null,
+    activity: { items: [], isDemo: false },
+    meta: {},
+    company: null,
+    tenantHub: null,
+  };
+}
+
+/** MC-U-2C — Mission Control dashboard (platform or tenant scope). */
+export async function getPlatformDashboardView(selectedCompanyId = null) {
+  const { data, error, status } = await request(platformDashboardPath(selectedCompanyId));
+  if (!data) {
+    return unavailablePlatformDashboardView(selectedCompanyId, resolveAuthStatusFromResponse(status));
+  }
+  if (data.scope === 'platform' || data.mode === 'platform') {
+    return normalizePlatformDashboardPayload(data);
+  }
+  return normalizeTenantDashboardPayload(data);
+}
+
+export function healthFromPlatformSnapshot(snapshot) {
+  if (!snapshot) return null;
+  const storage = snapshot.storage || 'demo';
+  let firebase = 'offline';
+  if (storage === 'firestore') firebase = 'connected';
+  else if (storage === 'memory') firebase = snapshot.status === 'ok' ? 'demo' : 'offline';
+
+  return {
+    whatsapp: Boolean(snapshot.whatsapp),
+    openai: Boolean(snapshot.openai),
+    firebase,
+    queue: snapshot.queue || { pending: 0, active: 0, concurrency: 1 },
+    timestamp: snapshot.timestamp || new Date().toISOString(),
+  };
+}
+
 export { PRIMARY_TENANT };
