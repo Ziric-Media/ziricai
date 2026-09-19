@@ -73,10 +73,11 @@ const API_BACKED_MODULES = new Set([
   'notifications',
   'team',
   'activity',
+  'support',
 ]);
 
 /** Static-only modules (no load-time API error surface required). */
-const STATIC_MODULES = new Set(['support']);
+const STATIC_MODULES = new Set([]);
 
 function read(rel) {
   return readFileSync(path.join(ROOT, rel), 'utf8');
@@ -288,9 +289,9 @@ assert(/if\s*\(\s*result\.error\s*\)/.test(settings));
 assert(/showToast\(\s*result\.error\s*,\s*['"]error['"]\s*\)/.test(settings));
 console.log('✓ API-backed modules expose errorState; settings surfaces persistence failures');
 
-assert(STATIC_MODULES.has('support'));
-assert(!API_BACKED_MODULES.has('support'));
-console.log('✓ Support module correctly classified as static (manual smoke only)');
+assert(API_BACKED_MODULES.has('support'));
+assert(!STATIC_MODULES.has('support'));
+console.log('✓ Support module classified as API-backed (MC-U-4C)');
 
 // ── 9. Demo-boundary regression spot-checks (2B–2D contracts) ─────────────
 const conversations = read('js/portal/modules/conversations.js');

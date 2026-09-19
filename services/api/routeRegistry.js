@@ -92,6 +92,12 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/companies/:companyId/crm/pipeline", domain: "crm", tenantScoped: true, description: "CRM pipeline stages" },
     { method: "GET", path: "/api/companies/:companyId/crm/tasks", domain: "crm", tenantScoped: true, description: "CRM tasks" },
 
+    // Support cases (tenant-scoped — MC-U-4C)
+    { method: "GET", path: "/api/companies/:companyId/support/cases", domain: "support", tenantScoped: true, description: "List tenant support cases" },
+    { method: "POST", path: "/api/companies/:companyId/support/cases", domain: "support", tenantScoped: true, description: "Create support case" },
+    { method: "GET", path: "/api/companies/:companyId/support/cases/:caseId", domain: "support", tenantScoped: true, description: "Get support case" },
+    { method: "PATCH", path: "/api/companies/:companyId/support/cases/:caseId", domain: "support", tenantScoped: true, description: "Update support case" },
+
     // Conversations (tenant unified inbox)
     { method: "GET", path: "/api/companies/:companyId/conversations", domain: "conversations", tenantScoped: true, description: "Unified inbox list" },
     { method: "POST", path: "/api/companies/:companyId/conversations/:id/reply", domain: "conversations", tenantScoped: true, description: "Human reply via Integration Hub" },

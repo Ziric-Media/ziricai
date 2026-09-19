@@ -39,6 +39,9 @@ export const TENANT_COLLECTIONS = {
     MARKETPLACE: "marketplace",
     /** Tenant Industry Pack installation registry (metadata + references). */
     MARKETPLACE_INSTALLS: "marketplaceInstalls",
+    /** MC-U-4C — tenant support cases (Portal SoT; MC reads via platform API in 4D). */
+    SUPPORT_CASES: "supportCases",
+    SUPPORT_CASE_ACTIVITIES: "supportCaseActivities",
 };
 
 /** Subcollections under companies/{companyId}/analytics (flat names for TenantRepository) */

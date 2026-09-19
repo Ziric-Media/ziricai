@@ -46,6 +46,7 @@ import { listWorkflows, upsertWorkflow } from "../automation/workflowRegistry.js
 import { listAutomationRuns } from "../automation/automationEngine.js";
 import { generateReport } from "../reporting/reportService.js";
 import { publish, EventTypes } from "../events/index.js";
+import { mountSupportCaseRoutes } from "./supportCaseRoutes.js";
 
 const PIPELINE_STAGES = ["new", "contacted", "qualified", "proposal", "won", "lost"];
 
@@ -454,4 +455,6 @@ export function mountCustomerOpsRoutes(app) {
             res.status(500).json({ error: err.message || "Failed to load ops summary" });
         }
     });
+
+    mountSupportCaseRoutes(app);
 }

@@ -329,3 +329,27 @@ export async function fetchSarahTools(companyId) {
   const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
   return request(`/api/sarah/tools${qs}`);
 }
+
+/** MC-U-4C — tenant support cases */
+export async function fetchSupportCases(companyId, { limit = 50, cursor, status } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  if (status) params.set('status', status);
+  return request(`/api/companies/${encodeURIComponent(companyId)}/support/cases?${params}`);
+}
+
+export async function createSupportCase(companyId, body) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/support/cases`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchSupportCase(companyId, caseId, body) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/support/cases/${encodeURIComponent(caseId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
