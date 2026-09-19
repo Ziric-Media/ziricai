@@ -135,7 +135,7 @@ function renderPlatformCensus(census) {
 }
 
 function viewPartialNote() {
-  return '<p class="welcome-text ops-subtitle">Cross-tenant operational KPI rollups are partial in this release — use tenant scope or pilot spotlight for hub-aligned metrics.</p>';
+  return '<p class="welcome-text ops-subtitle mc-platform-partial-note">Cross-tenant operational KPI rollups are partial in this release — use tenant scope or pilot spotlight for hub-aligned metrics.</p>';
 }
 
 function renderPilotSpotlight(spotlight) {
