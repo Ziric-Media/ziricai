@@ -62,6 +62,13 @@ import {
     PlatformDashboardValidationError,
 } from "../services/operations/platformDashboardService.js";
 import {
+    getPlatformExecutiveOverview,
+    getPlatformBillingConsole,
+    getPlatformIntegrationsBoard,
+    getPlatformAnalyticsOverview,
+    getPlatformSupportCases,
+} from "../services/operations/platformMissionControlService.js";
+import {
     listWorkflows,
     getWorkflow,
     createWorkflow,
@@ -131,6 +138,19 @@ import {
     MarketplacePackNotFoundError,
 } from "../services/platform/marketplaceReviewReadService.js";
 import { listMarketplaceInstallLifecycle } from "../services/platform/marketplaceInstallLifecycle.js";
+import {
+    getTenantMarketplaceEntitlement,
+    listTenantMarketplaceEntitlements,
+} from "../services/platform/marketplaceEntitlementReadService.js";
+import {
+    grantMarketplaceEntitlement,
+    revokeMarketplaceEntitlement,
+    updateMarketplaceEntitlementExpiry,
+} from "../services/platform/marketplaceEntitlementService.js";
+import {
+    MarketplaceEntitlementError,
+    INVALID_ENTITLEMENT,
+} from "../services/platform/marketplaceEntitlementErrors.js";
 import {
     submitMarketplacePackReview,
     mapMarketplaceReviewSubmitHttpStatus,
@@ -409,6 +429,72 @@ app.get("/api/operations/platform-dashboard", requirePlatformAccess(), async (re
     }
 });
 
+/** Mission Control — executive overview (read-only) */
+app.get("/api/operations/platform-executive-overview", requirePlatformAccess(), async (req, res) => {
+    try {
+        res.json(await getPlatformExecutiveOverview());
+    } catch (err) {
+        console.error("[api/operations/platform-executive-overview] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load platform overview" });
+    }
+});
+
+app.get("/api/operations/platform-billing-console", requirePlatformAccess(), async (req, res) => {
+    try {
+        res.json(await getPlatformBillingConsole());
+    } catch (err) {
+        console.error("[api/operations/platform-billing-console] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load platform billing console" });
+    }
+});
+
+app.get("/api/operations/platform-integrations", requirePlatformAccess(), async (req, res) => {
+    try {
+        res.json(await getPlatformIntegrationsBoard());
+    } catch (err) {
+        console.error("[api/operations/platform-integrations] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load platform integrations" });
+    }
+});
+
+app.get("/api/operations/platform-analytics-overview", requirePlatformAccess(), async (req, res) => {
+    try {
+        res.json(await getPlatformAnalyticsOverview());
+    } catch (err) {
+        console.error("[api/operations/platform-analytics-overview] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load platform analytics" });
+    }
+});
+
+app.get("/api/operations/platform-support-cases", requirePlatformAccess(), async (req, res) => {
+    try {
+        res.json(await getPlatformSupportCases());
+    } catch (err) {
+        console.error("[api/operations/platform-support-cases] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load support cases" });
+    }
+});
+
+/** Mission Control Sarah — platform operator assistant (read-oriented tools) */
+app.post("/api/operations/sarah/chat", requirePlatformAccess(), async (req, res) => {
+    try {
+        const message = String(req.body?.message || "").trim();
+        if (!message) return res.status(400).json({ error: "message is required" });
+        const sessionId = req.body?.sessionId ? String(req.body.sessionId) : null;
+        const companyId = req.body?.companyId ? String(req.body.companyId).trim() : null;
+        const ctx = await buildSarahContext(req, {
+            companyId: companyId || undefined,
+            sessionId,
+            surface: "mission_control",
+        });
+        const result = await handleSarahChat(ctx, { message, sessionId });
+        res.json({ ...result, surface: "mission_control", scopedCompanyId: companyId || null });
+    } catch (err) {
+        console.error("[api/operations/sarah/chat] error:", err.message);
+        res.status(err.status || 500).json({ error: err.message || "Sarah chat failed" });
+    }
+});
+
 /** AI Operations Center — aggregated platform metrics (superadmin or API key) */
 app.get("/api/operations/metrics", requirePlatformAccess(), async (req, res) => {
     try {
@@ -647,7 +733,11 @@ app.get("/api/portal/notifications/:companyId", requireTenantScope(), async (req
         const companyId = req.params.companyId;
         const items = await getPortalNotificationsAsync(companyId);
         const isDemo = await allowPortalDemoFallback(companyId);
-        res.json({ items, isDemo });
+        res.json({
+            items,
+            unreadCount: items.filter((n) => !n.read).length,
+            isDemo,
+        });
     } catch (err) {
         console.error("[api/portal/notifications] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load notifications" });
@@ -1547,6 +1637,126 @@ app.get("/api/marketplace/lifecycle/:companyId", requireAuthenticatedTenantMembe
     } catch (err) {
         console.error("[api/marketplace/lifecycle] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load marketplace lifecycle" });
+    }
+});
+
+/** Platform ops — grant paid-pack entitlement (4C-6C-B; install gate unchanged) */
+app.post(
+    "/api/platform/marketplace/entitlements",
+    requirePlatformAccess(),
+    authRateLimit("platform-marketplace-entitlements"),
+    requireBodyFields(["companyId", "packId"]),
+    async (req, res) => {
+        try {
+            const result = await grantMarketplaceEntitlement(req.body || {}, { platformAuth: req.platformAuth });
+            res.status(result.idempotent ? 200 : 201).json({ success: true, ...result });
+        } catch (err) {
+            const status = err.status || (err instanceof MarketplaceEntitlementError ? 400 : 500);
+            console.error("[api/platform/marketplace/entitlements POST] error:", err.message);
+            res.status(status).json({
+                error: err.message || "Failed to grant entitlement",
+                code: err.code || "ENTITLEMENT_GRANT_FAILED",
+            });
+        }
+    }
+);
+
+/** Platform ops — revoke or update expiry (4C-6C-C; install gate unchanged) */
+app.patch(
+    "/api/platform/marketplace/entitlements/:companyId/:packId",
+    requirePlatformAccess(),
+    authRateLimit("platform-marketplace-entitlements"),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const body = req.body || {};
+            const isRevoke = body.action === "revoke";
+            const hasExpiry = Object.prototype.hasOwnProperty.call(body, "expiresAt");
+            if (isRevoke && hasExpiry) {
+                return res.status(400).json({
+                    error: "Use either action revoke or expiresAt, not both",
+                    code: INVALID_ENTITLEMENT,
+                });
+            }
+            if (!isRevoke && !hasExpiry) {
+                return res.status(400).json({
+                    error: 'PATCH requires action "revoke" or expiresAt',
+                    code: INVALID_ENTITLEMENT,
+                });
+            }
+            const ctx = { platformAuth: req.platformAuth };
+            const result = isRevoke
+                ? await revokeMarketplaceEntitlement(req.params.companyId, req.params.packId, body, ctx)
+                : await updateMarketplaceEntitlementExpiry(
+                      req.params.companyId,
+                      req.params.packId,
+                      body.expiresAt,
+                      ctx
+                  );
+            res.status(200).json({ success: true, ...result });
+        } catch (err) {
+            const status = err.status || (err instanceof MarketplaceEntitlementError ? 400 : 500);
+            console.error("[api/platform/marketplace/entitlements PATCH] error:", err.message);
+            res.status(status).json({
+                error: err.message || "Failed to update entitlement",
+                code: err.code || "ENTITLEMENT_UPDATE_FAILED",
+            });
+        }
+    }
+);
+
+app.delete(
+    "/api/platform/marketplace/entitlements/:companyId/:packId",
+    requirePlatformAccess(),
+    authRateLimit("platform-marketplace-entitlements"),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const body = req.body || {};
+            const revokeReason =
+                body.revokeReason != null
+                    ? body.revokeReason
+                    : req.query?.revokeReason != null
+                      ? req.query.revokeReason
+                      : undefined;
+            const result = await revokeMarketplaceEntitlement(
+                req.params.companyId,
+                req.params.packId,
+                { revokeReason },
+                { platformAuth: req.platformAuth }
+            );
+            res.status(200).json({ success: true, ...result });
+        } catch (err) {
+            const status = err.status || (err instanceof MarketplaceEntitlementError ? 400 : 500);
+            console.error("[api/platform/marketplace/entitlements DELETE] error:", err.message);
+            res.status(status).json({
+                error: err.message || "Failed to revoke entitlement",
+                code: err.code || "ENTITLEMENT_REVOKE_FAILED",
+            });
+        }
+    }
+);
+
+/** AI Marketplace — paid-pack entitlement read (tenant-scoped; 4C-6B) */
+app.get("/api/marketplace/entitlements/:companyId/:packId", requireAuthenticatedTenantMember(), async (req, res) => {
+    try {
+        const data = await getTenantMarketplaceEntitlement(req.params.companyId, req.params.packId);
+        res.json(data);
+    } catch (err) {
+        const status = err.status || 500;
+        console.error("[api/marketplace/entitlements/pack] error:", err.message);
+        res.status(status).json({ error: err.message || "Failed to load entitlement", code: err.code || "ENTITLEMENT_ERROR" });
+    }
+});
+
+app.get("/api/marketplace/entitlements/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
+    try {
+        const data = await listTenantMarketplaceEntitlements(req.params.companyId, req.query.packId || null);
+        res.json(data);
+    } catch (err) {
+        const status = err.status || 500;
+        console.error("[api/marketplace/entitlements] error:", err.message);
+        res.status(status).json({ error: err.message || "Failed to load entitlements", code: err.code || "ENTITLEMENT_ERROR" });
     }
 });
 

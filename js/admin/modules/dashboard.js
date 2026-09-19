@@ -9,6 +9,7 @@ import {
   getPlatformDashboardView,
   healthFromPlatformSnapshot,
 } from '../services/operationsService.js';
+import { fetchPlatformExecutiveOverview } from '../services/platformConsole.js';
 
 let hourlyChart = null;
 
@@ -46,7 +47,7 @@ export async function renderDashboard(container) {
     'Super Admin';
 
   if (view.mode === 'platform') {
-    renderPlatformDashboard(container, view, userName, health);
+    await renderPlatformDashboard(container, view, userName, health);
   } else {
     renderTenantDashboard(container, view, userName);
   }
@@ -172,20 +173,29 @@ function availabilityForValue(value) {
   return 'real';
 }
 
-function renderPlatformDashboard(container, view, userName, health) {
-  const reg = view.registryKpis || {};
+async function renderPlatformDashboard(container, view, userName, health) {
   const partial = view.meta?.partial ? viewPartialNote() : '';
+  const execRes = await fetchPlatformExecutiveOverview();
+  const exec = execRes.data || {};
+  const tenants = exec.tenants || {};
+  const billing = exec.billing || {};
+  const wa = exec.integrations?.whatsapp || {};
 
   container.innerHTML = `
     ${dashboardHeader(userName, view)}
     ${renderPlatformCensus(view.census)}
     ${partial}
     <div class="kpi-grid kpi-grid-ops">
-      ${kpiCard('Tenants (directory)', formatNumber(reg.companiesRegistered ?? view.census?.total ?? 0), 'fa-building', 'blue', null)}
-      ${kpiCard('Active (registry)', formatMetric(reg.companiesActive, reg.companiesActive != null ? 'real' : 'unavailable'), 'fa-circle-check', 'green', null)}
-      ${kpiCard('Trialing', formatMetric(reg.companiesTrialing, reg.companiesTrialing != null ? 'real' : 'unavailable'), 'fa-hourglass-half', 'yellow', null)}
-      ${kpiCard('Onboarded today', formatMetric(reg.onboardedToday, reg.onboardedToday != null ? 'real' : 'unavailable'), 'fa-user-plus', 'purple', null)}
+      ${kpiCard('Total tenants', formatNumber(tenants.total ?? view.census?.total ?? 0), 'fa-building', 'blue', null)}
+      ${kpiCard('Active tenants', formatNumber(tenants.activeOperational ?? 0), 'fa-circle-check', 'green', null)}
+      ${kpiCard('Trial tenants', formatNumber(tenants.trial ?? 0), 'fa-hourglass-half', 'yellow', null)}
+      ${kpiCard('Paying tenants', formatNumber(tenants.paying ?? 0), 'fa-coins', 'purple', null)}
+      ${kpiCard('WhatsApp connected', formatNumber(wa.connected ?? 0), 'fa-brands fa-whatsapp', 'green', null)}
+      ${kpiCard('MRR (sampled)', billing.mrr != null ? `R${formatNumber(billing.mrr)}` : '—', 'fa-money-bill', 'green', null)}
+      ${kpiCard('New this month', formatNumber(tenants.newThisMonth ?? 0), 'fa-chart-line', 'blue', null)}
+      ${kpiCard('Past due', formatNumber(tenants.pastDue ?? 0), 'fa-triangle-exclamation', 'red', null)}
     </div>
+    <p class="panel-hint">${escapeHtml(billing.partialNote || exec.usage?.note || 'Usage and message rollups show — until platform rollup jobs are connected.')}</p>
     ${renderPilotSpotlight(view.pilotSpotlight)}
     <div class="ops-grid ops-row-1">
       <div class="activity-section ops-activity">

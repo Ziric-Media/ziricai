@@ -30,6 +30,12 @@ export const ROUTE_CATALOG = [
 
     // Operations (superadmin)
     { method: "GET", path: "/api/operations/platform-dashboard", domain: "operations", tenantScoped: false, description: "MC platform dashboard read facade (?scope=platform|tenant&companyId= when tenant)" },
+    { method: "GET", path: "/api/operations/platform-executive-overview", domain: "operations", tenantScoped: false, description: "Mission Control executive KPI overview (read-only)" },
+    { method: "GET", path: "/api/operations/platform-billing-console", domain: "operations", tenantScoped: false, description: "Mission Control platform billing table (read-only)" },
+    { method: "GET", path: "/api/operations/platform-integrations", domain: "operations", tenantScoped: false, description: "Mission Control integrations matrix (read-only)" },
+    { method: "GET", path: "/api/operations/platform-analytics-overview", domain: "operations", tenantScoped: false, description: "ZiricAI platform analytics overview (read-only)" },
+    { method: "GET", path: "/api/operations/platform-support-cases", domain: "operations", tenantScoped: false, description: "Mission Control support cases (read-only)" },
+    { method: "POST", path: "/api/operations/sarah/chat", domain: "operations", tenantScoped: false, description: "Mission Control Sarah operator chat" },
     { method: "GET", path: "/api/operations/metrics", domain: "operations", tenantScoped: false, description: "Platform metrics (optional ?companyId= for tenant CRM aggregation)" },
     { method: "GET", path: "/api/operations/tenant/:companyId/metrics", domain: "operations", tenantScoped: false, description: "Read-only tenant CRM metrics for Mission Control" },
     { method: "GET", path: "/api/operations/tenant/:companyId/analytics/timeseries", domain: "operations", tenantScoped: false, description: "Read-only tenant analytics time-series for Mission Control" },
@@ -158,6 +164,11 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/marketplace/packs/:packId/rating", domain: "marketplace", tenantScoped: false, description: "Durable rating aggregate for pack" },
     { method: "GET", path: "/api/marketplace/installed/:companyId", domain: "marketplace", tenantScoped: true, description: "Installed packs for tenant" },
     { method: "GET", path: "/api/marketplace/lifecycle/:companyId", domain: "marketplace", tenantScoped: true, description: "Marketplace install lifecycle (all registry statuses)" },
+    { method: "GET", path: "/api/marketplace/entitlements/:companyId", domain: "marketplace", tenantScoped: true, description: "Tenant pack entitlement list (read-only)" },
+    { method: "GET", path: "/api/marketplace/entitlements/:companyId/:packId", domain: "marketplace", tenantScoped: true, description: "Tenant pack entitlement for one pack (read-only)" },
+    { method: "POST", path: "/api/platform/marketplace/entitlements", domain: "platform", tenantScoped: false, description: "Platform grant marketplace pack entitlement" },
+    { method: "PATCH", path: "/api/platform/marketplace/entitlements/:companyId/:packId", domain: "platform", tenantScoped: false, description: "Platform revoke or update pack entitlement expiry" },
+    { method: "DELETE", path: "/api/platform/marketplace/entitlements/:companyId/:packId", domain: "platform", tenantScoped: false, description: "Platform soft-revoke pack entitlement" },
     { method: "POST", path: "/api/marketplace/install", domain: "marketplace", tenantScoped: true, tenantOptional: true, description: "Install industry pack" },
     { method: "POST", path: "/api/marketplace/review", domain: "marketplace", tenantScoped: true, description: "Submit pack review (installed tenant; server-resolved author)" },
 
