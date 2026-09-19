@@ -170,11 +170,6 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/marketplace/packs/:packId/rating", domain: "marketplace", tenantScoped: false, description: "Durable rating aggregate for pack" },
     { method: "GET", path: "/api/marketplace/installed/:companyId", domain: "marketplace", tenantScoped: true, description: "Installed packs for tenant" },
     { method: "GET", path: "/api/marketplace/lifecycle/:companyId", domain: "marketplace", tenantScoped: true, description: "Marketplace install lifecycle (all registry statuses)" },
-    { method: "GET", path: "/api/marketplace/entitlements/:companyId", domain: "marketplace", tenantScoped: true, description: "Tenant pack entitlement list (read-only)" },
-    { method: "GET", path: "/api/marketplace/entitlements/:companyId/:packId", domain: "marketplace", tenantScoped: true, description: "Tenant pack entitlement for one pack (read-only)" },
-    { method: "POST", path: "/api/platform/marketplace/entitlements", domain: "platform", tenantScoped: false, description: "Platform grant marketplace pack entitlement" },
-    { method: "PATCH", path: "/api/platform/marketplace/entitlements/:companyId/:packId", domain: "platform", tenantScoped: false, description: "Platform revoke or update pack entitlement expiry" },
-    { method: "DELETE", path: "/api/platform/marketplace/entitlements/:companyId/:packId", domain: "platform", tenantScoped: false, description: "Platform soft-revoke pack entitlement" },
     { method: "POST", path: "/api/marketplace/install", domain: "marketplace", tenantScoped: true, tenantOptional: true, description: "Install industry pack" },
     { method: "POST", path: "/api/marketplace/review", domain: "marketplace", tenantScoped: true, description: "Submit pack review (installed tenant; server-resolved author)" },
 
