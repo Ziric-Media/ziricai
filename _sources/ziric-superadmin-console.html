@@ -7,6 +7,7 @@
     <link rel="icon" href="assets/favicon-superadmin.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/favicon-superadmin.svg">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="css/admin-dashboard.css">
     <script type="importmap">
     {
@@ -35,8 +36,12 @@
     <!-- Login -->
     <div class="auth-screen open" id="loginScreen">
         <div class="auth-card">
-            <h1>ZiricAI Super Admin</h1>
-            <p>Sign in with your super admin account to manage multi-tenant companies.</p>
+            <div class="auth-brand">
+                <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="auth-logo-img" width="200" height="48">
+                <p class="auth-brand-tagline">Mission Control</p>
+            </div>
+            <h1 class="auth-title">Sign in</h1>
+            <p>Use your super admin account to manage multi-tenant companies.</p>
             <form id="loginForm" class="auth-login-form">
                 <input type="email" id="loginEmail" class="auth-login-input" placeholder="Email" autocomplete="username" required />
                 <input type="password" id="loginPassword" class="auth-login-input" placeholder="Password" autocomplete="current-password" required />

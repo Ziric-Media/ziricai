@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZiricAI Super Admin Console</title>
+    <title>ZiricAI Mission Control</title>
+    <link rel="icon" href="assets/favicon-superadmin.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/favicon-superadmin.svg">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="css/admin-dashboard.css">
     <script type="importmap">
     {
@@ -16,25 +19,23 @@
       }
     }
     </script>
-<script>window.__ZIRICAI_CONFIG__={"apiBase":"","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"firebase":{"apiKey":"AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"482382497730","appId":"1:482382497730:web:6bc2f8668a1598fa13f85b","measurementId":"G-92ZVT0731S","databaseId":"default"}};</script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"","assetVersion":"true","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"firebase":{"apiKey":"AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"482382497730","appId":"1:482382497730:web:6bc2f8668a1598fa13f85b","measurementId":"G-92ZVT0731S","databaseId":"default"}};</script>
 </head>
 <body>
 
     <!-- Login -->
     <div class="auth-screen open" id="loginScreen">
         <div class="auth-card">
-            <h1>ZiricAI Super Admin</h1>
-            <p>Sign in with your super admin account to manage multi-tenant companies.</p>
-            <form id="loginForm">
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="loginEmail" autocomplete="username" required />
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="loginPassword" autocomplete="current-password" required />
-                </div>
-                <button class="btn btn-primary" type="submit" style="width:100%;margin-top:8px;">Sign In</button>
+            <div class="auth-brand">
+                <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="auth-logo-img" width="200" height="48">
+                <p class="auth-brand-tagline">Mission Control</p>
+            </div>
+            <h1 class="auth-title">Sign in</h1>
+            <p>Use your super admin account to manage multi-tenant companies.</p>
+            <form id="loginForm" class="auth-login-form">
+                <input type="email" id="loginEmail" class="auth-login-input" placeholder="Email" autocomplete="username" required />
+                <input type="password" id="loginPassword" class="auth-login-input" placeholder="Password" autocomplete="current-password" required />
+                <button class="btn btn-primary auth-login-submit" type="submit">Sign In</button>
             </form>
             <p id="loginStatus" style="margin-top:16px;font-size:13px;color:var(--text-muted);"></p>
             <p style="margin-top:12px;font-size:12px;color:var(--text-muted);">No account? Use <a href="superadmin-register.html">superadmin-register.html</a></p>
@@ -58,7 +59,7 @@
             <div class="sidebar-brand">
                 <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img">
                 <div class="logo-text">
-                    <span>Super Admin</span>
+                    <span>Mission Control</span>
                 </div>
             </div>
             <nav class="sidebar-nav" id="sidebarNav">
@@ -67,25 +68,38 @@
                     <span class="icon">📊</span><span>Dashboard</span>
                 </a>
                 <a href="#" data-page="companies">
-                    <span class="icon">🏢</span><span>Tenants</span>
+                    <span class="icon">🏢</span><span>Companies</span>
                     <span class="badge" id="companyCount" title="Tenant records (not production customer count)">0</span>
                 </a>
-                <a href="#" data-page="agents">
-                    <span class="icon">🤖</span><span>AI Agents</span>
-                    <span class="badge" id="agentCount">—</span>
+                <a href="#" data-page="crm">
+                    <span class="icon">👥</span><span>CRM</span>
                 </a>
-                <a href="#" data-page="knowledge">
-                    <span class="icon">📚</span><span>Knowledge Base</span>
-                    <span class="badge" id="knowledgeCount">—</span>
-                </a>
-                <a href="#" data-page="customers">
-                    <span class="icon">👥</span><span>Customers</span>
-                </a>
-                <a href="#" data-page="analytics">
-                    <span class="icon">📈</span><span>Analytics</span>
+                <a href="#" data-page="sarah">
+                    <span class="icon">✨</span><span>Sarah</span>
                 </a>
                 <a href="#" data-page="billing">
                     <span class="icon">💳</span><span>Billing</span>
+                </a>
+                <a href="#" data-page="platformAnalytics">
+                    <span class="icon">📈</span><span>ZiricAI Analytics</span>
+                </a>
+                <a href="#" data-page="supportInbox">
+                    <span class="icon">📥</span><span>Support Inbox</span>
+                </a>
+                <a href="#" data-page="integrations">
+                    <span class="icon">🔌</span><span>Integrations</span>
+                </a>
+                <a href="#" data-page="support">
+                    <span class="icon">🎫</span><span>Support</span>
+                </a>
+                <div class="section-label">Workspace</div>
+                <a href="#" data-page="agents">
+                    <span class="icon">🤖</span><span>AI Employees</span>
+                    <span class="badge" id="agentCount">—</span>
+                </a>
+                <a href="#" data-page="knowledge">
+                    <span class="icon">📚</span><span>Knowledge</span>
+                    <span class="badge" id="knowledgeCount">—</span>
                 </a>
                 <div class="section-label">System</div>
                 <a href="#" data-page="settings">

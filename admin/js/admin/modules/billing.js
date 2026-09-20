@@ -13,10 +13,54 @@ import {
   createBillingRecord,
   updateBillingRecord,
 } from '../services/billing.js';
+import { fetchPlatformBillingConsole } from '../services/platformConsole.js';
+import { formatNumber } from '../ui.js';
 
 export async function renderBilling(container) {
   if (!state.companies.length) {
     container.innerHTML = emptyState('Create a company to manage billing.');
+    return;
+  }
+
+  if (!state.selectedCompanyId) {
+    container.innerHTML = loadingState('Loading platform billing…');
+    const { data, error } = await fetchPlatformBillingConsole();
+    if (!data) {
+      container.innerHTML = pageHeader('Billing', 'Platform-wide billing console.') + emptyState(error || 'Unable to load billing.');
+      return;
+    }
+    const totals = data.totals || {};
+    container.innerHTML = `
+      ${pageHeader('Billing', 'ZiricAI platform billing — authoritative tenant billing records.', '<span class="ops-tag">Read-only</span>')}
+      <div class="kpi-grid kpi-grid-6">
+        <div class="kpi-card"><div class="label">Total accounts</div><div class="value">${formatNumber(totals.totalAccounts || 0)}</div></div>
+        <div class="kpi-card"><div class="label">Trial accounts</div><div class="value">${formatNumber(totals.trialAccounts || 0)}</div></div>
+        <div class="kpi-card"><div class="label">Active paid</div><div class="value">${formatNumber(totals.activePaid || 0)}</div></div>
+        <div class="kpi-card"><div class="label">Past due</div><div class="value">${formatNumber(totals.pastDue || 0)}</div></div>
+        <div class="kpi-card"><div class="label">MRR</div><div class="value">R${formatNumber(totals.mrr || 0)}</div></div>
+        <div class="kpi-card"><div class="label">ARR</div><div class="value">R${formatNumber(totals.arr || 0)}</div></div>
+      </div>
+      <div class="table-container">
+        <table class="org-table">
+          <thead><tr><th>Company</th><th>Package</th><th>Status</th><th>Trial</th><th>Billing</th><th>MRR</th></tr></thead>
+          <tbody>
+            ${(data.rows || [])
+              .map(
+                (r) => `<tr>
+                <td>${escapeHtml(r.companyName)}<div class="panel-hint">${escapeHtml(r.companyId)}</div></td>
+                <td>${escapeHtml(r.package)}</td>
+                <td>${escapeHtml(r.status)}</td>
+                <td>${r.trialDaysRemaining != null ? `${r.trialDaysRemaining} days` : '—'}</td>
+                <td>${escapeHtml(r.billingLabel)}</td>
+                <td>R${formatNumber(r.mrr || 0)}</td>
+              </tr>`
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+      <p class="panel-hint">Select a tenant in the scope bar to edit Firestore billing records for that company.</p>
+    `;
     return;
   }
 

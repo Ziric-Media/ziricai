@@ -32,7 +32,7 @@ export async function renderBilling(container) {
     const totals = data.totals || {};
     container.innerHTML = `
       ${pageHeader('Billing', 'ZiricAI platform billing — authoritative tenant billing records.', '<span class="ops-tag">Read-only</span>')}
-      <div class="kpi-grid kpi-grid-ops">
+      <div class="kpi-grid kpi-grid-6">
         <div class="kpi-card"><div class="label">Total accounts</div><div class="value">${formatNumber(totals.totalAccounts || 0)}</div></div>
         <div class="kpi-card"><div class="label">Trial accounts</div><div class="value">${formatNumber(totals.trialAccounts || 0)}</div></div>
         <div class="kpi-card"><div class="label">Active paid</div><div class="value">${formatNumber(totals.activePaid || 0)}</div></div>
