@@ -1,5 +1,5 @@
 /**
- * Firestore onboarding sessions — platform/onboardingSessions/{sessionId}
+ * Firestore onboarding sessions — platform/onboarding/sessions/{sessionId}
  */
 import { getAdminFirestore } from "../database/firestoreAdmin.js";
 import {

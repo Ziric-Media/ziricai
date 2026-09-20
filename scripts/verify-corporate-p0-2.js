@@ -412,6 +412,62 @@ console.log(
     `✓ idempotent reprovision: company/owner/agent/kb/dept counts stable (${ownerProbeResult.idempotency.agentCount} agents, ${ownerProbeResult.idempotency.knowledgeDocCount} kb docs)`
 );
 
+console.log("\n=== P0-2c.1 Firestore onboarding session path contract ===");
+
+const {
+    platformOnboardingSessionsCollectionPath,
+    platformOnboardingSessionPath,
+} = await import("../services/database/schema.js");
+const onboardingCollPath = platformOnboardingSessionsCollectionPath();
+const onboardingDocPath = platformOnboardingSessionPath("p0-2c1-path-probe");
+const collSegments = onboardingCollPath.split("/").filter(Boolean).length;
+const docSegments = onboardingDocPath.split("/").filter(Boolean).length;
+assert.equal(onboardingCollPath, "platform/onboarding/sessions");
+assert.equal(onboardingDocPath, "platform/onboarding/sessions/p0-2c1-path-probe");
+assert.equal(collSegments % 2, 1, "Firestore collection path must have odd segment count");
+assert.equal(docSegments % 2, 0, "Firestore document path must have even segment count");
+console.log(`✓ onboarding session paths valid (${onboardingCollPath} → ${onboardingDocPath})`);
+
+const { hasAdminCredentials } = await import("../services/database/firestoreAdmin.js");
+if (!hasAdminCredentials()) {
+    console.log("(Firestore repository runtime probe skipped — Admin credentials not configured locally)");
+} else {
+    const firestorePathProbe = spawnSync(
+        process.execPath,
+        ["--input-type=module", "-e", `
+process.env.NODE_ENV = "test";
+process.env.STORAGE_BACKEND = "firestore";
+const { FirestoreOnboardingSessionRepository } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "services/platform/firestoreOnboardingSessionRepository.js")).href)});
+const repo = new FirestoreOnboardingSessionRepository();
+const sessionId = "p0-2c1-firestore-probe-" + Date.now();
+const uid = "p0-2c1-firestore-uid";
+const payload = {
+  sessionId,
+  uid,
+  companyId: "p0-2c1-probe-co",
+  status: "in_progress",
+  currentStep: "industry",
+  completedSteps: [],
+  updatedAt: new Date().toISOString(),
+};
+await repo.saveSession(payload);
+const loaded = await repo.getSession(sessionId);
+if (!loaded || loaded.companyId !== payload.companyId) throw new Error("getSession failed after save");
+await repo.saveSession({ ...loaded, currentStep: "whatsapp", completedSteps: ["industry"] });
+const updated = await repo.getSession(sessionId);
+if (updated.currentStep !== "whatsapp") throw new Error("session update failed");
+const listed = await repo.findLatestByUidAndStatus(uid, "in_progress");
+if (!listed || listed.sessionId !== sessionId) throw new Error("findLatestByUidAndStatus failed");
+console.log(JSON.stringify({ ok: true, sessionId, collectionPath: ${JSON.stringify(onboardingCollPath)} }));
+`],
+        { cwd: ROOT, env: { ...process.env, NODE_ENV: "test", STORAGE_BACKEND: "firestore" }, encoding: "utf8", timeout: 120_000 }
+    );
+    if (firestorePathProbe.status !== 0) {
+        throw new Error(`Firestore onboarding session repository probe failed\\n${firestorePathProbe.stderr || firestorePathProbe.stdout}`);
+    }
+    console.log("✓ FirestoreOnboardingSessionRepository save/get/update/findByUid (Admin SDK runtime)");
+}
+
 console.log("\n=== P0-2c durability, session auth, honesty ===");
 
 const {

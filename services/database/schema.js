@@ -403,13 +403,15 @@ export function platformRatingPath(packId) {
     return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.RATINGS}/${packId}`;
 }
 
-/** Platform onboarding wizard sessions (CORPORATE-P0-2c). */
+/** Platform onboarding wizard sessions (CORPORATE-P0-2c / P0-2c.1 Firestore path depth). */
 export const PLATFORM_ONBOARDING = {
-    SESSIONS: "onboardingSessions",
+    ROOT: "onboarding",
+    SESSIONS: "sessions",
 };
 
+/** Collection: platform/onboarding/sessions (3 segments — valid for Admin .collection()). */
 export function platformOnboardingSessionsCollectionPath() {
-    return `${ROOT.PLATFORM}/${PLATFORM_ONBOARDING.SESSIONS}`;
+    return `${ROOT.PLATFORM}/${PLATFORM_ONBOARDING.ROOT}/${PLATFORM_ONBOARDING.SESSIONS}`;
 }
 
 export function platformOnboardingSessionPath(sessionId) {
