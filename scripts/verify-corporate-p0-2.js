@@ -247,6 +247,147 @@ async function runLiveMode() {
     console.log("(live tenant absence: confirm probe companyId not created in platform directory manually or via MC)");
 }
 
+console.log("\n=== B/C/D. P0-2b owner binding + idempotency (unit/integration) ===");
+
+const {
+    resolveSelfServeOwnerUid,
+    bindSelfServeCompanyData,
+    resolveSeedDemoLead,
+} = await import("../services/platform/selfServeOwnerBinding.js");
+
+assert.throws(() => resolveSelfServeOwnerUid({}), /Authenticated owner uid is required/);
+console.log("✓ resolveSelfServeOwnerUid rejects missing uid");
+
+assert.throws(
+    () => bindSelfServeCompanyData({ ownerUid: "user-b" }, "user-a"),
+    (err) => err.code === "OWNER_UID_MISMATCH"
+);
+const bound = bindSelfServeCompanyData({ ownerUid: "user-a", name: "Co" }, "user-a");
+assert.equal(bound.ownerUid, "user-a");
+assert.equal(bound.selfServeOwnerUid, "user-a");
+console.log("✓ bindSelfServeCompanyData rejects spoofed ownerUid");
+
+const orchestratorSrc = read("services/platform/onboardingOrchestrator.js");
+assert.doesNotMatch(orchestratorSrc, /owner-\$\{Date\.now\(\)\}/);
+console.log("✓ onboardingOrchestrator has no synthetic owner uid fallback");
+
+assert.equal(resolveSeedDemoLead(undefined), process.env.NODE_ENV !== "production");
+assert.equal(resolveSeedDemoLead(true), true);
+assert.equal(resolveSeedDemoLead(false), false);
+console.log("✓ resolveSeedDemoLead defaults off in production");
+
+const ownerBindingProbe = spawnSync(
+    process.execPath,
+    ["--input-type=module", "-e", `
+process.env.NODE_ENV = "test";
+process.env.STORAGE_BACKEND = "memory";
+const { startOnboarding } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "services/platform/onboardingService.js")).href)});
+const { getTenantUser } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "services/tenants/userService.js")).href)});
+const { getCompany } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "services/tenants/companyService.js")).href)});
+const { provisionCompany } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "services/platform/provisioningService.js")).href)});
+const { listAiEmployees } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "services/tenants/aiEmployeeService.js")).href)});
+const { listKnowledgeDocuments } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "services/tenants/knowledgeService.js")).href)});
+const { listTeamMembers } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "services/tenants/userService.js")).href)});
+const { listDepartments } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "services/tenants/departmentService.js")).href)});
+const { listAllCompaniesFromStorage } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "services/tenants/companyService.js")).href)});
+
+function bindPayload(uid) {
+  return {
+    name: "P0-2 Owner Bind Co",
+    ownerUid: uid,
+    ownerId: uid,
+    selfServeOwnerUid: uid,
+    ownerEmail: "p0-2-owner-bind@example.invalid",
+  };
+}
+
+const ownerA = "corporate-p0-2-user-a";
+const ownerB = "corporate-p0-2-user-b";
+const start = await startOnboarding({
+  companyName: "P0-2 Owner Bind Co",
+  ownerEmail: "p0-2-owner-bind@example.invalid",
+  ownerName: "Owner A",
+  uid: ownerA,
+});
+const member = await getTenantUser(start.companyId, ownerA);
+if (!member || member.role !== "owner") throw new Error("owner membership missing for user A");
+const spoofMember = await getTenantUser(start.companyId, ownerB);
+if (spoofMember) throw new Error("user B must not have membership from user A signup");
+
+const company = await getCompany(start.companyId);
+if (company?.ownerUid !== ownerA && company?.ownerId !== ownerA) {
+  throw new Error("company ownerUid not bound to authenticated uid");
+}
+
+async function resourceSnapshot(companyId, ownerUid) {
+  const [companies, team, agents, knowledge, departments] = await Promise.all([
+    listAllCompaniesFromStorage(),
+    listTeamMembers(companyId),
+    listAiEmployees(companyId),
+    listKnowledgeDocuments(companyId),
+    listDepartments(companyId),
+  ]);
+  const companyRows = companies.filter((c) => (c.id || c.companyId) === companyId);
+  const owners = team.filter((m) => m.role === "owner");
+  const defaultAgents = agents.filter((a) => a.isDefault);
+  return {
+    companyRowCount: companyRows.length,
+    ownerMembershipCount: owners.length,
+    ownerUidOnCompany: companyRows[0]?.ownerUid || companyRows[0]?.ownerId || null,
+    teamCount: team.length,
+    agentCount: agents.length,
+    defaultAgentCount: defaultAgents.length,
+    defaultAgentIds: defaultAgents.map((a) => a.id).sort(),
+    knowledgeDocCount: knowledge.length,
+    departmentCount: departments.length,
+    ownerMemberUid: owners[0]?.uid || owners[0]?.id || null,
+    agentIds: agents.map((a) => a.id).sort(),
+    kbTitles: knowledge.map((d) => d.title).sort(),
+  };
+}
+
+function assertSnapshotEqual(before, after, label) {
+  const keys = Object.keys(before);
+  for (const key of keys) {
+    const b = before[key];
+    const a = after[key];
+    if (JSON.stringify(b) !== JSON.stringify(a)) {
+      throw new Error(\`idempotency \${label}: \${key} changed \${JSON.stringify(b)} -> \${JSON.stringify(a)}\`);
+    }
+  }
+}
+
+const companyId = start.companyId;
+const before = await resourceSnapshot(companyId, ownerA);
+if (before.companyRowCount !== 1) throw new Error("expected exactly one company shell");
+if (before.ownerMembershipCount !== 1) throw new Error("expected exactly one owner membership");
+if (before.defaultAgentCount !== 1) throw new Error("expected exactly one default agent");
+if (before.ownerMemberUid !== ownerA) throw new Error("owner membership uid not bound to authenticated uid");
+
+const first = await provisionCompany(companyId, bindPayload(ownerA));
+const mid = await resourceSnapshot(companyId, ownerA);
+assertSnapshotEqual(before, mid, "after first reprovision");
+
+const second = await provisionCompany(companyId, bindPayload(ownerA));
+if (!second.alreadyProvisioned) throw new Error("second provisionCompany must be idempotent");
+const after = await resourceSnapshot(companyId, ownerA);
+assertSnapshotEqual(before, after, "after second reprovision");
+if (first.links?.agentId !== second.links?.agentId) throw new Error("agent id changed on reprovision");
+
+console.log(JSON.stringify({ ok: true, companyId, idempotency: before }));
+`],
+    { cwd: ROOT, env: { ...process.env, NODE_ENV: "test", STORAGE_BACKEND: "memory" }, encoding: "utf8", timeout: 120_000 }
+);
+
+if (ownerBindingProbe.status !== 0) {
+    throw new Error(`owner binding probe failed\n${ownerBindingProbe.stderr || ownerBindingProbe.stdout}`);
+}
+const ownerProbeResult = JSON.parse((ownerBindingProbe.stdout || "").trim().split("\n").pop());
+console.log(`✓ startOnboarding binds owner membership (${ownerProbeResult.companyId})`);
+console.log(
+    `✓ idempotent reprovision: company/owner/agent/kb/dept counts stable (${ownerProbeResult.idempotency.agentCount} agents, ${ownerProbeResult.idempotency.knowledgeDocCount} kb docs)`
+);
+
 await runLiveMode();
 
-console.log("\nAll CORPORATE-P0-2 (P0-2a) checks passed.");
+console.log("\nAll CORPORATE-P0-2 checks passed (P0-2a factory + P0-2b owner binding).");

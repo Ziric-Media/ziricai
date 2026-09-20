@@ -117,6 +117,19 @@ export function isCanonicalProvisioningComplete(record) {
 export async function provisionCompany(companyId, companyData = {}) {
     if (!companyId) throw new Error("companyId is required");
 
+    const selfServeOwnerUid = companyData.selfServeOwnerUid
+        ? String(companyData.selfServeOwnerUid).trim()
+        : null;
+    if (selfServeOwnerUid) {
+        const boundOwner = String(companyData.ownerUid || companyData.ownerId || "").trim();
+        if (!boundOwner || boundOwner !== selfServeOwnerUid) {
+            throw Object.assign(new Error("Owner uid does not match authenticated user"), {
+                status: 403,
+                code: "OWNER_UID_MISMATCH",
+            });
+        }
+    }
+
     const store = await adapter();
     const existingRecord = await getStoredLinks(companyId);
     if (isCanonicalProvisioningComplete(existingRecord)) {
@@ -360,6 +373,7 @@ export async function provisionAgent(companyId, agentId = null, agentData = {}) 
         avatar: agentData.avatar || "🤖",
         personality: agentData.personality || "professional",
         model: agentData.model || "gpt-4o-mini",
+        modelVersion: String(agentData.modelVersion || "1.0").trim() || "1.0",
         temperature: Number(agentData.temperature ?? 0.7),
         memory: agentData.memory !== false,
         systemPrompt: prompt,

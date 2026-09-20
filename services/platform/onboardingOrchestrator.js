@@ -14,6 +14,7 @@ import {
     getOnboardingSession,
     ONBOARDING_STEPS,
 } from "./onboardingService.js";
+import { resolveSelfServeOwnerUid, resolveSeedDemoLead } from "./selfServeOwnerBinding.js";
 
 /**
  * One-shot onboarding: account → industry → whatsapp → knowledge → train → test → complete.
@@ -38,11 +39,13 @@ export async function completeOnboarding(payload = {}) {
     if (!ownerEmail?.trim()) throw new Error("ownerEmail is required");
     if (!ownerName?.trim()) throw new Error("ownerName is required");
 
+    const ownerUid = resolveSelfServeOwnerUid({ uid, ownerEmail, ownerName, companyName });
+
     const start = await startOnboarding({
         companyName,
         ownerName,
         ownerEmail,
-        uid: uid || `owner-${Date.now()}`,
+        uid: ownerUid,
     });
 
     const { sessionId, companyId } = start;
@@ -68,7 +71,7 @@ export async function completeOnboarding(payload = {}) {
     await completeOnboardingStep(sessionId, "complete", {
         branding,
         settings,
-        seedDemoLead: payload.seedDemoLead !== false,
+        seedDemoLead: resolveSeedDemoLead(payload.seedDemoLead),
     });
 
     const session = getOnboardingSession(sessionId);
@@ -132,7 +135,7 @@ export async function buildOnboardingResult(companyId, context = {}) {
         industry: context.session?.industry,
         industryId: context.session?.industryId,
         whatsappConnected: context.session?.whatsappConnected ?? true,
-        seedDemoLead: context.seedDemoLead !== false,
+        seedDemoLead: resolveSeedDemoLead(context.seedDemoLead),
         onboardingCompletedAt: context.session?.completedAt || new Date().toISOString(),
     });
     return gatherOnboardingResult(companyId, context);

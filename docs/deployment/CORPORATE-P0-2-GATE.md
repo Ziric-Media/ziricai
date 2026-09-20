@@ -1,6 +1,6 @@
 # CORPORATE-P0-2 — Signup / Tenant Creation / Owner Binding
 
-**Status:** SPEC APPROVED — P0-2a implementation in progress (factory closure + partial verifier)  
+**Status:** P0-2a CLOSED — P0-2b implementation ready for review (local; not deployed)  
 **Depends on:** CORPORATE-P0-1 ✅ CLOSED (production tenant isolation proven)  
 **Does not replace:** P1 onboarding honesty (partial overlap in P0-2c), P0-3 unified communication write path  
 
@@ -95,7 +95,7 @@ client → uid in JSON body → server trusts body.uid without token match
 | Topic | Decision |
 |--------|----------|
 | `POST /api/companies` | **Platform-only** — not a public signup route; prove unauthenticated cannot create |
-| Demo lead seed | Default **off** in **P0-2b** (clean production tenant; explicit opt-in for demos/tests) |
+| Demo lead seed | Default **off** in production via **P0-2b** (`resolveSeedDemoLead`; opt-in with `seedDemoLead: true` or `ONBOARDING_SEED_DEMO_LEAD=true`) |
 | Self-serve signup | **`POST /api/onboarding/start`** is the canonical public entry; `/complete` may remain temporarily with **identical auth + owner-binding rules**, not a second factory |
 
 ---
@@ -129,7 +129,7 @@ client → uid in JSON body → server trusts body.uid without token match
 | `provisionCompany` | `ownerUid` must match token when invoked from self-serve paths |
 | Identity substitution tests | Verifier proves User A token + body User B → owner is User A |
 
-**Out of scope for 2b:** Session durability (2c), demo lead default (2c/product decision).
+**Out of scope for 2b:** Session durability (2c), WhatsApp/training honesty (2c).
 
 ### P0-2c — Durability + honest onboarding (stability / honesty)
 

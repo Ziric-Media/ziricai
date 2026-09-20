@@ -23,6 +23,11 @@ import { getWorkspaceSnapshot } from "../portal/workspaceService.js";
 import { listAiEmployees } from "../tenants/aiEmployeeService.js";
 import { listKnowledgeDocuments } from "../tenants/knowledgeService.js";
 import { isWhatsAppDevMode } from "../integrations/metaWhatsAppErrors.js";
+import {
+    resolveSelfServeOwnerUid,
+    bindSelfServeCompanyData,
+    resolveSeedDemoLead,
+} from "./selfServeOwnerBinding.js";
 
 /** In-memory onboarding sessions (dev/demo; persist to Firestore in production). */
 const sessions = new Map();
@@ -151,24 +156,30 @@ export async function startOnboarding(payload = {}) {
     if (!ownerEmail?.trim()) throw new Error("ownerEmail is required");
     if (!ownerName?.trim()) throw new Error("ownerName is required");
 
+    const ownerUid = resolveSelfServeOwnerUid({ uid, ownerName, ownerEmail, companyName });
+
     const slug = slugifyCompanyName(companyName);
     const companyId = `${slug}-${Date.now().toString(36).slice(-4)}`;
     const sessionId = genId("session");
     const timestamp = now();
     const trialPlan = getPlan("trial");
 
-    const provisionResult = await provisionCompany(companyId, {
-        name: companyName.trim(),
-        owner: ownerName.trim(),
-        ownerEmail: ownerEmail.trim(),
-        ownerUid: uid || null,
-        ownerId: uid || null,
-        email: ownerEmail.trim(),
-        plan: "trial",
-        status: "active",
-        onboarding: true,
-        trialEndsAt: buildUsageFromPlan("trial", hashSeed(companyId)).trialEndsAt,
-    });
+    const provisionResult = await provisionCompany(
+        companyId,
+        bindSelfServeCompanyData(
+            {
+                name: companyName.trim(),
+                owner: ownerName.trim(),
+                ownerEmail: ownerEmail.trim(),
+                email: ownerEmail.trim(),
+                plan: "trial",
+                status: "active",
+                onboarding: true,
+                trialEndsAt: buildUsageFromPlan("trial", hashSeed(companyId)).trialEndsAt,
+            },
+            ownerUid
+        )
+    );
 
     const session = {
         sessionId,
@@ -176,7 +187,7 @@ export async function startOnboarding(payload = {}) {
         companyName: companyName.trim(),
         ownerName: ownerName.trim(),
         ownerEmail: ownerEmail.trim(),
-        uid: uid || null,
+        uid: ownerUid,
         plan: "trial",
         planLabel: trialPlan.label,
         currentStep: "account",
@@ -194,25 +205,19 @@ export async function startOnboarding(payload = {}) {
 
     sessions.set(sessionId, session);
 
-    if (uid) {
-        try {
-            await upsertGlobalUserProfile(uid, {
-                email: ownerEmail.trim(),
-                fullName: ownerName.trim(),
-                role: "owner",
-                companyId,
-                status: "active",
-            });
-            await upsertOwnerMembership(uid, companyId, {
-                email: ownerEmail.trim(),
-                fullName: ownerName.trim(),
-                role: "owner",
-                status: "active",
-            });
-        } catch (err) {
-            console.warn("[onboarding] Server-side membership write skipped:", err.message);
-        }
-    }
+    await upsertGlobalUserProfile(ownerUid, {
+        email: ownerEmail.trim(),
+        fullName: ownerName.trim(),
+        role: "owner",
+        companyId,
+        status: "active",
+    });
+    await upsertOwnerMembership(ownerUid, companyId, {
+        email: ownerEmail.trim(),
+        fullName: ownerName.trim(),
+        role: "owner",
+        status: "active",
+    });
 
     return {
         sessionId,
@@ -395,7 +400,7 @@ export async function completeOnboardingStep(sessionId, step, data = {}) {
                 industry: session.industry,
                 industryId: session.industryId,
                 whatsappConnected: session.whatsappConnected,
-                seedDemoLead: data.seedDemoLead !== false,
+                seedDemoLead: resolveSeedDemoLead(data.seedDemoLead),
                 onboardingCompletedAt: timestamp,
             });
 
