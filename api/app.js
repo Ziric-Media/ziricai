@@ -168,6 +168,7 @@ import { trackSession, invalidateSession, buildSessionResponse } from "../servic
 import { checkPermission } from "../services/auth/permissionsService.js";
 import { resolveMarketplacePaymentBypass } from "../services/platform/marketplaceAuth.js";
 import { requirePlatformAccess } from "../services/auth/platformAuth.js";
+import { requireFirebaseAuth } from "../services/auth/requireFirebaseAuth.js";
 import { validateCompanyIdParam, requireBodyFields, isValidCompanyId } from "../services/auth/validateInput.js";
 import { authRateLimit } from "../services/auth/authRateLimiter.js";
 import { auditLog } from "../services/audit/auditLog.js";
@@ -585,24 +586,31 @@ app.post("/api/companies/:companyId/archive", requireTenantScope(), checkPermiss
     }
 });
 
-app.post("/api/companies", async (req, res) => {
-    try {
-        const body = req.body || {};
-        const companyId = body.companyId || body.id;
-        if (!companyId) return res.status(400).json({ error: "companyId is required" });
+app.post(
+    "/api/companies",
+    requirePlatformAccess(),
+    authRateLimit("provision"),
+    validateCompanyIdParam("body"),
+    async (req, res) => {
+        try {
+            const body = req.body || {};
+            const companyId = body.companyId || body.id;
+            if (!companyId) return res.status(400).json({ error: "companyId is required" });
 
-        if (body.provision !== false) {
-            const result = await provisionCompany(companyId, body);
-            return res.status(201).json({ success: true, ...result });
+            if (body.provision !== false) {
+                auditLog("provision_company", { companyId, via: req.platformAuth?.via, surface: "POST /api/companies" });
+                const result = await provisionCompany(companyId, body);
+                return res.status(201).json({ success: true, ...result });
+            }
+
+            const company = await createCompany(companyId, body);
+            res.status(201).json({ success: true, company });
+        } catch (err) {
+            console.error("[api/companies POST] error:", err.message);
+            res.status(400).json({ error: err.message || "Failed to create company" });
         }
-
-        const company = await createCompany(companyId, body);
-        res.status(201).json({ success: true, company });
-    } catch (err) {
-        console.error("[api/companies POST] error:", err.message);
-        res.status(400).json({ error: err.message || "Failed to create company" });
     }
-});
+);
 
 /** Departments — org structure under tenant */
 app.get("/api/companies/:companyId/departments", requireTenantScope(), async (req, res) => {
@@ -801,15 +809,21 @@ app.get("/api/onboarding/session/:sessionId", (req, res) => {
     res.json({ session, whatsapp: getWhatsAppConfig() });
 });
 
-app.post("/api/onboarding/start", authRateLimit("onboarding"), requireBodyFields(["companyName", "ownerEmail", "ownerName"]), async (req, res) => {
-    try {
-        const result = await startOnboarding(req.body || {});
-        res.status(201).json(result);
-    } catch (err) {
-        console.error("[api/onboarding/start] error:", err.message);
-        res.status(400).json({ error: err.message || "Failed to start onboarding" });
+app.post(
+    "/api/onboarding/start",
+    authRateLimit("onboarding"),
+    requireBodyFields(["companyName", "ownerEmail", "ownerName"]),
+    requireFirebaseAuth(),
+    async (req, res) => {
+        try {
+            const result = await startOnboarding(req.body || {});
+            res.status(201).json(result);
+        } catch (err) {
+            console.error("[api/onboarding/start] error:", err.message);
+            res.status(400).json({ error: err.message || "Failed to start onboarding" });
+        }
     }
-});
+);
 
 app.post("/api/onboarding/complete-step", authRateLimit("onboarding"), async (req, res) => {
     try {
@@ -829,26 +843,37 @@ app.post("/api/onboarding/complete-step", authRateLimit("onboarding"), async (re
     }
 });
 
-app.post("/api/onboarding/provision", async (req, res) => {
-    try {
-        const result = await provisionOnboarding(req.body || {});
-        res.status(201).json(result);
-    } catch (err) {
-        console.error("[api/onboarding/provision] error:", err.message);
-        res.status(400).json({ error: err.message || "Failed to provision" });
+app.post(
+    "/api/onboarding/provision",
+    authRateLimit("onboarding"),
+    requireFirebaseAuth(),
+    async (req, res) => {
+        try {
+            const result = await provisionOnboarding(req.body || {});
+            res.status(201).json(result);
+        } catch (err) {
+            console.error("[api/onboarding/provision] error:", err.message);
+            res.status(400).json({ error: err.message || "Failed to provision" });
+        }
     }
-});
+);
 
 /** One-shot onboarding — full signup → live platform chain */
-app.post("/api/onboarding/complete", authRateLimit("onboarding"), requireBodyFields(["companyName", "ownerEmail", "ownerName"]), async (req, res) => {
-    try {
-        const result = await completeOnboarding(req.body || {});
-        res.status(201).json(result);
-    } catch (err) {
-        console.error("[api/onboarding/complete] error:", err.message);
-        res.status(400).json({ error: err.message || "Failed to complete onboarding" });
+app.post(
+    "/api/onboarding/complete",
+    authRateLimit("onboarding"),
+    requireBodyFields(["companyName", "ownerEmail", "ownerName"]),
+    requireFirebaseAuth(),
+    async (req, res) => {
+        try {
+            const result = await completeOnboarding(req.body || {});
+            res.status(201).json(result);
+        } catch (err) {
+            console.error("[api/onboarding/complete] error:", err.message);
+            res.status(400).json({ error: err.message || "Failed to complete onboarding" });
+        }
     }
-});
+);
 
 /** Super Admin — tenant directory from Firestore companies/* (B-MC-5a). */
 app.get("/api/platform/companies", requirePlatformAccess(), async (req, res) => {
