@@ -21,7 +21,7 @@
     border-color: var(--primary-dark);
 }
 
-/* Sidebar — ZiricAI platform logo + tenant name (Mission Control parity) */
+/* Sidebar — ZiricAI platform logo only (tenant name in topbar/breadcrumb) */
 .portal-body .sidebar.portal-sidebar .sidebar-brand,
 .portal-body .portal-sidebar-brand {
     display: flex;
@@ -36,37 +36,34 @@
     letter-spacing: normal;
 }
 
+.portal-body .portal-sidebar-brand.portal-sidebar-brand--platform {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 22px 8px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
 .portal-body .sidebar.portal-sidebar .sidebar-brand .logo-img.portal-platform-logo,
 .portal-body .portal-sidebar-brand .logo-img.portal-platform-logo {
     height: 42px;
     width: auto;
-    max-width: 120px;
+    max-width: 100%;
     object-fit: contain;
     flex-shrink: 0;
     display: block;
 }
 
-.portal-brand-title-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
+.portal-sidebar-product-label {
+    display: block;
     width: 100%;
-}
-
-.portal-body .sidebar.portal-sidebar .sidebar-brand .portal-tenant-mark,
-.portal-body .portal-sidebar-brand .portal-tenant-mark {
-    flex: 0 0 28px;
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
+    margin: 0;
     font-size: 11px;
-    border-radius: 8px;
-}
-
-.portal-brand-title-row .brand-company-name {
-    flex: 1;
-    min-width: 0;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    line-height: 1.3;
 }
 
 .portal-body .sidebar.portal-sidebar .sidebar-brand .logo-icon,
@@ -180,8 +177,49 @@
     max-width: 420px;
 }
 
-.portal-body .auth-card.portal-auth-card p {
+.portal-body .auth-card.portal-auth-card {
+    padding: 36px 32px 28px;
+}
+
+.portal-body .auth-card.portal-auth-card .auth-brand {
+    margin-bottom: 22px;
+}
+
+.portal-body .auth-card.portal-auth-card .auth-title {
+    margin: 0 0 10px;
+}
+
+.portal-body .auth-card.portal-auth-card .auth-lead {
     text-align: center;
+    margin: 0 0 22px;
+    line-height: 1.55;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.portal-body .auth-card.portal-auth-card .auth-login-form {
+    gap: 16px;
+    margin-top: 0;
+}
+
+.portal-body .auth-card.portal-auth-card .auth-login-submit {
+    margin-top: 6px;
+}
+
+.portal-body .auth-card.portal-auth-card .auth-login-status {
+    margin: 18px 0 0;
+    min-height: 20px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.portal-body .auth-card.portal-auth-card .auth-login-footer {
+    margin: 16px 0 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
 }
 
 /* Topbar — breadcrumb-first layout */

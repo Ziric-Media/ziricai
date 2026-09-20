@@ -26,14 +26,6 @@ let onAuthReady = null;
 
 const DEFAULT_PORTAL_FAVICON = 'assets/favicon-portal.svg';
 
-function companyInitials(name) {
-  const parts = String(name || 'C').trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
-  return (parts[0]?.slice(0, 2) || 'C').toUpperCase();
-}
-
 function applyFavicon(url) {
   const href = url?.trim() || DEFAULT_PORTAL_FAVICON;
   for (const rel of ['icon', 'apple-touch-icon']) {
@@ -106,6 +98,12 @@ async function loadTenantContext(profile) {
   updateNotificationBadge();
 
   prefetchHub(companyId).catch((err) => console.warn('[portal] hub prefetch:', err.message));
+  import('./core/notificationPolling.js')
+    .then((m) => {
+      m.registerNotificationRefresh?.(() => updateNotificationBadge());
+      m.startNotificationPolling?.();
+    })
+    .catch(() => {});
 }
 
 async function completeLoginSession(user, profile) {
@@ -161,19 +159,7 @@ function updateShellUI(profile, company, branding) {
   const emailEl = document.getElementById('sidebarUserEmail');
   if (emailEl) emailEl.textContent = profile?.email || '';
 
-  const sidebarBrand = document.getElementById('sidebarBrandName');
-  if (sidebarBrand) sidebarBrand.textContent = company?.name || 'Company Portal';
-
-  const sidebarLogo = document.getElementById('sidebarLogo');
-  if (sidebarLogo) {
-    if (branding?.logoUrl) {
-      sidebarLogo.classList.add('has-image');
-      sidebarLogo.innerHTML = `<img src="${branding.logoUrl}" alt="${company?.name || ''}" />`;
-    } else {
-      sidebarLogo.classList.remove('has-image');
-      sidebarLogo.textContent = companyInitials(company?.name);
-    }
-  }
+  // Sidebar shows ZiricAI platform branding only; tenant name lives in breadcrumb/topbar.
 }
 
 export function updateNotificationBadge() {

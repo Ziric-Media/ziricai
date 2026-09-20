@@ -41,14 +41,14 @@
                 <p class="auth-brand-tagline">Company Portal</p>
             </div>
             <h1 class="auth-title">Sign in</h1>
-            <p>Sign in with your company account. Demo maps to <strong>Central Motors</strong>.</p>
+            <p class="auth-lead">Sign in with your company account. Demo maps to <strong>Central Motors</strong>.</p>
             <form id="loginForm" class="auth-login-form">
                 <input type="email" id="loginEmail" class="auth-login-input" autocomplete="username" placeholder="Email" required />
                 <input type="password" id="loginPassword" class="auth-login-input" autocomplete="current-password" placeholder="Password" required />
                 <button class="btn btn-primary auth-login-submit" type="submit">Sign In</button>
             </form>
-            <p id="loginStatus" style="margin-top:16px;font-size:13px;color:var(--text-muted);"></p>
-            <p style="margin-top:12px;font-size:12px;color:var(--text-muted);">
+            <p id="loginStatus" class="auth-login-status"></p>
+            <p class="auth-login-footer">
                 Platform admin? Use <a href="#" data-site-link="admin">Super Admin Console</a>
             </p>
         </div>
@@ -80,15 +80,9 @@
 
     <div id="appShell" class="hidden">
         <aside class="sidebar portal-sidebar" id="sidebar">
-            <div class="sidebar-brand portal-sidebar-brand">
+            <div class="sidebar-brand portal-sidebar-brand portal-sidebar-brand--platform">
                 <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img portal-platform-logo">
-                <div class="logo-text">
-                    <div class="portal-brand-title-row">
-                        <div class="logo-icon portal-tenant-mark" id="sidebarLogo">CM</div>
-                        <span class="brand-company-name" id="sidebarBrandName">Central Motors</span>
-                    </div>
-                    <span class="brand-portal-label">Company Portal</span>
-                </div>
+                <span class="brand-portal-label portal-sidebar-product-label">Company Portal</span>
             </div>
             <nav class="sidebar-nav" id="sidebarNav">
                 <div class="section-label">Workspace</div>
