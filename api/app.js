@@ -156,6 +156,7 @@ import {
     provisionOnboarding,
     listOnboardingIndustries,
     getOnboardingSession,
+    assertOnboardingSessionOwner,
     getWhatsAppConfig,
     slugifyCompanyName,
 } from "../services/platform/onboardingService.js";
@@ -803,11 +804,27 @@ app.get("/api/onboarding/industries", (req, res) => {
     res.json({ industries: listOnboardingIndustries(), whatsapp: getWhatsAppConfig() });
 });
 
-app.get("/api/onboarding/session/:sessionId", (req, res) => {
-    const session = getOnboardingSession(req.params.sessionId);
-    if (!session) return res.status(404).json({ error: "Session not found" });
-    res.json({ session, whatsapp: getWhatsAppConfig() });
-});
+app.get(
+    "/api/onboarding/session/:sessionId",
+    authRateLimit("onboarding"),
+    requireFirebaseAuth(),
+    async (req, res) => {
+        try {
+            const session = await getOnboardingSession(req.params.sessionId);
+            if (!session) {
+                return res.status(404).json({ error: "Session not found", code: "SESSION_NOT_FOUND" });
+            }
+            assertOnboardingSessionOwner(session, req.firebaseAuth);
+            res.json({ session, whatsapp: getWhatsAppConfig() });
+        } catch (err) {
+            const status = err.status || 500;
+            res.status(status).json({
+                error: err.message || "Failed to load onboarding session",
+                code: err.code || "ONBOARDING_ERROR",
+            });
+        }
+    }
+);
 
 app.post(
     "/api/onboarding/start",

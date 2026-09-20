@@ -74,7 +74,7 @@ export async function completeOnboarding(payload = {}) {
         seedDemoLead: resolveSeedDemoLead(payload.seedDemoLead),
     });
 
-    const session = getOnboardingSession(sessionId);
+    const session = await getOnboardingSession(sessionId);
     return gatherOnboardingResult(companyId, {
         sessionId,
         session,

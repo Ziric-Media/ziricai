@@ -402,3 +402,16 @@ export function platformReviewPath(reviewId) {
 export function platformRatingPath(packId) {
     return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.RATINGS}/${packId}`;
 }
+
+/** Platform onboarding wizard sessions (CORPORATE-P0-2c). */
+export const PLATFORM_ONBOARDING = {
+    SESSIONS: "onboardingSessions",
+};
+
+export function platformOnboardingSessionsCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_ONBOARDING.SESSIONS}`;
+}
+
+export function platformOnboardingSessionPath(sessionId) {
+    return `${platformOnboardingSessionsCollectionPath()}/${sessionId}`;
+}

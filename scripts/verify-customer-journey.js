@@ -106,7 +106,7 @@ async function main() {
         process.exit(1);
     }
 
-    const session = getOnboardingSession(sessionId);
+    const session = await getOnboardingSession(sessionId);
     session?.status === "live" ? pass("session live status") : fail("session live status", session?.status);
 
     console.log("\n3. Trial billing record...");
