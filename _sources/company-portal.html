@@ -46,21 +46,16 @@
     <!-- Login -->
     <div class="auth-screen open" id="loginScreen">
         <div class="auth-card portal-auth-card">
-            <div class="portal-login-brand">
-                <div class="logo-icon portal-logo">CM</div>
-                <h1>Company Portal</h1>
+            <div class="auth-brand">
+                <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="auth-logo-img" width="200" height="48">
+                <p class="auth-brand-tagline">Company Portal</p>
             </div>
+            <h1 class="auth-title">Sign in</h1>
             <p>Sign in with your company account. Demo maps to <strong>Central Motors</strong>.</p>
-            <form id="loginForm">
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="loginEmail" autocomplete="username" placeholder="john@centralmotors.co.za" required />
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="loginPassword" autocomplete="current-password" required />
-                </div>
-                <button class="btn btn-primary" type="submit" style="width:100%;margin-top:8px;">Sign In</button>
+            <form id="loginForm" class="auth-login-form">
+                <input type="email" id="loginEmail" class="auth-login-input" autocomplete="username" placeholder="Email" required />
+                <input type="password" id="loginPassword" class="auth-login-input" autocomplete="current-password" placeholder="Password" required />
+                <button class="btn btn-primary auth-login-submit" type="submit">Sign In</button>
             </form>
             <p id="loginStatus" style="margin-top:16px;font-size:13px;color:var(--text-muted);"></p>
             <p style="margin-top:12px;font-size:12px;color:var(--text-muted);">
@@ -95,11 +90,14 @@
 
     <div id="appShell" class="hidden">
         <aside class="sidebar portal-sidebar" id="sidebar">
-            <div class="sidebar-brand">
-                <div class="logo-icon" id="sidebarLogo">CM</div>
+            <div class="sidebar-brand portal-sidebar-brand">
+                <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img portal-platform-logo">
                 <div class="logo-text">
-                    <span id="sidebarBrandName">Central Motors</span>
-                    <span>Company Portal</span>
+                    <div class="portal-brand-title-row">
+                        <div class="logo-icon portal-tenant-mark" id="sidebarLogo">CM</div>
+                        <span class="brand-company-name" id="sidebarBrandName">Central Motors</span>
+                    </div>
+                    <span class="brand-portal-label">Company Portal</span>
                 </div>
             </div>
             <nav class="sidebar-nav" id="sidebarNav">

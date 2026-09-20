@@ -21,7 +21,7 @@
     border-color: var(--primary-dark);
 }
 
-/* Sidebar — tenant brand block (logo + name, no overlap) */
+/* Sidebar — ZiricAI platform logo + tenant name (Mission Control parity) */
 .portal-body .sidebar.portal-sidebar .sidebar-brand,
 .portal-body .portal-sidebar-brand {
     display: flex;
@@ -34,6 +34,39 @@
     font-size: inherit;
     font-weight: normal;
     letter-spacing: normal;
+}
+
+.portal-body .sidebar.portal-sidebar .sidebar-brand .logo-img.portal-platform-logo,
+.portal-body .portal-sidebar-brand .logo-img.portal-platform-logo {
+    height: 42px;
+    width: auto;
+    max-width: 120px;
+    object-fit: contain;
+    flex-shrink: 0;
+    display: block;
+}
+
+.portal-brand-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    width: 100%;
+}
+
+.portal-body .sidebar.portal-sidebar .sidebar-brand .portal-tenant-mark,
+.portal-body .portal-sidebar-brand .portal-tenant-mark {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    font-size: 11px;
+    border-radius: 8px;
+}
+
+.portal-brand-title-row .brand-company-name {
+    flex: 1;
+    min-width: 0;
 }
 
 .portal-body .sidebar.portal-sidebar .sidebar-brand .logo-icon,
@@ -142,32 +175,13 @@
     box-shadow: 0 4px 12px var(--primary-glow);
 }
 
-/* Portal auth */
+/* Portal auth — shares Mission Control auth-brand / auth-login-form from admin-dashboard.css */
 .portal-auth-card {
     max-width: 420px;
 }
 
-.portal-login-brand {
+.portal-body .auth-card.portal-auth-card p {
     text-align: center;
-    margin-bottom: 20px;
-}
-
-.portal-login-brand .portal-logo {
-    width: 56px;
-    height: 56px;
-    border-radius: 14px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-weight: 800;
-    font-size: 20px;
-    margin-bottom: 12px;
-}
-
-.portal-login-brand h1 {
-    font-size: 22px;
-    margin: 0;
 }
 
 /* Topbar — breadcrumb-first layout */
@@ -960,7 +974,7 @@
     width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
+    border-radius: var(--input-radius);
     font-family: inherit;
     font-size: 14px;
     background: var(--bg-body);
@@ -1812,6 +1826,23 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
+    align-items: start;
+}
+
+.portal-form-row > input:not([type="submit"]):not([type="button"]),
+.portal-form-row > select,
+.portal-form-row > textarea,
+.portal-form-row .form-group input,
+.portal-form-row .form-group select,
+.portal-form-row .form-group textarea {
+    width: 100%;
+}
+
+.portal-form-row > button[type="submit"],
+.portal-form-row > .btn[type="submit"] {
+    grid-column: 1 / -1;
+    justify-self: start;
+    min-width: 140px;
 }
 
 .portal-color-field {
@@ -1825,7 +1856,7 @@
     height: 40px;
     padding: 2px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: var(--input-radius);
     cursor: pointer;
     background: var(--bg-body);
 }
@@ -2233,19 +2264,259 @@
     border-top: 1px solid var(--border-color);
 }
 
-.portal-sarah-form input {
+.portal-sarah-form input,
+.portal-sarah-form textarea {
     flex: 1;
     padding: 10px 12px;
     border: 1px solid var(--border-color);
-    border-radius: 10px;
+    border-radius: var(--input-radius);
     font-size: 13px;
     background: var(--bg-input, var(--bg-secondary));
     color: var(--text-primary);
 }
 
-.portal-sarah-form input:focus {
+.portal-sarah-form input:focus,
+.portal-sarah-form textarea:focus {
     outline: none;
     border-color: var(--brand-primary);
+}
+
+.portal-sarah-widget--shortcut .portal-sarah-panel {
+    display: none;
+}
+
+/* Sidebar Sarah module — no floating FAB */
+.portal-body .portal-sarah-widget--shortcut {
+    display: none !important;
+}
+
+/* Full-page Sarah chat (portal module) */
+.portal-body .page-content:has(.portal-sarah-page) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 16px 24px 24px;
+}
+
+.portal-sarah-page {
+    display: grid;
+    grid-template-columns: minmax(240px, 300px) 1fr;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+    height: auto;
+    max-height: none;
+    margin: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--bg-card);
+}
+
+.portal-sarah-page-aside {
+    padding: 24px 20px;
+    border-right: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    overflow-y: auto;
+}
+
+.portal-sarah-page-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.portal-sarah-page-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.portal-sarah-page-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.portal-sarah-page-subtitle {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.portal-sarah-page-intro {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    margin: 0 0 20px;
+}
+
+.portal-sarah-page-aside-heading {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0 0 10px;
+}
+
+.portal-sarah-cap-list,
+.portal-sarah-try-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px;
+    font-size: 13px;
+}
+
+.portal-sarah-cap-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.portal-sarah-cap-list li:last-child {
+    border-bottom: none;
+}
+
+.portal-sarah-cap-list i {
+    width: 18px;
+    color: var(--brand-primary);
+    text-align: center;
+}
+
+.portal-sarah-try-list li {
+    padding: 6px 0;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.portal-sarah-page-main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+}
+
+.portal-sarah-page-main-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-card);
+}
+
+.portal-sarah-page-main-header strong {
+    display: block;
+    font-size: 15px;
+}
+
+.portal-sarah-page-main-header span {
+    display: block;
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.portal-sarah-page-chat.portal-sarah-chat-mount {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.portal-sarah-chat-mount--page .portal-sarah-messages {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    padding: 20px 24px;
+    gap: 12px;
+}
+
+.portal-sarah-chat-mount--page .portal-sarah-msg {
+    max-width: min(720px, 85%);
+    font-size: 14px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+.portal-sarah-chat-mount--page .portal-sarah-suggestions--inline {
+    padding: 0 24px 12px;
+    flex-shrink: 0;
+}
+
+.portal-sarah-chat-mount--page .portal-sarah-chip {
+    font-size: 12px;
+    padding: 6px 12px;
+}
+
+.portal-sarah-chat-mount--page .portal-sarah-form {
+    padding: 16px 20px 20px;
+    align-items: flex-end;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+}
+
+.portal-sarah-chat-mount--page .portal-sarah-form textarea {
+    flex: 1;
+    min-height: 72px;
+    max-height: 200px;
+    resize: vertical;
+    padding: 12px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.45;
+    font-family: inherit;
+    background: var(--bg-input, var(--bg-card));
+    color: var(--text-primary);
+}
+
+.portal-sarah-send {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px;
+    height: auto;
+    align-self: stretch;
+}
+
+.portal-sarah-send span {
+    font-weight: 600;
+}
+
+@media (max-width: 900px) {
+    .portal-sarah-page {
+        grid-template-columns: 1fr;
+    }
+
+    .portal-sarah-page-aside {
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        max-height: 220px;
+    }
+
+    .portal-sarah-cap-list,
+    .portal-sarah-try-list {
+        display: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .portal-sarah-send span {
+        display: none;
+    }
 }
 
 /* Portal BOS — shell, widgets, mobile */

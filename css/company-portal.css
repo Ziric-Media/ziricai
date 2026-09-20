@@ -21,7 +21,7 @@
     border-color: var(--primary-dark);
 }
 
-/* Sidebar — tenant brand block (logo + name, no overlap) */
+/* Sidebar — ZiricAI platform logo + tenant name (Mission Control parity) */
 .portal-body .sidebar.portal-sidebar .sidebar-brand,
 .portal-body .portal-sidebar-brand {
     display: flex;
@@ -34,6 +34,39 @@
     font-size: inherit;
     font-weight: normal;
     letter-spacing: normal;
+}
+
+.portal-body .sidebar.portal-sidebar .sidebar-brand .logo-img.portal-platform-logo,
+.portal-body .portal-sidebar-brand .logo-img.portal-platform-logo {
+    height: 42px;
+    width: auto;
+    max-width: 120px;
+    object-fit: contain;
+    flex-shrink: 0;
+    display: block;
+}
+
+.portal-brand-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    width: 100%;
+}
+
+.portal-body .sidebar.portal-sidebar .sidebar-brand .portal-tenant-mark,
+.portal-body .portal-sidebar-brand .portal-tenant-mark {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    font-size: 11px;
+    border-radius: 8px;
+}
+
+.portal-brand-title-row .brand-company-name {
+    flex: 1;
+    min-width: 0;
 }
 
 .portal-body .sidebar.portal-sidebar .sidebar-brand .logo-icon,
@@ -142,32 +175,13 @@
     box-shadow: 0 4px 12px var(--primary-glow);
 }
 
-/* Portal auth */
+/* Portal auth — shares Mission Control auth-brand / auth-login-form from admin-dashboard.css */
 .portal-auth-card {
     max-width: 420px;
 }
 
-.portal-login-brand {
+.portal-body .auth-card.portal-auth-card p {
     text-align: center;
-    margin-bottom: 20px;
-}
-
-.portal-login-brand .portal-logo {
-    width: 56px;
-    height: 56px;
-    border-radius: 14px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-weight: 800;
-    font-size: 20px;
-    margin-bottom: 12px;
-}
-
-.portal-login-brand h1 {
-    font-size: 22px;
-    margin: 0;
 }
 
 /* Topbar — breadcrumb-first layout */
