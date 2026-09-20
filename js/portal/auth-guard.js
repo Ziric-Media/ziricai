@@ -159,7 +159,11 @@ function updateShellUI(profile, company, branding) {
   const emailEl = document.getElementById('sidebarUserEmail');
   if (emailEl) emailEl.textContent = profile?.email || '';
 
-  // Sidebar shows ZiricAI platform branding only; tenant name lives in breadcrumb/topbar.
+  const portalLabel = document.getElementById('sidebarPortalLabel');
+  if (portalLabel) {
+    const tenantName = company?.name?.trim() || 'Company';
+    portalLabel.textContent = `${tenantName} Company Portal`;
+  }
 }
 
 export function updateNotificationBadge() {

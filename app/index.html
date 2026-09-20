@@ -81,8 +81,10 @@
     <div id="appShell" class="hidden">
         <aside class="sidebar portal-sidebar" id="sidebar">
             <div class="sidebar-brand portal-sidebar-brand portal-sidebar-brand--platform">
-                <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img portal-platform-logo">
-                <span class="brand-portal-label portal-sidebar-product-label">Company Portal</span>
+                <div class="portal-sidebar-brand-stack">
+                    <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img portal-platform-logo">
+                    <span class="portal-sidebar-product-label" id="sidebarPortalLabel">Central Motors Company Portal</span>
+                </div>
             </div>
             <nav class="sidebar-nav" id="sidebarNav">
                 <div class="section-label">Workspace</div>
@@ -140,15 +142,12 @@
         <div class="main">
             <header class="topbar portal-topbar" id="topbar">
                 <div class="topbar-left">
-                    <div class="company-header-brand">
-                        <div class="company-logo" id="headerCompanyLogo"></div>
-                        <div>
-                            <div class="company-name" id="headerCompanyName">Central Motors</div>
-                            <div class="breadcrumb" id="breadcrumb">
-                                Portal / <span id="pageTitle">Dashboard</span>
-                            </div>
-                        </div>
-                    </div>
+                    <button type="button" class="bos-hamburger" id="sidebarToggle" aria-label="Open menu">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <nav class="breadcrumb bos-breadcrumb" id="breadcrumb" aria-label="Breadcrumb">
+                        <span id="pageTitle">Overview</span>
+                    </nav>
                 </div>
                 <div class="topbar-actions">
                     <button class="notification-bell" id="notificationBell" type="button" title="Notifications">
