@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { isCentralMotorsPilotMode } from "../storage/centralMotorsPilot.js";
+import { validateProductionTenantScopeEnforcement } from "./productionSecurityInvariants.js";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ENV_PATH = path.join(ROOT, ".env");
@@ -18,6 +19,8 @@ export function bootstrapEnv() {
         path: ENV_PATH,
         quiet: process.env.NODE_ENV === "production" || !hasEnvFile,
     });
+
+    validateProductionTenantScopeEnforcement(process.env);
 }
 
 function envSet(name) {

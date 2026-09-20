@@ -43,6 +43,7 @@ import { getQueueStats, initQueue } from "../services/queue/jobQueue.js";
 import { startMessageWorker } from "../services/queue/workers/messageWorker.js";
 import { isWhatsAppDevMode } from "../services/integrations/metaWhatsAppErrors.js";
 import { logRailwayEnvDiagnostics } from "../services/env/startupEnv.js";
+import { evaluatePlatformStorageHealth } from "../services/env/productionSecurityInvariants.js";
 import { isFirebaseTokenVerificationReady } from "../services/auth/authService.js";
 import {
     getPlatformMetrics,
@@ -221,8 +222,20 @@ async function platformHealthHandler(req, res) {
     try {
         const adapter = await getStorageAdapter();
         const configured = process.env.STORAGE_BACKEND || getConfiguredStorageBackend();
+        const storageFallback = getStorageFallbackReason() || null;
+        const storageState = evaluatePlatformStorageHealth({
+            nodeEnv: process.env.NODE_ENV,
+            adapterName: adapter.name,
+            storageConfigured: configured,
+            storageFallback,
+            firestoreAdmin: hasAdminCredentials(),
+        });
         res.json({
-            status: "ok",
+            status: storageState.platformStatus,
+            storageHealth: storageState.storageHealth,
+            storageDegradedReasons: storageState.storageDegradedReasons.length
+                ? storageState.storageDegradedReasons
+                : undefined,
             whatsapp: Boolean(process.env.PHONE_NUMBER_ID && process.env.WHATSAPP_TOKEN),
             verifyTokenSet: Boolean(
                 process.env.VERIFY_TOKEN ||
@@ -241,7 +254,7 @@ async function platformHealthHandler(req, res) {
             firestoreAdmin: hasAdminCredentials(),
             firebaseTokenVerify: isFirebaseTokenVerificationReady(),
             firebaseDatabaseId: process.env.FIREBASE_DATABASE_ID || "default",
-            storageFallback: getStorageFallbackReason() || null,
+            storageFallback,
             firebaseProjectId: process.env.FIREBASE_PROJECT_ID || "ziricai",
             queue: await getQueueStats(),
             tenantScopeEnforcement: (process.env.TENANT_SCOPE_ENFORCEMENT || "lax").toLowerCase(),

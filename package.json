@@ -26,6 +26,7 @@
         "verify:webhook": "node scripts/verify-webhook.js",
         "verify:whatsapp-integration": "node scripts/verify-whatsapp-integration.js",
         "verify:tenant-isolation": "node scripts/verify-tenant-isolation.js",
+        "verify:corporate-p0-1": "node scripts/verify-corporate-p0-1.js",
         "verify:book-test-drive": "node scripts/verify-book-test-drive.js",
         "verify:inventory-booking": "node scripts/verify-inventory-booking.js",
         "verify:test-drive-availability": "node scripts/verify-test-drive-availability.js",
