@@ -10,6 +10,7 @@ import { REGISTERED_COMMUNICATION_ADAPTERS } from "../services/conversation/cano
 import {
     executeAction,
     __setIntegrationSendOverride,
+    __setPreDeliverHook,
 } from "../services/automation/actionExecutor.js";
 import { getTenantConversationHistory } from "../services/storage/tenantStorage.js";
 import { setHumanTakeover } from "../services/tenants/conversationService.js";
@@ -18,6 +19,7 @@ import { mapMessageForInboxApi } from "../services/conversation/inboxMessageCont
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const TEST_COMPANY = "p0-3e-automation-co";
 const TEST_PHONE = "27821112233";
+const TEST_PHONE_RACE = "27821114444";
 
 function read(rel) {
     return readFileSync(join(ROOT, rel), "utf8");
@@ -35,7 +37,10 @@ assert.match(actionExecutorSrc, /getConversationTakeoverState/);
 assert.match(actionExecutorSrc, /metaMessageId/);
 assert.match(actionExecutorSrc, /source: "automation"/);
 assert.match(actionExecutorSrc, /await saveOutboundMessage\([\s\S]*?source: "automation"/);
-console.log("✓ actionExecutor uses canonical outbound + takeover guard");
+assert.match(actionExecutorSrc, /guard: "final_pre_outbound"/);
+const takeoverChecks = actionExecutorSrc.match(/getConversationTakeoverState/g) || [];
+assert.ok(takeoverChecks.length >= 2, "send_message must check takeover early and at final pre-outbound boundary");
+console.log("✓ actionExecutor uses canonical outbound + early/final takeover guards");
 
 assert.ok(
     REGISTERED_COMMUNICATION_ADAPTERS.some((a) => a.id === "automation-send-message"),
@@ -98,7 +103,41 @@ assert.equal(
     0,
     "takeover must block automation outbound"
 );
-console.log("✓ human takeover blocks automation send_message");
+console.log("✓ human takeover blocks automation send_message (early guard)");
+
+await setHumanTakeover(TEST_COMPANY, TEST_PHONE, { enabled: false, humanAgent: "Staff" });
+
+await setHumanTakeover(TEST_COMPANY, TEST_PHONE_RACE, { enabled: false, humanAgent: "Staff" });
+const sendsBeforeRace = sendCalls;
+__setPreDeliverHook(async () => {
+    await setHumanTakeover(TEST_COMPANY, TEST_PHONE_RACE, { enabled: true, humanAgent: "Staff" });
+});
+const raceBlocked = await executeAction(
+    { type: "send_message", config: { text: "Race after early check" } },
+    {
+        ...eventBase,
+        payload: { phone: TEST_PHONE_RACE, channel: "whatsapp" },
+    },
+    workflow
+);
+assert.equal(raceBlocked.skipped, true);
+assert.equal(raceBlocked.reason, "human_takeover");
+assert.equal(sendCalls, sendsBeforeRace, "final_pre_outbound must skip Meta send when takeover races in");
+__setPreDeliverHook(null);
+console.log("✓ final_pre_outbound guard blocks stale automation after takeover race");
+
+const skippedAi = await executeAction(
+    { type: "send_message", config: { template: "lead_followup" } },
+    {
+        companyId: TEST_COMPANY,
+        type: "MESSAGE_RECEIVED",
+        payload: { phone: TEST_PHONE, channel: "whatsapp", aiReplyPending: true },
+    },
+    workflow
+);
+assert.equal(skippedAi.skipped, true);
+assert.equal(skippedAi.reason, "ai_reply_pending");
+console.log("✓ aiReplyPending skip unchanged");
 
 await setHumanTakeover(TEST_COMPANY, TEST_PHONE, { enabled: false, humanAgent: "Staff" });
 
@@ -114,5 +153,6 @@ assert.equal(afterFailCount, beforeFailCount, "failed Meta send must not create 
 console.log("✓ failed integration send does not persist outbound message");
 
 __setIntegrationSendOverride(null);
+__setPreDeliverHook(null);
 
 console.log("\nCORPORATE-P0-3E PASS");

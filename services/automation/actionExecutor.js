@@ -10,10 +10,14 @@ import { sendNotification } from "../tenants/notificationService.js";
 import { createTask } from "../tenants/taskService.js";
 
 /** @internal CORPORATE-P0-3E verifier seam only — do not use in production paths */
-const p0_3eTestSeam = { integrationSendOverride: null };
+const p0_3eTestSeam = { integrationSendOverride: null, preDeliverHook: null };
 
 export function __setIntegrationSendOverride(fn) {
     p0_3eTestSeam.integrationSendOverride = fn;
+}
+
+export function __setPreDeliverHook(fn) {
+    p0_3eTestSeam.preDeliverHook = fn;
 }
 
 async function deliverOutbound(channel, ctx, payload) {
@@ -75,14 +79,37 @@ export async function executeAction(action, event, workflow) {
                 "Thank you for contacting us. A team member will follow up shortly.";
             const responseSource = config.template === "quotation_followup" ? "quotation_workflow" : "automation";
 
-            const takeover = await getConversationTakeoverState(companyId, phone, channel);
-            if (takeover.humanControlled) {
+            const takeoverEarly = await getConversationTakeoverState(companyId, phone, channel);
+            if (takeoverEarly.humanControlled) {
                 console.log("[automation] Skipping send_message — human takeover active", {
                     companyId,
                     phone,
                     workflowId: workflow.id,
-                    conversationId: takeover.conversationId,
+                    conversationId: takeoverEarly.conversationId,
                     responseSource: "automation_skipped",
+                    guard: "early_pre_outbound",
+                });
+                return {
+                    ok: true,
+                    action: "send_message",
+                    skipped: true,
+                    reason: "human_takeover",
+                };
+            }
+
+            if (typeof p0_3eTestSeam.preDeliverHook === "function") {
+                await p0_3eTestSeam.preDeliverHook({ companyId, phone, channel, workflow });
+            }
+
+            const takeoverFinal = await getConversationTakeoverState(companyId, phone, channel);
+            if (takeoverFinal.humanControlled) {
+                console.log("[automation] Skipping send_message — human takeover active", {
+                    companyId,
+                    phone,
+                    workflowId: workflow.id,
+                    conversationId: takeoverFinal.conversationId,
+                    responseSource: "automation_skipped",
+                    guard: "final_pre_outbound",
                 });
                 return {
                     ok: true,
