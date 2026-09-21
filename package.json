@@ -30,6 +30,7 @@
         "verify:corporate-p0-2": "node scripts/verify-corporate-p0-2.js",
         "verify:corporate-p0-3a": "node scripts/verify-corporate-p0-3a.js",
         "verify:corporate-p0-3b": "node scripts/verify-corporate-p0-3b.js",
+        "verify:corporate-p0-3e": "node scripts/verify-corporate-p0-3e.js",
         "verify:book-test-drive": "node scripts/verify-book-test-drive.js",
         "verify:inventory-booking": "node scripts/verify-inventory-booking.js",
         "verify:test-drive-availability": "node scripts/verify-test-drive-availability.js",

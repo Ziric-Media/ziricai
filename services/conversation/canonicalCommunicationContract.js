@@ -54,6 +54,14 @@ export const REGISTERED_COMMUNICATION_ADAPTERS = [
         ],
         direction: "mutation",
     },
+    {
+        id: "automation-send-message",
+        module: "services/automation/actionExecutor.js",
+        method: "executeAction",
+        action: "send_message",
+        direction: "outbound",
+        requires: ["saveOutboundMessage", "getConversationTakeoverState", "integrationHub.sendMessage"],
+    },
 ];
 
 /** Client or server patterns that must not become an authoritative message store (P0-3B removes MC usage). */

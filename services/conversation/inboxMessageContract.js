@@ -15,7 +15,7 @@ export function mapMessageForInboxApi(m) {
 
     let role = "customer";
     if (source === "human") role = "human";
-    else if (source === "ai" || rawRole === "assistant") role = "ai";
+    else if (source === "ai" || source === "automation" || rawRole === "assistant") role = "ai";
     else if (source === "customer" || rawRole === "user") role = "customer";
 
     const content = m.content || m.message || "";

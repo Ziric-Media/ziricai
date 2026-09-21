@@ -3,9 +3,23 @@
  */
 import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { addTask, updateCustomer } from "../customerService.js";
+import { saveOutboundMessage } from "../conversationService.js";
 import { sendMessage as integrationSend } from "../integrations/integrationHub.js";
+import { getConversationTakeoverState } from "../conversation/takeoverSafety.js";
 import { sendNotification } from "../tenants/notificationService.js";
 import { createTask } from "../tenants/taskService.js";
+
+/** @internal CORPORATE-P0-3E verifier seam only — do not use in production paths */
+const p0_3eTestSeam = { integrationSendOverride: null };
+
+export function __setIntegrationSendOverride(fn) {
+    p0_3eTestSeam.integrationSendOverride = fn;
+}
+
+async function deliverOutbound(channel, ctx, payload) {
+    const send = p0_3eTestSeam.integrationSendOverride || integrationSend;
+    return send(channel, ctx, payload);
+}
 
 /**
  * @param {object} action
@@ -51,22 +65,67 @@ export async function executeAction(action, event, workflow) {
                     reason: "ai_reply_pending",
                 };
             }
+            if (!companyId) {
+                return { ok: false, action: "send_message", error: "companyId is required for outbound message" };
+            }
             const channel = event.payload?.channel || "whatsapp";
             const text =
                 config.text ||
                 messageFromTemplate(config.template, event) ||
                 "Thank you for contacting us. A team member will follow up shortly.";
             const responseSource = config.template === "quotation_followup" ? "quotation_workflow" : "automation";
+
+            const takeover = await getConversationTakeoverState(companyId, phone, channel);
+            if (takeover.humanControlled) {
+                console.log("[automation] Skipping send_message — human takeover active", {
+                    companyId,
+                    phone,
+                    workflowId: workflow.id,
+                    conversationId: takeover.conversationId,
+                    responseSource: "automation_skipped",
+                });
+                return {
+                    ok: true,
+                    action: "send_message",
+                    skipped: true,
+                    reason: "human_takeover",
+                };
+            }
+
             try {
-                await integrationSend(channel, { companyId }, { to: phone, text });
+                const result = await deliverOutbound(channel, { companyId }, { to: phone, text });
+                const metaMessageId = result?.messages?.[0]?.id || null;
+                if (!metaMessageId) {
+                    return {
+                        ok: false,
+                        action: "send_message",
+                        error: "Integration send did not return a Meta message id",
+                    };
+                }
+
+                await saveOutboundMessage(phone, text, {
+                    companyId,
+                    channel,
+                    source: "automation",
+                    externalId: metaMessageId,
+                    senderName: config.senderName || workflow.name || "Automation",
+                });
+
                 console.log("[automation] Outbound sent", {
                     companyId,
                     phone,
                     workflowId: workflow.id,
                     responseSource,
                     template: config.template || null,
+                    metaMessageIdPrefix: String(metaMessageId).slice(0, 24),
                 });
-                return { ok: true, action: "send_message", text: text.slice(0, 80), responseSource };
+                return {
+                    ok: true,
+                    action: "send_message",
+                    text: text.slice(0, 80),
+                    responseSource,
+                    metaMessageId,
+                };
             } catch (err) {
                 return { ok: false, action: "send_message", error: err.message };
             }
