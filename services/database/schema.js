@@ -9,6 +9,11 @@ export const ROOT = {
     PLATFORM: "platform",
 };
 
+/**
+ * CORPORATE-P0-3 — Canonical communication SoT lives under companies/{companyId}:
+ * CONVERSATIONS, MESSAGES, CUSTOMERS (see services/conversation/canonicalCommunicationContract.js).
+ * CRM timeline and Portal/MC inbox lists are derived views — not alternate message stores.
+ */
 /** Subcollections under companies/{companyId} */
 export const TENANT_COLLECTIONS = {
     USERS: "users",
@@ -67,7 +72,10 @@ export const PLATFORM_MARKETPLACE = {
     RATINGS: "ratings",
 };
 
-/** Legacy root-level collections (Phase 1 migration — superadmin / server only) */
+/**
+ * Legacy root-level collections (Phase 1 migration — read/compatibility only).
+ * LEGACY_COLLECTIONS.CONVERSATIONS is NOT authoritative for new communication writes (P0-3).
+ */
 export const LEGACY_COLLECTIONS = {
     CUSTOMERS: "customers",
     AGENTS: "agents",

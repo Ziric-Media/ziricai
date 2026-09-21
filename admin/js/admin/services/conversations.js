@@ -4,15 +4,19 @@ import {
   query,
   orderBy,
   limit,
-  addDoc,
-  serverTimestamp,
 } from '../../firebase.js';
 import { listDocuments, getDocument, updateDocument, getDb } from './firestore-base.js';
 import {
   filterDemoInboxByCompany,
   getDemoInboxConversation,
 } from '../demo-data.js';
-import { fetchConversationsFromApi, fetchConversationMessagesFromApi } from '../api.js';
+import {
+  fetchConversationsFromApi,
+  fetchConversationMessagesFromApi,
+  postConversationReply,
+  postConversationTakeover,
+  postConversationRead,
+} from '../api.js';
 import { patchConversationOverride, getConversationOverride } from '../inbox-state.js';
 import { isDemoDataAllowed } from './dataMode.js';
 
@@ -70,10 +74,21 @@ function normalizeFirestoreMessage(doc) {
   };
 }
 
+function withDataSource(row, dataSource) {
+  return { ...normalizeApiConversation(row), dataSource };
+}
+
+function isApiBacked(dataSource) {
+  return dataSource === 'api';
+}
+
 export async function listConversations(companyId) {
   const apiRes = await fetchConversationsFromApi(companyId);
   if (apiRes.data?.items?.length) {
-    return { items: apiRes.data.items.map(normalizeApiConversation), source: 'api' };
+    return {
+      items: apiRes.data.items.map((row) => withDataSource(row, 'api')),
+      source: 'api',
+    };
   }
 
   const fsRes = await listDocuments(COLLECTION, {
@@ -113,15 +128,17 @@ export async function getConversation(companyId, id) {
   return { error: 'Conversation not found' };
 }
 
-export async function getMessages(companyId, conversationId) {
-  const override = getConversationOverride(conversationId);
-  if (override.messages?.length) {
-    if (isDemoDataAllowed()) {
-      const seed = getDemoInboxConversation(conversationId);
-      const base = seed?.messages || [];
-      return { items: [...base, ...override.messages] };
+export async function getMessages(companyId, conversationId, { dataSource } = {}) {
+  if (!isApiBacked(dataSource)) {
+    const override = getConversationOverride(conversationId);
+    if (override.messages?.length) {
+      if (isDemoDataAllowed()) {
+        const seed = getDemoInboxConversation(conversationId);
+        const base = seed?.messages || [];
+        return { items: [...base, ...override.messages] };
+      }
+      return { items: [...override.messages] };
     }
-    return { items: [...override.messages] };
   }
 
   const apiRes = await fetchConversationMessagesFromApi(companyId, conversationId);
@@ -234,9 +251,44 @@ export function generateAiReply(conversation, userText) {
   };
 }
 
-export async function sendMessage(conversationId, text, sender, meta = {}) {
+export async function sendMessage(
+  companyId,
+  conversationId,
+  text,
+  sender,
+  meta = {},
+  { dataSource } = {}
+) {
   const trimmed = String(text || '').trim();
   if (!trimmed) return { error: 'Message cannot be empty' };
+
+  if (isApiBacked(dataSource)) {
+    if (sender !== 'human') {
+      return {
+        error: 'Simulated customer/AI messages are disabled for API-backed conversations',
+      };
+    }
+    if (!companyId) return { error: 'companyId is required' };
+    const apiRes = await postConversationReply(companyId, conversationId, {
+      text: trimmed,
+      senderName: meta.senderName || null,
+    });
+    if (apiRes.error) {
+      return { error: apiRes.error, status: apiRes.status };
+    }
+    const message = {
+      id: msgId('api'),
+      role: 'human',
+      message: trimmed,
+      time: nowTimeLabel(),
+      ...(meta.senderName ? { senderName: meta.senderName } : {}),
+    };
+    return { message, success: true };
+  }
+
+  if (!isDemoDataAllowed()) {
+    return { error: 'Demo simulation is not available in this environment' };
+  }
 
   const message = {
     id: msgId(),
@@ -257,36 +309,27 @@ export async function sendMessage(conversationId, text, sender, meta = {}) {
     unread: sender === 'customer',
   });
 
-  try {
-    await addDoc(collection(getDb(), COLLECTION, conversationId, 'messages'), {
-      role: message.role,
-      message: trimmed,
-      senderName: meta.senderName || null,
-      createdAt: serverTimestamp(),
-    });
-  } catch (err) {
-    /* demo/local mode — ignore Firestore write failures */
-  }
-
   return { message, success: true };
 }
 
-export async function setTakeoverMode(conversationId, mode) {
+export async function setTakeoverMode(conversationId, mode, { companyId, dataSource, humanAgent } = {}) {
   const human = mode === 'human';
+
+  if (isApiBacked(dataSource)) {
+    if (!companyId) return { error: 'companyId is required' };
+    const apiRes = await postConversationTakeover(companyId, conversationId, {
+      enabled: human,
+      humanAgent: humanAgent || setTakeoverMode.assignedAgent || 'Agent',
+    });
+    if (apiRes.error) return { error: apiRes.error, status: apiRes.status };
+    return { success: true, mode: human ? 'human' : 'ai' };
+  }
+
   patchConversationOverride(conversationId, {
     mode,
     status: human ? 'human_takeover' : 'in_progress',
     assignedTo: human ? (setTakeoverMode.assignedAgent || 'Agent') : null,
   });
-
-  try {
-    await updateDocument(COLLECTION, conversationId, {
-      mode,
-      status: human ? 'human_takeover' : 'in_progress',
-    });
-  } catch (err) {
-    /* ignore */
-  }
 
   return { success: true, mode };
 }
@@ -315,7 +358,13 @@ export async function saveTags(conversationId, tags) {
   return { success: true };
 }
 
-export async function markConversationRead(conversationId) {
+export async function markConversationRead(conversationId, { companyId, dataSource } = {}) {
+  if (isApiBacked(dataSource)) {
+    if (!companyId) return { error: 'companyId is required' };
+    const apiRes = await postConversationRead(companyId, conversationId);
+    if (apiRes.error) return { error: apiRes.error, status: apiRes.status };
+    return { success: true };
+  }
   patchConversationOverride(conversationId, { unread: false });
   return { success: true };
 }

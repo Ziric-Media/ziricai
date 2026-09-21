@@ -54,20 +54,22 @@ export function getConversationOverride(id) {
 }
 
 export function patchConversationOverride(id, patch) {
-  inboxState.overrides[id] = {
-    ...getConversationOverride(id),
-    ...patch,
-  };
+  const existing = getConversationOverride(id);
+  const next = { ...existing, ...patch };
+  if (existing.dataSource === 'api' || patch.dataSource === 'api') {
+    delete next.messages;
+  }
+  inboxState.overrides[id] = next;
   persistInboxState();
 }
 
 export function mergeConversation(seed) {
   if (!seed) return null;
   const override = getConversationOverride(seed.id);
-  const mergedMessages = [
-    ...(seed.messages || []),
-    ...(override.messages || []),
-  ];
+  const apiBacked = seed.dataSource === 'api';
+  const mergedMessages = apiBacked
+    ? [...(seed.messages || [])]
+    : [...(seed.messages || []), ...(override.messages || [])];
   return {
     ...seed,
     ...override,

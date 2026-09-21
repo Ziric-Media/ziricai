@@ -70,7 +70,9 @@ async function paintInbox(container) {
     if (selected) setInboxState({ selectedConversationId: selected.id });
   }
 
-  const messagesRes = selected ? await getMessages(companyId, selected.id) : { items: [] };
+  const messagesRes = selected
+    ? await getMessages(companyId, selected.id, { dataSource: selected.dataSource })
+    : { items: [] };
   if (selected && messagesRes.items?.length) {
     selected = { ...selected, messages: messagesRes.items };
   }
@@ -95,7 +97,10 @@ async function paintInbox(container) {
   scrollThreadToBottom(container);
 
   if (selected?.unread) {
-    await markConversationRead(selected.id);
+    await markConversationRead(selected.id, {
+      companyId,
+      dataSource: selected.dataSource,
+    });
   }
 }
 
@@ -155,9 +160,9 @@ function bindListClicks(container, filtered) {
       const conv = inboxState.conversations.find((c) => c.id === id);
       if (!conv) return;
 
-      await markConversationRead(id);
-      const companyId = state.selectedCompanyId || null;
-      const messagesRes = await getMessages(companyId, id);
+      const companyId = state.selectedCompanyId || conv.companyId || null;
+      await markConversationRead(id, { companyId, dataSource: conv.dataSource });
+      const messagesRes = await getMessages(companyId, id, { dataSource: conv.dataSource });
       const merged = { ...conv, messages: messagesRes.items || conv.messages || [] };
 
       const threadEl = container.querySelector('#inboxThread');
@@ -203,7 +208,16 @@ function bindPanelEvents(container, conversation) {
   });
 
   const applyMode = async (mode) => {
-    await setTakeoverMode(conversation.id, mode);
+    const companyId = state.selectedCompanyId || conversation.companyId || null;
+    const res = await setTakeoverMode(conversation.id, mode, {
+      companyId,
+      dataSource: conversation.dataSource,
+      humanAgent: getAgentName(),
+    });
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
     syncConversationLocal(conversation.id, { mode, status: mode === 'human' ? 'human_takeover' : 'in_progress' });
     updateModeUI(container, mode);
     showToast(mode === 'human' ? 'Human takeover — AI paused' : 'AI resumed for this conversation', 'info');
@@ -277,22 +291,42 @@ async function handleSend(container, conversation) {
   input.value = '';
   const conv = getSelectedConversation();
   const mode = conv?.mode || 'ai';
+  const companyId = state.selectedCompanyId || conversation.companyId || null;
+
+  if (conv?.dataSource === 'api' && mode !== 'human') {
+    showToast('Switch to human takeover to reply on live WhatsApp conversations', 'info');
+    return;
+  }
 
   if (mode === 'human') {
     const agentName = getAgentName();
-    const res = await sendMessage(conversation.id, text, 'human', { senderName: agentName });
+    const res = await sendMessage(companyId, conversation.id, text, 'human', { senderName: agentName }, {
+      dataSource: conv?.dataSource,
+    });
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
+    const refreshed = await getMessages(companyId, conversation.id, { dataSource: conv?.dataSource });
+    const messages = refreshed.items?.length ? refreshed.items : [...(conv.messages || []), res.message];
     appendMessageToThread(container, res.message);
     syncConversationLocal(conversation.id, {
       lastMessage: text,
       preview: text.slice(0, 40),
       time: 'Just now',
-      messages: [...(conv.messages || []), res.message],
+      messages,
     });
     refreshList(container);
     return;
   }
 
-  const customerRes = await sendMessage(conversation.id, text, 'customer');
+  const customerRes = await sendMessage(companyId, conversation.id, text, 'customer', {}, {
+    dataSource: conv?.dataSource,
+  });
+  if (customerRes.error) {
+    showToast(customerRes.error, 'error');
+    return;
+  }
   appendMessageToThread(container, customerRes.message);
   syncConversationLocal(conversation.id, {
     lastMessage: text,
@@ -308,7 +342,10 @@ async function handleSend(container, conversation) {
     if (!current || current.mode === 'human') return;
 
     const ai = generateAiReply(current, text);
-    const aiRes = await sendMessage(conversation.id, ai.message, 'ai');
+    const aiRes = await sendMessage(companyId, conversation.id, ai.message, 'ai', {}, {
+      dataSource: current?.dataSource,
+    });
+    if (aiRes.error) return;
     appendMessageToThread(container, aiRes.message);
     updateAiPanel(container, ai);
     syncConversationLocal(conversation.id, {

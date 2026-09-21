@@ -230,6 +230,40 @@ export async function fetchConversationMessagesFromApi(companyId, conversationId
   return request(`/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}`);
 }
 
+/** Canonical tenant communication mutations (same routes as Portal). */
+export async function postConversationReply(companyId, conversationId, payload) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/reply`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function postConversationTakeover(companyId, conversationId, { enabled = true, humanAgent = 'Staff' } = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/takeover`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled, humanAgent }),
+    }
+  );
+}
+
+export async function postConversationRead(companyId, conversationId) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/read`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }
+  );
+}
+
 export async function fetchCustomersFromApi(companyId) {
   if (!companyId) {
     return { error: 'companyId is required', status: 400 };
