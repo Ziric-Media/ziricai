@@ -1,6 +1,6 @@
 # CORPORATE-P0-3 — Unified Communication Write Path
 
-**Status:** OPEN — P0-3A/B **implemented** in worktree `.p0-3-ab-prestage` (pending deploy + live MC acceptance); P0-3C–F **locked**  
+**Status:** **CORPORATE-P0-3A/B CLOSED** — code `18e45bd`; admin Netlify **`6ab10cb0a66ab6f526ad164d`**; live acceptance **`p0-3ab-live-evidence.json`**; program gate P0-3 remains **OPEN** (3C–F locked)  
 **Baseline:** production API `f18a3aa` (P0-2c.1), tenant foundation **CORPORATE-P0-2 COMPLETE**  
 **Depends on:** CORPORATE-P0-1 ✅, CORPORATE-P0-2 ✅  
 **Next controlled doc:** [CORPORATE-P0-3-AB-IMPLEMENTATION-PLAN.md](./CORPORATE-P0-3-AB-IMPLEMENTATION-PLAN.md) (P0-3A/B only — await explicit authorization)  
@@ -142,8 +142,8 @@ Portal Sarah tools (e.g. `viewConversations`) are **read-only** on tenant inbox.
 
 | Sub-gate | Intent | Implementation |
 |----------|--------|----------------|
-| **P0-3A** | Canonical communication authority — designate SoT + write service; no second authoritative store | **Implemented** — await deploy closure |
-| **P0-3B** | Mission Control alignment — stop root `conversations/{id}/messages` and local comm overrides; use tenant API like Portal | **Implemented** — await live MC acceptance |
+| **P0-3A** | Canonical communication authority — designate SoT + write service; no second authoritative store | **CLOSED** |
+| **P0-3B** | Mission Control alignment — stop root `conversations/{id}/messages` and local comm overrides; use tenant API like Portal | **CLOSED** |
 | **P0-3C** | Legacy path containment — phone-key / optional-scope routes read-only or retired | After B |
 | **P0-3D** | Sarah/Portal separation — WhatsApp customer state vs staff memory; no leak into WhatsApp SoT | After B |
 | **P0-3E** | Automation alignment — `send_message` through canonical outbound (`saveOutboundMessage`) | After B |

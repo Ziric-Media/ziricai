@@ -1,0 +1,73 @@
+{
+  "timestamp": "2026-09-21T11:12:53.448Z",
+  "base": "https://ziricai-production.up.railway.app",
+  "adminDeploy": "6ab10cb0a66ab6f526ad164d",
+  "codeCommit": "18e45bd",
+  "steps": [
+    {
+      "name": "0a Admin deploy exposes canonical MC client",
+      "pass": true,
+      "detail": "https://admin.ziricai.com"
+    },
+    {
+      "name": "0b Admin blocks API-thread AI simulation",
+      "pass": true,
+      "detail": "dataSource gate present"
+    },
+    {
+      "name": "1 Disposable Firebase owner",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "2 Onboarding tenant created",
+      "pass": "p0-3ab-mub5c80j-c5gy",
+      "detail": "company=p0-3ab-mub5c80j-c5gy"
+    },
+    {
+      "name": "3 MC-path human reply (tenant API)",
+      "pass": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "4 MC-path refresh sees reply",
+      "pass": true,
+      "detail": "messages=1"
+    },
+    {
+      "name": "5 Portal-path same conversation + reply",
+      "pass": true,
+      "detail": "messages=1"
+    },
+    {
+      "name": "6 Takeover (canonical API)",
+      "pass": true,
+      "detail": "humanTakeover=true"
+    },
+    {
+      "name": "7 Portal sees takeover state",
+      "pass": true,
+      "detail": "mode=human"
+    },
+    {
+      "name": "8 Mark read (canonical API)",
+      "pass": true,
+      "detail": "unread=false"
+    },
+    {
+      "name": "9 CM tenant isolation (owner cannot list CM)",
+      "pass": true,
+      "detail": "status=403 — set CORPORATE_P0_3_SUPERADMIN_ID_TOKEN for CM list smoke"
+    },
+    {
+      "name": "10 CM mutation denied for disposable owner",
+      "pass": true,
+      "detail": "status=403"
+    }
+  ],
+  "ok": true,
+  "owner": {
+    "email": "p0-3ab-owner-1789989175514@ziricai-p0-3.invalid",
+    "uid": "6QBA2LfL17ek9aUUu8yGNUK1P4Q2"
+  }
+}
