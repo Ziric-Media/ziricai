@@ -91,16 +91,16 @@ export async function listConversations(companyId) {
     };
   }
 
+  if (!isDemoDataAllowed()) {
+    return { items: [], source: 'api', error: apiRes.error || null };
+  }
+
   const fsRes = await listDocuments(COLLECTION, {
     companyId,
     orderByField: 'updatedAt',
   });
   if (fsRes.items?.length) {
     return { items: fsRes.items.map(normalizeApiConversation), source: 'firestore' };
-  }
-
-  if (!isDemoDataAllowed()) {
-    return { items: [], source: 'api', error: apiRes.error || fsRes.error };
   }
 
   const demo = filterDemoInboxByCompany(companyId);
@@ -154,6 +154,10 @@ export async function getMessages(companyId, conversationId, { dataSource } = {}
       })),
       source: 'api',
     };
+  }
+
+  if (isApiBacked(dataSource)) {
+    return { items: [], source: 'api', error: apiRes.error || null };
   }
 
   try {

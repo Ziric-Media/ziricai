@@ -122,8 +122,8 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/customers/:phone/timeline", domain: "crm", tenantScoped: true, tenantOptional: true, description: "Customer timeline" },
 
     // Conversations (legacy adapter)
-    { method: "GET", path: "/api/conversations", domain: "conversations", tenantScoped: true, tenantOptional: true, description: "List conversations" },
-    { method: "GET", path: "/api/conversations/:id/messages", domain: "conversations", tenantScoped: true, tenantOptional: true, description: "Conversation messages" },
+    { method: "GET", path: "/api/conversations", domain: "conversations", tenantScoped: true, description: "List conversations (legacy alias — canonical tenant list)" },
+    { method: "GET", path: "/api/conversations/:id/messages", domain: "conversations", tenantScoped: true, description: "Conversation messages (legacy alias — canonical tenant history)" },
 
     // Knowledge (legacy flat + memory adapter)
     { method: "GET", path: "/api/companies/:companyId/knowledge/documents", domain: "knowledge", tenantScoped: true, description: "List tenant knowledge documents" },

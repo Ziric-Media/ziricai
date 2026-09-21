@@ -125,14 +125,12 @@ export async function upsertConversationMeta(companyId, conversationIdOrPhone, m
 
 export async function listTenantConversations(companyId, options = {}) {
     const limit = options.limit || 50;
-    const legacy = await legacyListConversations({ companyId, limit });
-    if (legacy.length) {
-        return legacy.map((c) => mapConversationRow(c, companyId));
-    }
     const tenant = await conversationRepo.list(companyId, { max: limit });
-    if (tenant.length) {
-        return tenant.map((c) => mapConversationRow(c, companyId));
+    const mappedTenant = tenant.map((c) => mapConversationRow(c, companyId));
+    if (mappedTenant.length || !options.includeLegacy) {
+        return mappedTenant;
     }
+    const legacy = await legacyListConversations({ companyId, limit });
     return legacy.map((c) => mapConversationRow(c, companyId));
 }
 

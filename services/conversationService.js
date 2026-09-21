@@ -13,9 +13,20 @@ async function adapter() {
     return getStorageAdapter();
 }
 
+export function assertCommunicationCompanyId(companyId, operation = "communication write") {
+    if (process.env.NODE_ENV === "production" && !companyId) {
+        throw Object.assign(new Error(`${operation} requires companyId in production`), {
+            status: 400,
+            code: "MISSING_COMPANY_ID",
+        });
+    }
+}
+
 export async function saveInboundMessage(phone, text, options = {}) {
-    if (options.companyId) {
-        return saveTenantMessage(options.companyId, phone, "user", text, {
+    const companyId = options.companyId || null;
+    assertCommunicationCompanyId(companyId, "saveInboundMessage");
+    if (companyId) {
+        return saveTenantMessage(companyId, phone, "user", text, {
             ...options,
             source: options.source || "customer",
         });
@@ -25,8 +36,10 @@ export async function saveInboundMessage(phone, text, options = {}) {
 }
 
 export async function saveOutboundMessage(phone, text, options = {}) {
-    if (options.companyId) {
-        return saveTenantMessage(options.companyId, phone, "assistant", text, {
+    const companyId = options.companyId || null;
+    assertCommunicationCompanyId(companyId, "saveOutboundMessage");
+    if (companyId) {
+        return saveTenantMessage(companyId, phone, "assistant", text, {
             ...options,
             source: options.source || "ai",
         });

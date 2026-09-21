@@ -1891,32 +1891,36 @@ app.post("/api/knowledge/upload", requireTenantScope(), checkPermission("canUplo
     }
 });
 
-/** Bridge WhatsApp webhook memory → admin inbox (read-only). */
-app.get("/api/conversations", requireTenantScope({ optional: true }), async (req, res) => {
+/** Legacy list alias — tenant-scoped; reads canonical tenant conversations only (CORPORATE-P0-3C). */
+app.get("/api/conversations", requireTenantScope(), async (req, res) => {
     try {
-        const companyId = req.query.companyId || null;
+        const companyId = req.query.companyId || req.tenant?.companyId;
         const items = await listConversations({ companyId, limit: 50 });
-        res.json({ items });
+        res.json({ items, companyId, canonical: true });
     } catch (err) {
         console.error("[api/conversations] error:", err.message);
-        res.status(500).json({ error: err.message || "Failed to list conversations" });
+        res.status(err.status || 500).json({ error: err.message || "Failed to list conversations", code: err.code });
     }
 });
 
-app.get("/api/conversations/:id/messages", requireTenantScope({ optional: true }), async (req, res) => {
+app.get("/api/conversations/:id/messages", requireTenantScope(), async (req, res) => {
     try {
+        const companyId = req.query.companyId || req.tenant?.companyId;
         const id = req.params.id;
-        const history = await getConversation(id, 50);
+        const phone = id.includes("::") ? id.split("::").slice(-1)[0] : id;
+        const channel = req.query.channel || "whatsapp";
+        const history = await getConversation(phone, 50, { companyId, channel });
         const items = history.map((m, idx) => ({
-            id: `api-${idx}`,
+            id: m.id || `api-${idx}`,
             role: m.role === "assistant" ? "ai" : m.role === "user" ? "customer" : m.role,
-            message: m.content,
-            content: m.content,
+            message: m.content || m.message,
+            content: m.content || m.message,
+            source: m.source || null,
         }));
-        res.json({ items, conversation: { id, phone: id } });
+        res.json({ items, conversation: { id, phone, companyId, channel }, canonical: true });
     } catch (err) {
         console.error("[api/conversations/:id/messages] error:", err.message);
-        res.status(500).json({ error: err.message || "Failed to load messages" });
+        res.status(err.status || 500).json({ error: err.message || "Failed to load messages", code: err.code });
     }
 });
 

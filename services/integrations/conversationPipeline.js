@@ -29,6 +29,17 @@ export async function ingest(message) {
     const contactName = metadata?.contactName || null;
     const messageType = metadata?.messageType || "text";
 
+    if (process.env.NODE_ENV === "production" && !companyId) {
+        logError(channel, null, "Pipeline ingest rejected — missing companyId in production", { from });
+        return {
+            success: false,
+            from,
+            channel,
+            companyId: null,
+            error: "MISSING_COMPANY_ID",
+        };
+    }
+
     if (externalId && (await isInboundMessageProcessed(externalId))) {
         console.log("[whatsapp] Duplicate inbound skipped", {
             companyId,
