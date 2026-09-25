@@ -98,6 +98,69 @@ Plan-gating (`upgradeDialog`) is UI-only — no dependency on the deferred entit
 | `package.json` | Adds the two verify scripts above |
 | `docs/deployment/CLIENT-ZERO-STEP0-MANIFEST.md` | This manifest |
 
+## 5. MISSION CONTROL INBOX — INTENTIONAL OPERATIONAL CHANGE
+
+**This is deliberate.** Netlify `admin` currently serves main's older inbox, which writes messages and takeover state directly to the root Firestore `conversations` collection. Step 0 ships production's P0-3E inbox instead.
+
+**Acceptance invariant:** Mission Control does not write conversation messages or takeover state directly to Firestore. It uses the canonical tenant communication APIs.
+
+| File (source → generated deploy copy) | Role |
+|---|---|
+| `js/admin/services/conversations.js` → `admin/js/admin/services/conversations.js` | Data layer. `dataSource: 'api'` rows: `sendMessage` → `postConversationReply`, `setTakeoverMode` → `postConversationTakeover`, `markConversationRead` → `postConversationRead`. Simulated customer/AI messages refused for API rows |
+| `js/admin/modules/conversations.js` → `admin/js/admin/modules/conversations.js` | Inbox UI; passes `companyId` + `dataSource` into the data layer |
+| `js/admin/inbox-state.js` → `admin/js/admin/inbox-state.js` | Local UI overrides only (browser `localStorage`) |
+| `js/admin/api.js` → `admin/js/admin/api.js` | `postConversationReply/Takeover/Read` → `POST /api/companies/:companyId/conversations/:conversationId/{reply,takeover,read}` (hand-merged with main's pool calls) |
+| Backend (already live on Railway, unchanged) | Canonical routes in `api/app.js`; persistence via `services/conversationService.js` (P0-3C); takeover state via `services/conversation/takeoverSafety.js` |
+
+Evidence (static, this commit):
+
+| Check | Result |
+|---|---|
+| Generated `admin/` inbox files byte-identical to production's P0-3E versions | yes |
+| Direct Firestore write calls (`addDoc/setDoc/updateDoc/updateDocument/...`) in inbox module, inbox-state, inbox-ui | 0 |
+| Direct write calls in `services/conversations.js` on the **message** or **takeover** path | 0 |
+| Non-API fallback for takeover / read / demo messages | browser `localStorage` only; demo messages additionally gated by `isDemoDataAllowed()` |
+
+**Residual (disclosed, unchanged from production P0-3E):** `saveNotes()` and `saveTags()` in `js/admin/services/conversations.js` (lines 345–363) still call `updateDocument('conversations', id, …)` — a direct write of **notes/tags metadata** to the legacy root `conversations` collection, errors swallowed. Triggered only by the inbox notes box and tag editor. Not messages, not takeover, so outside the invariant above; it does not touch the canonical tenant store. Recommended follow-up: route through a tenant API or disable. **Open decision** — left as-is to keep Step 0 narrow unless you want it disabled before deploy.
+
+**Live acceptance (required after deploy — UI loading is not sufficient):**
+
+| # | Test | Pass condition |
+|---|---|---|
+| MC-1 | Reply from MC inbox to a test WhatsApp conversation | Test handset receives the message; `GET /api/companies/:companyId/conversations/:conversationId` shows it as a `human` message in the canonical tenant thread; no new doc in root `conversations` |
+| MC-2 | Take over the conversation in MC | `GET` shows takeover/human mode; an inbound WhatsApp message from the test handset gets **no** Sarah reply (Railway log shows takeover skip) |
+| MC-3 | Release takeover | `GET` shows AI mode; next inbound gets a Sarah reply |
+| MC-4 | Open conversation (read) | Unread cleared via `/read`; persists on reload |
+
+## 6. FIREBASE KEY CLASSIFICATION
+
+**Expected public web configuration (not a secret):** each built `index.html` (`app/`, `admin/`, `marketing/`) contains the Firebase **web** config object with keys `apiKey, appId, authDomain, databaseId, measurementId, messagingSenderId, projectId, storageBucket`. These identify the Firebase project to the browser SDK; they are the same values already served by the live sites. Security boundary = Firebase Auth, Firestore/Storage rules, authorized domains, backend authorization (`requireTenantScope`, `requirePlatformAccess`, `requireFirebaseAuth`).
+
+**Actual secrets / credentials — none present.** Scans run on this commit:
+
+| Scope | Patterns | Hits |
+|---|---|---|
+| Deploy output `app/`, `admin/`, `marketing/` (194 html/js/json/css/toml/txt files) | OpenAI `sk-…`, private-key blocks, service-account JSON (`private_key`, `…iam.gserviceaccount.com`), Meta `EAA…`, Stripe `sk_/rk_live|test`, `whsec_`, Postgres URL with password, GitHub tokens, server env names with values (`OPENAI_API_KEY`, `WHATSAPP_TOKEN`, `FIREBASE_PRIVATE_KEY`, `RAILWAY_TOKEN`, `STRIPE_SECRET_KEY`, `PLATFORM_API_KEY`, `META_APP_SECRET`) | **0** (2 files contain `sk-demo` fake demo placeholders) |
+| Full committed tree (836 files — what Railway uploads) | same | 3 hits, all **placeholders**: `.env.example` (`postgres://user:…@host`, `FIREBASE_PRIVATE_KEY="…YOUR_KEY_HERE…"`), `docs/deployment/FIRESTORE_PRODUCTION.md` (`"…\n...\n…"`) |
+| Diff of all 3 pushed branches vs `origin/main` | same | 0 |
+| Tracked `.env`, service-account JSON, `.pem`, `.key`, `credentials.json` on any branch | — | none |
+| Worktree untracked files / local `.env` | — | 0 untracked; no `.env` in worktree (server secrets live only in Railway variables) |
+
+## 7. KNOWN BASELINE VERIFIER FAILURES — NOT CAUSED BY STEP 0
+
+Proof: run on `prod/live-2026-09-25` (`41756a4`) and `client-zero/step0` (`2cbb574`), same env.
+
+| Verifier | Production snapshot | Step 0 | Failing assertion |
+|---|---|---|---|
+| `verify-corporate-p0-3a.js` | exit 1 @ line 37 | exit 1 @ line 37 | `schema.js` must match `/CORPORATE-P0-3\|canonical communication\|not authoritative/i` |
+| `verify-corporate-p0-3c.js` | exit 1 @ line 65 | exit 1 @ line 65 | `conversationPipeline.js` must match `/NODE_ENV === "production" && !companyId/` |
+
+Byte-identical between the two commits (git blob ids): `scripts/verify-corporate-p0-3a.js` (`08f5c1a504`), `scripts/verify-corporate-p0-3c.js` (`72bb25a0b7`), `services/database/schema.js` (`dc1a351790`), `services/integrations/conversationPipeline.js` (`4317424034`). Step 0 touched none of them, so the failures cannot be Step 0 regressions.
+
+Classification:
+- **P0-3A** — documentation-only: expects a P0-3 comment in `schema.js`. Stale verifier.
+- **P0-3C** — expects a **pipeline-level** production fail-closed guard that is not in the production artifact. Tenant safety is still enforced on both sides: `webhookRouter.js` skips the pipeline for unknown `phone_number_id` (returns 200 to Meta), and `saveInboundMessage` requires `companyId` in production (`assertCommunicationCompanyId`, P0-3C). The missing pipeline guard is a defence-in-depth gap in the **baseline**, recorded for a later P0-3C follow-up — not a Step 0 change.
+
 ## Verification (local, `NODE_ENV=test`, `STORAGE_BACKEND=memory`)
 
 | Check | Result |
@@ -109,10 +172,14 @@ Plan-gating (`upgradeDialog`) is UI-only — no dependency on the deferred entit
 | `verify-corporate-p0-1`, `p0-3b`, `p0-3e`, `verify-tenant-isolation` | pass |
 | `verify-book-test-drive`, `verify-inventory-booking`, `verify-test-drive-availability` | pass |
 | `verify-sales-execution`, `verify-customer-identity` | pass |
-| `verify-corporate-p0-3a`, `p0-3c` | **fail identically on the untouched production snapshot** — stale source-text assertions, pre-existing, not caused by Step 0 |
-| `prepare-sites` app/admin/marketing | built; Firebase `apiKey` present in each `index.html`; generated MC inbox == production P0-3E |
+| `verify-corporate-p0-3a`, `p0-3c` | see section 7 — KNOWN BASELINE VERIFIER FAILURES |
+| `prepare-sites` app/admin/marketing | built; public Firebase web config present (section 6); generated MC inbox == production P0-3E |
 
-## Not done — awaiting review
+## Not done — awaiting authorization
 
 - No deploy (Railway or Netlify).
-- Deploy order once approved: Railway from this worktree → Netlify `app`, `admin`, `marketing` (`--no-build`, after apiKey check) → live smoke: anonymous `/api/sarah/chat` = 401, portal Sarah works logged-in, WhatsApp text + voice note, MC inbox reply/takeover.
+- Deploy order once approved: `npm run verify:imports` gate → Railway from this worktree → Netlify `app`, `admin`, `marketing` (`--no-build`) → live acceptance:
+  - anonymous `POST /api/sarah/chat` → 401 `AUTH_REQUIRED`; marketing widget answers (canned)
+  - Portal Sarah works when logged in
+  - WhatsApp text + voice note (transcript persisted to the tenant thread)
+  - MC-1 … MC-4 (section 5)
