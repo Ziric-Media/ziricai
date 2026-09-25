@@ -7,7 +7,7 @@
  * Does not import inventory — use scripts/import-central-motors-inventory.js.
  * Does not remove demo-central-motors — demo stays available for local dev without pilot flag.
  */
-import { getCompany, createCompany } from "../tenants/companyService.js";
+import { getCompany, createCompany, updateCompany } from "../tenants/companyService.js";
 import { createAiEmployee, listAiEmployees } from "../tenants/aiEmployeeService.js";
 import { saveKnowledgeDocument, listKnowledgeDocuments } from "../tenants/knowledgeService.js";
 import {
@@ -19,6 +19,7 @@ import {
     CENTRAL_MOTORS_COMPANY_ID,
 } from "./seedDemoTenants.js";
 import { isCentralMotorsPilotMode } from "./centralMotorsPilot.js";
+import { saveBillingRecord } from "../payments/billingService.js";
 import {
     findActiveWhatsAppIntegrationByPhoneNumberId,
     upsertWhatsAppIntegration,
@@ -30,7 +31,7 @@ import {
 const PILOT_COMPANY = {
     name: "Central Motors Rustenburg",
     industry: "Automotive",
-    plan: "business",
+    plan: "starter",
     status: "active",
     email: "info@centralmotorsrtb.co.za",
     phone: "+27 14 000 0000",
@@ -156,9 +157,21 @@ export async function seedCentralMotorsPilotIfEnabled() {
     const companyId = CENTRAL_MOTORS_RTB_COMPANY_ID;
     const seeded = { company: false, agent: false, integration: false, knowledge: 0 };
 
-    if (!(await getCompany(companyId))) {
+    const existingCompany = await getCompany(companyId);
+    if (!existingCompany) {
         await createCompany(companyId, PILOT_COMPANY);
         seeded.company = true;
+    } else if (existingCompany.plan !== "starter") {
+        await updateCompany(companyId, { plan: "starter" });
+    }
+
+    try {
+        await saveBillingRecord(companyId, {
+            planId: "starter",
+            status: "active",
+        });
+    } catch (err) {
+        console.warn("[seed] Central Motors pilot billing record:", err.message);
     }
 
     const existingAgents = await listAiEmployees(companyId);

@@ -8,7 +8,26 @@ import { getPublicPackRating, resolveCustomerCatalogPackId } from "./marketplace
 import { installIndustryPack, getInstalledPacks } from "./industryPackService.js";
 import { checkForUpdates } from "./marketplaceVersioning.js";
 import { publish, EventTypes } from "../events/index.js";
+import { auditLog } from "../audit/auditLog.js";
+import { getMarketplaceEntitlementRepository } from "./marketplaceEntitlementRepository.js";
+import {
+    isEntitlementInstallEligible,
+    resolveEntitlementEffectiveStatus,
+} from "./marketplaceEntitlementModel.js";
+
 const WIZARD_STEPS = ["preview", "branding", "integrations", "install", "success"];
+
+function buildPaidInstallBlockedResult(manifest) {
+    return {
+        step: 4,
+        stepName: "install",
+        requiresPayment: true,
+        price: manifest.price,
+        message: "This is a paid template. Contact sales or request access to install.",
+        contactSales: true,
+        demoInstallAvailable: true,
+    };
+}
 
 /**
  * Step 1 — Preview pack contents checklist.
@@ -111,16 +130,27 @@ export async function executeInstall(companyId, packId, options = {}) {
     const resolved = resolvePackId(packId);
     const manifest = buildPackManifest(getPackById(resolved), { useDemoSocialProof: false });
 
-    if (manifest.isPaid && options.demoMode !== true && options.skipPayment !== true) {
-        return {
-            step: 4,
-            stepName: "install",
-            requiresPayment: true,
-            price: manifest.price,
-            message: "This is a paid template. Contact sales or enable demo mode to install.",
-            contactSales: true,
-            demoInstallAvailable: true,
-        };
+    if (manifest.isPaid) {
+        const trustedBypass = options.demoMode === true || options.skipPayment === true;
+        if (!trustedBypass) {
+            let entitlementRecord = null;
+            try {
+                const repo = await getMarketplaceEntitlementRepository();
+                entitlementRecord = await repo.getEntitlement(companyId, resolved);
+            } catch (err) {
+                console.error("[executeInstall] entitlement read failed:", err.message);
+                return buildPaidInstallBlockedResult(manifest);
+            }
+            if (!isEntitlementInstallEligible(entitlementRecord)) {
+                return buildPaidInstallBlockedResult(manifest);
+            }
+            auditLog("marketplace_install_entitlement_authorized", {
+                companyId,
+                packId: resolved,
+                installedBy: options.installedBy || null,
+                effectiveStatus: resolveEntitlementEffectiveStatus(entitlementRecord),
+            });
+        }
     }
 
     const customizations = {

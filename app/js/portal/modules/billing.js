@@ -27,7 +27,13 @@ export async function renderBilling(container) {
   const companyId = state.companyId;
 
   const res = await fetchPortalUsage(companyId);
-  const useDemo = shouldUseDemoFallback({ companyId, isDemo: state.hubData?.isDemo, isProvisioned: state.hubData?.isProvisioned });
+  const useDemo =
+    res.data?.isDemo ??
+    shouldUseDemoFallback({
+      companyId,
+      isDemo: state.hubData?.isDemo,
+      isProvisioned: state.hubData?.isProvisioned,
+    });
   const usage = res.data?.usage || state.usage || (useDemo ? DEMO_USAGE : { plan: 'trial', planLabel: 'Trial', messagesUsed: 0, messagesLimit: 500, tokensUsed: 0, tokensLimit: 100000, storageUsedMb: 0, storageLimitMb: 512, renewalDate: '—', billingCycle: 'monthly', amount: 0, currency: 'ZAR', usageSource: 'recorded' });
   const usageIsRecorded = usage.usageSource === 'recorded';
   const invoices = res.data?.invoices || (useDemo ? DEMO_INVOICES : []);
@@ -153,7 +159,7 @@ function renderPlanCards(plans, currentPlan) {
     .filter((p) => p.id !== 'trial')
     .map((p) => planCard(
     p.label || p.id,
-    p.price ?? 0,
+    p.price,
     (p.features || []).join(' · ') || p.tagline || '',
     currentPlan === p.id,
     p.id === 'trial'

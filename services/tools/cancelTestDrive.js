@@ -4,6 +4,7 @@
 import { cancelAppointmentRecord } from "../database/appointmentRepository.js";
 import { formatSlotLabel } from "./availability.js";
 import { publish, EventTypes } from "../events/index.js";
+import { syncTestDriveCancelled } from "../integrations/crmSyncService.js";
 
 export default {
     name: "cancelTestDrive",
@@ -22,7 +23,7 @@ export default {
     },
 
     async execute(ctx, args = {}) {
-        const { companyId, customerId } = ctx;
+        const { companyId, customerId, customerPhone } = ctx;
         const bookingId = args.bookingId;
 
         if (!companyId) {
@@ -57,6 +58,21 @@ export default {
                 status: "cancelled",
                 scheduledAt: booking?.scheduledAt,
                 source: "ai_tool_cancel",
+            }).catch(() => {});
+
+            const phone = customerPhone || customerId;
+            if (phone) {
+                await syncTestDriveCancelled(companyId, phone, {
+                    appointment: booking,
+                    enriched: booking,
+                    duplicate: false,
+                }).catch(() => {});
+            }
+        } else if (customerPhone || customerId) {
+            await syncTestDriveCancelled(companyId, customerPhone || customerId, {
+                appointment: booking,
+                enriched: booking,
+                duplicate: true,
             }).catch(() => {});
         }
 

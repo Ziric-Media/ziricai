@@ -328,6 +328,61 @@ Guide prospects toward demos or quotes without being pushy. Escalate complex neg
         },
     }),
     buildEmployeePack({
+        id: "pack-marketing-ai",
+        name: "Marketing AI",
+        category: "marketing",
+        icon: "📈",
+        color: "#db2777",
+        role: "marketing_assistant",
+        roleLabel: "Marketing Assistant",
+        agentName: "Morgan (AI)",
+        personality: "creative",
+        greetingMessage:
+            "Hi! I'm Morgan, your marketing assistant. I can help with campaigns, social replies, and content ideas. What are you working on?",
+        systemPrompt: `You are Morgan, a creative marketing assistant AI.
+Draft campaign ideas, social post replies, email snippets, and nurture warm leads using the knowledge base.
+Stay on-brand, concise, and compliant — escalate legal, crisis, or PR-sensitive topics to a human marketing lead.`,
+        knowledge: [
+            {
+                title: "Brand Voice & Tone",
+                type: "manual",
+                content:
+                    "Friendly, professional, locally relevant. Short sentences for social. Always include a clear call-to-action when appropriate.",
+            },
+            {
+                title: "FAQ — Social & Campaign Requests",
+                type: "faq",
+                content:
+                    "Share the goal, audience, channel, and deadline. Morgan drafts options for review — nothing posts without human approval unless auto-reply rules are enabled.",
+            },
+            {
+                title: "Lead Nurture Playbook",
+                type: "manual",
+                content:
+                    "Warm leads: acknowledge interest, offer value (brochure, demo, event invite), suggest next step within 24h. Re-engage cold leads with seasonal offers.",
+            },
+        ],
+        workflow: {
+            name: "Marketing Enquiry Intake",
+            label: "Campaign intent",
+            keyword: "campaign|social|marketing|promotion|content|post",
+            entities: ["channel", "goal"],
+            template: "marketing_follow_up",
+            stage: "marketing_enquiry",
+        },
+        crm: {
+            label: "Marketing CRM",
+            stages: ["marketing_enquiry", "draft_sent", "scheduled", "published", "closed"],
+            fields: [
+                { key: "campaignGoal", label: "Campaign Goal", type: "text" },
+                { key: "channel", label: "Channel", type: "text" },
+                { key: "audience", label: "Target Audience", type: "text" },
+            ],
+            tags: ["marketing", "campaign"],
+            metrics: ["campaign_enquiries", "content_drafts"],
+        },
+    }),
+    buildEmployeePack({
         id: "pack-customer-support-ai",
         name: "Customer Support AI",
         category: "support",
@@ -438,7 +493,7 @@ Always confirm date, time, contact details, and appointment type before finalisi
     }),
     buildEmployeePack({
         id: "pack-collections-ai",
-        name: "Collections AI",
+        name: "Finance AI",
         category: "finance",
         icon: "💰",
         color: "#ca8a04",

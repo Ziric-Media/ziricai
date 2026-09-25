@@ -168,6 +168,11 @@ service cloud.firestore {
         allow write: if isSuperAdmin();
       }
 
+      match /marketplaceEntitlements/{packId} {
+        allow read: if tenantSubcollection(companyId);
+        allow write: if isSuperAdmin();
+      }
+
       match /analytics/{metricId} {
         allow read: if tenantSubcollection(companyId);
         allow write: if isSuperAdmin();

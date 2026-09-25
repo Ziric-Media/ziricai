@@ -187,11 +187,15 @@ export async function provisionCompany(companyId, companyData = {}) {
     await ensureKnowledgeBase(companyId, `kb-${companyId}`);
 
     const agentResult = await provisionAgent(companyId, null, {
-        name: companyData.agentName || `${name.split(" ")[0] || "Alex"} (AI)`,
-        role: "customer_support",
-        roleLabel: "Customer Support",
+        name: companyData.agentName || "Sarah (AI)",
+        role: companyData.agentRole || companyData.role || "sales_consultant",
+        roleLabel: companyData.agentRoleLabel || companyData.roleLabel || "Sales Consultant",
+        personality: companyData.personality || "sales_driven",
         isDefault: true,
         companyName: name,
+        model: companyData.aiModel || companyData.model || undefined,
+        temperature: companyData.aiTemperature ?? companyData.temperature,
+        knowledgeBaseId: `kb-${companyId}`,
     });
 
     const knowledgeBaseId = `kb-${companyId}`;

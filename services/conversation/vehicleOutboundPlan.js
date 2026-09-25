@@ -21,6 +21,11 @@ const VEHICLE_SPEC_LINE =
 const NUMBERED_LIST_LINE = /^\s*\d+[\.\):]\s+/;
 const BARE_SPEC_BULLET = /^\s*-\s*(?:Price|Mileage|Transmission|Fuel|Location|Seating|Fuel Type)\s*:/i;
 const RANK_BADGE_LINE = /^\s*🥇|^\s*🥈|^\s*🥉|^\s*Best Match|^\s*Alternative #/i;
+const INVENTORY_INTRO_LINE =
+    /^\s*(?:here are|we have|great news|good news|fantastic|wonderful|excellent|i found|i'?ve found|check out|take a look|these are|some of our|currently have|available in stock).*(?:suv|vehicle|car|option|inventory|stock|match|recommend|fortuner|hilux|bmw|toyota|honda|ford)/i;
+const GENERIC_STOCK_TEASER =
+    /^\s*(?:here are|we have|i found|great|fantastic|wonderful|excellent|good).*(?:option|options|choice|choices|pick|picks|shortlist|selection)/i;
+const EMOJI_VEHICLE_LINE = /^\s*🚗/;
 
 /**
  * @param {string|null|undefined} url
@@ -68,6 +73,9 @@ export function stripVehicleListingProseFromText(text, vehicles = []) {
         if (BARE_SPEC_BULLET.test(trimmed)) return false;
         if (RANK_BADGE_LINE.test(trimmed)) return false;
         if (/^🚗\s+\d+\./.test(trimmed)) return false;
+        if (EMOJI_VEHICLE_LINE.test(trimmed)) return false;
+        if (INVENTORY_INTRO_LINE.test(trimmed)) return false;
+        if (GENERIC_STOCK_TEASER.test(trimmed)) return false;
         if (VEHICLE_SPEC_LINE.test(trimmed)) return false;
         const lower = trimmed.toLowerCase();
         for (const token of makeTokens) {
@@ -78,6 +86,92 @@ export function stripVehicleListingProseFromText(text, vehicles = []) {
 
     result = kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
     return result;
+}
+
+function paragraphMentionsVehicleTokens(text, vehicles = []) {
+    const lower = String(text || "").toLowerCase();
+    for (const vehicle of vehicles) {
+        for (const token of [vehicle?.make, vehicle?.model, vehicle?.title, vehicle?.bodyType].filter(Boolean)) {
+            const part = String(token).toLowerCase();
+            if (part.length >= 3 && lower.includes(part.slice(0, Math.min(part.length, 12)))) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function isInventoryIntroParagraph(text, vehicles = []) {
+    const trimmed = String(text || "").trim();
+    if (!trimmed) return false;
+    if (INVENTORY_INTRO_LINE.test(trimmed)) return true;
+    if (GENERIC_STOCK_TEASER.test(trimmed)) return true;
+    if (EMOJI_VEHICLE_LINE.test(trimmed)) return true;
+    if (paragraphMentionsVehicleTokens(trimmed, vehicles)) return true;
+    if (
+        /\b(?:suv|suvs|vehicle|vehicles|car|cars|in stock|inventory|available)\b/i.test(trimmed) &&
+        /\b(?:here|have|found|picked|several|some|few|great|fantastic|good|options)\b/i.test(trimmed)
+    ) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Build a single canonical intro when searchInventory cards will follow.
+ * @param {object[]} vehicles
+ */
+export function buildCanonicalInventoryIntro(vehicles = []) {
+    const count = vehicles.length;
+    const bodyTypes = new Set(
+        vehicles.map((v) => String(v?.bodyType || "").trim().toLowerCase()).filter(Boolean)
+    );
+    const allSuv =
+        (bodyTypes.size === 1 && bodyTypes.has("suv")) ||
+        (bodyTypes.size > 0 && [...bodyTypes].every((b) => b === "suv"));
+
+    if (allSuv) {
+        if (count === 1) return "We have an SUV in stock that may suit you — here are the details:";
+        if (count === 2) return "We have a couple of SUVs available. I've picked two good options for you:";
+        return "We have several SUVs available. I've picked a few good options for you:";
+    }
+
+    if (count === 1) return "Here's a vehicle from our current stock that may suit you:";
+    if (count === 2) return "We have two options from our current stock that may suit you:";
+    return "We have several vehicles available. I've picked a few good options for you:";
+}
+
+/**
+ * Collapse duplicate LLM inventory intros — cards are canonical from tool results.
+ * @param {string} llmReply
+ * @param {object[]} vehicles
+ * @returns {{ intro: string, followUp: string }}
+ */
+export function buildInventoryIntroText(llmReply = "", vehicles = []) {
+    const stripped = stripVehicleListingProseFromText(llmReply, vehicles);
+    const paragraphs = stripped
+        .split(/\n\n+/)
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+    const introParagraphs = paragraphs.filter((p) => isInventoryIntroParagraph(p, vehicles));
+    const followUpParagraphs = paragraphs.filter((p) => !isInventoryIntroParagraph(p, vehicles));
+
+    let intro;
+    if (
+        introParagraphs.length > 1 ||
+        introParagraphs.length === 0 ||
+        introParagraphs.some((p) => paragraphMentionsVehicleTokens(p, vehicles))
+    ) {
+        intro = buildCanonicalInventoryIntro(vehicles);
+    } else {
+        intro = introParagraphs[0];
+    }
+
+    return {
+        intro: intro.trim(),
+        followUp: followUpParagraphs.join("\n\n").trim(),
+    };
 }
 
 /**
@@ -185,9 +279,9 @@ export function buildVehicleOutboundPlan({ toolResults = [], llmReply = "", chan
     if (!vehicles.length) return null;
 
     const messages = [];
-    const strippedReply = stripVehicleListingProseFromText(llmReply, vehicles);
-    if (strippedReply) {
-        messages.push({ type: "text", text: strippedReply });
+    const { intro, followUp } = buildInventoryIntroText(llmReply, vehicles);
+    if (intro) {
+        messages.push({ type: "text", text: intro });
     }
 
     vehicles.forEach((vehicle, index) => {
@@ -204,7 +298,13 @@ export function buildVehicleOutboundPlan({ toolResults = [], llmReply = "", chan
         }
     });
 
+    if (followUp) {
+        messages.push({ type: "text", text: followUp });
+    }
+
     if (!messages.length) return null;
+
+    const strippedReply = [intro, followUp].filter(Boolean).join("\n\n");
 
     return {
         messages,

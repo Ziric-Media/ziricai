@@ -5,6 +5,7 @@ import { upsertTenantCustomer } from "../storage/tenantStorage.js";
 import { upsertDurableCustomer } from "../database/customerRepository.js";
 import { countPassengersFromText } from "../inventory/seatingCapacity.js";
 import { parseIntroducedPerson, parseRelationshipSpeaker, parseOccupation } from "../customerIdentity.js";
+import { isInventoryBrowseIntent } from "./inventoryIntent.js";
 
 export const LEAD_STAGES = [
     "NEW",
@@ -678,6 +679,9 @@ function inferStageAdvance(text, currentStage) {
     if (/\b(book|test drive|schedule|appointment)\b/.test(lower)) {
         return advanceLeadStage(current, /\bconfirm|booked\b/.test(lower) ? "TEST_DRIVE_BOOKED" : "TEST_DRIVE_REQUESTED");
     }
+    if (isInventoryBrowseIntent(text)) {
+        return advanceLeadStage(current, "VEHICLES_RECOMMENDED");
+    }
     if (/\b(what do you have|show me|options|available|in stock|search)\b/.test(lower)) {
         return advanceLeadStage(current, "DISCOVERY");
     }
@@ -1006,7 +1010,7 @@ export function buildRecommendedVehicleRecords(vehicles = [], { reason, requirem
             location: v.location || null,
             primaryImageUrl: Array.isArray(v.images) ? v.images[0] || null : null,
             reason: reason || buildInventoryRecommendationReason(v, { familySize, ...(requirements ? { customerRequirements: requirements } : {}) }),
-            requirements: requirements?.length ? [...requirements] : undefined,
+            ...(requirements?.length ? { requirements: [...requirements] } : {}),
             recommendedAt: now,
             position: index + 1,
         }));

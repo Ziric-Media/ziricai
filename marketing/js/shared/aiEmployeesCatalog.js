@@ -176,7 +176,7 @@ export const AI_EMPLOYEES_CATALOG = [
         integrations: ["Facebook", "Instagram", "WhatsApp", "Mailchimp"],
         experienceLevel: "Mid",
         industries: ["retail", "restaurant", "hotel", "beauty-salon", "gym"],
-        packId: null,
+        packId: "pack-marketing-ai",
         monthlyPrice: "included",
     },
     {

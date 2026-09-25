@@ -713,13 +713,27 @@ function filterAndSortCatalogPacks(packs, filters = {}) {
 
 /** Customer-facing catalog — real rating aggregates only (no demo social proof). */
 export async function getCustomerMarketplaceCatalog(filters = {}) {
+    const { q, category, price, sort, audience } = filters;
     const { hydrateCatalogRatings } = await import("./marketplaceReviewReadService.js");
-    const packs = await hydrateCatalogRatings(getCatalogPacks());
-    const filtered = filterAndSortCatalogPacks(packs, filters);
+    const { applyPortalAiEmployeeCatalog, isPortalAiEmployeeAudience } = await import(
+        "./portalAiEmployeesCatalog.js"
+    );
+
+    let categories = MARKETPLACE_CATEGORIES;
+    let catalogPacks = getCatalogPacks();
+    if (isPortalAiEmployeeAudience(audience)) {
+        const portalView = applyPortalAiEmployeeCatalog(catalogPacks);
+        catalogPacks = portalView.packs;
+        categories = portalView.categories;
+    }
+
+    const packs = await hydrateCatalogRatings(catalogPacks);
+    const filtered = filterAndSortCatalogPacks(packs, { q, category, price, sort });
     return {
-        categories: MARKETPLACE_CATEGORIES,
+        catalogAudience: isPortalAiEmployeeAudience(audience) ? "portal_ai_employees" : "full",
+        categories,
         packs: filtered,
-        thirdParty: THIRD_PARTY_REGISTRY,
+        thirdParty: isPortalAiEmployeeAudience(audience) ? [] : THIRD_PARTY_REGISTRY,
         featured: filtered.filter((p) => p.featured && p.installable),
     };
 }

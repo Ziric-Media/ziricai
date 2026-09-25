@@ -125,6 +125,14 @@ import {
     provisionAgent,
     getCompanyLinks,
 } from "../services/platform/provisioningService.js";
+import { provisionOperatorTenant } from "../services/platform/operatorTenantProvisionService.js";
+import {
+    listWhatsAppPoolNumbers,
+    upsertWhatsAppPoolNumber,
+    assignWhatsAppPoolNumberToCompany,
+    releaseWhatsAppPoolNumber,
+    ensureEnvSeedNumber,
+} from "../services/platform/whatsappNumberPoolService.js";
 import {
     getCustomerMarketplaceCatalog,
     getInstalledPacks,
@@ -156,6 +164,7 @@ import {
     provisionOnboarding,
     listOnboardingIndustries,
     getOnboardingSession,
+    assertOnboardingSessionOwner,
     getWhatsAppConfig,
     slugifyCompanyName,
 } from "../services/platform/onboardingService.js";
@@ -803,11 +812,27 @@ app.get("/api/onboarding/industries", (req, res) => {
     res.json({ industries: listOnboardingIndustries(), whatsapp: getWhatsAppConfig() });
 });
 
-app.get("/api/onboarding/session/:sessionId", (req, res) => {
-    const session = getOnboardingSession(req.params.sessionId);
-    if (!session) return res.status(404).json({ error: "Session not found" });
-    res.json({ session, whatsapp: getWhatsAppConfig() });
-});
+app.get(
+    "/api/onboarding/session/:sessionId",
+    authRateLimit("onboarding"),
+    requireFirebaseAuth(),
+    async (req, res) => {
+        try {
+            const session = await getOnboardingSession(req.params.sessionId);
+            if (!session) {
+                return res.status(404).json({ error: "Session not found", code: "SESSION_NOT_FOUND" });
+            }
+            assertOnboardingSessionOwner(session, req.firebaseAuth);
+            res.json({ session, whatsapp: getWhatsAppConfig() });
+        } catch (err) {
+            const status = err.status || 500;
+            res.status(status).json({
+                error: err.message || "Failed to load onboarding session",
+                code: err.code || "ONBOARDING_ERROR",
+            });
+        }
+    }
+);
 
 app.post(
     "/api/onboarding/start",
@@ -1052,6 +1077,107 @@ app.post(
             });
         } catch (err) {
             respondPlatformWhatsAppError(res, err, "api/platform/whatsapp/deactivate");
+        }
+    }
+);
+
+/** Super Admin — WhatsApp number pool inventory. */
+app.get(
+    "/api/platform/whatsapp-numbers",
+    requirePlatformAccess(),
+    async (req, res) => {
+        try {
+            await ensureEnvSeedNumber();
+            const status = req.query.status ? String(req.query.status) : null;
+            const kind = req.query.kind ? String(req.query.kind) : null;
+            const items = await listWhatsAppPoolNumbers({ status, kind });
+            res.json({
+                items,
+                total: items.length,
+                available: items.filter((n) => n.status === "available").length,
+                inUse: items.filter((n) => n.status === "in_use").length,
+            });
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers] error:", err.message);
+            res.status(status).json({ error: err.message || "Failed to list WhatsApp numbers" });
+        }
+    }
+);
+
+/** Super Admin — add/update a Meta phone identity in the pool. */
+app.post(
+    "/api/platform/whatsapp-numbers",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    requireBodyFields(["phoneNumberId"]),
+    async (req, res) => {
+        try {
+            const number = await upsertWhatsAppPoolNumber(req.body || {});
+            auditLog("platform_whatsapp_pool_upsert", {
+                numberId: number.id,
+                phoneNumberId: number.phoneNumberId,
+                via: req.platformAuth?.via,
+            });
+            res.status(201).json({ number });
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers POST] error:", err.message);
+            res.status(status).json({ error: err.message, code: err.code });
+        }
+    }
+);
+
+/** Super Admin — assign pool number → tenant WhatsApp (Meta identity link). */
+app.post(
+    "/api/platform/companies/:companyId/integrations/whatsapp/assign-pool-number",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    validateCompanyIdParam("params"),
+    requireBodyFields(["numberId"]),
+    async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const body = req.body || {};
+            const result = await assignWhatsAppPoolNumberToCompany({
+                companyId,
+                numberId: body.numberId,
+                activate: body.activate !== false,
+            });
+            auditLog("platform_whatsapp_pool_assign", {
+                companyId,
+                numberId: body.numberId,
+                phoneNumberId: result.number?.phoneNumberId,
+                activated: result.activated,
+                via: req.platformAuth?.via,
+            });
+            res.status(201).json(result);
+        } catch (err) {
+            respondPlatformWhatsAppError(res, err, "api/platform/whatsapp/assign-pool-number");
+        }
+    }
+);
+
+/** Super Admin — release pool number back to AVAILABLE. */
+app.post(
+    "/api/platform/whatsapp-numbers/:numberId/release",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    async (req, res) => {
+        try {
+            const result = await releaseWhatsAppPoolNumber({
+                numberId: req.params.numberId,
+            });
+            auditLog("platform_whatsapp_pool_release", {
+                numberId: req.params.numberId,
+                previousCompanyId: result.previousCompanyId,
+                via: req.platformAuth?.via,
+            });
+            res.json(result);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers/release] error:", err.message);
+            res.status(status).json({ error: err.message, code: err.code });
         }
     }
 );
@@ -1550,6 +1676,37 @@ app.post(
         res.status(500).json({ error: err.message || "Failed to provision company" });
     }
 });
+
+/**
+ * Mission Control New Company — create tenant + real Auth owner + Sarah + KB + CRM.
+ * No synthetic owner UIDs.
+ */
+app.post(
+    "/api/platform/provision/operator-tenant",
+    requirePlatformAccess(),
+    authRateLimit("provision"),
+    requireBodyFields(["name", "ownerEmail"]),
+    async (req, res) => {
+        try {
+            const body = req.body || {};
+            auditLog("provision_operator_tenant", {
+                name: body.name,
+                ownerEmail: body.ownerEmail,
+                via: req.platformAuth?.via,
+            });
+            const result = await provisionOperatorTenant(body);
+            res.status(201).json(result);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/provision/operator-tenant] error:", err.message);
+            res.status(status).json({
+                error: err.message || "Failed to provision operator tenant",
+                code: err.code || undefined,
+                companyId: err.companyId || undefined,
+            });
+        }
+    }
+);
 
 /** Platform provisioning — AI employee resources (superadmin or API key) */
 app.post(

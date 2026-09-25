@@ -32,5 +32,5 @@ export function getSelectedCompany() {
 
 export function companyScopeLabel() {
   const company = getSelectedCompany();
-  return company ? company.name : 'All Companies';
+  return company ? company.name : 'All Tenants';
 }

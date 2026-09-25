@@ -2,7 +2,11 @@
  * WhatsApp adapter — wraps existing services/whatsapp.js and Meta webhook format.
  */
 import { BaseAdapter } from "./baseAdapter.js";
-import { sendWhatsAppMessage, sendWhatsAppMessagesSequential } from "../../whatsapp.js";
+import {
+    sendWhatsAppMessage,
+    sendWhatsAppMessagesSequential,
+    resolveGraphPhoneNumberId,
+} from "../../whatsapp.js";
 import { createUnifiedMessage, CHANNELS } from "../types/unifiedMessage.js";
 import {
     resolveCompanyFromPhoneNumberId,
@@ -15,26 +19,57 @@ import {
     verifyMetaWebhookToken,
 } from "../metaWebhook.js";
 import { getDefaultAiEmployee } from "../../tenants/aiEmployeeService.js";
+import { getWhatsAppIntegration } from "../../tenants/integrationService.js";
 
 export class WhatsAppAdapter extends BaseAdapter {
     getChannelType() {
         return CHANNELS.WHATSAPP;
     }
 
+    /**
+     * Shared-token multi-phone: token is global; Graph phone id is per-tenant.
+     */
     isConfigured(_ctx = {}) {
-        return Boolean(process.env.PHONE_NUMBER_ID && process.env.WHATSAPP_TOKEN);
+        return Boolean(process.env.WHATSAPP_TOKEN);
+    }
+
+    /**
+     * Resolve outbound Meta phone_number_id: payload → ctx → tenant integration → env fallback.
+     * @param {{ companyId?: string|null, phoneNumberId?: string|null }} ctx
+     * @param {{ phoneNumberId?: string|null }} payload
+     */
+    async resolveOutboundPhoneNumberId(ctx = {}, payload = {}) {
+        const explicit = payload?.phoneNumberId || ctx?.phoneNumberId;
+        if (explicit) return String(explicit).trim();
+
+        if (ctx?.companyId) {
+            try {
+                const integration = await getWhatsAppIntegration(ctx.companyId);
+                if (integration?.phoneNumberId) {
+                    return String(integration.phoneNumberId).trim();
+                }
+            } catch (err) {
+                logWarn(CHANNELS.WHATSAPP, ctx.companyId, "Failed to load WhatsApp integration for outbound", {
+                    error: err.message,
+                });
+            }
+        }
+
+        return resolveGraphPhoneNumberId({});
     }
 
     async sendMessage(ctx, payload) {
         const { to, text, messages } = payload;
+        const phoneNumberId = await this.resolveOutboundPhoneNumberId(ctx, payload);
         logInfo(CHANNELS.WHATSAPP, ctx?.companyId, "Sending message", {
             to,
             parts: messages?.length || (text ? 1 : 0),
+            phoneNumberIdSuffix: phoneNumberId ? String(phoneNumberId).slice(-4) : null,
         });
         if (Array.isArray(messages) && messages.length) {
-            return sendWhatsAppMessagesSequential(to, messages);
+            return sendWhatsAppMessagesSequential(to, messages, { phoneNumberId });
         }
-        return sendWhatsAppMessage(to, text);
+        return sendWhatsAppMessage(to, text, { phoneNumberId });
     }
 
     /**
@@ -65,6 +100,21 @@ export class WhatsAppAdapter extends BaseAdapter {
         const text = message.text?.body || "";
         const messageType = message.type;
 
+        const mediaPayload = messageType !== "text" ? message?.[messageType] || null : null;
+        const mediaId = mediaPayload?.id || null;
+        const media = mediaId
+            ? [
+                  {
+                      type: messageType,
+                      id: mediaId,
+                      mimeType: mediaPayload?.mime_type || null,
+                      voice: Boolean(mediaPayload?.voice),
+                  },
+              ]
+            : messageType !== "text"
+              ? [{ type: messageType, id: null, mimeType: null, voice: false }]
+              : [];
+
         return createUnifiedMessage({
             companyId,
             channel: CHANNELS.WHATSAPP,
@@ -72,7 +122,7 @@ export class WhatsAppAdapter extends BaseAdapter {
             from,
             to: phoneNumberId || process.env.PHONE_NUMBER_ID || "",
             text,
-            media: messageType !== "text" ? [{ type: messageType, id: message.id }] : [],
+            media,
             timestamp: message.timestamp
                 ? new Date(Number(message.timestamp) * 1000).toISOString()
                 : new Date().toISOString(),
@@ -81,8 +131,14 @@ export class WhatsAppAdapter extends BaseAdapter {
                 contactName,
                 phoneNumberId,
                 displayPhone: value?.metadata?.display_phone_number,
+                voiceNote: messageType === "audio" && Boolean(mediaPayload?.voice),
             },
         });
+    }
+
+    async downloadMedia(_ctx, mediaId) {
+        const { downloadWhatsAppMedia } = await import("../../whatsapp.js");
+        return downloadWhatsAppMedia(mediaId);
     }
 
     async getProfile(_ctx, userId) {

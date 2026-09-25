@@ -1,33 +1,32 @@
 /**
- * Plugin-ready module registry (scaffold).
- * Future: lazy-load renderers by id; register third-party admin modules here.
+ * Mission Control module registry.
  */
 export const MODULES = [
   'dashboard',
-  'commandCenter',
   'companies',
-  'marketplace',
+  'crm',
+  'sarah',
+  'billing',
+  'platformAnalytics',
+  'supportInbox',
+  'integrations',
+  'support',
   'agents',
   'knowledge',
-  'conversations',
-  'customers',
-  'automation',
-  'analytics',
-  'billing',
   'settings',
 ];
 
 export const MODULE_LABELS = {
-  dashboard: 'Mission Control',
-  commandCenter: 'Command Center',
+  dashboard: 'Dashboard',
   companies: 'Companies',
-  marketplace: 'Marketplace',
+  crm: 'CRM',
+  sarah: 'Sarah',
+  billing: 'Billing',
+  platformAnalytics: 'ZiricAI Analytics',
+  supportInbox: 'Support Inbox',
+  integrations: 'Integrations',
+  support: 'Support',
   agents: 'AI Employees',
   knowledge: 'Knowledge Base',
-  conversations: 'Live Conversations',
-  customers: 'Customers',
-  automation: 'Automation',
-  analytics: 'Analytics',
-  billing: 'Billing',
   settings: 'Settings',
 };

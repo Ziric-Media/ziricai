@@ -52,12 +52,38 @@ if (!el.stepContent) {
 
 window.initOnboarding = initOnboarding;
 
+const ONBOARDING_SESSION_STORAGE_KEY = 'ziric_onboarding_session_id';
+
+function stepIndexFromSession(currentStep) {
+  const idx = STEPS.findIndex((s) => s.id === currentStep);
+  return idx >= 0 ? idx : 0;
+}
+
 async function bootstrap() {
   try {
-    const { fetchIndustries } = await import('./api.js');
+    const { fetchIndustries, fetchOnboardingSession } = await import('./api.js');
     const data = await fetchIndustries();
     state.industries = data.industries || [];
     state.whatsapp = data.whatsapp || state.whatsapp;
+
+    const savedSessionId = sessionStorage.getItem(ONBOARDING_SESSION_STORAGE_KEY);
+    if (savedSessionId) {
+      try {
+        const resumed = await fetchOnboardingSession(savedSessionId);
+        const session = resumed?.session;
+        if (session?.status === 'in_progress') {
+          state.sessionId = session.sessionId;
+          state.companyId = session.companyId;
+          state.portalUrl = session.portalUrl;
+          state.companyName = session.companyName;
+          state.stepIndex = stepIndexFromSession(session.currentStep);
+          state.whatsappSimulated = session.whatsappState === 'simulated';
+        }
+      } catch {
+        /* not signed in or session unavailable */
+      }
+    }
+
     renderStepList();
     if (STEPS[state.stepIndex]?.id === 'industry') {
       renderStepContent();
@@ -270,7 +296,7 @@ function renderCompleteStep() {
       <ul class="complete-checklist">
         <li><i class="fa-solid fa-circle-check"></i> 14-day trial started</li>
         <li><i class="fa-solid fa-circle-check"></i> Default AI employee active</li>
-        <li><i class="fa-solid fa-circle-check"></i> WhatsApp channel ${state.whatsappSimulated ? 'simulated (add Meta credentials for live)' : 'connected'}</li>
+        <li><i class="fa-solid fa-circle-check"></i> WhatsApp: ${state.whatsappSimulated ? 'simulated (connect Meta in Portal)' : 'connected or pending in Portal'}</li>
         <li><i class="fa-solid fa-circle-check"></i> Knowledge base seeded</li>
       </ul>
       <div class="complete-stats">
@@ -434,8 +460,8 @@ async function handleAccountStep() {
   state.companyName = companyName;
 
   setStatus('Creating your account...');
-  const [{ registerUser }, { createUserProfile, createTenantMembership }, { startOnboarding }] =
-    await Promise.all([import('../auth.js'), import('../users.js'), loadOnboardingApi()]);
+  const [{ registerUser }, { startOnboarding }] =
+    await Promise.all([import('../auth.js'), loadOnboardingApi()]);
   const authResult = await registerUser(ownerEmail, password);
   if (authResult.error) throw new Error(authResult.error);
 
@@ -444,31 +470,16 @@ async function handleAccountStep() {
   state.sessionId = onboard.sessionId;
   state.companyId = onboard.companyId;
   state.portalUrl = onboard.portalUrl;
+  state.whatsappSimulated = onboard.whatsappState === 'simulated';
+  sessionStorage.setItem(ONBOARDING_SESSION_STORAGE_KEY, onboard.sessionId);
 
-  setStatus('Setting up your profile...');
-  const profileResult = await createUserProfile(authResult.user.uid, {
-    fullName: ownerName,
-    email: ownerEmail,
-    role: 'owner',
-    company: companyName,
-    companyId: state.companyId,
-    status: 'active',
-  });
-  if (profileResult.error) {
-    console.warn('Profile write:', profileResult.error);
+  if (onboard.resumed) {
+    setStatus('Resuming your onboarding...', 'success');
+  } else if (onboard.alreadyLive) {
+    setStatus('Your workspace is already live — open Portal to continue.', 'success');
+  } else {
+    setStatus('Account created!', 'success');
   }
-
-  const memberResult = await createTenantMembership(authResult.user.uid, state.companyId, {
-    email: ownerEmail,
-    fullName: ownerName,
-    role: 'owner',
-    status: 'active',
-  });
-  if (memberResult.error) {
-    console.warn('Membership write:', memberResult.error);
-  }
-
-  setStatus('Account created!', 'success');
 }
 
 async function handleIndustryStep() {
@@ -494,8 +505,20 @@ async function handleWhatsAppStep() {
     rows[i].classList.add('done');
   }
   const { completeStep } = await loadOnboardingApi();
-  await completeStep(state.sessionId, 'whatsapp', {});
-  setStatus('WhatsApp connected!', 'success');
+  const result = await completeStep(state.sessionId, 'whatsapp', {});
+  const wa = result?.whatsapp || {};
+  state.whatsappSimulated = wa.state === 'simulated' || wa.simulated === true;
+  if (wa.state === 'connected' && wa.connected) {
+    setStatus('WhatsApp connected!', 'success');
+  } else if (wa.state === 'pending') {
+    setStatus('WhatsApp setup in progress — finish credentials in Portal.', 'success');
+  } else if (wa.state === 'simulated') {
+    setStatus('WhatsApp demo complete (simulated — connect Meta in Portal for live messaging).', 'success');
+  } else if (wa.state === 'failed') {
+    setStatus(wa.error || 'WhatsApp setup failed — retry in Portal.', 'error');
+  } else {
+    setStatus('WhatsApp not connected yet — continue setup in Portal.', 'success');
+  }
 }
 
 async function handleKnowledgeStep() {
@@ -537,8 +560,9 @@ async function handleTrainStep() {
   }
 
   const { completeStep } = await loadOnboardingApi();
-  await completeStep(state.sessionId, 'train', {});
-  setStatus('Training complete!', 'success');
+  const result = await completeStep(state.sessionId, 'train', {});
+  const training = result?.training || {};
+  setStatus(training.message || 'Knowledge setup complete.', 'success');
   state.stepIndex += 1;
   render();
 }

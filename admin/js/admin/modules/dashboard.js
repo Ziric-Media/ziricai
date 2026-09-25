@@ -6,33 +6,39 @@ import {
   trendHtml,
 } from '../ui.js';
 import {
-  getMetrics,
-  getActivityFeed,
-  getSystemHealth,
+  getPlatformDashboardView,
+  healthFromPlatformSnapshot,
 } from '../services/operationsService.js';
+import { fetchPlatformExecutiveOverview } from '../services/platformConsole.js';
 
 let hourlyChart = null;
 
 export async function renderDashboard(container) {
   container.innerHTML = loadingState('Loading Mission Control...');
 
-  let ops;
-  let activity;
-  let health;
+  const scopedId = state.selectedCompanyId || null;
 
+  let view;
   try {
-    [ops, activity, health] = await Promise.all([
-      getMetrics(),
-      getActivityFeed(),
-      getSystemHealth(),
-    ]);
+    view = await getPlatformDashboardView(scopedId);
   } catch (err) {
     console.error('Mission Control load error:', err);
     container.innerHTML = loadingState('Failed to load Mission Control. Retrying...');
     return;
   }
 
-  setState({ operationsData: ops, backendHealth: health });
+  const health =
+    view.mode === 'platform'
+      ? healthFromPlatformSnapshot(view.platformHealth) || {
+          whatsapp: false,
+          openai: false,
+          firebase: 'offline',
+          queue: { pending: 0, active: 0 },
+          timestamp: new Date().toISOString(),
+        }
+      : null;
+
+  setState({ operationsData: view, backendHealth: health });
 
   const userName =
     state.profile?.fullName ||
@@ -40,109 +46,167 @@ export async function renderDashboard(container) {
     state.user?.email?.split('@')[0] ||
     'Super Admin';
 
-  const demoNote = ops.isDemo
-    ? '<span class="demo-badge"><i class="fa-solid fa-flask"></i> Sample data</span>'
+  if (view.mode === 'platform') {
+    await renderPlatformDashboard(container, view, userName, health);
+  } else {
+    renderTenantDashboard(container, view, userName);
+  }
+}
+
+function scopeBadge(view) {
+  if (view.authRequired) {
+    return '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-lock"></i> Sign in required</span>';
+  }
+  if (view.authForbidden) {
+    return '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-user-shield"></i> Super Admin authorization required</span>';
+  }
+  if (view.apiError) {
+    return '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-triangle-exclamation"></i> Data temporarily unavailable</span>';
+  }
+  if (view.mode === 'platform') {
+    return '<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-globe"></i> All tenants · tenant records (not production customers)</span>';
+  }
+  const name = escapeHtml(view.company?.name || view.companyId || 'Tenant');
+  const cls = classificationBadgeClass(view.company?.classification);
+  const classBadge = view.company?.classification
+    ? `<span class="tenant-class-badge ${cls}">${escapeHtml(view.company.classification)}</span>`
     : '';
+  const demo = view.isDemo
+    ? ' <span class="demo-badge"><i class="fa-solid fa-flask"></i> Demo content</span>'
+    : '';
+  return `<span class="demo-badge" style="opacity:0.85"><i class="fa-solid fa-database"></i> Portal hub · ${name}</span> ${classBadge}${demo}`;
+}
 
-  const { metrics, trends } = ops;
-
-  container.innerHTML = `
+function dashboardHeader(userName, view) {
+  return `
     <div class="dashboard-header ops-header">
       <div class="dashboard-header-left">
         <h1>Mission Control</h1>
-        <p class="welcome-text ops-subtitle">AI Operations Center — Welcome back, <strong>${escapeHtml(userName)}</strong> ${demoNote}</p>
+        <p class="welcome-text ops-subtitle">AI Operations Center — Welcome back, <strong>${escapeHtml(userName)}</strong> ${scopeBadge(view)}</p>
       </div>
       <div class="dashboard-header-actions">
-        <div class="date-range-picker">
-          <i class="fa-solid fa-calendar"></i>
-          <input type="date" id="dashDateFrom" value="${new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10)}" />
-          <span>to</span>
-          <input type="date" id="dashDateTo" value="${new Date().toISOString().slice(0, 10)}" />
-        </div>
         <button class="btn btn-secondary btn-sm" type="button" id="refreshDashboard">
           <i class="fa-solid fa-rotate"></i> Refresh
         </button>
       </div>
-    </div>
+    </div>`;
+}
 
+function classificationBadgeClass(classification) {
+  const map = {
+    'PRODUCTION CUSTOMER': 'production',
+    PILOT: 'pilot',
+    ACCEPTANCE: 'acceptance',
+    'DEMO/SHOWCASE': 'demo',
+    TEST: 'test',
+    UNKNOWN: 'unknown',
+  };
+  return map[classification] || 'unknown';
+}
+
+function renderPlatformCensus(census) {
+  if (!census?.byClass) return '';
+  const b = census.byClass;
+  const cells = [
+    { label: 'Production', value: b.productionCustomer ?? 0 },
+    { label: 'Pilot', value: b.pilot ?? 0 },
+    { label: 'Acceptance', value: b.acceptance ?? 0 },
+    { label: 'Demo', value: b.demoShowcase ?? 0 },
+    { label: 'Test', value: b.test ?? 0 },
+    { label: 'Unknown', value: b.unknown ?? 0 },
+  ];
+  return `
+    <div class="tenant-summary-grid" aria-label="Tenant classification summary">
+      <div class="tenant-summary-total">
+        <span class="tenant-summary-total-value">${formatNumber(census.total ?? 0)}</span>
+        <span class="tenant-summary-total-label">Tenant records</span>
+      </div>
+      ${cells
+        .map(
+          (c) => `
+        <div class="tenant-summary-cell">
+          <span class="tenant-summary-value">${formatNumber(c.value)}</span>
+          <span class="tenant-summary-label">${escapeHtml(c.label)}</span>
+        </div>`
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+function viewPartialNote() {
+  return '<p class="welcome-text ops-subtitle mc-platform-partial-note">Cross-tenant operational KPI rollups are partial in this release — use tenant scope or pilot spotlight for hub-aligned metrics.</p>';
+}
+
+function renderPilotSpotlight(spotlight) {
+  if (!spotlight?.companyId) return '';
+  const kpis = spotlight.kpis || {};
+  const ops = kpis.ops || {};
+  const cls = classificationBadgeClass(spotlight.classification);
+  const badge = spotlight.classification
+    ? `<span class="tenant-class-badge ${cls}">${escapeHtml(spotlight.classification)}</span>`
+    : '';
+  return `
+    <div class="panel-card" style="margin-bottom:1rem">
+      <div class="panel-header">
+        <h3><i class="fa-solid fa-star"></i> Pilot spotlight — ${escapeHtml(spotlight.name || spotlight.companyId)}</h3>
+        <span class="ops-tag">${escapeHtml(spotlight.companyId)} ${badge}</span>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem">
+        ${miniStat('Inbox total', ops.inbox?.total, availabilityForValue(ops.inbox?.total))}
+        ${miniStat('Unread', ops.inbox?.unread, availabilityForValue(ops.inbox?.unread))}
+        ${miniStat('CRM customers', ops.crm?.customers, availabilityForValue(ops.crm?.customers))}
+        ${miniStat('Leads', ops.crm?.leads, availabilityForValue(ops.crm?.leads))}
+        ${miniStat('Appts today', ops.appointments?.today, availabilityForValue(ops.appointments?.today))}
+      </div>
+      <p class="welcome-text ops-subtitle" style="margin-top:0.75rem">
+        <button type="button" class="btn btn-primary btn-sm" id="openPilotTenant" data-company-id="${escapeHtml(spotlight.companyId)}">
+          <i class="fa-solid fa-crosshairs"></i> Open pilot tenant
+        </button>
+        <span style="margin-left:8px">Or pick the same row in the scope dropdown · <a href="#" data-nav="companies">Tenants</a></span>
+      </p>
+    </div>`;
+}
+
+function availabilityForValue(value) {
+  if (value == null || Number.isNaN(Number(value))) return 'unavailable';
+  return 'real';
+}
+
+async function renderPlatformDashboard(container, view, userName, health) {
+  const partial = view.meta?.partial ? viewPartialNote() : '';
+  const execRes = await fetchPlatformExecutiveOverview();
+  const exec = execRes.data || {};
+  const tenants = exec.tenants || {};
+  const billing = exec.billing || {};
+  const wa = exec.integrations?.whatsapp || {};
+
+  container.innerHTML = `
+    ${dashboardHeader(userName, view)}
+    ${renderPlatformCensus(view.census)}
+    ${partial}
     <div class="kpi-grid kpi-grid-ops">
-      ${kpiCard('AI Employees Online', formatNumber(metrics.aiEmployeesOnline), 'fa-robot', 'green', trends.aiEmployeesOnline)}
-      ${kpiCard('Active Conversations', formatNumber(metrics.activeConversations), 'fa-comments', 'purple', trends.activeConversations)}
-      ${kpiCard('Avg Response Time', `${metrics.avgResponseTimeSec} sec`, 'fa-bolt', 'yellow', trends.avgResponseTimeSec)}
-      ${kpiCard('Customer Satisfaction', `${metrics.customerSatisfaction}%`, 'fa-face-smile', 'green', trends.customerSatisfaction)}
-      ${kpiCard('Messages Today', formatCompact(metrics.messagesToday), 'fa-fire', 'orange', trends.messagesToday)}
-      ${kpiCard('OpenAI Tokens Used', formatCompact(metrics.openAiTokensUsed), 'fa-brain', 'yellow', trends.openAiTokensUsed)}
-      ${kpiCard('Est. Revenue Generated', formatCurrency(metrics.estimatedRevenue), 'fa-money-bill', 'green', trends.estimatedRevenue)}
-      ${kpiCard('Human Takeovers', formatNumber(metrics.humanTakeovers), 'fa-user-shield', 'red', trends.humanTakeovers)}
-      ${kpiCard('AI Success Rate', `${metrics.aiSuccessRate}%`, 'fa-chart-line', 'purple', trends.aiSuccessRate)}
-      ${kpiCard('Companies Online', formatNumber(metrics.companiesOnline), 'fa-building', 'blue', trends.companiesOnline)}
+      ${kpiCard('Total tenants', formatNumber(tenants.total ?? view.census?.total ?? 0), 'fa-building', 'blue', null)}
+      ${kpiCard('Active tenants', formatNumber(tenants.activeOperational ?? 0), 'fa-circle-check', 'green', null)}
+      ${kpiCard('Trial tenants', formatNumber(tenants.trial ?? 0), 'fa-hourglass-half', 'yellow', null)}
+      ${kpiCard('Paying tenants', formatNumber(tenants.paying ?? 0), 'fa-coins', 'purple', null)}
+      ${kpiCard('WhatsApp connected', formatNumber(wa.connected ?? 0), 'fa-brands fa-whatsapp', 'green', null)}
+      ${kpiCard('MRR (sampled)', billing.mrr != null ? `R${formatNumber(billing.mrr)}` : '—', 'fa-money-bill', 'green', null)}
+      ${kpiCard('New this month', formatNumber(tenants.newThisMonth ?? 0), 'fa-chart-line', 'blue', null)}
+      ${kpiCard('Past due', formatNumber(tenants.pastDue ?? 0), 'fa-triangle-exclamation', 'red', null)}
     </div>
-
+    <p class="panel-hint">${escapeHtml(billing.partialNote || exec.usage?.note || 'Usage and message rollups show — until platform rollup jobs are connected.')}</p>
+    ${renderPilotSpotlight(view.pilotSpotlight)}
     <div class="ops-grid ops-row-1">
       <div class="activity-section ops-activity">
         <div class="header">
-          <h3><i class="fa-solid fa-satellite-dish"></i> Live Activity Feed</h3>
+          <h3><i class="fa-solid fa-satellite-dish"></i> Platform activity</h3>
           <span class="live-indicator"><span class="pulse"></span> Live</span>
         </div>
         <div class="activity-feed ops-activity-scroll">
-          ${renderActivityFeed(activity.items)}
+          ${renderActivityFeed(view.activity?.items)}
         </div>
       </div>
-
-      <div class="panel-card">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-user-shield"></i> Recent Human Takeovers</h3>
-          <a href="#" class="panel-link" data-nav="conversations">View inbox</a>
-        </div>
-        <div class="takeover-list">
-          ${renderTakeovers(ops.humanTakeovers)}
-        </div>
-      </div>
-    </div>
-
-    <div class="ops-grid ops-row-2">
-      <div class="panel-card">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-circle-question"></i> Trending Questions</h3>
-          <span class="ops-tag">Today</span>
-        </div>
-        <div class="trending-list">
-          ${renderTrendingQuestions(ops.trendingQuestions)}
-        </div>
-      </div>
-
-      <div class="panel-card">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-trophy"></i> AI Performance Leaderboard</h3>
-          <a href="#" class="panel-link" data-nav="agents">Manage</a>
-        </div>
-        <div class="agent-rank-list">
-          ${renderAgentLeaderboard(ops.leaderboards?.agents)}
-        </div>
-      </div>
-
-      <div class="panel-card">
-        <div class="panel-header">
-          <h3><i class="fa-solid fa-building"></i> Company Performance</h3>
-          <a href="#" class="panel-link" data-nav="companies">View all</a>
-        </div>
-        <div class="company-rank-list">
-          ${renderCompanyLeaderboard(ops.leaderboards?.companies)}
-        </div>
-      </div>
-    </div>
-
-    <div class="ops-grid ops-row-3">
-      <div class="chart-card chart-card-line ops-heatmap">
-        <div class="chart-card-header">
-          <h3><i class="fa-solid fa-chart-bar"></i> Hourly Conversations (24h)</h3>
-          <div class="chart-legend">
-            <span class="legend-item"><span class="dot purple"></span> Conversations</span>
-          </div>
-        </div>
-        <div class="chart-canvas-wrap ops-chart-wrap"><canvas id="hourlyConversationsChart"></canvas></div>
-      </div>
-
       <div class="panel-card">
         <div class="panel-header">
           <h3><i class="fa-solid fa-heart-pulse"></i> System Health</h3>
@@ -153,14 +217,62 @@ export async function renderDashboard(container) {
         </div>
       </div>
     </div>
+    <footer class="dashboard-footer">
+      <span>&copy; 2026 ZiricAI Mission Control</span>
+      <span class="version">v1.1.0 · platform view</span>
+    </footer>
+  `;
+  bindDashboardEvents(container);
+}
+
+function renderTenantDashboard(container, view, userName) {
+  const { metrics, trends, metricAvailability = {}, tenantHub } = view;
+  const ops = tenantHub?.ops || {};
+
+  container.innerHTML = `
+    ${dashboardHeader(userName, view)}
+    ${renderTenantHubPanel(view, ops, metricAvailability)}
+
+    <div class="kpi-grid kpi-grid-ops">
+      ${kpiCard('Active Conversations', formatMetric(metrics.activeConversations, metricAvailability.activeConversations), 'fa-comments', 'purple', trends.activeConversations)}
+      ${kpiCard('CRM Leads', formatMetric(metrics.crmLeads, metricAvailability.leads), 'fa-user-plus', 'blue', null)}
+      ${kpiCard('Qualified Leads', formatMetric(metrics.crmQualifiedLeads, metricAvailability.pipeline), 'fa-filter', 'purple', null)}
+      ${kpiCard('Test Drives Booked', formatMetric(metrics.crmTestDrivesBooked, metricAvailability.testDrivesBooked), 'fa-car', 'green', null)}
+      ${kpiCard('Finance Enquiries', formatMetric(metrics.crmFinanceEnquiries, metricAvailability.financeEnquiries), 'fa-coins', 'yellow', null)}
+      ${kpiCard('Deals Won', formatMetric(metrics.crmDealsWon, metricAvailability.pipeline), 'fa-trophy', 'green', null)}
+      ${kpiCard('Messages (total)', formatMetric(metrics.messagesTotal, metricAvailability.messagesTotal), 'fa-fire', 'orange', null)}
+      ${kpiCard('Human Takeovers', formatMetric(metrics.humanTakeovers, metricAvailability.humanTakeovers), 'fa-user-shield', 'red', trends.humanTakeovers)}
+      ${kpiCard('AI Employees Online', formatMetric(metrics.aiEmployeesOnline, metricAvailability.aiEmployeesOnline), 'fa-robot', 'green', trends.aiEmployeesOnline)}
+      ${kpiCard('Est. Revenue', formatMetric(metrics.estimatedRevenue, metricAvailability.estimatedRevenue), 'fa-money-bill', 'green', trends.estimatedRevenue)}
+    </div>
+
+    <div class="ops-grid ops-row-1">
+      <div class="activity-section ops-activity">
+        <div class="header">
+          <h3><i class="fa-solid fa-satellite-dish"></i> Tenant activity</h3>
+          <span class="live-indicator"><span class="pulse"></span> Live</span>
+        </div>
+        <div class="activity-feed ops-activity-scroll">
+          ${renderActivityFeed(view.activity?.items)}
+        </div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-header">
+          <h3><i class="fa-solid fa-inbox"></i> Inbox snapshot</h3>
+          <a href="#" class="panel-link" data-nav="conversations">View inbox</a>
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(2,1fr);gap:0.75rem;padding:0.5rem">
+          ${miniStat('Total threads', ops.inbox?.total, availabilityForValue(ops.inbox?.total))}
+          ${miniStat('Unread', ops.inbox?.unread, availabilityForValue(ops.inbox?.unread))}
+        </div>
+      </div>
+    </div>
 
     <footer class="dashboard-footer">
       <span>&copy; 2026 ZiricAI Mission Control</span>
-      <span class="version">v1.1.0</span>
+      <span class="version">v1.1.0 · tenant hub</span>
     </footer>
   `;
-
-  initHourlyChart(container, ops.hourlyConversations);
   bindDashboardEvents(container);
 }
 
@@ -176,7 +288,65 @@ function formatCurrency(value) {
   return `R${formatNumber(n)}`;
 }
 
-function kpiCard(label, value, icon, color, trend) {
+function formatMetric(value, availability, { currency = false } = {}) {
+  if (availability === 'unavailable' || availability === 'demo' || value == null) {
+    return '—';
+  }
+  if (currency) return formatCurrency(value);
+  if (typeof value === 'number' && value >= 10000) return formatCompact(value);
+  return formatNumber(value);
+}
+
+function renderTenantHubPanel(view, ops = {}, availability = {}) {
+  const companyId = view.companyId || view.company?.id || '—';
+  const companyName = view.company?.name || companyId;
+  const cls = classificationBadgeClass(view.company?.classification);
+  const classBadge = view.company?.classification
+    ? `<span class="tenant-class-badge ${cls}">${escapeHtml(view.company.classification)}</span>`
+    : '';
+
+  if (view.authRequired || view.authForbidden || view.apiError) {
+    const msg = view.authRequired
+      ? 'Sign in with your Super Admin account to load tenant hub metrics.'
+      : view.authForbidden
+        ? 'Your account does not have Super Admin access to this tenant hub.'
+        : 'Tenant hub data is temporarily unavailable.';
+    return `
+      <div class="panel-card" style="margin-bottom:1rem">
+        <div class="panel-header">
+          <h3><i class="fa-solid fa-building"></i> ${escapeHtml(companyName)}</h3>
+          <span class="ops-tag">${escapeHtml(companyId)}</span>
+        </div>
+        <p class="welcome-text ops-subtitle">${msg}</p>
+      </div>`;
+  }
+
+  return `
+    <div class="panel-card" style="margin-bottom:1rem">
+      <div class="panel-header">
+        <h3><i class="fa-solid fa-building"></i> ${escapeHtml(companyName)}</h3>
+        <span class="ops-tag">${escapeHtml(companyId)} ${classBadge}</span>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem">
+        ${miniStat('Customers', ops.crm?.customers, availabilityForValue(ops.crm?.customers))}
+        ${miniStat('Leads', ops.crm?.leads, availability.leads || availabilityForValue(ops.crm?.leads))}
+        ${miniStat('Inbox total', ops.inbox?.total, availabilityForValue(ops.inbox?.total))}
+        ${miniStat('Unread', ops.inbox?.unread, availability.activeConversations || availabilityForValue(ops.inbox?.unread))}
+        ${miniStat('Appts today', ops.appointments?.today, availability.testDrivesBooked || availabilityForValue(ops.appointments?.today))}
+        ${miniStat('Upcoming appts', ops.appointments?.upcoming, availabilityForValue(ops.appointments?.upcoming))}
+      </div>
+      <p class="welcome-text ops-subtitle" style="margin-top:0.75rem">
+        KPIs sourced from Portal hub read model (<code>portal_hub</code>). Switch to <strong>All Tenants</strong> for platform census and health.
+      </p>
+    </div>`;
+}
+
+function miniStat(label, value, availability) {
+  const display = formatMetric(value, availability);
+  return `<div class="kpi-card"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(String(display))}</div></div>`;
+}
+
+function kpiCard(label, value, icon, color, trend, currency = false) {
   return `
     <div class="kpi-card">
       <div class="header">
@@ -265,8 +435,8 @@ function renderAgentLeaderboard(agents) {
         <div class="rank-meta">${escapeHtml(a.company)} · ${formatNumber(a.messages)} msgs</div>
       </div>
       <div class="rank-stats">
-        <span class="rank-stat">${a.satisfaction}%<small>CSAT</small></span>
-        <span class="rank-stat">${a.conversion}%<small>Conv</small></span>
+        <span class="rank-stat">${a.satisfaction != null ? `${a.satisfaction}%` : '—'}<small>CSAT</small></span>
+        <span class="rank-stat">${a.conversion != null ? `${a.conversion}%` : '—'}<small>Conv</small></span>
       </div>
     </div>`
     )
@@ -356,7 +526,7 @@ function initHourlyChart(container, hourlyData) {
   const ctx = container.querySelector('#hourlyConversationsChart');
   if (!ctx) return;
 
-  const data = hourlyData || DEMO_HOURLY_FALLBACK;
+  const data = (hourlyData && hourlyData.some((v) => v != null)) ? hourlyData : Array.from({ length: 24 }, () => 0);
   const gridColor = 'rgba(148, 163, 184, 0.15)';
   const textColor = '#94a3b8';
 
@@ -398,10 +568,21 @@ function initHourlyChart(container, hourlyData) {
   });
 }
 
-const DEMO_HOURLY_FALLBACK = [12, 8, 5, 4, 6, 18, 42, 68, 94, 112, 128, 134, 118, 102, 96, 88, 76, 64, 52, 38, 28, 22, 18, 14];
+const DEMO_HOURLY_FALLBACK = Array.from({ length: 24 }, () => 0);
+
+function applyTenantScopeFromDashboard(companyId) {
+  const select = document.getElementById('companySelector');
+  if (!select) return;
+  select.value = companyId || '';
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+}
 
 function bindDashboardEvents(container) {
   container.querySelector('#refreshDashboard')?.addEventListener('click', () => renderDashboard(container));
+  container.querySelector('#openPilotTenant')?.addEventListener('click', (e) => {
+    const id = e.currentTarget?.dataset?.companyId;
+    if (id) applyTenantScopeFromDashboard(id);
+  });
   container.querySelectorAll('[data-nav]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.preventDefault();

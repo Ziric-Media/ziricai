@@ -14,10 +14,10 @@ import {
     updateDoc,
     deleteDoc,
     query,
-    where,
-    orderBy,
-    limit,
-    startAfter,
+    queryWhere,
+    queryOrderBy,
+    queryLimit,
+    queryStartAfter,
     serverTimestamp,
 } from "./firestoreClient.js";
 import { ROOT } from "./schema.js";
@@ -205,18 +205,15 @@ export class TenantRepository {
 
         const constraints = [];
         for (const [field, value] of Object.entries(filters)) {
-            constraints.push(where(field, "==", value));
+            constraints.push(queryWhere(field, "==", value));
         }
-        constraints.push(orderBy(orderByField, orderDirection));
+        constraints.push(queryOrderBy(orderByField, orderDirection));
 
         if (startAfterId) {
-            const cursorSnap = await getDoc(tenantDocRef(companyId, this.collectionName, startAfterId));
-            if (cursorSnap.exists()) {
-                constraints.push(startAfter(cursorSnap));
-            }
+            constraints.push(queryStartAfter(tenantDocRef(companyId, this.collectionName, startAfterId)));
         }
 
-        constraints.push(limit(pageSize + 1));
+        constraints.push(queryLimit(pageSize + 1));
 
         const q = query(tenantCollectionRef(companyId, this.collectionName), ...constraints);
         const snapshot = await getDocs(q);

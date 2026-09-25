@@ -2,6 +2,7 @@
  * Match events to tenant workflows.
  */
 import { listWorkflows } from "./workflowRegistry.js";
+import { EventTypes } from "../events/eventTypes.js";
 
 function textFromEvent(event) {
     return String(
@@ -13,8 +14,14 @@ function textFromEvent(event) {
 }
 
 function matchesKeywords(text, keywords = []) {
-    if (!keywords.length) return true;
+    if (!keywords.length) return false;
     return keywords.some((k) => text.includes(String(k).toLowerCase()));
+}
+
+function workflowSendsCustomerMessage(workflow) {
+    return (workflow.actions || []).some(
+        (a) => a.type === "send_message" && !a.config?.forceCustomerMessage
+    );
 }
 
 function matchesWorkflowTrigger(workflow, event) {
@@ -24,7 +31,17 @@ function matchesWorkflowTrigger(workflow, event) {
     const text = textFromEvent(event);
     const match = trigger.match || {};
 
-    if (match.keywords?.length && !matchesKeywords(text, match.keywords)) return false;
+    const keywords = match.keywords || [];
+    if (keywords.length && !matchesKeywords(text, keywords)) return false;
+
+    if (
+        trigger.eventType === EventTypes.MESSAGE_RECEIVED &&
+        workflowSendsCustomerMessage(workflow) &&
+        !keywords.length &&
+        !match.matchAll
+    ) {
+        return false;
+    }
 
     if (match.inactiveHours != null) {
         const hours = Number(event.payload?.inactiveHours || event.metadata?.inactiveHours || 0);

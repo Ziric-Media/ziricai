@@ -4,22 +4,28 @@ import {
   pageHeader,
   emptyState,
   loadingState,
+  errorState,
   showToast,
   statusBadge,
   formatNumber,
 } from '../ui.js';
+import { isDemoDataAllowed, resolveListItems } from '../services/dataMode.js';
 import {
   listAgents,
   createAgent,
   updateAgent,
   deleteAgent,
   duplicateAgent,
+  enrichAgentsForDisplay,
+  isWhatsappChannelEnabled,
   isCompanyWhatsAppActive,
+  PRIMARY_PILOT_TENANT_ID,
 } from '../services/agents.js';
 import { provisionAgentWorkspace, fetchSupervisorReviews } from '../api.js';
 import { withTimeout } from '../utils.js';
 import { DEMO_AGENTS, DEMO_COMPANIES } from '../demo-data.js';
 import { listCompanies } from '../services/companies.js';
+import { formatAgentModelLabel } from '../../shared/aiEmployeeDisplay.js';
 
 const MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'];
 const WIZARD_STEPS = 7;
@@ -72,21 +78,116 @@ const AVATAR_PRESETS = ['🤖', '👩‍💼', '👨‍💼', '🧑‍💻', '�
 
 let filters = { search: '', company: '', role: '', status: '' };
 let wizardStep = 1;
+let listLoadState = 'ok';
+let listSource = 'api';
+let listError = null;
+
+function sourceBadgeLabel() {
+  if (listSource === 'demo') return 'Demo fallback';
+  return 'Live API';
+}
+
+function notifyAgentsSidebar(detail) {
+  document.dispatchEvent(new CustomEvent('ziric:agents-updated', { detail }));
+}
+
+function confirmPilotMutation(actionLabel) {
+  if (isDemoDataAllowed()) return true;
+  if (state.selectedCompanyId !== PRIMARY_PILOT_TENANT_ID) return true;
+  return confirm(
+    `${actionLabel} on the live Central Motors pilot tenant (${PRIMARY_PILOT_TENANT_ID}). ` +
+      'This affects production Sarah — continue only if you intend to change the pilot employee.'
+  );
+}
+
+function personalityLabel(value) {
+  if (!value) return '';
+  const match = PERSONALITIES.find((p) => p.value === value);
+  return match?.label || String(value).replace(/_/g, ' ');
+}
 
 export async function renderAgents(container) {
   container.innerHTML = loadingState('Loading AI employees...');
 
+  const scopedCompanyId = state.selectedCompanyId || null;
   const [agentsRes, companiesRes] = await Promise.all([
-    withTimeout(listAgents()),
+    withTimeout(listAgents(scopedCompanyId)),
     withTimeout(listCompanies()),
   ]);
 
-  let agents = agentsRes.items?.length ? agentsRes.items : DEMO_AGENTS;
-  if (!agents.length) agents = DEMO_AGENTS;
-  const companies = companiesRes.items?.length ? companiesRes.items : (state.companies?.length ? state.companies : DEMO_COMPANIES);
-  setState({ agents, companies });
+  listLoadState = agentsRes.loadState || (agentsRes.isDemo ? 'demo' : agentsRes.items?.length ? 'ok' : 'empty');
+  listSource = agentsRes.source || (agentsRes.isDemo ? 'demo' : 'api');
+  listError = agentsRes.error || null;
 
-  const companyId = state.selectedCompanyId || companies[0]?.id || null;
+  if (listLoadState === 'scope_required') {
+    notifyAgentsSidebar({ companyId: null, count: null, loadState: 'scope_required' });
+    const companyHints = (state.companies || [])
+      .slice(0, 5)
+      .map((c) => escapeHtml(c.name))
+      .join(', ');
+    container.innerHTML = `
+      ${pageHeader(
+        'AI Employees',
+        'Create named AI team members — not chatbots, but dedicated digital employees for each company.',
+        '<span class="crm-source-badge">Live API</span>'
+      )}
+      <div class="profile-card" style="text-align:center;padding:48px 24px;">
+        <div style="font-size:40px;margin-bottom:12px;">🏢</div>
+        <div style="font-weight:600;margin-bottom:8px;">Company scope required</div>
+        <div style="color:var(--text-muted);font-size:14px;margin-bottom:16px;max-width:520px;margin-left:auto;margin-right:auto;">
+          AI employees load per tenant — not across all companies at once.
+          Use the <strong>Scope</strong> dropdown in the top bar and choose a company
+          ${companyHints ? `(e.g. ${companyHints})` : ''} to view its AI employees.
+        </div>
+        <button class="btn btn-primary" type="button" id="selectCompanyScopeAgents">
+          <i class="fa-solid fa-building"></i> Open Scope selector
+        </button>
+      </div>
+    `;
+    container.querySelector('#selectCompanyScopeAgents')?.addEventListener('click', () => {
+      const select = document.getElementById('companySelector');
+      select?.focus();
+      select?.click();
+    });
+    return;
+  }
+
+  if (listLoadState === 'error') {
+    notifyAgentsSidebar({ companyId: scopedCompanyId, count: null, loadState: 'error' });
+    container.innerHTML = `
+      ${pageHeader(
+        'AI Employees',
+        'Create named AI team members — not chatbots, but dedicated digital employees for each company.',
+        '<span class="crm-source-badge">Live API</span>'
+      )}
+      ${errorState('Unable to load AI employees. Please check your connection and try again.')}
+      <div style="text-align:center;margin-top:-24px;padding-bottom:32px;">
+        <button class="btn btn-primary" type="button" id="retryAgents">
+          <i class="fa-solid fa-rotate-right"></i> Retry
+        </button>
+      </div>
+    `;
+    container.querySelector('#retryAgents')?.addEventListener('click', () => renderAgents(container));
+    return;
+  }
+
+  const companies = isDemoDataAllowed()
+    ? resolveListItems(companiesRes, () => (state.companies?.length ? state.companies : DEMO_COMPANIES))
+    : (companiesRes.items || state.companies || []);
+
+  const agents = enrichAgentsForDisplay(
+    isDemoDataAllowed() ? resolveListItems(agentsRes, DEMO_AGENTS) : (agentsRes.items || []),
+    { companyId: scopedCompanyId, companies }
+  );
+
+  setState({ agents, companies });
+  notifyAgentsSidebar({
+    companyId: scopedCompanyId,
+    count: agents.length,
+    loadState: listLoadState,
+  });
+
+  const companyId = scopedCompanyId || companies[0]?.id || null;
   let supervisor = null;
   if (companyId) {
     const supRes = await withTimeout(fetchSupervisorReviews(companyId, 5));
@@ -133,11 +234,24 @@ function employeeAvatar(agent) {
 }
 
 function whatsappBadge(agent) {
-  const connected = agent.whatsappConnected && agent.channels?.whatsapp !== false;
+  const connected = agent.whatsappConnected === true;
   if (connected) {
     return '<span class="status-badge active"><i class="fa-brands fa-whatsapp"></i> Connected</span>';
   }
+  if (isWhatsappChannelEnabled(agent)) {
+    return '<span class="status-badge pending"><i class="fa-brands fa-whatsapp"></i> Channel enabled</span>';
+  }
   return '<span class="status-badge inactive">Not connected</span>';
+}
+
+function defaultBadge(agent) {
+  if (!agent.isDefault) return '';
+  return '<span class="status-badge active" style="margin-left:8px"><i class="fa-solid fa-star"></i> Default</span>';
+}
+
+function formatConversations(agent) {
+  if (agent.conversations == null || agent.conversations === undefined) return '—';
+  return formatNumber(agent.conversations);
 }
 
 function actionMenu(agent) {
@@ -170,20 +284,27 @@ function actionMenu(agent) {
 }
 
 function renderRow(agent, companies) {
+  const personality = personalityLabel(agent.personality);
   return `
     <tr data-id="${escapeHtml(agent.id)}">
       <td>
         <div class="org-name">
           <div class="avatar employee-table-avatar">${employeeAvatar(agent)}</div>
-          <div class="company-name-text">${escapeHtml(agent.name)}</div>
+          <div>
+            <div class="company-name-text">${escapeHtml(agent.name)}${defaultBadge(agent)}</div>
+            ${agent.knowledgeBaseId ? `<div class="text-muted" style="font-size:12px">KB: ${escapeHtml(agent.knowledgeBaseId)}</div>` : ''}
+          </div>
         </div>
       </td>
       <td>${escapeHtml(companyName(agent.companyId, companies))}</td>
-      <td>${escapeHtml(roleLabel(agent))}</td>
-      <td><span class="model-tag">${escapeHtml(agent.model || 'gpt-4o-mini')}</span></td>
+      <td>
+        <div>${escapeHtml(roleLabel(agent))}</div>
+        ${personality ? `<div class="text-muted" style="font-size:12px">${escapeHtml(personality)}</div>` : ''}
+      </td>
+      <td><span class="model-tag">${escapeHtml(formatAgentModelLabel(agent))}</span></td>
       <td>${whatsappBadge(agent)}</td>
       <td>${statusBadge(agent.status === 'training' ? 'inactive' : agent.status)}</td>
-      <td>${formatNumber(agent.conversations || 0)}</td>
+      <td>${formatConversations(agent)}</td>
       <td class="col-actions">${actionMenu(agent)}</td>
     </tr>
   `;
@@ -253,13 +374,17 @@ function buildListMarkup(agents, companies, isDemo, supervisor = null) {
     ? companies
     : [...new Map(agents.map((a) => [a.companyId, { id: a.companyId, name: companyName(a.companyId, companies) }])).values()];
 
+  const headerActions = `
+    <span class="crm-source-badge">${escapeHtml(sourceBadgeLabel())}</span>
+    <button class="btn btn-primary btn-sm" type="button" id="openEmployeeWizard">
+      <i class="fa-solid fa-plus"></i> Create AI Employee
+    </button>`;
+
   return `
     ${pageHeader(
       'AI Employees',
       'Create named AI team members — not chatbots, but dedicated digital employees for each company.',
-      `<button class="btn btn-primary btn-sm" type="button" id="openEmployeeWizard">
-        <i class="fa-solid fa-plus"></i> Create AI Employee
-      </button>`
+      headerActions
     )}
     ${isDemo ? `<div class="demo-banner"><i class="fa-solid fa-flask"></i> Showing demo data — Firestore unavailable or empty. Changes persist locally.</div>` : ''}
 
@@ -290,7 +415,12 @@ function buildListMarkup(agents, companies, isDemo, supervisor = null) {
     <div id="employeesContent">
       ${filtered.length
         ? renderTable(filtered, companies)
-        : emptyState('No AI employees match your filters.', '<button class="btn btn-primary btn-sm" type="button" id="clearEmployeeFilters">Clear filters</button>')}
+        : listLoadState === 'empty' && !filters.search && !filters.company && !filters.role && !filters.status
+          ? emptyState(
+              'No AI employees configured for this company yet.',
+              '<button class="btn btn-primary btn-sm" type="button" id="openEmployeeWizardEmpty"><i class="fa-solid fa-plus"></i> Create AI Employee</button>'
+            )
+          : emptyState('No AI employees match your filters.', '<button class="btn btn-primary btn-sm" type="button" id="clearEmployeeFilters">Clear filters</button>')}
     </div>
 
     ${buildWizardSlideOver(companies)}
@@ -530,6 +660,16 @@ function bindListEvents(container, agents, companies) {
   };
 
   container.querySelector('#openEmployeeWizard')?.addEventListener('click', () => {
+    if (!confirmPilotMutation('Create a new AI employee')) return;
+    resetWizardForm(container, companies);
+    container.querySelector('#employeeWizardTitle').textContent = 'Create AI Employee';
+    container.querySelector('#employeeEditId').value = '';
+    openWizard();
+    seedPreviewChat(container);
+  });
+
+  container.querySelector('#openEmployeeWizardEmpty')?.addEventListener('click', () => {
+    if (!confirmPilotMutation('Create a new AI employee')) return;
     resetWizardForm(container, companies);
     container.querySelector('#employeeWizardTitle').textContent = 'Create AI Employee';
     container.querySelector('#employeeEditId').value = '';
@@ -811,6 +951,9 @@ async function saveEmployee(container, closeWizard, agents, companies) {
     return;
   }
 
+  const mutationLabel = id ? 'Update this AI employee' : 'Create a new AI employee';
+  if (!confirmPilotMutation(mutationLabel)) return;
+
   const existing = id ? agents.find((a) => a.id === id) : null;
   if (existing?.conversations) payload.conversations = existing.conversations;
 
@@ -971,6 +1114,7 @@ function bindDelegatedActions(container, { openWizard, agents, companies }) {
     if (dupBtn) {
       e.stopPropagation();
       container.querySelectorAll('.action-menu.open').forEach((m) => m.classList.remove('open'));
+      if (!confirmPilotMutation('Duplicate this AI employee')) return;
       const result = await duplicateAgent(dupBtn.dataset.id);
       if (result.error) { showToast(result.error, 'error'); return; }
       showToast('AI employee duplicated', 'success');
@@ -1004,6 +1148,7 @@ function bindDelegatedActions(container, { openWizard, agents, companies }) {
       e.stopPropagation();
       container.querySelectorAll('.action-menu.open').forEach((m) => m.classList.remove('open'));
       if (!confirm('Delete this AI employee? This cannot be undone.')) return;
+      if (!confirmPilotMutation('Delete this AI employee')) return;
       const result = await deleteAgent(deleteBtn.dataset.id);
       if (result.error) { showToast(result.error, 'error'); return; }
       showToast('AI employee deleted', 'success');

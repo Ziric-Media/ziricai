@@ -113,12 +113,16 @@ export async function askAIWithTools(message, options = {}) {
         maxToolRounds = 3,
         authoritativeBookingData = false,
         preloadedBookingResult = null,
+        preloadedInventoryResult = null,
     } = options;
 
     let currentMessages = buildChatMessages(userText, { ...options, authoritativeBookingData });
     const toolResults = [];
     if (preloadedBookingResult?.ok) {
         toolResults.push({ tool: "getCustomerBookings", ...preloadedBookingResult });
+    }
+    if (preloadedInventoryResult?.ok) {
+        toolResults.push({ tool: "searchInventory", ...preloadedInventoryResult });
     }
     let reply = "";
 
@@ -207,5 +211,59 @@ export async function askAIWithTools(message, options = {}) {
     } catch (error) {
         console.error("[openai] API error (tools):", error.status || error.code, error.message);
         return { reply: "Sorry, I'm having trouble responding right now.", toolResults };
+    }
+}
+
+/**
+ * Transcribe audio (e.g. WhatsApp voice notes) via OpenAI Whisper.
+ * @param {Buffer|Uint8Array} audioBuffer
+ * @param {{ filename?: string, mimeType?: string, language?: string|null }} [options]
+ * @returns {Promise<{ text: string, language?: string|null }>}
+ */
+export async function transcribeAudio(audioBuffer, options = {}) {
+    if (!openai) {
+        throw Object.assign(new Error("OPENAI_API_KEY is not set"), { code: "NO_OPENAI_KEY" });
+    }
+
+    const buffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer || []);
+    if (!buffer.length) {
+        throw Object.assign(new Error("Empty audio buffer"), { code: "EMPTY_AUDIO" });
+    }
+
+    const mimeType = String(options.mimeType || "audio/ogg").split(";")[0].trim();
+    const extFromMime = {
+        "audio/ogg": "ogg",
+        "audio/opus": "ogg",
+        "audio/mpeg": "mp3",
+        "audio/mp4": "m4a",
+        "audio/aac": "aac",
+        "audio/amr": "amr",
+        "audio/wav": "wav",
+        "audio/webm": "webm",
+    };
+    const ext = extFromMime[mimeType] || "ogg";
+    const filename = options.filename || `whatsapp-voice.${ext}`;
+
+    const { toFile } = await import("openai");
+    const file = await toFile(buffer, filename, { type: mimeType });
+
+    const model = process.env.OPENAI_TRANSCRIBE_MODEL || "whisper-1";
+    const params = { file, model };
+    if (options.language) {
+        params.language = String(options.language);
+    }
+
+    try {
+        const result = await openai.audio.transcriptions.create(params);
+        const text = String(result?.text || "").trim();
+        console.log("[openai] Transcription complete", {
+            model,
+            chars: text.length,
+            mimeType,
+        });
+        return { text, language: options.language || null };
+    } catch (error) {
+        console.error("[openai] Transcription error:", error.status || error.code, error.message);
+        throw error;
     }
 }

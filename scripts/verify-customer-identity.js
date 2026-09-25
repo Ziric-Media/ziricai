@@ -116,6 +116,47 @@ async function main() {
     assert(recallPrompt.includes("Customer name: Spencer"), "Recall prompt uses Spencer after restart");
     console.log("✓ customer name survives storage re-init (simulated restart)");
 
+    const agent = {
+        name: "Sarah",
+        systemPrompt: "You are Sarah at Central Motors Rustenburg.",
+        greetingMessage:
+            "Hi there! I'm Sarah from Central Motors Rustenburg. Looking for your next vehicle?",
+    };
+
+    const newThreadPrompt = buildWhatsAppSystemPrompt({
+        companyId: COMPANY_ID,
+        companyName: COMPANY_NAME,
+        customer,
+        agent,
+        isNewConversation: true,
+        inboundMessage: "Hi",
+    });
+    assert(newThreadPrompt.includes("NEW THREAD"), "New conversation prompt marks first thread");
+    assert(newThreadPrompt.includes("For opening greetings"), "New thread may use greeting template");
+
+    const continuingPrompt = buildWhatsAppSystemPrompt({
+        companyId: COMPANY_ID,
+        companyName: COMPANY_NAME,
+        customer,
+        agent,
+        isNewConversation: false,
+        inboundMessage: "What SUVs do you have?",
+    });
+    assert(continuingPrompt.includes("CONTINUING THREAD"), "Continuing conversation prompt set");
+    assert(continuingPrompt.includes("Do NOT re-introduce yourself"), "Continuing thread forbids re-introduction");
+    assert(!continuingPrompt.includes("For opening greetings"), "Continuing thread skips greeting template");
+
+    const midChatHiPrompt = buildWhatsAppSystemPrompt({
+        companyId: COMPANY_ID,
+        companyName: COMPANY_NAME,
+        customer,
+        agent,
+        isNewConversation: false,
+        inboundMessage: "Hi again",
+    });
+    assert(midChatHiPrompt.includes("brief greeting mid-conversation"), "Mid-chat hi gets brief reply rule");
+    console.log("✓ conversation continuity: new vs continuing thread prompt rules");
+
     console.log("\nAll customer identity verification checks passed.");
 }
 

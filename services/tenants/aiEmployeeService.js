@@ -100,6 +100,7 @@ export async function createAiEmployee(companyId, data = {}) {
         avatar: data.avatar || "🤖",
         personality: data.personality || template.personality,
         model: data.model || "gpt-4o-mini",
+        modelVersion: String(data.modelVersion || "1.0").trim() || "1.0",
         temperature: Number(data.temperature ?? 0.7),
         memory: data.memory !== false,
         systemPrompt:

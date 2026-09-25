@@ -341,6 +341,7 @@ const GENERIC_QUERY_TERMS = new Set([
     "stock",
     "inventory",
     "available",
+    "availability",
     "price",
     "mileage",
     "low",
@@ -350,6 +351,36 @@ const GENERIC_QUERY_TERMS = new Set([
     "show",
     "me",
     "any",
+    "some",
+    "all",
+    "do",
+    "does",
+    "did",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "of",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "we",
+    "our",
+    "your",
+    "please",
+    "looking",
+    "want",
+    "need",
+    "get",
+    "got",
+    "options",
+    "option",
+    "list",
+    "which",
+    "there",
 ]);
 
 function normalizeBodyType(value) {
@@ -641,22 +672,21 @@ export async function searchInventory(companyId, query = "", filters = {}) {
 
     if (terms.length && !wantsLowMileage && !priceSort) {
         const meaningfulTerms = terms.filter((t) => !GENERIC_QUERY_TERMS.has(t));
-        if (structured && meaningfulTerms.length === 0) {
-            // Filter-only mode — structured filters already applied; generic query words must not zero results.
+        if (meaningfulTerms.length === 0) {
+            // Browse-all / generic stock query ("what vehicles do you have in stock?") —
+            // do not term-score; keep filter-matched inventory as the result set.
         } else if (structured) {
             results = results
-                .map((v) => ({ vehicle: v, score: scoreVehicle(v, meaningfulTerms.length ? meaningfulTerms : terms) }))
+                .map((v) => ({ vehicle: v, score: scoreVehicle(v, meaningfulTerms) }))
                 .sort((a, b) => b.score - a.score)
                 .map((r) => r.vehicle);
         } else {
-            const scored = results
-                .map((v) => ({ vehicle: v, score: scoreVehicle(v, terms) }))
+            // Specific search terms: narrow to matches. Zero-score → empty (not browse-all).
+            results = results
+                .map((v) => ({ vehicle: v, score: scoreVehicle(v, meaningfulTerms) }))
                 .filter((r) => r.score > 0)
                 .sort((a, b) => b.score - a.score)
                 .map((r) => r.vehicle);
-            if (scored.length || !mergedFilters.excludeMake) {
-                results = scored;
-            }
         }
     }
 

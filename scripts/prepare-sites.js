@@ -5,6 +5,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { resolveWebFirebaseConfig } from '../js/firebase-config.js';
@@ -74,18 +75,36 @@ const PRODUCTION_API_URL =
 
 /** Deployment identity for Portal asset cache busting (Netlify build env). */
 function resolveAssetVersion() {
-  return process.env.COMMIT_REF || process.env.NETLIFY || 'dev';
+  const ref = process.env.COMMIT_REF || process.env.CACHED_COMMIT_REF || '';
+  let base = '';
+  if (ref && ref !== 'true' && ref !== 'false') base = ref;
+  else {
+    try {
+      base = execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8' }).trim();
+    } catch {
+      base = 'dev';
+    }
+  }
+  // Include CSS fingerprints so Netlify/browser caches bust when styles change without a new git SHA.
+  try {
+    const hasher = crypto.createHash('sha256');
+    for (const name of ['admin-dashboard.css', 'company-portal.css']) {
+      const cssPath = path.join(ROOT, 'css', name);
+      if (fs.existsSync(cssPath)) hasher.update(fs.readFileSync(cssPath));
+    }
+    return `${base.slice(0, 12)}-${hasher.digest('hex').slice(0, 8)}`;
+  } catch {
+    return base;
+  }
 }
 
 function siteConfigBlock(site) {
   const apiBase =
     process.env.API_BASE_URL !== undefined
       ? process.env.API_BASE_URL
-      : useCdnFirebase && (site === 'marketing' || site === 'app' || site === 'admin')
+      : site === 'marketing' || site === 'app' || site === 'admin'
         ? ''
-        : site === 'marketing' || site === 'app' || site === 'admin'
-          ? PRODUCTION_API_URL
-          : '';
+        : '';
   const marketing = process.env.MARKETING_BASE_URL || 'https://marketing.ziricai.com';
   const app = process.env.APP_BASE_URL || 'https://app.ziricai.com';
   const admin = process.env.ADMIN_BASE_URL || 'https://admin.ziricai.com';
@@ -231,11 +250,20 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
   }
 
   if (site === 'admin') {
+    const assetVersion = resolveAssetVersion();
     out = out.replace(
       /open http:\/\/localhost:3000\/index\.html/,
       'open http://localhost:3000/admin/'
     );
     out = out.replace(/superadmin-register\.html/g, 'superadmin-register.html');
+    out = out.replace(
+      /href="css\/admin-dashboard\.css"/,
+      `href="css/admin-dashboard.css?v=${assetVersion}"`
+    );
+    out = out.replace(
+      /src="js\/admin\/main\.js"/,
+      `src="js/admin/main.js?v=${assetVersion}"`
+    );
   }
 
   if (out.includes('__ZIRICAI_CONFIG__')) {
@@ -267,11 +295,12 @@ function prepareMarketing() {
   rmDir(path.join(dir, 'js'));
   rmDir(path.join(dir, 'assets'));
 
-  writeText('marketing/index.html', patchHtml(readText('ziricai.html'), { site: 'marketing' }));
+  // Static publish dirs never include node_modules — always use gstatic CDN importmap.
+  writeText('marketing/index.html', patchHtml(readText('ziricai.html'), { site: 'marketing', importmapMode: 'cdn' }));
 
   for (const name of fs.readdirSync(ROOT)) {
     if (name.startsWith('industry-') && name.endsWith('.html')) {
-      writeText(`marketing/${name}`, patchHtml(readText(name), { site: 'marketing' }));
+      writeText(`marketing/${name}`, patchHtml(readText(name), { site: 'marketing', importmapMode: 'cdn' }));
     }
   }
 
@@ -301,7 +330,7 @@ function prepareApp() {
   rmDir(path.join(dir, 'js'));
   rmDir(path.join(dir, 'assets'));
 
-  writeText('app/index.html', patchHtml(readText('company-portal.html'), { site: 'app' }));
+  writeText('app/index.html', patchHtml(readText('company-portal.html'), { site: 'app', importmapMode: 'cdn' }));
 
   const marketingOnboarding = process.env.MARKETING_BASE_URL || 'https://marketing.ziricai.com';
   writeText(
@@ -344,11 +373,11 @@ function prepareAdmin() {
   rmDir(path.join(dir, 'js'));
   rmDir(path.join(dir, 'assets'));
 
-  writeText('admin/index.html', patchHtml(readText('ziric-superadmin-console.html'), { site: 'admin' }));
+  writeText('admin/index.html', patchHtml(readText('ziric-superadmin-console.html'), { site: 'admin', importmapMode: 'cdn' }));
 
   for (const page of ['superadmin-register.html', 'register-admin.html', 'workspace-centralmotors.html']) {
     if (fs.existsSync(path.join(ROOT, page))) {
-      writeText(`admin/${page}`, patchHtml(readText(page), { site: 'admin' }));
+      writeText(`admin/${page}`, patchHtml(readText(page), { site: 'admin', importmapMode: 'cdn' }));
     }
   }
 

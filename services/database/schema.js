@@ -39,6 +39,8 @@ export const TENANT_COLLECTIONS = {
     MARKETPLACE: "marketplace",
     /** Tenant Industry Pack installation registry (metadata + references). */
     MARKETPLACE_INSTALLS: "marketplaceInstalls",
+    /** Paid / granted pack entitlements (PORTAL-4C-6). */
+    MARKETPLACE_ENTITLEMENTS: "marketplaceEntitlements",
     /** MC-U-4C — tenant support cases (Portal SoT; MC reads via platform API in 4D). */
     SUPPORT_CASES: "supportCases",
     SUPPORT_CASE_ACTIVITIES: "supportCaseActivities",
@@ -378,6 +380,11 @@ export function tenantMarketplaceInstallPath(companyId, packId) {
     return `${tenantCollectionPath(companyId, TENANT_COLLECTIONS.MARKETPLACE_INSTALLS)}/${packId}`;
 }
 
+/** Document path: companies/{companyId}/marketplaceEntitlements/{packId} */
+export function tenantMarketplaceEntitlementPath(companyId, packId) {
+    return `${tenantCollectionPath(companyId, TENANT_COLLECTIONS.MARKETPLACE_ENTITLEMENTS)}/${packId}`;
+}
+
 /** Collection path: platform/marketplace/packs/{packId}/versions */
 export function platformPackVersionCollectionPath(packId) {
     return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.PACKS}/${packId}/versions`;
@@ -401,4 +408,33 @@ export function platformReviewPath(reviewId) {
 /** Document path: platform/marketplace/ratings/{packId} */
 export function platformRatingPath(packId) {
     return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.RATINGS}/${packId}`;
+}
+
+/** Platform onboarding wizard sessions (CORPORATE-P0-2c). */
+export const PLATFORM_ONBOARDING = {
+    SESSIONS: "onboardingSessions",
+};
+
+export function platformOnboardingSessionsCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_ONBOARDING.SESSIONS}`;
+}
+
+export function platformOnboardingSessionPath(sessionId) {
+    return `${platformOnboardingSessionsCollectionPath()}/${sessionId}`;
+}
+
+/** Platform WhatsApp test/production number pool (Mission Control onboarding). */
+export const PLATFORM_WHATSAPP_POOL = {
+    ROOT: "whatsapp",
+    NUMBERS: "numbers",
+};
+
+/** Collection path: platform/whatsapp/numbers */
+export function platformWhatsAppNumbersCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_WHATSAPP_POOL.ROOT}/${PLATFORM_WHATSAPP_POOL.NUMBERS}`;
+}
+
+/** Document path: platform/whatsapp/numbers/{numberId} */
+export function platformWhatsAppNumberPath(numberId) {
+    return `${platformWhatsAppNumbersCollectionPath()}/${numberId}`;
 }

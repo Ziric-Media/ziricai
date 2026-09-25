@@ -12,9 +12,62 @@ import { handleWebhookRequest, handleWhatsAppWebhook, handleLegacyWhatsAppWebhoo
 import { ingest, ingestBatch } from "./conversationPipeline.js";
 import { requireTenantOrPlatformAccess } from "../core/tenantContext.js";
 import { requirePlatformAccess } from "../auth/platformAuth.js";
-import { listChannelIntegrations } from "../tenants/integrationService.js";
+import { listIntegrations } from "../tenants/integrationService.js";
+import { resolvePilotDataCompanyId } from "../storage/centralMotorsPilot.js";
+import { CHANNELS } from "./types/unifiedMessage.js";
 
 let initialized = false;
+
+const ACTIVE_INTEGRATION_STATUSES = new Set(["active", "connected"]);
+
+/**
+ * Merge tenant integration docs into adapter channel catalog rows.
+ * @param {object[]} channels
+ * @param {object[]} integrations sanitized integration records
+ */
+export function mergeTenantIntegrationsIntoChannels(channels, integrations = []) {
+    const byChannel = new Map();
+    for (const rec of integrations) {
+        const key = rec.channel || rec.provider;
+        if (key) byChannel.set(key, rec);
+    }
+
+    return channels.map((ch) => {
+        const rec = byChannel.get(ch.channel);
+        if (!rec) return ch;
+        const status = String(rec.status || "").toLowerCase();
+        const tenantConnected = ACTIVE_INTEGRATION_STATUSES.has(status);
+        return {
+            ...ch,
+            configured: tenantConnected,
+            integrationStatus: rec.status || null,
+            displayPhoneNumber: rec.displayPhoneNumber || null,
+            phoneNumberId: rec.phoneNumberId || null,
+        };
+    });
+}
+
+async function listSanitizedIntegrations(companyId) {
+    const items = await listIntegrations(companyId);
+    return items.map((rec) => {
+        const {
+            config,
+            accessToken,
+            whatsappToken,
+            token,
+            privateKey,
+            credentials,
+            ...safe
+        } = rec;
+        return {
+            ...safe,
+            channel: safe.channel || safe.provider,
+            phoneNumberId: safe.phoneNumberId
+                ? `***${String(safe.phoneNumberId).slice(-4)}`
+                : null,
+        };
+    });
+}
 
 function isOutboundRetryable(err) {
     return isRetryableOutboundError(err);
@@ -133,16 +186,32 @@ export function mountIntegrationRoutes(app) {
     app.get("/api/integrations/logs/:companyId", requireTenantOrPlatformAccess(), (req, res) => {
         const limit = Number(req.query.limit) || 50;
         const channel = req.query.channel || undefined;
-        const logs = getIntegrationLogs(req.params.companyId, { limit, channel });
-        res.json({ items: logs, count: logs.length });
+        const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+        const logs = getIntegrationLogs(dataCompanyId, { limit, channel });
+        res.json({ items: logs, count: logs.length, companyId: req.params.companyId });
     });
 
     app.get("/api/integrations/channels/:companyId", requireTenantOrPlatformAccess(), async (req, res) => {
-        const companyId = req.params.companyId;
-        const integrations = await listChannelIntegrations(companyId, "whatsapp");
+        const portalCompanyId = req.params.companyId;
+        const dataCompanyId = resolvePilotDataCompanyId(portalCompanyId);
+        const integrations = await listSanitizedIntegrations(dataCompanyId);
+        let channels = getChannelStatus(dataCompanyId);
+        channels = mergeTenantIntegrationsIntoChannels(channels, integrations);
+
+        const waRow = channels.find((c) => c.channel === CHANNELS.WHATSAPP);
+        const waIntegration = integrations.find(
+            (i) => (i.channel || i.provider) === CHANNELS.WHATSAPP
+        );
+        if (waRow && waIntegration && waRow.configured) {
+            waRow.description = waRow.displayPhoneNumber
+                ? `Connected · ${waRow.displayPhoneNumber}`
+                : "WhatsApp Business API connected for this workspace";
+        }
+
         res.json({
-            companyId,
-            channels: getChannelStatus(companyId),
+            companyId: portalCompanyId,
+            dataCompanyId,
+            channels,
             integrations,
         });
     });

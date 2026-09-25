@@ -79,6 +79,26 @@ export async function fetchKnowledgeDocuments(companyId, { knowledgeBaseId } = {
   return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/documents${qs}`);
 }
 
+export async function createKnowledgeDocument(companyId, data) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/documents`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function uploadKnowledgeFile(companyId, { title, type, file, knowledgeBaseId }) {
+  const form = new FormData();
+  form.append('title', title);
+  form.append('type', type || 'document');
+  form.append('file', file);
+  if (knowledgeBaseId) form.append('knowledgeBaseId', knowledgeBaseId);
+  return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/upload`, {
+    method: 'POST',
+    body: form,
+  });
+}
+
 export async function fetchAiEmployees(companyId) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/ai-employees`);
 }

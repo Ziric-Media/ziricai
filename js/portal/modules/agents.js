@@ -22,11 +22,11 @@ const ROLE_COLORS = {
 
 const CHANNEL_ICONS = {
   whatsapp: { icon: 'fa-brands fa-whatsapp', label: 'WhatsApp' },
-  websiteChat: { icon: 'fa-comments', label: 'Web Chat' },
+  websiteChat: { icon: 'fa-solid fa-comments', label: 'Web Chat' },
   facebookMessenger: { icon: 'fa-brands fa-facebook-messenger', label: 'Messenger' },
   instagram: { icon: 'fa-brands fa-instagram', label: 'Instagram' },
   telegram: { icon: 'fa-brands fa-telegram', label: 'Telegram' },
-  email: { icon: 'fa-envelope', label: 'Email' },
+  email: { icon: 'fa-solid fa-envelope', label: 'Email' },
 };
 
 let searchTerm = '';
@@ -145,12 +145,21 @@ function employeeCard(agent) {
       </div>
 
       <div class="portal-employee-stats">
-        <div><span class="label">Model</span><span class="value">${escapeHtml(formatAgentModelLabel(agent))}</span></div>
-        <div><span class="label">Knowledge</span><span class="value">${kbLabel}</span></div>
-        <div><span class="label">Conversations</span><span class="value">${formatNumber(agent.conversations || 0)}</span></div>
+        <div class="portal-employee-stat">
+          <span class="stat-label">Model</span>
+          <span class="stat-value">${escapeHtml(formatAgentModelLabel(agent))}</span>
+        </div>
+        <div class="portal-employee-stat">
+          <span class="stat-label">Knowledge</span>
+          <span class="stat-value">${kbLabel}</span>
+        </div>
+        <div class="portal-employee-stat">
+          <span class="stat-label">Conversations</span>
+          <span class="stat-value">${formatNumber(agent.conversations || 0)}</span>
+        </div>
       </div>
 
-      ${channels.length ? `<div class="portal-employee-channels">${channels.map((c) => `<span class="channel-tag"><i class="${c.icon}"></i> ${c.label}</span>`).join('')}</div>` : ''}
+      ${channels.length ? `<div class="portal-employee-channels">${channels.map((c) => `<span class="portal-channel-tag"><i class="${c.icon}"></i> ${c.label}</span>`).join('')}</div>` : ''}
     </article>
   `;
 }

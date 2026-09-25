@@ -13,6 +13,7 @@ async function main() {
     const {
         stripVehicleListingProseFromText,
         buildVehicleOutboundPlan,
+        buildInventoryIntroText,
     } = await import("../services/conversation/vehicleOutboundPlan.js");
     const { buildInventoryRecommendationReason } = await import("../services/conversation/salesContext.js");
     const {
@@ -67,6 +68,67 @@ Would you like to schedule a test drive?`;
     assert(imageMsg && !imageMsg.caption, "hero image has no duplicate caption");
     assert(cardMsg.text.includes("Why I recommend it:") || cardMsg.text.includes("🚗 1."), "card has title");
     console.log("✓ 2. Canonical card + hero image (no caption duplicate)");
+
+    /* 2b. Duplicate SUV intros collapse to one canonical intro + cards */
+    const suvVehicles = [
+        {
+            vehicleId: "suv-1",
+            bodyType: "SUV",
+            title: "2022 Toyota Fortuner 2.8 GD-6",
+            price: 549900,
+            mileage: 45000,
+            images: ["https://centralmotorsrtb.co.za/wp-content/uploads/fortuner.jpg"],
+        },
+        {
+            vehicleId: "suv-2",
+            bodyType: "SUV",
+            title: "2021 Ford Everest 2.0 Bi-Turbo",
+            price: 489900,
+            mileage: 62000,
+            images: ["https://centralmotorsrtb.co.za/wp-content/uploads/everest.jpg"],
+        },
+    ];
+    const duplicateSuvReply = `Here are some SUVs we currently have:
+
+1. 2022 Toyota Fortuner - R549,900
+
+Great news! We have some fantastic SUVs available for you:
+
+1. 2022 Toyota Fortuner - R549,900
+2. 2021 Ford Everest - R489,900
+
+Which one interests you most?`;
+    const suvIntro = buildInventoryIntroText(duplicateSuvReply, suvVehicles);
+    assert(
+        /SUVs available/i.test(suvIntro.intro),
+        `canonical SUV intro expected, got: ${suvIntro.intro}`
+    );
+    assert(
+        suvIntro.followUp.includes("Which one interests you"),
+        "follow-up question preserved after cards"
+    );
+    const suvPlan = buildVehicleOutboundPlan({
+        toolResults: [{ tool: "searchInventory", ok: true, vehicles: suvVehicles }],
+        llmReply: duplicateSuvReply,
+        channel: "whatsapp",
+    });
+    const suvIntroTexts = suvPlan.messages.filter(
+        (m) => m.type === "text" && !m.text.includes("💰")
+    );
+    assert(suvIntroTexts.length === 2, "one intro before cards + one follow-up after");
+    assert(
+        /SUVs available/i.test(suvIntroTexts[0].text),
+        "first outbound text is single canonical intro"
+    );
+    assert(
+        suvPlan.messages.filter((m) => m.type === "text" && m.text.includes("💰")).length === 2,
+        "one card per SUV"
+    );
+    assert(
+        !suvPlan.messages.some((m) => /great news/i.test(m.text || "")),
+        "duplicate LLM intro removed from outbound plan"
+    );
+    console.log("✓ 2b. Duplicate SUV intros collapse to intro + cards + follow-up");
 
     /* 3. Needs-based recommendation */
     const reason = buildInventoryRecommendationReason(sampleVehicles[0], {

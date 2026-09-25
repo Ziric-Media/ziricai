@@ -4,6 +4,7 @@
 import { buildEmployeeSystemPrompt } from "./employeePrompts.js";
 import { getCustomerDisplayName } from "../customerIdentity.js";
 import { formatSalesContextForPrompt } from "../conversation/salesContext.js";
+import { buildSalesFunnelTurnGuidance } from "../conversation/salesFunnelTurn.js";
 
 const WHATSAPP_CHANNEL_RULES = `
 You are replying to a customer on WhatsApp as a business representative.
@@ -13,6 +14,26 @@ Never describe yourself as a chatbot being tested or configured.
 You represent the business to the customer, not the technology platform.
 Keep replies concise and helpful unless the customer asks for detail.
 `.trim();
+
+/** First vs continuing thread — prevents repeated Sarah introductions. */
+export const WHATSAPP_CONVERSATION_CONTINUITY_RULES = {
+    newConversation: `
+CONVERSATION STATE — NEW THREAD:
+- This is the customer's first message in this WhatsApp conversation (or a fresh start).
+- You may introduce yourself briefly when appropriate (e.g. they say Hi/Hello).
+- Keep the opening warm and human — one short intro is enough.
+`.trim(),
+    continuing: `
+CONVERSATION STATE — CONTINUING THREAD:
+- The customer has already been chatting with you in this thread — conversation history is available below.
+- Do NOT re-introduce yourself. Never open with "Hi there! I'm Sarah from…", "Hello! I'm Sarah…", or a repeated dealership welcome.
+- Continue naturally from prior messages — acknowledge their question directly and use their name if known.
+- Answer the current message first; do not restart the sales conversation from scratch.
+`.trim(),
+    continuingGreeting: `
+- The customer sent a brief greeting mid-conversation — reply warmly but briefly without a full re-introduction.
+`.trim(),
+};
 
 /** Platform rules — inventory via searchInventory tool; bookings via bookTestDrive. */
 export const WHATSAPP_AUTHORITATIVE_DATA_RULES = `
@@ -229,6 +250,11 @@ function isProduction() {
  *   companyName?: string|null,
  *   customer?: object|null,
  *   contactName?: string|null,
+ *   isNewConversation?: boolean,
+ *   inboundMessage?: string|null,
+ *   inventoryBrowseIntent?: boolean,
+ *   inventoryPreloaded?: boolean,
+ *   historyLength?: number,
  * }} params
  */
 export function buildWhatsAppSystemPrompt({
@@ -237,6 +263,11 @@ export function buildWhatsAppSystemPrompt({
     companyName = null,
     customer = null,
     contactName = null,
+    isNewConversation = false,
+    inboundMessage = "",
+    inventoryBrowseIntent = false,
+    inventoryPreloaded = false,
+    historyLength = 0,
 } = {}) {
     const demoFallback = !isProduction() && companyId ? DEMO_TENANT_AGENTS[companyId] : null;
     const resolvedAgent = agent || demoFallback;
@@ -280,11 +311,31 @@ export function buildWhatsAppSystemPrompt({
         parts.push(salesContextBlock);
     }
 
-    const greeting = resolvedAgent?.greetingMessage;
-    if (greeting) {
-        parts.push(
-            `For greetings (Hi, Hello, etc.), respond warmly in the same spirit as: "${greeting}" — vary wording naturally.`
-        );
+    const funnelBlock = buildSalesFunnelTurnGuidance({
+        salesContext: customer?.salesContext,
+        isNewConversation,
+        inboundMessage,
+        inventoryBrowseIntent,
+        inventoryPreloaded,
+        historyLength,
+    });
+    if (funnelBlock) {
+        parts.push(funnelBlock);
+    }
+
+    if (isNewConversation) {
+        parts.push(WHATSAPP_CONVERSATION_CONTINUITY_RULES.newConversation);
+        const greeting = resolvedAgent?.greetingMessage;
+        if (greeting) {
+            parts.push(
+                `For opening greetings (Hi, Hello, etc.), respond warmly in the same spirit as: "${greeting}" — vary wording naturally.`
+            );
+        }
+    } else {
+        parts.push(WHATSAPP_CONVERSATION_CONTINUITY_RULES.continuing);
+        if (isGreetingMessage(inboundMessage)) {
+            parts.push(WHATSAPP_CONVERSATION_CONTINUITY_RULES.continuingGreeting);
+        }
     }
 
     return parts.join("\n\n");

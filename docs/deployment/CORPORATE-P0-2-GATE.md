@@ -1,6 +1,6 @@
 # CORPORATE-P0-2 — Signup / Tenant Creation / Owner Binding
 
-**Status:** P0-2a CLOSED — P0-2b implementation ready for review (local; not deployed)  
+**Status:** P0-2a CLOSED — P0-2b CLOSED (`d722fc5`) — **P0-2c implemented locally (awaiting review; not committed/deployed)**  
 **Depends on:** CORPORATE-P0-1 ✅ CLOSED (production tenant isolation proven)  
 **Does not replace:** P1 onboarding honesty (partial overlap in P0-2c), P0-3 unified communication write path  
 
@@ -133,17 +133,62 @@ client → uid in JSON body → server trusts body.uid without token match
 
 ### P0-2c — Durability + honest onboarding (stability / honesty)
 
-**Goal:** Real SaaS journey; no misleading connected/trained states.
+**Goal:** Real SaaS journey; durable wizard state; truthful integration/training reporting.
 
-| Item | Target behavior |
-|------|-----------------|
-| Onboarding sessions | Persist (e.g. Firestore `platform/onboardingSessions/{id}` or tenant-scoped doc) |
-| WhatsApp step | `connected: false` / explicit `simulated` when platform WA not tenant-bound |
-| Train step | No fake “complete” with fabricated chunk counts unless labeled simulation |
-| Demo lead seed | Default **off** for production corporate signup (or env-gated) |
-| Client onboarding UI | Reflect server honest states only |
+#### Locked product policy — one active onboarding per owner
 
-**Out of scope for 2c:** P0-3 MC/Portal unified outbound path, marketplace entitlement, CRM v1 UI.
+When an authenticated owner calls `POST /api/onboarding/start`:
+
+1. Resolve owner **only** from verified Firebase `auth.uid` (via `requireFirebaseAuth` + P0-2b binding).
+2. If an **`in_progress`** session exists for that uid → **return/resume** it (no new tenant).
+3. If a **`live`** session exists for that uid → return that session (`alreadyLive: true`) without creating another company.
+4. Otherwise create a new session + tenant.
+
+No separate “new company” workflow in P0-2c.
+
+#### Durable session architecture (P0-2c implementation)
+
+```
+onboardingService
+       ↓
+onboardingSessionStore (business ops)
+       ↓
+onboardingSessionRepository (memory | Firestore Admin)
+       ↓
+platform/onboardingSessions/{sessionId}
+```
+
+Persisted fields include: `sessionId`, `uid`, `companyId`, owner contact fields, `status` (`in_progress` | `live` | `abandoned`), `currentStep`, `completedSteps`, step flags (`whatsappState`, `trainingState`, …), timestamps, `lastError`. **No secrets/tokens.**
+
+#### Session authorization
+
+`GET /api/onboarding/session/:sessionId` requires Firebase Bearer. Owner uid must match session uid (superadmin bypass). Session id alone is **not** authorization.
+
+#### Honest states
+
+| Domain | States | Rule |
+|--------|--------|------|
+| WhatsApp | `connected`, `pending`, `simulated`, `failed`, `unconfigured` | **`simulated` / `pending` / `unconfigured` must not display as connected** |
+| Training | `simulated` → `knowledge_setup_complete` | **No fabricated chunk counts** in onboarding |
+| Website import | `simulated` placeholder | Not presented as live crawl |
+
+#### Resume
+
+Client stores `sessionId` in `sessionStorage`, calls authenticated GET on load when signed in. Server reloads durable session after process restart (repository contract test in verifier).
+
+#### Terminal sessions
+
+When `status === live`, onboarding **mutation** steps return **409** `ONBOARDING_COMPLETE`. Read-only GET remains allowed for owner.
+
+#### Still simulated / out of P0-2c
+
+- Full website crawl pipeline
+- Real embedding/training job in wizard
+- Transactional cross-service provisioning
+- Session TTL/archival automation
+- Removing all client-side Firestore helpers outside onboarding account step (server is authoritative)
+
+**Out of scope for 2c:** P0-3 comms path, marketplace entitlement, CRM v1 UI, MC/Sarah/WhatsApp runtime changes.
 
 ---
 

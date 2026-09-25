@@ -6,6 +6,7 @@ import { addTask, updateCustomer } from "../customerService.js";
 import { sendMessage as integrationSend } from "../integrations/integrationHub.js";
 import { sendNotification } from "../tenants/notificationService.js";
 import { createTask } from "../tenants/taskService.js";
+import { EventTypes } from "../events/eventTypes.js";
 
 /**
  * @param {object} action
@@ -36,12 +37,19 @@ export async function executeAction(action, event, workflow) {
             if (!phone) {
                 return { ok: false, action: "send_message", error: "No recipient phone" };
             }
-            if (event.payload?.aiReplyPending || event.payload?.skipAutoReply) {
+            const channel = event.payload?.channel || "whatsapp";
+            const skipForAiInbound =
+                !config.forceCustomerMessage &&
+                (event.payload?.aiReplyPending ||
+                    event.payload?.skipAutoReply ||
+                    (event.type === EventTypes.MESSAGE_RECEIVED && channel === "whatsapp"));
+            if (skipForAiInbound) {
                 console.log("[automation] Skipping send_message — AI reply handles inbound", {
                     companyId,
                     phone,
                     workflowId: workflow.id,
                     eventType: event.type,
+                    channel,
                     responseSource: "automation_skipped",
                 });
                 return {
@@ -51,11 +59,17 @@ export async function executeAction(action, event, workflow) {
                     reason: "ai_reply_pending",
                 };
             }
-            const channel = event.payload?.channel || "whatsapp";
-            const text =
-                config.text ||
-                messageFromTemplate(config.template, event) ||
-                "Thank you for contacting us. A team member will follow up shortly.";
+            const resolvedText = config.text || messageFromTemplate(config.template, event);
+            if (!resolvedText) {
+                return {
+                    ok: false,
+                    action: "send_message",
+                    error: config.template
+                        ? `Unknown message template: ${config.template}`
+                        : "send_message requires config.text or a known config.template",
+                };
+            }
+            const text = resolvedText;
             const responseSource = config.template === "quotation_followup" ? "quotation_workflow" : "automation";
             try {
                 await integrationSend(channel, { companyId }, { to: phone, text });

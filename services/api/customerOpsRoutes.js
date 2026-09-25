@@ -34,6 +34,11 @@ import {
     updateAppointment,
     cancelAppointment,
 } from "../tenants/appointmentService.js";
+
+/** Portal showcase tenant → live WhatsApp/CRM data tenant when pilot mode is on. */
+function dataCompanyId(req) {
+    return resolvePilotDataCompanyId(req.params.companyId);
+}
 import {
     listTenantNotifications,
     listUnreadNotifications,
@@ -57,10 +62,11 @@ export function mountCustomerOpsRoutes(app) {
     /* ── CRM ── */
     app.get("/api/companies/:companyId/crm/customers", requireTenantScope(), async (req, res) => {
         try {
-            const items = await listTenantCustomers(req.params.companyId, {
+            const companyId = dataCompanyId(req);
+            const items = await listTenantCustomers(companyId, {
                 limit: parseInt(req.query.limit || "100", 10),
             });
-            res.json({ items, companyId: req.params.companyId });
+            res.json({ items, companyId: req.params.companyId, dataCompanyId: companyId });
         } catch (err) {
             console.error("[crm/customers] error:", err.message);
             res.status(500).json({ error: err.message || "Failed to list customers" });
@@ -69,8 +75,9 @@ export function mountCustomerOpsRoutes(app) {
 
     app.get("/api/companies/:companyId/crm/contacts", requireTenantScope(), async (req, res) => {
         try {
-            const items = await listContacts(req.params.companyId);
-            res.json({ items, companyId: req.params.companyId });
+            const companyId = dataCompanyId(req);
+            const items = await listContacts(companyId);
+            res.json({ items, companyId: req.params.companyId, dataCompanyId: companyId });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to list contacts" });
         }
@@ -78,7 +85,8 @@ export function mountCustomerOpsRoutes(app) {
 
     app.post("/api/companies/:companyId/crm/contacts", requireTenantScope(), async (req, res) => {
         try {
-            const contact = await createContact(req.params.companyId, req.body || {});
+            const companyId = dataCompanyId(req);
+            const contact = await createContact(companyId, req.body || {});
             res.status(201).json({ contact });
         } catch (err) {
             res.status(400).json({ error: err.message || "Failed to create contact" });
@@ -87,8 +95,9 @@ export function mountCustomerOpsRoutes(app) {
 
     app.get("/api/companies/:companyId/crm/leads", requireTenantScope(), async (req, res) => {
         try {
-            const items = await listLeads(req.params.companyId);
-            res.json({ items, companyId: req.params.companyId });
+            const companyId = dataCompanyId(req);
+            const items = await listLeads(companyId);
+            res.json({ items, companyId: req.params.companyId, dataCompanyId: companyId });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to list leads" });
         }
@@ -96,7 +105,7 @@ export function mountCustomerOpsRoutes(app) {
 
     app.post("/api/companies/:companyId/crm/leads", requireTenantScope(), async (req, res) => {
         try {
-            const companyId = req.params.companyId;
+            const companyId = dataCompanyId(req);
             const lead = await createLead(companyId, {
                 stage: "new",
                 leadScore: 50,
@@ -117,9 +126,10 @@ export function mountCustomerOpsRoutes(app) {
 
     app.get("/api/companies/:companyId/crm/pipeline", requireTenantScope(), async (req, res) => {
         try {
+            const companyId = dataCompanyId(req);
             const [leads, customers] = await Promise.all([
-                listLeads(req.params.companyId),
-                listTenantCustomers(req.params.companyId),
+                listLeads(companyId),
+                listTenantCustomers(companyId),
             ]);
             const stages = PIPELINE_STAGES.map((stage) => ({
                 stage,
@@ -128,6 +138,7 @@ export function mountCustomerOpsRoutes(app) {
             }));
             res.json({
                 companyId: req.params.companyId,
+                dataCompanyId: companyId,
                 stages,
                 totals: { leads: leads.length, customers: customers.length },
             });
@@ -138,8 +149,9 @@ export function mountCustomerOpsRoutes(app) {
 
     app.get("/api/companies/:companyId/crm/tasks", requireTenantScope(), async (req, res) => {
         try {
-            const items = await listTasks(req.params.companyId);
-            res.json({ items, companyId: req.params.companyId });
+            const companyId = dataCompanyId(req);
+            const items = await listTasks(companyId);
+            res.json({ items, companyId: req.params.companyId, dataCompanyId: companyId });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to list tasks" });
         }
@@ -147,7 +159,8 @@ export function mountCustomerOpsRoutes(app) {
 
     app.post("/api/companies/:companyId/crm/tasks", requireTenantScope(), async (req, res) => {
         try {
-            const task = await createTask(req.params.companyId, req.body || {});
+            const companyId = dataCompanyId(req);
+            const task = await createTask(companyId, req.body || {});
             res.status(201).json({ task });
         } catch (err) {
             res.status(400).json({ error: err.message || "Failed to create task" });
@@ -156,8 +169,9 @@ export function mountCustomerOpsRoutes(app) {
 
     app.get("/api/companies/:companyId/crm/customers/:customerId/timeline", requireTenantScope(), async (req, res) => {
         try {
+            const companyId = dataCompanyId(req);
             const phone = normalizePhone(req.params.customerId);
-            const items = await getTimeline(phone, { companyId: req.params.companyId });
+            const items = await getTimeline(phone, { companyId });
             res.json({ items, customerId: req.params.customerId });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to load timeline" });
@@ -166,10 +180,11 @@ export function mountCustomerOpsRoutes(app) {
 
     app.get("/api/companies/:companyId/crm/customers/:customerId", requireTenantScope(), async (req, res) => {
         try {
+            const companyId = dataCompanyId(req);
             const phone = normalizePhone(req.params.customerId);
-            const profile = await getCustomerProfile(phone, { companyId: req.params.companyId });
+            const profile = await getCustomerProfile(phone, { companyId });
             if (!profile) return res.status(404).json({ error: "Customer not found" });
-            await syncCustomerToTenant(req.params.companyId, phone, profile);
+            await syncCustomerToTenant(companyId, phone, profile);
             res.json({ customer: profile });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to load customer" });
@@ -178,7 +193,7 @@ export function mountCustomerOpsRoutes(app) {
 
     app.patch("/api/companies/:companyId/crm/customers/:customerId", requireTenantScope(), async (req, res) => {
         try {
-            const companyId = req.params.companyId;
+            const companyId = dataCompanyId(req);
             const phone = normalizePhone(req.params.customerId);
             const body = req.body || {};
             if (body.note?.text) {
@@ -293,11 +308,12 @@ export function mountCustomerOpsRoutes(app) {
     /* ── Appointments ── */
     app.get("/api/companies/:companyId/appointments", requireTenantScope(), async (req, res) => {
         try {
+            const companyId = dataCompanyId(req);
             const upcoming = req.query.upcoming === "true";
             const items = upcoming
-                ? await listUpcomingAppointments(req.params.companyId)
-                : await listAppointments(req.params.companyId);
-            res.json({ items, companyId: req.params.companyId });
+                ? await listUpcomingAppointments(companyId)
+                : await listAppointments(companyId);
+            res.json({ items, companyId: req.params.companyId, dataCompanyId: companyId });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to list appointments" });
         }
@@ -305,8 +321,9 @@ export function mountCustomerOpsRoutes(app) {
 
     app.post("/api/companies/:companyId/appointments", requireTenantScope(), async (req, res) => {
         try {
-            const appointment = await createAppointment(req.params.companyId, req.body || {});
-            await publish(req.params.companyId, EventTypes.APPOINTMENT_BOOKED, {
+            const companyId = dataCompanyId(req);
+            const appointment = await createAppointment(companyId, req.body || {});
+            await publish(companyId, EventTypes.APPOINTMENT_BOOKED, {
                 appointmentId: appointment.id,
                 customerName: appointment.customerName,
                 scheduledAt: appointment.scheduledAt,
@@ -320,8 +337,9 @@ export function mountCustomerOpsRoutes(app) {
 
     app.patch("/api/companies/:companyId/appointments/:appointmentId", requireTenantScope(), async (req, res) => {
         try {
+            const companyId = dataCompanyId(req);
             const appointment = await updateAppointment(
-                req.params.companyId,
+                companyId,
                 req.params.appointmentId,
                 req.body || {}
             );
@@ -333,7 +351,8 @@ export function mountCustomerOpsRoutes(app) {
 
     app.post("/api/companies/:companyId/appointments/:appointmentId/cancel", requireTenantScope(), async (req, res) => {
         try {
-            const appointment = await cancelAppointment(req.params.companyId, req.params.appointmentId);
+            const companyId = dataCompanyId(req);
+            const appointment = await cancelAppointment(companyId, req.params.appointmentId);
             res.json({ appointment, cancelled: true });
         } catch (err) {
             res.status(400).json({ error: err.message || "Failed to cancel appointment" });
@@ -431,18 +450,30 @@ export function mountCustomerOpsRoutes(app) {
             const [customers, conversations, appointments, runs, workflows] = await Promise.all([
                 listTenantCustomers(dataCompanyId, { limit: 500 }),
                 listTenantConversations(dataCompanyId, { limit: 100 }),
-                listUpcomingAppointments(dataCompanyId),
+                listAppointments(dataCompanyId),
                 listAutomationRuns(dataCompanyId, { limit: 20 }),
                 listWorkflows(dataCompanyId),
             ]);
-            const appointmentsToday = appointments.filter(
-                (a) => a.scheduledAt?.slice(0, 10) === today && a.status === "scheduled"
-            );
+            const nowMs = Date.now();
+            const isActive = (a) => {
+                const status = String(a.status || "").toLowerCase();
+                return status !== "cancelled" && status !== "canceled";
+            };
+            const active = appointments.filter(isActive);
+            const appointmentsToday = active.filter((a) => a.scheduledAt?.slice(0, 10) === today);
+            const appointmentsUpcoming = active.filter((a) => {
+                const ms = new Date(a.scheduledAt || a.dateTime || 0).getTime();
+                return Number.isFinite(ms) && ms >= nowMs;
+            });
             res.json({
                 companyId,
                 crm: { customers: customers.length, leads: customers.filter((c) => (c.leadScore ?? 0) >= 50).length },
                 inbox: { total: conversations.length, unread: conversations.filter((c) => c.unread).length },
-                appointments: { today: appointmentsToday.length, upcoming: appointments.length },
+                appointments: {
+                    today: appointmentsToday.length,
+                    upcoming: appointmentsUpcoming.length,
+                    booked: active.length,
+                },
                 automation: {
                     active: workflows.filter((w) => w.status === "active").length,
                     recentRuns: runs.length,

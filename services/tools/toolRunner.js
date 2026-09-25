@@ -161,7 +161,7 @@ export async function runTool(name, ctx, args = {}) {
             };
         }
 
-        if (ctx.customerPhone && (name === "checkTestDriveAvailability" || name === "bookTestDrive")) {
+        if (ctx.customerPhone && (name === "checkTestDriveAvailability" || name === "bookTestDrive" || name === "rescheduleTestDrive")) {
             const schedUpdates = schedulingUpdatesFromToolResult(name, enrichedArgs, result);
             if (Object.keys(schedUpdates).length) {
                 try {
@@ -179,6 +179,13 @@ export async function runTool(name, ctx, args = {}) {
             let planUpdates = testDrivePlan;
             if (name === "bookTestDrive") {
                 planUpdates = planUpdatesFromToolResult(name, enrichedArgs, result, testDrivePlan);
+            } else if (name === "rescheduleTestDrive" && result.ok && result.appointment) {
+                planUpdates = planUpdatesFromToolResult(
+                    "bookTestDrive",
+                    { vehicleId: enrichedArgs.vehicleId },
+                    { ok: true, appointment: result.appointment, vehicleId: enrichedArgs.vehicleId },
+                    testDrivePlan
+                );
             } else if (name === "checkTestDriveAvailability" && result.available) {
                 planUpdates = pendingEntryFromAvailability(testDrivePlan, enrichedArgs, result);
             }

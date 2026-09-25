@@ -95,6 +95,7 @@ function normalizePayload(data, existing = null) {
     knowledgeSources,
     channels,
     model: data.model ?? existing?.model ?? 'gpt-4o-mini',
+    modelVersion: String(data.modelVersion ?? existing?.modelVersion ?? '1.0').trim() || '1.0',
     temperature: Number(data.temperature ?? existing?.temperature ?? 0.7),
     maxTokens: Number(data.maxTokens ?? existing?.maxTokens ?? 1024),
     memory: Boolean(data.memory ?? existing?.memory ?? true),

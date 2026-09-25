@@ -69,7 +69,15 @@ export async function assertTenantAccess(ctx) {
             throw Object.assign(new Error("Authentication required"), { status: 401, code: "UNAUTHORIZED" });
         }
 
+        if (await tryPilotShowcaseTenantAccess(ctx, ctx.companyId)) {
+            return;
+        }
+
         if (!ctx.profile) {
+            const membershipOnly = await getTenantMembership(ctx.uid, ctx.companyId);
+            if (membershipOnly) {
+                return;
+            }
             throw Object.assign(new Error("User profile not found — complete onboarding or contact support"), {
                 status: 403,
                 code: "PROFILE_REQUIRED",

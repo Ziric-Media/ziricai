@@ -1,4 +1,5 @@
 import { DEMO_WORKFLOWS, DEMO_TEMPLATES } from '../demo-data.js';
+import { isDemoDataAllowed, shouldUseDemoOnApiError } from './dataMode.js';
 
 const DEMO_STORE_KEY = 'ziricai-demo-workflows';
 const DEMO_VERSION_KEY = 'ziricai-demo-workflows-version';
@@ -38,7 +39,7 @@ function saveDemoStore(items) {
 }
 
 function shouldUseDemo(result) {
-  return Boolean(result?.error);
+  return shouldUseDemoOnApiError(result);
 }
 
 function toListItem(wf) {

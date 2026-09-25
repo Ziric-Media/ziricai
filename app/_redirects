@@ -1,0 +1,2 @@
+# Used when Netlify CLI deploys publish dir without app/netlify.toml (e.g. --dir=app from repo root).
+/api/*  https://ziricai-production.up.railway.app/api/:splat  200!

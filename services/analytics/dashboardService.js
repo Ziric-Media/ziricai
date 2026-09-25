@@ -10,8 +10,9 @@ import {
 import { listEvents } from "../events/eventStore.js";
 import { listTenantCustomers, listLeads } from "../tenants/crmService.js";
 import { listTenantConversations } from "../tenants/conversationService.js";
-import { listUpcomingAppointments } from "../tenants/appointmentService.js";
+import { listAppointments } from "../tenants/appointmentService.js";
 import { listAutomationRuns } from "../automation/automationEngine.js";
+import { resolvePilotDataCompanyId } from "../storage/centralMotorsPilot.js";
 
 function buildChartSeries(dailyRows) {
     return {
@@ -121,17 +122,25 @@ function buildTableRows(dailyRows) {
  * @param {{ days?: number }} [options]
  */
 export async function getDashboardSnapshot(companyId, { days = 14 } = {}) {
+    const dataCompanyId = resolvePilotDataCompanyId(companyId);
     const [metrics, dailyRows, recentEvents, customers, leads, conversations, appointments, runs] =
         await Promise.all([
-            getCurrentMetrics(companyId),
-            getDailyAggregates(companyId, days),
-            listEvents(companyId, { limit: 10 }),
-            listTenantCustomers(companyId, { limit: 200 }).catch(() => []),
-            listLeads(companyId).catch(() => []),
-            listTenantConversations(companyId, { limit: 100 }).catch(() => []),
-            listUpcomingAppointments(companyId).catch(() => []),
-            listAutomationRuns(companyId, { limit: 20 }).catch(() => []),
+            getCurrentMetrics(dataCompanyId),
+            getDailyAggregates(dataCompanyId, days),
+            listEvents(dataCompanyId, { limit: 10 }),
+            listTenantCustomers(dataCompanyId, { limit: 200 }).catch(() => []),
+            listLeads(dataCompanyId).catch(() => []),
+            listTenantConversations(dataCompanyId, { limit: 100 }).catch(() => []),
+            listAppointments(dataCompanyId).catch(() => []),
+            listAutomationRuns(dataCompanyId, { limit: 20 }).catch(() => []),
         ]);
+
+    const isActive = (a) => {
+        const status = String(a.status || "").toLowerCase();
+        return status !== "cancelled" && status !== "canceled";
+    };
+    const activeAppointments = (appointments || []).filter(isActive);
+    const today = new Date().toISOString().slice(0, 10);
 
     const series = buildChartSeries(dailyRows);
     const summary = buildSummary(metrics, dailyRows);
@@ -158,7 +167,8 @@ export async function getDashboardSnapshot(companyId, { days = 14 } = {}) {
         kpis: {
             conversations: metrics.conversations || conversations.length || 0,
             leads: metrics.leads || leads.length || 0,
-            appointments: metrics.appointments || appointments.length || 0,
+            // Prefer Sarah ledger (Postgres+mirror) so Analytics matches Appointments.
+            appointments: activeAppointments.length,
             revenue: metrics.revenue || 0,
             sales: metrics.sales || 0,
             responseTimeSec: metrics.avgResponseSec,
@@ -170,8 +180,8 @@ export async function getDashboardSnapshot(companyId, { days = 14 } = {}) {
             automationSuccessRate: metrics.automationSuccessRate,
             crmCustomers: customers.length,
             inboxUnread: conversations.filter((c) => c.unread).length,
-            appointmentsToday: appointments.filter(
-                (a) => a.scheduledAt?.slice(0, 10) === new Date().toISOString().slice(0, 10)
+            appointmentsToday: activeAppointments.filter(
+                (a) => a.scheduledAt?.slice(0, 10) === today
             ).length,
         },
         aiInsights: {
@@ -181,7 +191,7 @@ export async function getDashboardSnapshot(companyId, { days = 14 } = {}) {
                 conversations: conversations.length,
                 leads: leads.length,
                 qualified: leads.filter((l) => (l.leadScore ?? 0) >= 70).length,
-                appointments: appointments.length,
+                appointments: activeAppointments.length,
                 conversions: metrics.conversions || 0,
             },
             channelMix: Object.entries(channelCounts).map(([channel, count]) => ({ channel, count })),

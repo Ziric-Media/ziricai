@@ -161,6 +161,19 @@ export async function resolveCompanyFromPhoneNumberId(phoneNumberId) {
         return mapped;
     }
 
+    if (isCentralMotorsPilotMode()) {
+        const pilotPhones = new Set([CENTRAL_MOTORS_PHONE_NUMBER_ID]);
+        const envPhone = process.env.PHONE_NUMBER_ID ? String(process.env.PHONE_NUMBER_ID).trim() : null;
+        if (envPhone) pilotPhones.add(envPhone);
+        if (pilotPhones.has(key)) {
+            console.log("[whatsapp] Central Motors pilot company resolved (fallback)", {
+                companyId: CENTRAL_MOTORS_RTB_COMPANY_ID,
+                phoneNumberId: maskPhoneNumberId(key),
+            });
+            return CENTRAL_MOTORS_RTB_COMPANY_ID;
+        }
+    }
+
     console.warn("[whatsapp] No integration for phone_number_id — companyId=null", {
         phoneNumberId: maskPhoneNumberId(key),
     });
@@ -178,9 +191,30 @@ function getDemoPhoneNumberMappings() {
     return [[CENTRAL_MOTORS_PHONE_NUMBER_ID, centralTarget]];
 }
 
-/** @deprecated Bootstrap dev-only in-memory mappings from env + demo seeds. Never runs in production. */
+function bootstrapCentralMotorsPilotPhoneRouting() {
+    if (!isCentralMotorsPilotMode()) return;
+
+    const companyId = CENTRAL_MOTORS_RTB_COMPANY_ID;
+    const phones = new Set([CENTRAL_MOTORS_PHONE_NUMBER_ID]);
+    const envPhone = process.env.PHONE_NUMBER_ID ? String(process.env.PHONE_NUMBER_ID).trim() : null;
+    if (envPhone) phones.add(envPhone);
+
+    for (const phoneId of phones) {
+        registerPhoneNumberMapping(phoneId, companyId);
+    }
+
+    console.log("[whatsapp] Central Motors pilot phone routing registered", {
+        companyId,
+        phoneCount: phones.size,
+    });
+}
+
+/** Bootstrap in-memory phone_number_id → companyId (dev demo + production pilot fallback). */
 export function bootstrapIntegrationConfig() {
-    if (isProduction()) return;
+    if (isProduction()) {
+        bootstrapCentralMotorsPilotPhoneRouting();
+        return;
+    }
 
     for (const [phoneId, companyId] of getDemoPhoneNumberMappings()) {
         registerPhoneNumberMapping(phoneId, companyId);

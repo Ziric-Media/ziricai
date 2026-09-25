@@ -17,6 +17,10 @@ import { withTimeout } from '../../admin/utils.js';
 import { navigateTo } from '../router.js';
 import { buildIndustryPackAccessMailto } from '../../shared/marketplaceSalesContact.js';
 import { can } from '../permissions.js';
+import {
+  showUpgradeDialog,
+  marketplaceUpgradeMessage,
+} from '../upgradeDialog.js';
 
 /** Lifecycle Firestore read can exceed default 4s on cold production paths (~5–6s observed). */
 const MARKETPLACE_LIFECYCLE_TIMEOUT_MS = 10000;
@@ -656,38 +660,64 @@ async function loadPackReviewsIntoMount(mountEl, packId, { cursor = null, append
 }
 
 function renderContactSalesButton(packId, packName, companyId, { primary = true } = {}) {
-  const href = contactSalesHref(packId, packName, companyId);
   const cls = primary ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
-  return `<a class="${cls} mp-contact-sales" href="${escapeHtml(href)}">
-    <i class="fa-solid fa-envelope"></i> Contact Sales / Request Access
-  </a>`;
+  return `<button type="button" class="${cls} mp-upgrade-btn" data-pack-name="${escapeHtml(packName || packId)}" data-pack-id="${escapeHtml(packId)}">
+    <i class="fa-solid fa-crown"></i> Get Access
+  </button>`;
 }
 
 function renderPaidPackNotice() {
   return `<div class="mp-paid-notice" role="note">
     <i class="fa-solid fa-lock"></i>
     <div>
-      <strong>Paid Industry Pack</strong>
-      <p>This is a paid Industry Pack. Contact Sales to request access before installation.</p>
+      <strong>Plan upgrade required</strong>
+      <p>Marketplace packages beyond your current tier require a plan upgrade. Your provisioned AI employees for this plan stay available.</p>
     </div>
   </div>`;
 }
 
 function renderPaymentRequiredPanel(packId, packName, companyId) {
-  const href = contactSalesHref(packId, packName, companyId);
   return `<div class="mp-payment-required-panel" role="alert">
     <i class="fa-solid fa-circle-exclamation"></i>
-    <h3>Access required</h3>
-    <p>Sales-approved access is required before this Industry Pack can be installed in your workspace.</p>
+    <h3>Upgrade required</h3>
+    <p>Additional AI employee packages are unlocked by moving to a higher plan.</p>
     <p class="mp-payment-pack-line"><strong>Pack:</strong> ${escapeHtml(packName || packId)}</p>
-    <p class="text-muted">Status: ${escapeHtml('Paid')} · ${escapeHtml('Contact Sales to purchase access')}</p>
+    <p class="text-muted">Status: Paid · Included with higher subscription tiers</p>
     <div class="mp-modal-actions mp-payment-actions">
-      <a class="btn btn-primary" href="${escapeHtml(href)}">
-        <i class="fa-solid fa-envelope"></i> Contact Sales / Request Access
-      </a>
+      <button type="button" class="btn btn-primary mp-upgrade-btn" data-pack-name="${escapeHtml(packName || packId)}" data-pack-id="${escapeHtml(packId)}">
+        <i class="fa-solid fa-crown"></i> View billing plans
+      </button>
       <button type="button" class="btn btn-secondary" id="mpPaymentClose">Close</button>
     </div>
   </div>`;
+}
+
+function openMarketplaceUpgrade(packName) {
+  showUpgradeDialog({
+    title: 'Upgrade to unlock packages',
+    featureLabel: packName,
+    message: marketplaceUpgradeMessage(packName),
+    confirmLabel: 'View billing plans',
+  });
+}
+
+function asPortalPaidPacks(packs = []) {
+  return packs.map((p) => ({
+    ...p,
+    isPaid: true,
+    isFree: false,
+    priceLabel: 'Paid',
+    price: typeof p.price === 'number' && p.price > 0 ? p.price : 1,
+  }));
+}
+
+function bindUpgradeButtons(root) {
+  root.querySelectorAll('.mp-upgrade-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openMarketplaceUpgrade(btn.dataset.packName || btn.dataset.packId || 'This package');
+    });
+  });
 }
 
 export async function renderMarketplace(container) {
@@ -702,7 +732,7 @@ export async function renderMarketplace(container) {
 
   if (catalogRes.error) {
     container.innerHTML = `
-      ${pageHeader('AI Marketplace', 'One-click install complete AI Employees — under 5 minutes.')}
+      ${pageHeader('AI Marketplace', 'Hire AI employees — Sales, Marketing, Finance, HR, and more for your business.')}
       ${errorState(catalogRes.error)}
       <div style="text-align:center;margin-top:12px;">
         <button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>
@@ -711,6 +741,7 @@ export async function renderMarketplace(container) {
   }
 
   const catalog = catalogRes.data || { categories: [], packs: [] };
+  catalog.packs = asPortalPaidPacks(catalog.packs || []);
   const lifecycleItems = lifecycleRes.error ? [] : lifecycleRes.data?.items || [];
   const updates = updatesRes.error ? [] : updatesRes.data?.updates || [];
   indexLifecycle(lifecycleItems, updates);
@@ -724,7 +755,7 @@ export async function renderMarketplace(container) {
   container.innerHTML = `
     ${pageHeader(
       'AI Marketplace',
-      'One-click install complete AI Employees — under 5 minutes.',
+      'Hire AI employees — Sales, Marketing, Finance, HR, and more for your business.',
     )}
 
     ${partialErrors.length
@@ -745,7 +776,6 @@ export async function renderMarketplace(container) {
       </select>
       <select id="mpPrice" class="marketplace-filter-select">
         <option value="">All prices</option>
-        <option value="free">Free</option>
         <option value="paid">Paid</option>
       </select>
       <select id="mpSort" class="marketplace-filter-select">
@@ -849,29 +879,24 @@ function renderPackCards(packs, companyId) {
 
   return visible.map((pack) => {
     const lc = resolveLifecycleForPack(pack);
-    const priceBadge = pack.isPaid
-      ? `<span class="mp-price paid">Paid</span>`
-      : `<span class="mp-price free">Free</span>`;
+    /* Portal marketplace: all additional packs are paid / plan-gated. */
+    const priceBadge = `<span class="mp-price paid">Paid</span>`;
 
     const packLabel = pack.name || pack.id;
-    let footerAction = `<button type="button" class="btn btn-primary btn-sm mp-install-btn" data-pack-id="${escapeHtml(pack.id)}">
-                <i class="fa-solid fa-download"></i> Install
-              </button>`;
-    if (pack.isPaid && !lc?.status) {
-      footerAction = `${renderContactSalesButton(pack.id, packLabel, companyId)}
-        <button type="button" class="btn btn-secondary btn-sm mp-preview-btn" data-pack-id="${escapeHtml(pack.id)}">
+    let footerAction = `${renderContactSalesButton(pack.id, packLabel, companyId)}
+        <button type="button" class="btn btn-secondary btn-sm mp-preview-btn" data-pack-id="${escapeHtml(pack.id)}" data-pack-name="${escapeHtml(packLabel)}">
           <i class="fa-solid fa-eye"></i> Preview
         </button>`;
-    } else if (lc?.status === 'installed') {
+    if (lc?.status === 'installed') {
       footerAction = `<span class="pack-status installed"><i class="fa-solid fa-circle-check"></i> Installed</span>`;
     } else if (lc?.status === 'installing') {
       footerAction = lc.installingStale
         ? `<span class="pack-status mp-lifecycle-stale"><i class="fa-solid fa-clock"></i> Stale — retry</span>
-           <button type="button" class="btn btn-secondary btn-sm mp-install-btn" data-pack-id="${escapeHtml(pack.id)}">Retry</button>`
+           <button type="button" class="btn btn-secondary btn-sm mp-upgrade-btn" data-pack-id="${escapeHtml(pack.id)}" data-pack-name="${escapeHtml(packLabel)}">Retry</button>`
         : `<span class="pack-status"><i class="fa-solid fa-spinner fa-spin"></i> Installing…</span>`;
     } else if (lc?.status === 'failed') {
       footerAction = `<span class="pack-status mp-lifecycle-failed-text"><i class="fa-solid fa-circle-xmark"></i> Failed</span>
-           <button type="button" class="btn btn-primary btn-sm mp-install-btn" data-pack-id="${escapeHtml(pack.id)}">Retry</button>`;
+           <button type="button" class="btn btn-primary btn-sm mp-upgrade-btn" data-pack-id="${escapeHtml(pack.id)}" data-pack-name="${escapeHtml(packLabel)}">Retry</button>`;
     }
 
     return `
@@ -904,7 +929,7 @@ function bindMarketplaceEvents(container, companyId, catalog) {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (category) params.set('category', category);
-    if (price) params.set('price', price);
+    /* Price is plan-gated on the portal — do not rely on API free/paid flags. */
     if (sort) params.set('sort', sort);
 
     const res = await fetchMarketplaceCatalog(params.toString());
@@ -912,7 +937,9 @@ function bindMarketplaceEvents(container, companyId, catalog) {
       showToast(res.error, 'error');
       return;
     }
-    const packs = res.data?.packs || catalog.packs;
+    let packs = asPortalPaidPacks(res.data?.packs || catalog.packs);
+    if (price === 'paid') packs = packs.filter((p) => p.isPaid);
+    if (price === 'free') packs = [];
     container.querySelector('#mpPackGrid').innerHTML = renderPackCards(packs, companyId);
     bindPackButtons(container, companyId);
   };
@@ -942,11 +969,16 @@ function bindPackButtons(container, companyId) {
     btn.addEventListener('click', () => openDetailModal(container, btn.dataset.packId));
   });
   container.querySelectorAll('.mp-install-btn').forEach((btn) => {
-    btn.addEventListener('click', () => openWizardModal(container, companyId, btn.dataset.packId));
+    btn.addEventListener('click', () => {
+      openMarketplaceUpgrade(btn.dataset.packName || btn.dataset.packId || 'This package');
+    });
   });
   container.querySelectorAll('.mp-preview-btn').forEach((btn) => {
-    btn.addEventListener('click', () => openWizardModal(container, companyId, btn.dataset.packId));
+    btn.addEventListener('click', () => {
+      openMarketplaceUpgrade(btn.dataset.packName || btn.dataset.packId || 'This package');
+    });
   });
+  bindUpgradeButtons(container);
 }
 
 function openInstalledDetailModal(container, packId) {
@@ -1008,8 +1040,8 @@ async function openDetailModal(container, packId) {
       <ul>${(c.items || []).slice(0, 4).map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>
     </div>`).join('');
 
-  const isPaid = d.pack?.isPaid === true;
-  const paidNotice = isPaid && lc?.status !== 'installed' ? renderPaidPackNotice() : '';
+  const isPaid = true;
+  const paidNotice = lc?.status !== 'installed' ? renderPaidPackNotice() : '';
 
   const lifecycleNote = lc?.status === 'failed'
     ? `<p class="mp-lifecycle-error"><i class="fa-solid fa-circle-xmark"></i> Last install failed: ${escapeHtml(lc.lastError || 'Unknown error')}</p>`
@@ -1027,7 +1059,7 @@ async function openDetailModal(container, packId) {
           <span class="pack-icon">${d.pack?.icon || '📦'}</span>
           <div>
             <h3>${escapeHtml(d.pack?.name || '')}</h3>
-            <p>v${escapeHtml(d.pack?.version || '1.0')} · ${escapeHtml(d.pack?.priceLabel || 'Free')}</p>
+            <p>v${escapeHtml(d.pack?.version || '1.0')} · Paid</p>
             <div class="mp-detail-rating">${renderCatalogRatingSummary(d.pack || {})}</div>
             ${d.pack?.extends ? `<p class="text-muted"><i class="fa-solid fa-sitemap"></i> Extends ${escapeHtml(d.pack.extends)}</p>` : ''}
           </div>
@@ -1043,14 +1075,8 @@ async function openDetailModal(container, packId) {
         <div class="mp-modal-actions">
           ${lc?.status === 'installed'
             ? `<button type="button" class="btn btn-secondary mp-installed-detail" data-pack-id="${escapeHtml(packId)}">Installed details</button>`
-            : isPaid
-              ? `${renderContactSalesButton(packId, d.pack?.name || packId, requireCompanyId())}
-                 <button type="button" class="btn btn-secondary mp-wizard-from-detail" data-pack-id="${escapeHtml(packId)}">
-                   <i class="fa-solid fa-eye"></i> Preview pack
-                 </button>`
-              : `<button type="button" class="btn btn-primary mp-wizard-from-detail" data-pack-id="${escapeHtml(packId)}">
-            <i class="fa-solid fa-download"></i> ${lc?.status === 'failed' || lc?.status === 'installing' ? 'Retry install' : 'Install Pack'}
-          </button>`}
+            : `${renderContactSalesButton(packId, d.pack?.name || packId, requireCompanyId())}
+                 <button type="button" class="btn btn-secondary" data-close="1">Close</button>`}
         </div>
       </div>
     </div>`;
@@ -1060,10 +1086,7 @@ async function openDetailModal(container, packId) {
       if (e.target.dataset.close) closeModal(modal);
     });
   });
-  modal.querySelector('.mp-wizard-from-detail')?.addEventListener('click', (e) => {
-    closeModal(modal);
-    openWizardModal(container, requireCompanyId(), e.target.dataset.packId);
-  });
+  bindUpgradeButtons(modal);
   modal.querySelector('.mp-installed-detail')?.addEventListener('click', (e) => {
     openInstalledDetailModal(container, e.target.dataset.packId);
   });
@@ -1076,10 +1099,11 @@ async function openDetailModal(container, packId) {
 }
 
 function openWizardModal(container, companyId, packId) {
-  wizardState = { companyId, packId, step: 1, branding: {}, integrations: [] };
-  const modal = container.querySelector('#mpWizardModal');
-  modal.classList.remove('hidden');
-  renderWizardStep(container, modal);
+  const packName =
+    wizardState.packName ||
+    lifecycleByPackId.get(packId)?.packName ||
+    packId;
+  openMarketplaceUpgrade(packName);
 }
 
 function installErrorMessage(result) {

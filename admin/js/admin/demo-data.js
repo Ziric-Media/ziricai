@@ -535,6 +535,7 @@ const DEMO_AGENT_DEFAULTS = {
   temperature: 0.7,
   maxTokens: 1024,
   memory: true,
+  modelVersion: '1.0',
   reasoningLevel: 'standard',
   humanTakeover: true,
   officeHours: 'Mon–Fri 08:00–17:00',

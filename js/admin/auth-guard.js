@@ -1,6 +1,7 @@
 import { observeAuthState, loginUser, logoutUser, isSuperAdminRole, resolveAuthProfile } from '../auth.js';
 import { setState } from './state.js';
 import { showToast } from './ui.js';
+import { createLoginBusy } from '../shared/loginBusy.js';
 
 /** @type {((user: import('firebase/auth').User, profile: object | null) => void | Promise<void>) | null} */
 let onAuthReady = null;
@@ -86,34 +87,43 @@ function updateUserMenu(profile, email) {
 
 export function bindLoginForm() {
   const form = document.getElementById('loginForm');
+  const busy = createLoginBusy(form, document.getElementById('loginStatus'));
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (form.getAttribute('aria-busy') === 'true') return;
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    const status = document.getElementById('loginStatus');
-    if (status) status.textContent = 'Signing in...';
+    busy.start('Signing in...');
 
-    const result = await loginUser(email, password);
-    if (result.error) {
-      if (status) status.textContent = result.error;
-      showToast(result.error, 'error');
-      return;
+    try {
+      const result = await loginUser(email, password);
+      if (result.error) {
+        busy.stop(result.error);
+        showToast(result.error, 'error');
+        return;
+      }
+
+      busy.step('Verifying access...');
+      const { user } = result;
+      const profile = result.profile || (await resolveAuthProfile(user, { allowDemo: false }));
+
+      if (!profile || !isSuperAdminRole(profile.role)) {
+        const msg = 'Super Admin access required for this console.';
+        busy.stop(msg);
+        showToast(msg, 'error');
+        showAccessDenied(msg);
+        return;
+      }
+
+      busy.step('Opening dashboard...');
+      await completeLoginSession(user, profile);
+      busy.stop();
+    } catch (err) {
+      console.error('Console login failed:', err);
+      const message = err?.message || 'Sign in failed. Please try again.';
+      busy.stop(message);
+      showToast(message, 'error');
     }
-
-    const { user } = result;
-    const profile = result.profile || (await resolveAuthProfile(user, { allowDemo: false }));
-
-    if (!profile || !isSuperAdminRole(profile.role)) {
-      const msg = 'Super Admin access required for this console.';
-      if (status) status.textContent = msg;
-      showToast(msg, 'error');
-      showAccessDenied(msg);
-      return;
-    }
-
-    if (status) status.textContent = 'Opening dashboard...';
-    await completeLoginSession(user, profile);
-    if (status) status.textContent = '';
   });
 }
 

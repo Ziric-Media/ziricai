@@ -78,6 +78,33 @@ export function planBadge(plan) {
   return `<span class="plan-badge ${escapeHtml(key)}">${escapeHtml(labels[key] || plan || 'Starter')}</span>`;
 }
 
+const TENANT_CLASS_CSS = {
+  'PRODUCTION CUSTOMER': 'production',
+  PILOT: 'pilot',
+  ACCEPTANCE: 'acceptance',
+  'DEMO/SHOWCASE': 'demo',
+  TEST: 'test',
+  UNKNOWN: 'unknown',
+};
+
+const TENANT_CLASS_SHORT = {
+  'PRODUCTION CUSTOMER': 'PRODUCTION',
+  PILOT: 'PILOT',
+  ACCEPTANCE: 'ACCEPTANCE',
+  'DEMO/SHOWCASE': 'DEMO',
+  TEST: 'TEST',
+  UNKNOWN: 'UNKNOWN',
+};
+
+/** Read-only tenant class badge (MC-U-1B). Diagnostic details go in title only. */
+export function tenantClassBadge(classification, diagnosticTitle = '') {
+  const key = String(classification || 'UNKNOWN');
+  const css = TENANT_CLASS_CSS[key] || 'unknown';
+  const label = TENANT_CLASS_SHORT[key] || key;
+  const title = diagnosticTitle ? ` title="${escapeHtml(diagnosticTitle)}"` : '';
+  return `<span class="tenant-class-badge ${css}"${title}>${escapeHtml(label)}</span>`;
+}
+
 export function maskApiKey(key) {
   if (!key) return '—';
   if (key.length <= 8) return '••••••••';

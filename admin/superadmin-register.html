@@ -5,31 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ziric Media AI â€” Super Admin Registration</title>
   <script type="importmap">
-  {
-    "imports": {
-      "firebase/app": "./node_modules/firebase/app/dist/esm/index.esm.js",
-      "firebase/auth": "./node_modules/firebase/auth/dist/esm/index.esm.js",
-      "firebase/firestore": "./node_modules/firebase/firestore/dist/esm/index.esm.js",
-      "firebase/storage": "./node_modules/firebase/storage/dist/esm/index.esm.js",
-      "@firebase/app": "./node_modules/@firebase/app/dist/esm/index.esm.js",
-      "@firebase/auth": "./node_modules/@firebase/auth/dist/esm/index.js",
-      "@firebase/firestore": "./node_modules/@firebase/firestore/dist/index.esm.js",
-      "@firebase/storage": "./node_modules/@firebase/storage/dist/index.esm.js",
-      "@firebase/util": "./node_modules/@firebase/util/dist/index.esm.js",
-      "@firebase/logger": "./node_modules/@firebase/logger/dist/esm/index.esm.js",
-      "@firebase/component": "./node_modules/@firebase/component/dist/esm/index.esm.js",
-      "@firebase/webchannel-wrapper/bloom-blob": "./node_modules/@firebase/webchannel-wrapper/dist/bloom-blob/esm/bloom_blob_es2018.js",
-      "@firebase/webchannel-wrapper/webchannel-blob": "./node_modules/@firebase/webchannel-wrapper/dist/webchannel-blob/esm/webchannel_blob_es2018.js",
-      "idb": "./node_modules/idb/build/index.js",
-      "re2js": "./node_modules/re2js/build/index.esm.js"
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js",
+        "firebase/storage": "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js"
+      }
     }
-  }
-  </script>
-<script>window.__ZIRICAI_CONFIG__={"apiBase":"https://ziricai-production.up.railway.app","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"firebase":{"apiKey":"","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"","appId":"","measurementId":""}};</script>
+    </script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"","assetVersion":"d722fc51d97a-9f16c2d6","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"firebase":{"apiKey":"AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"482382497730","appId":"1:482382497730:web:6bc2f8668a1598fa13f85b","measurementId":"G-92ZVT0731S","databaseId":"default"}};</script>
 </head>
 <body>
   <h1>Super Admin Registration</h1>
-  <p>Ziric Media AI â€” create a Super Admin account</p>
+  <p>Ziric Media AI — create a Super Admin account, or link a Firestore profile to an existing login.</p>
 
   <div>
     <label>
@@ -70,9 +59,9 @@
       throw new Error('Use a local HTTP server; file:// is not supported.');
     }
 
-    let registerUser, createUserProfile;
+    let registerUser, loginUser, createUserProfile;
     try {
-      ({ registerUser } = await import('./js/auth.js'));
+      ({ registerUser, loginUser } = await import('./js/auth.js'));
       ({ createUserProfile } = await import('./js/users.js'));
     } catch (err) {
       document.getElementById('status').textContent =
@@ -117,6 +106,7 @@
       registerBtn.disabled = true;
       setStatus('Status: Creating Firebase Auth account...');
 
+      let uid;
       let authResult;
       try {
         authResult = await registerUser(email, password);
@@ -128,22 +118,35 @@
       }
 
       if (authResult.error) {
-        setStatus('Status: ' + authResult.error);
-        registerBtn.disabled = false;
-        return;
+        const alreadyExists = /already exists/i.test(authResult.error);
+        if (alreadyExists) {
+          setStatus('Status: Auth account exists — signing in to link Firestore profile...');
+          const loginResult = await loginUser(email, password);
+          if (loginResult.error) {
+            setStatus('Status: ' + loginResult.error);
+            registerBtn.disabled = false;
+            return;
+          }
+          uid = loginResult.user.uid;
+        } else {
+          setStatus('Status: ' + authResult.error);
+          registerBtn.disabled = false;
+          return;
+        }
+      } else {
+        uid = authResult.user.uid;
       }
 
-      const uid = authResult.user.uid;
-      setStatus('Status: Auth account created. Writing Firestore profile (users/' + uid + ')...');
+      setStatus('Status: Writing Firestore profile (users/' + uid + ')...');
 
       let profileResult;
       try {
         profileResult = await createUserProfile(uid, {
           fullName,
           email,
-          role: 'Super Admin',
-          company: 'Ziric Media',
-          status: 'Active',
+          role: 'superadmin',
+          company: 'ZiricAI',
+          status: 'active',
         });
       } catch (err) {
         console.error('createUserProfile threw:', err);
@@ -169,9 +172,9 @@
       }
 
       setStatus(
-        'Status: Success â€” Super Admin account created for ' +
+        'Status: Success — Super Admin profile linked for ' +
           profileResult.profile.email +
-          ' (uid: ' + uid + ').'
+          ' (uid: ' + uid + '). You can now sign in at the Control Center.'
       );
       registerBtn.disabled = false;
     });

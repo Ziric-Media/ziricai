@@ -116,6 +116,11 @@ export function getAdminFirestore() {
 
         const databaseId = getAdminDatabaseId();
         adminDb = getFirestore(app, databaseId);
+        try {
+            adminDb.settings({ ignoreUndefinedProperties: true });
+        } catch {
+            /* settings already applied on this instance */
+        }
         console.error(`[firestoreAdmin] Using Firestore database "${databaseId}"`);
         return adminDb;
     } catch (err) {
