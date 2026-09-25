@@ -14,8 +14,6 @@ import {
   sendMessage,
   setTakeoverMode,
   setAssignedAgent,
-  saveNotes,
-  saveTags,
   markConversationRead,
   generateAiReply,
   regenerateSuggestedReply,
@@ -252,25 +250,6 @@ function bindPanelEvents(container, conversation) {
       suggestedReply: ai.suggestedReply,
       aiConfidence: ai.confidence,
       knowledgeUsed: ai.knowledgeUsed,
-    });
-  });
-
-  let notesTimer;
-  container.querySelector('#internalNotes')?.addEventListener('input', (e) => {
-    clearTimeout(notesTimer);
-    notesTimer = setTimeout(async () => {
-      await saveNotes(conversation.id, e.target.value);
-      syncConversationLocal(conversation.id, { notes: e.target.value });
-    }, 400);
-  });
-
-  container.querySelectorAll('#tagChipRow .tag-chip').forEach((chip) => {
-    chip.addEventListener('click', async () => {
-      chip.classList.toggle('active');
-      const tags = [...container.querySelectorAll('#tagChipRow .tag-chip.active')].map((c) => c.dataset.tag);
-      await saveTags(conversation.id, tags);
-      syncConversationLocal(conversation.id, { tags });
-      showToast('Tags updated', 'success');
     });
   });
 }

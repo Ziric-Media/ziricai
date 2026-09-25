@@ -170,15 +170,15 @@ export function renderProfilePanel(conversation) {
 
       <div class="panel-section">
         <h3><i class="fa-solid fa-note-sticky"></i> Internal Notes</h3>
-        <p class="panel-hint">Invisible to customer</p>
-        <textarea id="internalNotes" rows="3" placeholder="Customer wants financing. Call tomorrow.">${escapeHtml(conversation.notes || '')}</textarea>
+        <p class="panel-hint">Invisible to customer · editing temporarily disabled</p>
+        <textarea id="internalNotes" rows="3" readonly disabled aria-disabled="true">${escapeHtml(conversation.notes || '')}</textarea>
       </div>
 
       <div class="panel-section">
         <h3><i class="fa-solid fa-tags"></i> Tags</h3>
         <div class="tag-chip-row" id="tagChipRow">
           ${DEMO_INBOX_TAG_OPTIONS.map((tag) => `
-            <button type="button" class="tag-chip ${tags.includes(tag) ? 'active' : ''}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>
+            <button type="button" class="tag-chip ${tags.includes(tag) ? 'active' : ''}" data-tag="${escapeHtml(tag)}" disabled aria-disabled="true" title="Tag editing temporarily disabled">${escapeHtml(tag)}</button>
           `).join('')}
         </div>
       </div>

@@ -96,6 +96,8 @@ Plan-gating (`upgradeDialog`) is UI-only — no dependency on the deferred entit
 | `scripts/verify-import-resolution.mjs` (`npm run verify:imports`) | Preflight: every relative import in `api/` + `services/` resolves and named imports are exported (catches the earlier Railway `ERR_MODULE_NOT_FOUND` class) |
 | `scripts/verify-step0-sarah-lockdown.mjs` (`npm run verify:step0-sarah-lockdown`) | Boots the app, asserts anonymous / invalid-token chat → 401 `AUTH_REQUIRED`, role-less → no tools, landing has no API call |
 | `package.json` | Adds the two verify scripts above |
+| `js/admin/services/conversations.js`, `js/admin/modules/conversations.js`, `js/admin/modules/inbox-ui.js` (+ generated `admin/` copies) | **Mission Control notes/tags editing disabled** (frontend only): `saveNotes()`/`saveTags()` no longer write to Firestore (return a disabled error; `updateDocument` import removed); notes/tag input handlers removed; notes textarea and tag chips rendered `disabled`. No backend, schema or replacement API changes |
+| `admin/*.html` (generated) | Cache-busting `assetVersion` only (`41756a45af16-9f16c2d6` → `18826ebabe57-9f16c2d6`, the build-time HEAD), so browsers load the new admin JS |
 | `docs/deployment/CLIENT-ZERO-STEP0-MANIFEST.md` | This manifest |
 
 ## 5. MISSION CONTROL INBOX — INTENTIONAL OPERATIONAL CHANGE
@@ -118,10 +120,11 @@ Evidence (static, this commit):
 |---|---|
 | Generated `admin/` inbox files byte-identical to production's P0-3E versions | yes |
 | Direct Firestore write calls (`addDoc/setDoc/updateDoc/updateDocument/...`) in inbox module, inbox-state, inbox-ui | 0 |
-| Direct write calls in `services/conversations.js` on the **message** or **takeover** path | 0 |
+| Direct write calls in `services/conversations.js` (any path, after notes/tags disable) | 0 |
+| `verify-corporate-p0-3b.js` (MC inbox gating) / `verify-corporate-p0-3e.js` after the change | pass / pass |
 | Non-API fallback for takeover / read / demo messages | browser `localStorage` only; demo messages additionally gated by `isDemoDataAllowed()` |
 
-**Residual (disclosed, unchanged from production P0-3E):** `saveNotes()` and `saveTags()` in `js/admin/services/conversations.js` (lines 345–363) still call `updateDocument('conversations', id, …)` — a direct write of **notes/tags metadata** to the legacy root `conversations` collection, errors swallowed. Triggered only by the inbox notes box and tag editor. Not messages, not takeover, so outside the invariant above; it does not touch the canonical tenant store. Recommended follow-up: route through a tenant API or disable. **Open decision** — left as-is to keep Step 0 narrow unless you want it disabled before deploy.
+**Notes/tags legacy write — REMOVED in Step 0.** Production P0-3E's `saveNotes()`/`saveTags()` wrote notes/tags metadata directly to the legacy root `conversations` collection. Step 0 disables notes/tags editing (frontend only, section 4): no Firestore write remains anywhere in the MC inbox (`services/conversations.js`, module, inbox-state, inbox-ui — source and generated: 0 write calls). Existing notes/tags still display read-only. Reply, takeover, release and read/unread are unaffected.
 
 **Live acceptance (required after deploy — UI loading is not sufficient):**
 
@@ -160,6 +163,14 @@ Byte-identical between the two commits (git blob ids): `scripts/verify-corporate
 Classification:
 - **P0-3A** — documentation-only: expects a P0-3 comment in `schema.js`. Stale verifier.
 - **P0-3C** — expects a **pipeline-level** production fail-closed guard that is not in the production artifact. Tenant safety is still enforced on both sides: `webhookRouter.js` skips the pipeline for unknown `phone_number_id` (returns 200 to Meta), and `saveInboundMessage` requires `companyId` in production (`assertCommunicationCompanyId`, P0-3C). The missing pipeline guard is a defence-in-depth gap in the **baseline**, recorded for a later P0-3C follow-up — not a Step 0 change.
+
+## 8. TRACKED FOLLOW-UPS (not part of Step 0)
+
+| Item | Scope |
+|---|---|
+| MC Inbox Notes/Tags → canonical tenant metadata API | Design tenant-scoped notes/tags API + re-enable the controls after Client Zero |
+| P0-3C follow-up: pipeline-level fail-closed `companyId` guard | Add the `conversationPipeline.js` production guard P0-3C's verifier expects; then P0-3C verifier should pass |
+| P0-3A verifier documentation assertion | Add the expected P0-3 comment to `schema.js` or update the stale verifier |
 
 ## Verification (local, `NODE_ENV=test`, `STORAGE_BACKEND=memory`)
 

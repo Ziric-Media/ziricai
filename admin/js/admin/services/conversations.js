@@ -5,7 +5,7 @@ import {
   orderBy,
   limit,
 } from '../../firebase.js';
-import { listDocuments, getDocument, updateDocument, getDb } from './firestore-base.js';
+import { listDocuments, getDocument, getDb } from './firestore-base.js';
 import {
   filterDemoInboxByCompany,
   getDemoInboxConversation,
@@ -342,24 +342,13 @@ export function setAssignedAgent(name) {
   setTakeoverMode.assignedAgent = name;
 }
 
-export async function saveNotes(conversationId, notes) {
-  patchConversationOverride(conversationId, { notes });
-  try {
-    await updateDocument(COLLECTION, conversationId, { notes });
-  } catch (err) {
-    /* ignore */
-  }
-  return { success: true };
+/* Notes/tags editing is disabled until a canonical tenant metadata API exists — no direct Firestore writes. */
+export async function saveNotes() {
+  return { error: 'Notes editing is disabled' };
 }
 
-export async function saveTags(conversationId, tags) {
-  patchConversationOverride(conversationId, { tags });
-  try {
-    await updateDocument(COLLECTION, conversationId, { tags });
-  } catch (err) {
-    /* ignore */
-  }
-  return { success: true };
+export async function saveTags() {
+  return { error: 'Tag editing is disabled' };
 }
 
 export async function markConversationRead(conversationId, { companyId, dataSource } = {}) {
