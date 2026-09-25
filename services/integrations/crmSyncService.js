@@ -14,6 +14,10 @@ import {
     leadScoreFromSarahStage,
     formatSarahStageLabel,
 } from "./leadStageMapping.js";
+import {
+    syncCanonicalAppointmentRecord,
+    syncCanonicalAppointmentCancelled,
+} from "./appointmentCanonicalSync.js";
 
 const leadRepo = new TenantRepository(TENANT_COLLECTIONS.LEADS);
 
@@ -239,10 +243,19 @@ export async function syncFromSalesTurn(companyId, phone, options = {}) {
 /**
  * Record a successful test-drive booking in tenant CRM (idempotent).
  */
-export async function syncTestDriveBooked(companyId, phone, { appointment, vehicleLabel, duplicate = false } = {}) {
+export async function syncTestDriveBooked(companyId, phone, { appointment, vehicleLabel, duplicate = false, enriched = null } = {}) {
     if (!companyId || !phone || !appointment?.id) return null;
+
+    await syncCanonicalAppointmentRecord(companyId, appointment, { enriched }).catch((err) => {
+        console.warn("[crmSync] Canonical appointment mirror failed:", {
+            companyId,
+            appointmentId: appointment.id,
+            message: err.message,
+        });
+    });
+
     if (duplicate) {
-        return { skipped: true, reason: "duplicate_booking" };
+        return { skipped: true, reason: "duplicate_booking", appointmentId: appointment.id };
     }
 
     const key = normalizePhone(phone);
@@ -301,4 +314,48 @@ export async function syncTestDriveBooked(companyId, phone, { appointment, vehic
     });
 
     return { companyId, phone: key, appointmentId: appointment.id, stage };
+}
+
+/**
+ * Record test-drive cancellation in tenant CRM (idempotent).
+ */
+export async function syncTestDriveCancelled(companyId, phone, { appointment, enriched = null, duplicate = false } = {}) {
+    if (!companyId || !phone || !appointment?.id) return null;
+
+    await syncCanonicalAppointmentCancelled(companyId, appointment, { enriched }).catch((err) => {
+        console.warn("[crmSync] Canonical appointment cancel mirror failed:", {
+            companyId,
+            appointmentId: appointment.id,
+            message: err.message,
+        });
+    });
+
+    if (duplicate) {
+        return { skipped: true, reason: "duplicate_cancel", appointmentId: appointment.id };
+    }
+
+    const key = normalizePhone(phone);
+    const scheduledLabel = appointment.scheduledAt
+        ? new Date(appointment.scheduledAt).toLocaleString("en-ZA", {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+          })
+        : "scheduled time";
+
+    await addTenantTimelineEventIfNew(companyId, key, {
+        id: `appointment-cancelled-${appointment.id}`,
+        type: "appointment",
+        title: "Test drive cancelled",
+        description: `Booking cancelled — was ${scheduledLabel}`,
+        meta: {
+            appointmentId: appointment.id,
+            status: "cancelled",
+            source: "sarah",
+        },
+    });
+
+    return { companyId, phone: key, appointmentId: appointment.id, status: "cancelled" };
 }

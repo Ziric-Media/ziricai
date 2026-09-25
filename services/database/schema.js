@@ -9,11 +9,6 @@ export const ROOT = {
     PLATFORM: "platform",
 };
 
-/**
- * CORPORATE-P0-3 — Canonical communication SoT lives under companies/{companyId}:
- * CONVERSATIONS, MESSAGES, CUSTOMERS (see services/conversation/canonicalCommunicationContract.js).
- * CRM timeline and Portal/MC inbox lists are derived views — not alternate message stores.
- */
 /** Subcollections under companies/{companyId} */
 export const TENANT_COLLECTIONS = {
     USERS: "users",
@@ -44,6 +39,8 @@ export const TENANT_COLLECTIONS = {
     MARKETPLACE: "marketplace",
     /** Tenant Industry Pack installation registry (metadata + references). */
     MARKETPLACE_INSTALLS: "marketplaceInstalls",
+    /** Paid / granted pack entitlements (PORTAL-4C-6). */
+    MARKETPLACE_ENTITLEMENTS: "marketplaceEntitlements",
     /** MC-U-4C — tenant support cases (Portal SoT; MC reads via platform API in 4D). */
     SUPPORT_CASES: "supportCases",
     SUPPORT_CASE_ACTIVITIES: "supportCaseActivities",
@@ -72,10 +69,7 @@ export const PLATFORM_MARKETPLACE = {
     RATINGS: "ratings",
 };
 
-/**
- * Legacy root-level collections (Phase 1 migration — read/compatibility only).
- * LEGACY_COLLECTIONS.CONVERSATIONS is NOT authoritative for new communication writes (P0-3).
- */
+/** Legacy root-level collections (Phase 1 migration — superadmin / server only) */
 export const LEGACY_COLLECTIONS = {
     CUSTOMERS: "customers",
     AGENTS: "agents",
@@ -386,6 +380,11 @@ export function tenantMarketplaceInstallPath(companyId, packId) {
     return `${tenantCollectionPath(companyId, TENANT_COLLECTIONS.MARKETPLACE_INSTALLS)}/${packId}`;
 }
 
+/** Document path: companies/{companyId}/marketplaceEntitlements/{packId} */
+export function tenantMarketplaceEntitlementPath(companyId, packId) {
+    return `${tenantCollectionPath(companyId, TENANT_COLLECTIONS.MARKETPLACE_ENTITLEMENTS)}/${packId}`;
+}
+
 /** Collection path: platform/marketplace/packs/{packId}/versions */
 export function platformPackVersionCollectionPath(packId) {
     return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.PACKS}/${packId}/versions`;
@@ -411,17 +410,31 @@ export function platformRatingPath(packId) {
     return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.RATINGS}/${packId}`;
 }
 
-/** Platform onboarding wizard sessions (CORPORATE-P0-2c / P0-2c.1 Firestore path depth). */
+/** Platform onboarding wizard sessions (CORPORATE-P0-2c). */
 export const PLATFORM_ONBOARDING = {
-    ROOT: "onboarding",
-    SESSIONS: "sessions",
+    SESSIONS: "onboardingSessions",
 };
 
-/** Collection: platform/onboarding/sessions (3 segments — valid for Admin .collection()). */
 export function platformOnboardingSessionsCollectionPath() {
-    return `${ROOT.PLATFORM}/${PLATFORM_ONBOARDING.ROOT}/${PLATFORM_ONBOARDING.SESSIONS}`;
+    return `${ROOT.PLATFORM}/${PLATFORM_ONBOARDING.SESSIONS}`;
 }
 
 export function platformOnboardingSessionPath(sessionId) {
     return `${platformOnboardingSessionsCollectionPath()}/${sessionId}`;
+}
+
+/** Platform WhatsApp test/production number pool (Mission Control onboarding). */
+export const PLATFORM_WHATSAPP_POOL = {
+    ROOT: "whatsapp",
+    NUMBERS: "numbers",
+};
+
+/** Collection path: platform/whatsapp/numbers */
+export function platformWhatsAppNumbersCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_WHATSAPP_POOL.ROOT}/${PLATFORM_WHATSAPP_POOL.NUMBERS}`;
+}
+
+/** Document path: platform/whatsapp/numbers/{numberId} */
+export function platformWhatsAppNumberPath(numberId) {
+    return `${platformWhatsAppNumbersCollectionPath()}/${numberId}`;
 }

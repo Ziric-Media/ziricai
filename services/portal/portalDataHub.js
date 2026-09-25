@@ -10,7 +10,7 @@ import { listTenantConversations } from '../tenants/conversationService.js';
 
 import { listTenantCustomers, listLeads } from '../tenants/crmService.js';
 
-import { listUpcomingAppointments } from '../tenants/appointmentService.js';
+import { listAppointments } from '../tenants/appointmentService.js';
 
 import { listTenantNotifications } from '../tenants/notificationService.js';
 
@@ -241,9 +241,11 @@ function buildLiveMetrics({
   const unreadFromInbox = (conversationsRaw || []).filter((c) => c.unread).length;
 
   const appointmentsToday = appointments.filter(
-
-    (a) => a.scheduledAt?.slice(0, 10) === today && a.status === 'scheduled'
-
+    (a) => {
+      const status = String(a.status || '').toLowerCase();
+      const active = status === 'scheduled' || status === 'confirmed';
+      return active && a.scheduledAt?.slice(0, 10) === today;
+    }
   ).length;
 
 
@@ -460,7 +462,7 @@ export async function getPortalHub(companyId) {
 
     listLeads(dataCompanyId).catch(() => []),
 
-    listUpcomingAppointments(dataCompanyId).catch(() => []),
+    listAppointments(dataCompanyId).catch(() => []),
 
     listAutomationRuns(dataCompanyId, { limit: 10 }).catch(() => []),
 
@@ -596,11 +598,24 @@ export async function getPortalHub(companyId) {
 
 
 
-  const appointmentsToday = appointments.filter(
+  const isActiveAppointment = (a) => {
+    const status = String(a.status || '').toLowerCase();
+    return status !== 'cancelled' && status !== 'canceled';
+  };
 
-    (a) => a.scheduledAt?.slice(0, 10) === today && a.status === 'scheduled'
+  const activeAppointments = (appointments || []).filter(isActiveAppointment);
+  const nowMs = Date.now();
 
+  const appointmentsToday = activeAppointments.filter(
+    (a) => a.scheduledAt?.slice(0, 10) === today
   ).length;
+
+  const appointmentsUpcoming = activeAppointments.filter((a) => {
+    const ms = new Date(a.scheduledAt || a.dateTime || 0).getTime();
+    return Number.isFinite(ms) && ms >= nowMs;
+  }).length;
+
+  const appointmentsBooked = activeAppointments.length;
 
   const unreadFromInbox = (conversationsRaw || []).filter((c) => c.unread).length;
 
@@ -630,7 +645,7 @@ export async function getPortalHub(companyId) {
 
             leads: leads.length,
 
-            appointments: appointments.length,
+            appointments: appointmentsBooked,
 
             automations: workspace.resources?.automations,
 
@@ -678,7 +693,11 @@ export async function getPortalHub(companyId) {
 
       inbox: { total: conversationsRaw.length, unread: unreadFromInbox },
 
-      appointments: { today: appointmentsToday, upcoming: appointments.length },
+      appointments: {
+        today: appointmentsToday,
+        upcoming: appointmentsUpcoming,
+        booked: appointmentsBooked,
+      },
 
       automation: { recentRuns: automationRuns.length },
 

@@ -4,8 +4,8 @@
 import { sendWhatsAppMessage } from "../whatsapp.js";
 import { getStorageAdapter } from "../storage/storageAdapter.js";
 
-export async function sendWhatsApp(to, text) {
-    return sendWhatsAppMessage(to, text);
+export async function sendWhatsApp(to, text, options = {}) {
+    return sendWhatsAppMessage(to, text, options);
 }
 
 export async function pushNotification(companyId, notification) {
@@ -24,6 +24,7 @@ export async function listNotifications(companyId) {
     return [];
 }
 
+/** Shared-token multi-phone: token is required; phone id is resolved per tenant at send time. */
 export function isWhatsAppConfigured() {
-    return Boolean(process.env.PHONE_NUMBER_ID && process.env.WHATSAPP_TOKEN);
+    return Boolean(process.env.WHATSAPP_TOKEN);
 }

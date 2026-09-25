@@ -10,6 +10,16 @@ import {
 
 const RETRY_BTN = '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
 
+function isActiveStatus(status) {
+  const s = String(status || '').toLowerCase();
+  return s !== 'cancelled' && s !== 'canceled';
+}
+
+function isCancellable(status) {
+  const s = String(status || '').toLowerCase();
+  return s === 'scheduled' || s === 'confirmed';
+}
+
 export async function renderAppointments(container) {
   if (!can(state.profile?.role, 'canViewInbox')) {
     container.innerHTML = errorState('You do not have permission to view appointments.');
@@ -19,7 +29,8 @@ export async function renderAppointments(container) {
   container.innerHTML = loadingState('Loading appointments...');
   const companyId = state.companyId;
 
-  const res = await fetchAppointments(companyId, { upcoming: true });
+  // Full Sarah ledger (Postgres + mirror), not future-only — aligns with Analytics booked count.
+  const res = await fetchAppointments(companyId, { upcoming: false });
 
   if (res.error) {
     container.innerHTML = `
@@ -29,17 +40,25 @@ export async function renderAppointments(container) {
     return;
   }
 
-  const items = res.data?.items || [];
-
+  const items = (res.data?.items || []).filter((a) => isActiveStatus(a.status));
+  const nowMs = Date.now();
   const today = new Date().toISOString().slice(0, 10);
+
   const todayItems = items.filter((a) => a.scheduledAt?.slice(0, 10) === today);
-  const upcomingItems = items.filter((a) => a.scheduledAt?.slice(0, 10) !== today);
+  const upcomingItems = items.filter((a) => {
+    const ms = new Date(a.scheduledAt || a.dateTime || 0).getTime();
+    return Number.isFinite(ms) && ms >= nowMs && a.scheduledAt?.slice(0, 10) !== today;
+  });
+  const recentItems = items.filter((a) => {
+    const ms = new Date(a.scheduledAt || a.dateTime || 0).getTime();
+    return Number.isFinite(ms) && ms < nowMs && a.scheduledAt?.slice(0, 10) !== today;
+  });
 
   container.innerHTML = `
     ${pageHeader(
       'Appointments',
       `Scheduling for ${escapeHtml(state.company?.name || 'your company')}.`,
-      `<span class="ops-tag">${todayItems.length} today</span>`
+      `<span class="ops-tag">${todayItems.length} today · ${items.length} booked</span>`
     )}
 
     <div class="kpi-grid kpi-grid-ops" style="margin-bottom:1.5rem;">
@@ -51,8 +70,14 @@ export async function renderAppointments(container) {
       </div>
       <div class="kpi-card">
         <div class="header">
-          <div><div class="label">Upcoming</div><div class="value">${items.length}</div></div>
+          <div><div class="label">Upcoming</div><div class="value">${upcomingItems.length}</div></div>
           <div class="icon-wrapper blue"><i class="fa-solid fa-calendar-check"></i></div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="header">
+          <div><div class="label">Booked</div><div class="value">${items.length}</div></div>
+          <div class="icon-wrapper teal"><i class="fa-solid fa-clipboard-list"></i></div>
         </div>
       </div>
     </div>
@@ -77,6 +102,7 @@ export async function renderAppointments(container) {
 
     ${renderSection('Today', todayItems)}
     ${renderSection('Upcoming', upcomingItems)}
+    ${renderSection('Recent', recentItems)}
   `;
 
   container.querySelector('#bookApptForm')?.addEventListener('submit', async (e) => {
@@ -120,7 +146,7 @@ function renderSection(title, items) {
                 <td>${escapeHtml(a.service || '—')}</td>
                 <td>${escapeHtml(a.scheduledAt?.slice(0, 16).replace('T', ' ') || '—')}</td>
                 <td>${statusBadge(a.status || 'scheduled')}</td>
-                <td>${a.status === 'scheduled' ? `<button class="btn btn-secondary btn-sm" data-cancel="${escapeHtml(a.id)}" type="button">Cancel</button>` : '—'}</td>
+                <td>${isCancellable(a.status) ? `<button class="btn btn-secondary btn-sm" data-cancel="${escapeHtml(a.id)}" type="button">Cancel</button>` : '—'}</td>
               </tr>
             `).join('')
             : `<tr><td colspan="5">${renderEmptyState({ message: `No ${title.toLowerCase()} appointments.` })}</td></tr>`}

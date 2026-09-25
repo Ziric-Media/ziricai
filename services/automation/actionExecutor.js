@@ -8,6 +8,7 @@ import { sendMessage as integrationSend } from "../integrations/integrationHub.j
 import { getConversationTakeoverState } from "../conversation/takeoverSafety.js";
 import { sendNotification } from "../tenants/notificationService.js";
 import { createTask } from "../tenants/taskService.js";
+import { EventTypes } from "../events/eventTypes.js";
 
 /** @internal CORPORATE-P0-3E verifier seam only — do not use in production paths */
 const p0_3eTestSeam = { integrationSendOverride: null, preDeliverHook: null };
@@ -54,12 +55,21 @@ export async function executeAction(action, event, workflow) {
             if (!phone) {
                 return { ok: false, action: "send_message", error: "No recipient phone" };
             }
-            if (event.payload?.aiReplyPending || event.payload?.skipAutoReply) {
+            const channel = event.payload?.channel || "whatsapp";
+            // WhatsApp inbound is handled by Sarah/messageWorker. Automations must not
+            // auto-reply unless explicitly forced (forceCustomerMessage) or non-inbound events.
+            const skipForAiInbound =
+                !config.forceCustomerMessage &&
+                (event.payload?.aiReplyPending ||
+                    event.payload?.skipAutoReply ||
+                    (event.type === EventTypes.MESSAGE_RECEIVED && channel === "whatsapp"));
+            if (skipForAiInbound) {
                 console.log("[automation] Skipping send_message — AI reply handles inbound", {
                     companyId,
                     phone,
                     workflowId: workflow.id,
                     eventType: event.type,
+                    channel,
                     responseSource: "automation_skipped",
                 });
                 return {
@@ -72,11 +82,17 @@ export async function executeAction(action, event, workflow) {
             if (!companyId) {
                 return { ok: false, action: "send_message", error: "companyId is required for outbound message" };
             }
-            const channel = event.payload?.channel || "whatsapp";
-            const text =
-                config.text ||
-                messageFromTemplate(config.template, event) ||
-                "Thank you for contacting us. A team member will follow up shortly.";
+            const resolvedText = config.text || messageFromTemplate(config.template, event);
+            if (!resolvedText) {
+                return {
+                    ok: false,
+                    action: "send_message",
+                    error: config.template
+                        ? `Unknown message template: ${config.template}`
+                        : "send_message requires config.text or a known config.template",
+                };
+            }
+            const text = resolvedText;
             const responseSource = config.template === "quotation_followup" ? "quotation_workflow" : "automation";
 
             const takeoverEarly = await getConversationTakeoverState(companyId, phone, channel);

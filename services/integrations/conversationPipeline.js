@@ -29,17 +29,6 @@ export async function ingest(message) {
     const contactName = metadata?.contactName || null;
     const messageType = metadata?.messageType || "text";
 
-    if (process.env.NODE_ENV === "production" && !companyId) {
-        logError(channel, null, "Pipeline ingest rejected — missing companyId in production", { from });
-        return {
-            success: false,
-            from,
-            channel,
-            companyId: null,
-            error: "MISSING_COMPANY_ID",
-        };
-    }
-
     if (externalId && (await isInboundMessageProcessed(externalId))) {
         console.log("[whatsapp] Duplicate inbound skipped", {
             companyId,
@@ -149,15 +138,23 @@ export async function ingest(message) {
             conversationId: resolvedConversationId,
             externalMessageId: externalId || null,
             externalId: externalId || null,
+            /* Tenant Graph identity for outbound (defense in depth; adapter also resolves via companyId). */
+            phoneNumberId: metadata?.phoneNumberId || message.to || null,
+            media: Array.isArray(message.media) ? message.media : [],
+            voiceNote: Boolean(metadata?.voiceNote),
         });
 
-        if (companyId && messageType === "text" && String(text || "").trim()) {
+        if (
+            companyId &&
+            ((messageType === "text" && String(text || "").trim()) || messageType === "audio")
+        ) {
             await publish(companyId, EventTypes.MESSAGE_RECEIVED, {
                 phone: from,
-                text,
+                text: text || (messageType === "audio" ? "[voice note]" : ""),
                 channel,
                 contactName,
                 aiReplyPending: true,
+                messageType,
             });
         }
 

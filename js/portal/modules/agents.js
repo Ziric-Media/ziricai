@@ -145,9 +145,18 @@ function employeeCard(agent) {
       </div>
 
       <div class="portal-employee-stats">
-        <div><span class="label">Model</span><span class="value">${escapeHtml(formatAgentModelLabel(agent))}</span></div>
-        <div><span class="label">Knowledge</span><span class="value">${kbLabel}</span></div>
-        <div><span class="label">Conversations</span><span class="value">${formatNumber(agent.conversations || 0)}</span></div>
+        <div class="portal-employee-stat">
+          <span class="stat-label">Model</span>
+          <span class="stat-value">${escapeHtml(formatAgentModelLabel(agent))}</span>
+        </div>
+        <div class="portal-employee-stat">
+          <span class="stat-label">Knowledge</span>
+          <span class="stat-value">${kbLabel}</span>
+        </div>
+        <div class="portal-employee-stat">
+          <span class="stat-label">Conversations</span>
+          <span class="stat-value">${formatNumber(agent.conversations || 0)}</span>
+        </div>
       </div>
 
       ${channels.length ? `<div class="portal-employee-channels">${channels.map((c) => `<span class="channel-tag"><i class="${c.icon}"></i> ${c.label}</span>`).join('')}</div>` : ''}

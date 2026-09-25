@@ -125,6 +125,14 @@ import {
     provisionAgent,
     getCompanyLinks,
 } from "../services/platform/provisioningService.js";
+import { provisionOperatorTenant } from "../services/platform/operatorTenantProvisionService.js";
+import {
+    listWhatsAppPoolNumbers,
+    upsertWhatsAppPoolNumber,
+    assignWhatsAppPoolNumberToCompany,
+    releaseWhatsAppPoolNumber,
+    ensureEnvSeedNumber,
+} from "../services/platform/whatsappNumberPoolService.js";
 import {
     getCustomerMarketplaceCatalog,
     getInstalledPacks,
@@ -1073,6 +1081,107 @@ app.post(
     }
 );
 
+/** Super Admin — WhatsApp number pool inventory. */
+app.get(
+    "/api/platform/whatsapp-numbers",
+    requirePlatformAccess(),
+    async (req, res) => {
+        try {
+            await ensureEnvSeedNumber();
+            const status = req.query.status ? String(req.query.status) : null;
+            const kind = req.query.kind ? String(req.query.kind) : null;
+            const items = await listWhatsAppPoolNumbers({ status, kind });
+            res.json({
+                items,
+                total: items.length,
+                available: items.filter((n) => n.status === "available").length,
+                inUse: items.filter((n) => n.status === "in_use").length,
+            });
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers] error:", err.message);
+            res.status(status).json({ error: err.message || "Failed to list WhatsApp numbers" });
+        }
+    }
+);
+
+/** Super Admin — add/update a Meta phone identity in the pool. */
+app.post(
+    "/api/platform/whatsapp-numbers",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    requireBodyFields(["phoneNumberId"]),
+    async (req, res) => {
+        try {
+            const number = await upsertWhatsAppPoolNumber(req.body || {});
+            auditLog("platform_whatsapp_pool_upsert", {
+                numberId: number.id,
+                phoneNumberId: number.phoneNumberId,
+                via: req.platformAuth?.via,
+            });
+            res.status(201).json({ number });
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers POST] error:", err.message);
+            res.status(status).json({ error: err.message, code: err.code });
+        }
+    }
+);
+
+/** Super Admin — assign pool number → tenant WhatsApp (Meta identity link). */
+app.post(
+    "/api/platform/companies/:companyId/integrations/whatsapp/assign-pool-number",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    validateCompanyIdParam("params"),
+    requireBodyFields(["numberId"]),
+    async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const body = req.body || {};
+            const result = await assignWhatsAppPoolNumberToCompany({
+                companyId,
+                numberId: body.numberId,
+                activate: body.activate !== false,
+            });
+            auditLog("platform_whatsapp_pool_assign", {
+                companyId,
+                numberId: body.numberId,
+                phoneNumberId: result.number?.phoneNumberId,
+                activated: result.activated,
+                via: req.platformAuth?.via,
+            });
+            res.status(201).json(result);
+        } catch (err) {
+            respondPlatformWhatsAppError(res, err, "api/platform/whatsapp/assign-pool-number");
+        }
+    }
+);
+
+/** Super Admin — release pool number back to AVAILABLE. */
+app.post(
+    "/api/platform/whatsapp-numbers/:numberId/release",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    async (req, res) => {
+        try {
+            const result = await releaseWhatsAppPoolNumber({
+                numberId: req.params.numberId,
+            });
+            auditLog("platform_whatsapp_pool_release", {
+                numberId: req.params.numberId,
+                previousCompanyId: result.previousCompanyId,
+                via: req.platformAuth?.via,
+            });
+            res.json(result);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers/release] error:", err.message);
+            res.status(status).json({ error: err.message, code: err.code });
+        }
+    }
+);
+
 /** Super Admin — create tenant company record (B-MC-5c-1). */
 app.post(
     "/api/platform/companies",
@@ -1568,6 +1677,37 @@ app.post(
     }
 });
 
+/**
+ * Mission Control New Company — create tenant + real Auth owner + Sarah + KB + CRM.
+ * No synthetic owner UIDs.
+ */
+app.post(
+    "/api/platform/provision/operator-tenant",
+    requirePlatformAccess(),
+    authRateLimit("provision"),
+    requireBodyFields(["name", "ownerEmail"]),
+    async (req, res) => {
+        try {
+            const body = req.body || {};
+            auditLog("provision_operator_tenant", {
+                name: body.name,
+                ownerEmail: body.ownerEmail,
+                via: req.platformAuth?.via,
+            });
+            const result = await provisionOperatorTenant(body);
+            res.status(201).json(result);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/provision/operator-tenant] error:", err.message);
+            res.status(status).json({
+                error: err.message || "Failed to provision operator tenant",
+                code: err.code || undefined,
+                companyId: err.companyId || undefined,
+            });
+        }
+    }
+);
+
 /** Platform provisioning — AI employee resources (superadmin or API key) */
 app.post(
     "/api/platform/provision/agent",
@@ -1891,36 +2031,32 @@ app.post("/api/knowledge/upload", requireTenantScope(), checkPermission("canUplo
     }
 });
 
-/** Legacy list alias — tenant-scoped; reads canonical tenant conversations only (CORPORATE-P0-3C). */
-app.get("/api/conversations", requireTenantScope(), async (req, res) => {
+/** Bridge WhatsApp webhook memory → admin inbox (read-only). */
+app.get("/api/conversations", requireTenantScope({ optional: true }), async (req, res) => {
     try {
-        const companyId = req.query.companyId || req.tenant?.companyId;
+        const companyId = req.query.companyId || null;
         const items = await listConversations({ companyId, limit: 50 });
-        res.json({ items, companyId, canonical: true });
+        res.json({ items });
     } catch (err) {
         console.error("[api/conversations] error:", err.message);
-        res.status(err.status || 500).json({ error: err.message || "Failed to list conversations", code: err.code });
+        res.status(500).json({ error: err.message || "Failed to list conversations" });
     }
 });
 
-app.get("/api/conversations/:id/messages", requireTenantScope(), async (req, res) => {
+app.get("/api/conversations/:id/messages", requireTenantScope({ optional: true }), async (req, res) => {
     try {
-        const companyId = req.query.companyId || req.tenant?.companyId;
         const id = req.params.id;
-        const phone = id.includes("::") ? id.split("::").slice(-1)[0] : id;
-        const channel = req.query.channel || "whatsapp";
-        const history = await getConversation(phone, 50, { companyId, channel });
+        const history = await getConversation(id, 50);
         const items = history.map((m, idx) => ({
-            id: m.id || `api-${idx}`,
+            id: `api-${idx}`,
             role: m.role === "assistant" ? "ai" : m.role === "user" ? "customer" : m.role,
-            message: m.content || m.message,
-            content: m.content || m.message,
-            source: m.source || null,
+            message: m.content,
+            content: m.content,
         }));
-        res.json({ items, conversation: { id, phone, companyId, channel }, canonical: true });
+        res.json({ items, conversation: { id, phone: id } });
     } catch (err) {
         console.error("[api/conversations/:id/messages] error:", err.message);
-        res.status(err.status || 500).json({ error: err.message || "Failed to load messages", code: err.code });
+        res.status(500).json({ error: err.message || "Failed to load messages" });
     }
 });
 

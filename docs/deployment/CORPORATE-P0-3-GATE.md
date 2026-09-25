@@ -1,9 +1,9 @@
 # CORPORATE-P0-3 — Unified Communication Write Path
 
-**Status:** **CORPORATE-P0-3A/B CLOSED** — code `18e45bd`; admin Netlify **`6ab10cb0a66ab6f526ad164d`**; live acceptance **`p0-3ab-live-evidence.json`**; program gate P0-3 remains **OPEN** (3C–F locked)  
-**Baseline:** production API `f18a3aa` (P0-2c.1), tenant foundation **CORPORATE-P0-2 COMPLETE**  
+**Status:** **P0-3A/B/C/E CLOSED in production** — Gate 2 live acceptance **`p0-3c-live-evidence.json`** (deploy `f7394fa3`, artifact `279ed15`); **P0-3D** and **P0-3F** remain **LOCKED**; IntegrationHub retry-queue takeover **DEFERRED**  
+**Baseline:** production API Gate 2 `f7394fa3` / `279ed15` (P0-3C); tenant foundation **CORPORATE-P0-2 COMPLETE**  
 **Depends on:** CORPORATE-P0-1 ✅, CORPORATE-P0-2 ✅  
-**Next controlled doc:** [CORPORATE-P0-3-AB-IMPLEMENTATION-PLAN.md](./CORPORATE-P0-3-AB-IMPLEMENTATION-PLAN.md) (P0-3A/B only — await explicit authorization)  
+**Next:** authorize **P0-3D** or **P0-3F** only via explicit gate unlock (do not reopen P0-3C)  
 
 ---
 
@@ -144,10 +144,10 @@ Portal Sarah tools (e.g. `viewConversations`) are **read-only** on tenant inbox.
 |----------|--------|----------------|
 | **P0-3A** | Canonical communication authority — designate SoT + write service; no second authoritative store | **CLOSED** |
 | **P0-3B** | Mission Control alignment — stop root `conversations/{id}/messages` and local comm overrides; use tenant API like Portal | **CLOSED** |
-| **P0-3C** | Legacy path containment — phone-key / optional-scope routes read-only or retired | After B |
-| **P0-3D** | Sarah/Portal separation — WhatsApp customer state vs staff memory; no leak into WhatsApp SoT | After B |
-| **P0-3E** | Automation alignment — `send_message` through canonical outbound (`saveOutboundMessage`) | After B |
-| **P0-3F** | Delivery status — queued → sent → delivered → read (+ failures) | **Last** sub-phase |
+| **P0-3C** | Legacy path containment — phone-key / optional-scope routes read-only or retired | **CLOSED** (Gate 2 live: `f7394fa3` / `279ed15`) |
+| **P0-3D** | Sarah/Portal separation — WhatsApp customer state vs staff memory; no leak into WhatsApp SoT | **LOCKED** |
+| **P0-3E** | Automation alignment — `send_message` through canonical outbound (`saveOutboundMessage`) | **CLOSED** |
+| **P0-3F** | Delivery status — queued → sent → delivered → read (+ failures) | **LOCKED** |
 
 **Recommended implementation order:** 3A → 3B → 3E → 3C → 3D → 3F → full cross-channel acceptance.
 
@@ -198,19 +198,22 @@ Plus: duplicate webhook / worker retry idempotency; human reply during AI proces
 
 ---
 
-## Evidence required to close (future)
+## Evidence — P0-3C Gate 2 (CLOSED)
 
-| Artifact | Required |
-|----------|----------|
-| Audit accepted | ✅ (this document) |
-| P0-3A/B plan approved | Pending — [AB plan](./CORPORATE-P0-3-AB-IMPLEMENTATION-PLAN.md) |
-| Implementation PR(s) per sub-gate | Not authorized |
-| `verify-corporate-p0-3a` / `3b` / full `p0-3` green | TBD |
-| Production WhatsApp + Portal + MC smoke on disposable tenant | Yes (at program close) |
-| P0-1 / P0-2 regression | Yes |
-| CM pilot read-only smoke | Yes |
+| Artifact | Status |
+|----------|--------|
+| Live evidence | ✅ [`p0-3c-live-evidence.json`](../../p0-3c-live-evidence.json) |
+| Production deployment | `f7394fa3-222a-464a-bfb6-404b31a1acea` |
+| Deployed artifact | `279ed15b0c9c7f3d1484e255c503708bc884b283` |
+| Prior production | `1af7ce58-a3f5-4946-acce-28bfd34d9916` |
+| Health / Firestore / strict tenants / Admin | ✅ |
+| Legacy isolation, fail-closed, canonical authority, MC poison, cross-tenant | ✅ |
+| P0-3A/B/E + P0-1/P0-2 regressions | ✅ |
+| CM contamination / env changes / real-customer mutation / GitHub / Netlify | None |
 
-**Gate status:** OPEN — audit accepted; **implementation not authorized** (authorize P0-3A/B via AB plan checklist).
+**Artifact identity nuance:** Railway metadata does not embed Git SHA. Gate identity is the combination of clean `279ed15` worktree deploy, artifact/source probe, matching behavior, and authorized commit boundary. **Infra backlog:** cryptographic deployment provenance.
+
+**P0-3C gate status:** **CLOSED** — remaining communication work is **P0-3D** / **P0-3F** only (explicit unlock required).
 
 ---
 
@@ -219,7 +222,9 @@ Plus: duplicate webhook / worker retry idempotency; human reply during AI proces
 ```
 CORPORATE-P0-2 ✅ COMPLETE
         ↓
-CORPORATE-P0-3 (this gate) ← SPEC / AUDIT
+CORPORATE-P0-3A/B/C/E ✅ CLOSED (canonical communication authority)
+        ↓
+P0-3D / P0-3F (LOCKED) → full P0-3 finish test
         ↓
 P1 Portal / CRM / Billing enhancements
 ```

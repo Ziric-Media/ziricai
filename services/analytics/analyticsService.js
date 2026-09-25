@@ -33,27 +33,10 @@ export async function recordEvent(name, payload = {}) {
 
 
 
-    if (payload.companyId) {
-
-        const typeMap = {
-
-            message_processed: EventTypes.MESSAGE_RECEIVED,
-
-            supervisor_review: null,
-
-            inbound_message_processed: EventTypes.MESSAGE_RECEIVED,
-
-        };
-
-        const mapped = typeMap[name];
-
-        if (mapped) {
-
-            await publish(payload.companyId, mapped, payload).catch(() => {});
-
-        }
-
-    }
+    // Do NOT remap message_processed / inbound_message_processed → MessageReceived.
+    // Pipeline already publishes MessageReceived (with aiReplyPending). Remapping here
+    // re-fires automations AFTER Sarah replies and caused duplicate "team member will
+    // follow up" WhatsApp spam (Central Motors Service Reminder workflow).
 
 
 
