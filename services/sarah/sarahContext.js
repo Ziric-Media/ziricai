@@ -17,7 +17,7 @@ import { getWhatsAppIntegration } from "../tenants/integrationService.js";
 export async function buildSarahContext(req, overrides = {}) {
     const tenant = await resolveTenantContext(req);
     const companyId = overrides.companyId || tenant.companyId || process.env.DEFAULT_COMPANY_ID || "demo-central-motors";
-    const role = tenant.role || "owner";
+    const role = tenant.role || null;
     const permissions = getPermissions(role);
 
     const [company, workspace, agents, knowledgeDocs, waIntegration] = await Promise.all([

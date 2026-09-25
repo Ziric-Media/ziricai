@@ -3,7 +3,7 @@ import { askAI, askAIWithTools, transcribeAudio } from "../../openai.js";
 
 import { sendMessage as integrationSend } from "../../integrations/integrationHub.js";
 
-import { saveOutboundMessage, getConversation } from "../../conversationService.js";
+import { saveInboundMessage, saveOutboundMessage, getConversation } from "../../conversationService.js";
 
 import { getCustomer, addTimelineEvent, parseExplicitCustomerName, persistExplicitCustomerName, getCustomerDisplayName } from "../../customerService.js";
 

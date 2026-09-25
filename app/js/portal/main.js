@@ -21,6 +21,7 @@ import { initAuthGuard, bindLoginForm, bindLogout } from './auth-guard.js';
 import { renderNotificationDrawer } from './modules/notifications.js';
 import { initPortalSarah } from './sarah/sarah-ui.js';
 import { initAppShell, applySidebarVisibility } from './core/appShell.js';
+import { closeNotificationDrawer, dismissShellOverlays } from './core/shellOverlay.js';
 
 export async function bootstrap() {
   if (location.protocol === 'file:') {
@@ -73,18 +74,16 @@ function bindShellEvents() {
 
   document.querySelector('.view-all-notifications')?.addEventListener('click', (e) => {
     e.preventDefault();
-    document.getElementById('notificationDrawer')?.classList.remove('open');
-    document.getElementById('overlay')?.classList.remove('open');
+    closeNotificationDrawer();
     navigateTo('notifications');
   });
 
   document.getElementById('closeNotificationDrawer')?.addEventListener('click', () => {
-    document.getElementById('notificationDrawer')?.classList.remove('open');
+    closeNotificationDrawer();
   });
 
   document.getElementById('overlay')?.addEventListener('click', () => {
-    document.getElementById('notificationDrawer')?.classList.remove('open');
-    document.getElementById('overlay')?.classList.remove('open');
+    dismissShellOverlays();
   });
 
   document.addEventListener('keydown', (e) => {
@@ -93,9 +92,7 @@ function bindShellEvents() {
       toggleTheme();
     }
     if (e.key === 'Escape') {
-      document.getElementById('notificationDrawer')?.classList.remove('open');
-      document.getElementById('overlay')?.classList.remove('open');
-      document.getElementById('sidebar')?.classList.remove('open');
+      dismissShellOverlays();
     }
   });
 }

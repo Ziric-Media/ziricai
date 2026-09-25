@@ -442,17 +442,10 @@
     }
 
     const pk = window.ZiricPlatformKnowledge;
-    let sarahSessionId = null;
     let sarahLastTopicId = null;
 
     const sarahDefaultReply = pk?.getDefaultReply?.() || window.ZiricBillingPlans?.getDefaultPlatformReply?.() ||
         'Great question! ZiricAI deploys AI employees to handle customer enquiries 24/7 on WhatsApp, web, and social. Setup takes under 10 minutes, and every plan includes a 14-day free trial. Ask about pricing, setup, industries, WhatsApp, or security — or click Start Free Trial to get going!';
-
-    function getSarahApiBase() {
-        return window.__ZIRICAI_CONFIG__?.apiBase ??
-            window.__ZIRICAI_CONFIG__?.sites?.api ??
-            (typeof location !== 'undefined' && /localhost|127\.0\.0\.1/.test(location.hostname) ? '' : 'https://ziricai-production.up.railway.app');
-    }
 
     function isGenericSarahReply(reply) {
         if (!reply) return true;
@@ -491,35 +484,8 @@
         return sarahDefaultReply;
     }
 
-    async function fetchSarahReplyFromApi(text) {
-        const apiBase = getSarahApiBase();
-        if (!apiBase) return null;
-
-        try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 4500);
-            const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/sarah/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                body: JSON.stringify({ message: text, sessionId: sarahSessionId, surface: 'landing' }),
-                signal: controller.signal,
-            });
-            clearTimeout(timeout);
-            if (!res.ok) return null;
-            const data = await res.json();
-            if (data.sessionId) sarahSessionId = data.sessionId;
-            return data.reply?.trim() || null;
-        } catch {
-            return null;
-        }
-    }
-
     async function getSarahReply(text) {
-        const localReply = getSarahReplyLocal(text);
-        if (!isGenericSarahReply(localReply)) return localReply;
-        const apiReply = await fetchSarahReplyFromApi(text);
-        if (apiReply && !isGenericSarahReply(apiReply)) return apiReply;
-        return localReply || apiReply || sarahDefaultReply;
+        return getSarahReplyLocal(text) || sarahDefaultReply;
     }
 
     function initSarahChat() {

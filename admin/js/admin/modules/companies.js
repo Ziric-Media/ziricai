@@ -7,6 +7,7 @@ import {
   errorState,
   planBadge,
   statusBadge,
+  tenantClassBadge,
   showToast,
 } from '../ui.js';
 import {
@@ -19,11 +20,15 @@ import {
 } from '../services/companies.js';
 import {
   provisionCompanyWorkspace,
+  provisionOperatorTenant,
   fetchPlatformWhatsAppIntegration,
   registerPlatformWhatsAppIntegration,
   configurePlatformWhatsAppIntegration,
   activatePlatformWhatsAppIntegration,
   deactivatePlatformWhatsAppIntegration,
+  fetchWhatsAppPoolNumbers,
+  assignWhatsAppPoolNumber,
+  releaseWhatsAppPoolNumber,
 } from '../api.js';
 import { navigateTo } from '../router.js';
 import { withTimeout } from '../utils.js';
@@ -38,17 +43,23 @@ import {
   integrationCardState,
   isActiveIntegrationStatus,
 } from '../services/whatsappIntegrationDisplay.js';
+import {
+  classifyTenant,
+  summarizeByClassification,
+  tenantClassFilterOptions,
+  TENANT_CLASS,
+} from '../../shared/tenantClassification.js';
 
-let filters = { search: '', plan: '', status: '' };
+let filters = { search: '', plan: '', status: '', tenantClass: '' };
+let waModalCompanyId = null;
+let waSelectedPoolNumberId = null;
 let deleteTargetId = null;
 let listLoadState = 'ok';
 let listSource = 'api';
 let listError = null;
-/** @type {string|null} company id for open integration modals */
-let waModalCompanyId = null;
 
 export async function renderCompanies(container) {
-  container.innerHTML = loadingState('Loading companies...');
+  container.innerHTML = loadingState('Loading tenants...');
   const result = await withTimeout(listCompanies());
 
   listLoadState = result.loadState || (result.isDemo ? 'demo' : result.items?.length ? 'ok' : 'empty');
@@ -58,11 +69,11 @@ export async function renderCompanies(container) {
   if (listLoadState === 'error') {
     container.innerHTML = `
       ${pageHeader(
-        'Companies',
-        'Manage tenant workspaces — the root of your multi-tenant AI platform.',
+        'Tenants',
+        'Tenant records — not production customer count.',
         '<span class="crm-source-badge">Live API</span>'
       )}
-      ${errorState('Unable to load companies. Please check your connection and try again.')}
+      ${errorState('Unable to load tenants. Please check your connection and try again.')}
       <div style="text-align:center;margin-top:-24px;padding-bottom:32px;">
         <button class="btn btn-primary" type="button" id="retryCompanies">
           <i class="fa-solid fa-rotate-right"></i> Retry
@@ -86,20 +97,66 @@ export async function renderCompanies(container) {
   bindListEvents(container);
 }
 
+function buildTenantSummaryStrip(companies) {
+  const summary = summarizeByClassification(companies);
+  const cells = [
+    { label: 'Production', value: summary[TENANT_CLASS.PRODUCTION_CUSTOMER], key: 'production' },
+    { label: 'Pilot', value: summary[TENANT_CLASS.PILOT], key: 'pilot' },
+    { label: 'Acceptance', value: summary[TENANT_CLASS.ACCEPTANCE], key: 'acceptance' },
+    { label: 'Demo', value: summary[TENANT_CLASS.DEMO_SHOWCASE], key: 'demo' },
+    { label: 'Test', value: summary[TENANT_CLASS.TEST], key: 'test' },
+    { label: 'Unknown', value: summary[TENANT_CLASS.UNKNOWN], key: 'unknown' },
+  ];
+  return `
+    <div class="tenant-summary-grid" aria-label="Tenant classification summary">
+      <div class="tenant-summary-total">
+        <span class="tenant-summary-total-value">${companies.length}</span>
+        <span class="tenant-summary-total-label">Tenant records</span>
+      </div>
+      ${cells
+        .map(
+          (c) => `
+        <div class="tenant-summary-cell ${c.key}">
+          <span class="tenant-summary-value">${c.value}</span>
+          <span class="tenant-summary-label">${c.label}</span>
+        </div>`
+        )
+        .join('')}
+    </div>`;
+}
+
+function buildClassFilterMarkup() {
+  const options = tenantClassFilterOptions();
+  return `
+    <div class="tenant-class-filter segmented-control" role="group" aria-label="Filter by tenant class">
+      ${options
+        .map(
+          (opt) => `
+        <button type="button" class="segment tenant-class-filter-btn ${filters.tenantClass === opt.value ? 'active' : ''}"
+          data-tenant-class="${escapeHtml(opt.value)}">${escapeHtml(opt.label)}</button>`
+        )
+        .join('')}
+    </div>`;
+}
+
 function buildListMarkup(companies, isDemo, sourceBadge = '', loadState = 'ok') {
   const filtered = applyFilters(companies);
   const emptyMessage = loadState === 'empty'
-    ? 'No companies yet. Add your first tenant workspace to get started.'
-    : 'No companies match your filters.';
+    ? 'No tenants yet. Add your first tenant workspace to get started.'
+    : 'No tenants match your filters.';
+  const hasFilters = Boolean(filters.search || filters.plan || filters.status || filters.tenantClass);
   return `
     ${pageHeader(
-      'Companies',
-      'Manage tenant workspaces — the root of your multi-tenant AI platform.',
+      'Tenants',
+      'Tenant records — not production customer count.',
       `<button class="btn btn-primary btn-sm" type="button" id="openCompanyForm">
         <i class="fa-solid fa-plus"></i> Add Company
       </button>${sourceBadge ? ` ${sourceBadge}` : ''}`
     )}
     ${isDemo ? `<div class="demo-banner"><i class="fa-solid fa-flask"></i> Showing demo data — Firestore unavailable or empty. Changes persist locally.</div>` : ''}
+
+    ${buildTenantSummaryStrip(companies)}
+    ${buildClassFilterMarkup()}
 
     <div class="companies-toolbar table-toolbar">
       <div class="search-wrapper">
@@ -126,7 +183,7 @@ function buildListMarkup(companies, isDemo, sourceBadge = '', loadState = 'ok') 
     <div id="companiesContent">
       ${filtered.length
         ? renderTable(filtered)
-        : emptyState(emptyMessage, filters.search || filters.plan || filters.status
+        : emptyState(emptyMessage, hasFilters
           ? '<button class="btn btn-primary btn-sm" type="button" id="clearCompanyFilters">Clear filters</button>'
           : '<button class="btn btn-primary btn-sm" type="button" id="openCompanyFormEmpty"><i class="fa-solid fa-plus"></i> Add Company</button>')}
     </div>
@@ -141,11 +198,13 @@ function applyFilters(companies) {
   const term = filters.search.toLowerCase();
   return companies.filter((c) => {
     const matchesSearch = !term || [
-      c.name, c.industry, c.owner, c.ownerEmail, c.email,
+      c.name, c.industry, c.owner, c.ownerEmail, c.email, c.id,
     ].some((v) => String(v || '').toLowerCase().includes(term));
     const matchesPlan = !filters.plan || c.plan === filters.plan;
     const matchesStatus = !filters.status || c.status === filters.status;
-    return matchesSearch && matchesPlan && matchesStatus;
+    const { classification } = classifyTenant(c);
+    const matchesClass = !filters.tenantClass || classification === filters.tenantClass;
+    return matchesSearch && matchesPlan && matchesStatus && matchesClass;
   });
 }
 
@@ -201,7 +260,7 @@ function renderTable(companies) {
       <table class="org-table companies-table">
         <thead>
           <tr>
-            <th>Company Name</th>
+            <th>Tenant</th>
             <th>Industry</th>
             <th>Plan</th>
             <th>Status</th>
@@ -215,7 +274,7 @@ function renderTable(companies) {
         </tbody>
       </table>
       <div class="table-footer">
-        <div class="info">${companies.length} compan${companies.length === 1 ? 'y' : 'ies'}</div>
+        <div class="info">${companies.length} tenant record${companies.length === 1 ? '' : 's'} shown</div>
       </div>
     </div>
   `;
@@ -224,13 +283,15 @@ function renderTable(companies) {
 function renderRow(company) {
   const links = company.provisioningLinks || {};
   const portalUrl = links.portalUrl || `/company-portal.html?company=${encodeURIComponent(company.id)}`;
+  const classInfo = classifyTenant(company);
+  const classTitle = `${classInfo.classificationSource} · ${classInfo.classificationConfidence} — ${classInfo.evidence.slice(0, 2).join('; ')}`;
   return `
     <tr data-id="${escapeHtml(company.id)}" class="company-row">
       <td>
         <div class="org-name">
           <div class="avatar company-table-avatar">${logoCell(company)}</div>
           <div>
-            <div class="company-name-text">${escapeHtml(company.name)}</div>
+            <div class="company-name-text">${tenantClassBadge(classInfo.classification, classTitle)} ${escapeHtml(company.name)}</div>
             <div class="company-cross-links">
               <a href="${escapeHtml(portalUrl)}" target="_blank" rel="noopener" class="cross-link" title="Open Company Portal"><i class="fa-solid fa-arrow-up-right-from-square"></i> Portal</a>
               <button type="button" class="cross-link-btn nav-agents" data-company-id="${escapeHtml(company.id)}" title="View AI Employees"><i class="fa-solid fa-robot"></i> Agents</button>
@@ -279,10 +340,20 @@ function buildFormSlideOver() {
 
         <div class="form-section">
           <h4><i class="fa-solid fa-user-tie"></i> Owner Information</h4>
-          <div class="form-group"><label for="companyOwner">Owner Name</label><input type="text" id="companyOwner" placeholder="e.g. John Smith" /></div>
+          <p class="form-hint" style="margin-top:0;">Required for new companies — creates a real Firebase Auth login (no synthetic UID) and binds the owner to this tenant.</p>
+          <div class="form-group"><label for="companyOwner">Owner Name *</label><input type="text" id="companyOwner" placeholder="e.g. John Smith" /></div>
           <div class="form-row">
-            <div class="form-group"><label for="companyOwnerEmail">Owner Email</label><input type="email" id="companyOwnerEmail" placeholder="owner@company.co.za" /></div>
+            <div class="form-group"><label for="companyOwnerEmail">Owner Email *</label><input type="email" id="companyOwnerEmail" placeholder="owner@company.co.za" required /></div>
             <div class="form-group"><label for="companyOwnerPhone">Owner Phone</label><input type="tel" id="companyOwnerPhone" placeholder="+27 82 555 0101" /></div>
+          </div>
+          <div class="form-group"><label for="companyTenantClass">Tenant classification</label>
+            <select id="companyTenantClass">
+              <option value="PRODUCTION CUSTOMER" selected>Production customer</option>
+              <option value="PILOT">Pilot</option>
+              <option value="ACCEPTANCE">Acceptance</option>
+              <option value="DEMO/SHOWCASE">Demo / Showcase</option>
+              <option value="TEST">Test</option>
+            </select>
           </div>
         </div>
 
@@ -480,6 +551,33 @@ function buildWhatsAppModals() {
         </div>
       </div>
     </div>
+    <div class="wizard-overlay" id="waAssignPoolModal">
+      <div class="wizard-modal" style="max-width:560px;">
+        <div class="wizard-header">
+          <div><h2>Assign ZiricAI test number</h2></div>
+          <button class="btn btn-secondary btn-sm" type="button" data-wa-close="waAssignPoolModal"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="wizard-body">
+          <p class="form-hint" style="margin-top:0;">
+            Selects a Meta phone identity from the Ziric WhatsApp number pool and links it to this tenant.
+            ZiricAI does not create phone numbers in Meta — it registers a supplied test number onto the company.
+          </p>
+          <div id="waPoolNumberList" class="wa-pool-number-list">
+            <p class="text-muted">Loading available numbers…</p>
+          </div>
+          <div class="form-group form-check" style="margin-top:12px;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="waAssignActivate" checked />
+              <span>Activate after assign (Sarah receives WhatsApp for this tenant)</span>
+            </label>
+          </div>
+        </div>
+        <div class="wizard-footer">
+          <button class="btn btn-secondary" type="button" data-wa-close="waAssignPoolModal">Cancel</button>
+          <button class="btn btn-primary" type="button" id="waAssignPoolSubmit" disabled><i class="fa-solid fa-link"></i> Assign &amp; connect</button>
+        </div>
+      </div>
+    </div>
   `;
 }
 
@@ -507,7 +605,11 @@ function renderWhatsAppIntegrationCardContent(payload) {
 
   const state = integrationCardState(integration, runtimeReady, missing);
   const status = integration?.status || '—';
-  const statusLabel = String(status).replace(/_/g, ' ');
+  const hasPhone = Boolean(integration?.phoneNumberId);
+  const readyForSetup = state === 'pending' && !hasPhone;
+  const statusLabel = readyForSetup
+    ? 'Ready for Setup'
+    : String(status).replace(/_/g, ' ');
   const runtimeBlock = isActiveIntegrationStatus(status)
     ? (runtimeReady
       ? '<div class="integration-runtime ready"><i class="fa-solid fa-circle-check"></i> Runtime ready</div>'
@@ -516,25 +618,33 @@ function renderWhatsAppIntegrationCardContent(payload) {
     : '';
 
   let actions = '';
-  if (state === 'pending' || state === 'disconnected') {
-    const hasPhone = Boolean(integration?.phoneNumberId);
+  if (readyForSetup || ((state === 'pending' || state === 'disconnected') && !hasPhone)) {
     actions = `
       <div class="integration-card-actions">
-        <button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>
+        <button class="btn btn-primary btn-sm" type="button" id="waOpenAssignPool"><i class="fa-brands fa-whatsapp"></i> Use ZiricAI Test Number</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure manually</button>
+      </div>
+      <p class="form-hint">Assign an AVAILABLE number from the Ziric WhatsApp pool. Numbers are never auto-assigned on company create.</p>`;
+  } else if (state === 'pending' || state === 'disconnected') {
+    actions = `
+      <div class="integration-card-actions">
         <button class="btn btn-primary btn-sm" type="button" id="waOpenActivate" ${hasPhone ? '' : 'disabled title="Phone number ID required"'}><i class="fa-solid fa-play"></i> Activate integration</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="waOpenAssignPool"><i class="fa-brands fa-whatsapp"></i> Switch pool number</button>
       </div>`;
   } else if (state === 'active_ready' || state === 'active_not_ready') {
     actions = `
       <div class="integration-card-actions">
         <button class="btn btn-warning btn-sm" type="button" id="waOpenDeactivate"><i class="fa-solid fa-pause"></i> Deactivate integration</button>
         <button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="waReleasePool" title="Release pool number back to AVAILABLE"><i class="fa-solid fa-unlock"></i> Release test number</button>
       </div>`;
   } else {
     actions = `<button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>`;
   }
 
   return `
-    <div class="integration-card-status ${escapeHtml(state)}">
+    <div class="integration-card-status ${escapeHtml(readyForSetup ? 'wa-ready' : state)}">
       <span class="integration-status-label">${escapeHtml(statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1))}</span>
     </div>
     ${runtimeBlock}
@@ -653,6 +763,62 @@ function bindWhatsAppCardActions(container, companyId, integration = null) {
     container.querySelector('#waDeactivateReason').value = '';
     openWaModal(container, 'waDeactivateModal');
   });
+  container.querySelector('#waOpenAssignPool')?.addEventListener('click', async () => {
+    waSelectedPoolNumberId = null;
+    const list = container.querySelector('#waPoolNumberList');
+    const submit = container.querySelector('#waAssignPoolSubmit');
+    if (submit) submit.disabled = true;
+    if (list) list.innerHTML = '<p class="text-muted">Loading available numbers…</p>';
+    openWaModal(container, 'waAssignPoolModal');
+    const res = await fetchWhatsAppPoolNumbers({ status: 'available' });
+    if (res.error) {
+      if (list) list.innerHTML = errorState(res.error);
+      return;
+    }
+    const items = res.data?.items || [];
+    if (!items.length) {
+      if (list) {
+        list.innerHTML = `
+          <p class="form-hint">No AVAILABLE numbers in the pool.</p>
+          <p class="form-hint">Add Meta phone number IDs via the platform WhatsApp pool API, or ensure <code>PHONE_NUMBER_ID</code> is set on the server (auto-seeds as AVAILABLE).</p>`;
+      }
+      return;
+    }
+    if (list) {
+      list.innerHTML = items.map((n) => `
+        <label class="wa-pool-option" style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border-color, #e5e7eb);cursor:pointer;">
+          <input type="radio" name="waPoolNumber" value="${escapeHtml(n.id)}" style="margin-top:4px;" />
+          <span>
+            <strong>${escapeHtml(n.label || n.displayPhoneNumber || n.id)}</strong><br/>
+            <span class="text-muted">${escapeHtml(n.displayPhoneNumber || '—')} · ID ${escapeHtml(n.phoneNumberId || '—')} · ${escapeHtml(n.kind || 'test')}</span>
+          </span>
+        </label>`).join('');
+      list.querySelectorAll('input[name="waPoolNumber"]').forEach((input) => {
+        input.addEventListener('change', () => {
+          waSelectedPoolNumberId = input.value;
+          if (submit) submit.disabled = !waSelectedPoolNumberId;
+        });
+      });
+    }
+  });
+  container.querySelector('#waReleasePool')?.addEventListener('click', async () => {
+    const poolRes = await fetchWhatsAppPoolNumbers({ status: 'in_use' });
+    const items = poolRes.data?.items || [];
+    const leased = items.find((n) => n.assignedCompanyId === companyId);
+    if (!leased) {
+      showToast('No pool number assigned to this company', 'warning');
+      return;
+    }
+    const res = await releaseWhatsAppPoolNumber(leased.id);
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
+    showToast('Test number released back to AVAILABLE', 'success');
+    await loadWhatsAppIntegrationCard(container, companyId);
+    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
+    renderCompanies(container);
+  });
 }
 
 function bindWhatsAppModalEvents(container) {
@@ -758,6 +924,28 @@ function bindWhatsAppModalEvents(container) {
     document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
     renderCompanies(container);
   });
+
+  container.querySelector('#waAssignPoolSubmit')?.addEventListener('click', async () => {
+    if (!waModalCompanyId || !waSelectedPoolNumberId) return;
+    const activate = container.querySelector('#waAssignActivate')?.checked !== false;
+    const res = await assignWhatsAppPoolNumber(waModalCompanyId, {
+      numberId: waSelectedPoolNumberId,
+      activate,
+    });
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
+    const data = res.data || {};
+    showToast(
+      `WhatsApp linked (${data.number?.displayPhoneNumber || data.number?.phoneNumberId || 'pool number'}). Sarah is connected for this tenant.`,
+      'success'
+    );
+    closeWaModal(container, 'waAssignPoolModal');
+    await loadWhatsAppIntegrationCard(container, waModalCompanyId);
+    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
+    renderCompanies(container);
+  });
 }
 
 function buildDeleteModal() {
@@ -811,8 +999,15 @@ function bindListEvents(container) {
   container.querySelector('#cancelCompanyForm')?.addEventListener('click', closeForm);
 
   container.querySelector('#clearCompanyFilters')?.addEventListener('click', () => {
-    filters = { search: '', plan: '', status: '' };
-    refreshContent(container);
+    clearAllCompanyFilters(container);
+  });
+
+  container.querySelectorAll('.tenant-class-filter-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      filters.tenantClass = btn.dataset.tenantClass || '';
+      syncTenantClassFilterActive(container);
+      refreshContent(container);
+    });
   });
 
   container.querySelector('#companySearch')?.addEventListener('input', (e) => {
@@ -979,23 +1174,38 @@ function bindDelegatedActions(container, { openForm, openDeleteModal }) {
   });
 }
 
+function syncTenantClassFilterActive(container) {
+  container.querySelectorAll('.tenant-class-filter-btn').forEach((btn) => {
+    const value = btn.dataset.tenantClass || '';
+    btn.classList.toggle('active', value === filters.tenantClass);
+  });
+}
+
+function clearAllCompanyFilters(container) {
+  filters = { search: '', plan: '', status: '', tenantClass: '' };
+  const search = container.querySelector('#companySearch');
+  const planFilter = container.querySelector('#companyPlanFilter');
+  const statusFilter = container.querySelector('#companyStatusFilter');
+  if (search) search.value = '';
+  if (planFilter) planFilter.value = '';
+  if (statusFilter) statusFilter.value = '';
+  syncTenantClassFilterActive(container);
+  refreshContent(container);
+}
+
 function refreshContent(container) {
   const filtered = applyFilters(state.companies);
   const content = container.querySelector('#companiesContent');
   if (!content) return;
+  const hasFilters = Boolean(filters.search || filters.plan || filters.status || filters.tenantClass);
   content.innerHTML = filtered.length
     ? renderTable(filtered)
-    : emptyState('No companies match your filters.', '<button class="btn btn-primary btn-sm" type="button" id="clearCompanyFilters">Clear filters</button>');
+    : emptyState('No tenants match your filters.', hasFilters
+      ? '<button class="btn btn-primary btn-sm" type="button" id="clearCompanyFilters">Clear filters</button>'
+      : '');
 
   container.querySelector('#clearCompanyFilters')?.addEventListener('click', () => {
-    filters = { search: '', plan: '', status: '' };
-    const search = container.querySelector('#companySearch');
-    const planFilter = container.querySelector('#companyPlanFilter');
-    const statusFilter = container.querySelector('#companyStatusFilter');
-    if (search) search.value = '';
-    if (planFilter) planFilter.value = '';
-    if (statusFilter) statusFilter.value = '';
-    refreshContent(container);
+    clearAllCompanyFilters(container);
   });
 }
 
@@ -1012,6 +1222,9 @@ function openCompanyForm(container, company, openForm) {
   container.querySelector('#companyOwner').value = company?.owner || '';
   container.querySelector('#companyOwnerEmail').value = company?.ownerEmail || '';
   container.querySelector('#companyOwnerPhone').value = company?.ownerPhone || '';
+  container.querySelector('#companyTenantClass').value =
+    company?.settings?.tenantClass ||
+    (company?.settings?.productionCustomer ? 'PRODUCTION CUSTOMER' : 'PRODUCTION CUSTOMER');
   container.querySelector('#companyPlan').value = company?.plan || 'business';
   container.querySelector('#companyStatus').value = company?.status || 'active';
   const planAmount = container.querySelector('#companyPlanAmount');
@@ -1036,6 +1249,9 @@ async function saveCompany(container, closeForm) {
   const kbOption = kbSelect.selectedOptions[0];
   const agentOption = agentSelect.selectedOptions[0];
   const plan = container.querySelector('#companyPlan').value;
+  const ownerEmail = container.querySelector('#companyOwnerEmail').value.trim();
+  const ownerName = container.querySelector('#companyOwner').value.trim();
+  const tenantClass = container.querySelector('#companyTenantClass')?.value || 'PRODUCTION CUSTOMER';
 
   const payload = {
     name: container.querySelector('#companyName').value.trim(),
@@ -1044,8 +1260,8 @@ async function saveCompany(container, closeForm) {
     email: container.querySelector('#companyEmail').value.trim(),
     phone: container.querySelector('#companyPhone').value.trim(),
     logoUrl: container.querySelector('#companyLogoUrl').value.trim(),
-    owner: container.querySelector('#companyOwner').value.trim(),
-    ownerEmail: container.querySelector('#companyOwnerEmail').value.trim(),
+    owner: ownerName,
+    ownerEmail,
     ownerPhone: container.querySelector('#companyOwnerPhone').value.trim(),
     plan,
     status: container.querySelector('#companyStatus').value,
@@ -1058,6 +1274,7 @@ async function saveCompany(container, closeForm) {
     knowledgeBaseName: kbOption?.dataset?.name || '',
     knowledgeMaxDocs: Number(container.querySelector('#companyKnowledgeMaxDocs').value) || 500,
     knowledgeAutoSync: container.querySelector('#companyKnowledgeAutoSync').checked,
+    tenantClass,
     billing: {
       planAmount: Number(container.querySelector('#companyPlanAmount').value) || PLAN_AMOUNTS[plan],
       currency: 'ZAR',
@@ -1071,37 +1288,65 @@ async function saveCompany(container, closeForm) {
     return;
   }
 
-  const result = id ? await updateCompany(id, payload) : await createCompany(payload);
+  /* New company — full operator provision (Auth owner + Sarah + KB + CRM). */
+  if (!id) {
+    if (!ownerEmail) {
+      showToast('Owner email is required to create a portal login', 'warning');
+      return;
+    }
+    if (!ownerName) {
+      showToast('Owner name is required', 'warning');
+      return;
+    }
+
+    const provision = await provisionOperatorTenant({
+      ...payload,
+      agentName: 'Sarah (AI)',
+      agentRole: 'sales_consultant',
+      agentRoleLabel: 'Sales Consultant',
+      personality: 'sales_driven',
+    });
+
+    if (provision.error) {
+      showToast(provision.error, 'error');
+      return;
+    }
+
+    const data = provision.data || provision;
+    const tempPw = data.owner?.temporaryPassword;
+    const resetLink = data.owner?.passwordResetLink;
+    let ownerMsg = `Owner ${data.owner?.email || ownerEmail} bound (${data.owner?.uid || 'uid'})`;
+    if (data.owner?.authCreated && tempPw) {
+      ownerMsg += ` — temporary password: ${tempPw}`;
+    } else if (resetLink) {
+      ownerMsg += ' — password reset link generated';
+    }
+    showToast(
+      `Company ${data.companyId} provisioned with Sarah. ${ownerMsg}. WhatsApp: Ready for Setup.`,
+      'success'
+    );
+    if (tempPw) {
+      console.info('[Mission Control] Owner temporary password (share once):', {
+        companyId: data.companyId,
+        email: data.owner?.email,
+        temporaryPassword: tempPw,
+        passwordResetLink: resetLink,
+      });
+    }
+
+    closeForm();
+    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
+    renderCompanies(container);
+    return;
+  }
+
+  const result = await updateCompany(id, payload);
   if (result.error) {
     showToast(result.error, 'error');
     return;
   }
 
-  const companyId = id || result.id || result.item?.id;
-  if (companyId && !id) {
-    const provision = await provisionCompanyWorkspace(companyId, {
-      ...payload,
-      companyId,
-    });
-    if (!provision.error && provision.data?.links) {
-      const links = provision.data.links;
-      await updateCompany(companyId, {
-        agentId: links.agentId,
-        agentName: links.agentName || payload.agentName,
-        knowledgeBaseId: links.knowledgeBaseId,
-        knowledgeBaseName: `${payload.name} KB`,
-        provisioningLinks: links,
-      });
-      showToast('Company created — portal, agent, CRM, and workflows provisioned', 'success');
-    } else if (provision.error) {
-      showToast(`Company saved; provisioning pending (${provision.error})`, 'warning');
-    } else {
-      showToast('Company created', 'success');
-    }
-  } else {
-    showToast(id ? 'Company updated' : 'Company created', 'success');
-  }
-
+  showToast('Company updated', 'success');
   closeForm();
   document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
   renderCompanies(container);

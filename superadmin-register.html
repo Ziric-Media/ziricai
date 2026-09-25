@@ -28,7 +28,7 @@
 </head>
 <body>
   <h1>Super Admin Registration</h1>
-  <p>Ziric Media AI â€” create a Super Admin account</p>
+  <p>Ziric Media AI — create a Super Admin account, or link a Firestore profile to an existing login.</p>
 
   <div>
     <label>
@@ -69,9 +69,9 @@
       throw new Error('Use a local HTTP server; file:// is not supported.');
     }
 
-    let registerUser, createUserProfile;
+    let registerUser, loginUser, createUserProfile;
     try {
-      ({ registerUser } = await import('./js/auth.js'));
+      ({ registerUser, loginUser } = await import('./js/auth.js'));
       ({ createUserProfile } = await import('./js/users.js'));
     } catch (err) {
       document.getElementById('status').textContent =
@@ -116,6 +116,7 @@
       registerBtn.disabled = true;
       setStatus('Status: Creating Firebase Auth account...');
 
+      let uid;
       let authResult;
       try {
         authResult = await registerUser(email, password);
@@ -127,22 +128,35 @@
       }
 
       if (authResult.error) {
-        setStatus('Status: ' + authResult.error);
-        registerBtn.disabled = false;
-        return;
+        const alreadyExists = /already exists/i.test(authResult.error);
+        if (alreadyExists) {
+          setStatus('Status: Auth account exists — signing in to link Firestore profile...');
+          const loginResult = await loginUser(email, password);
+          if (loginResult.error) {
+            setStatus('Status: ' + loginResult.error);
+            registerBtn.disabled = false;
+            return;
+          }
+          uid = loginResult.user.uid;
+        } else {
+          setStatus('Status: ' + authResult.error);
+          registerBtn.disabled = false;
+          return;
+        }
+      } else {
+        uid = authResult.user.uid;
       }
 
-      const uid = authResult.user.uid;
-      setStatus('Status: Auth account created. Writing Firestore profile (users/' + uid + ')...');
+      setStatus('Status: Writing Firestore profile (users/' + uid + ')...');
 
       let profileResult;
       try {
         profileResult = await createUserProfile(uid, {
           fullName,
           email,
-          role: 'Super Admin',
-          company: 'Ziric Media',
-          status: 'Active',
+          role: 'superadmin',
+          company: 'ZiricAI',
+          status: 'active',
         });
       } catch (err) {
         console.error('createUserProfile threw:', err);
@@ -168,9 +182,9 @@
       }
 
       setStatus(
-        'Status: Success â€” Super Admin account created for ' +
+        'Status: Success — Super Admin profile linked for ' +
           profileResult.profile.email +
-          ' (uid: ' + uid + ').'
+          ' (uid: ' + uid + '). You can now sign in at the Control Center.'
       );
       registerBtn.disabled = false;
     });

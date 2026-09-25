@@ -13,21 +13,17 @@
  */
 
 import {
-
   doc,
-
   setDoc,
-
   getDoc,
   getDocFromServer,
-
   updateDoc,
-
   serverTimestamp,
-
-} from 'firebase/firestore';
-
-import { db, auth, ensureFirestoreReady } from './firebase.js';
+  getDb,
+  auth,
+  ensureFirestoreReady,
+} from './firebase.js';
+import { getFirebaseDatabaseId } from './firebase-config.js';
 
 
 
@@ -104,7 +100,7 @@ async function probeDefaultFirestoreDatabase() {
 
   const url =
     `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}` +
-    `/databases/(default)/documents/__ziric_firestore_probe__?key=${encodeURIComponent(apiKey)}`;
+    `/databases/${encodeURIComponent(getFirebaseDatabaseId())}/documents/__ziric_firestore_probe__?key=${encodeURIComponent(apiKey)}`;
 
   try {
     const res = await fetch(url);
@@ -295,7 +291,7 @@ export async function createUserProfile(uid, profileData) {
       return { error: dbCheck.error };
     }
 
-    const profileRef = doc(db, 'users', uid);
+    const profileRef = doc(getDb(), 'users', uid);
     const payload = buildProfilePayload(uid, profileData);
 
     await withTimeout(
@@ -374,6 +370,10 @@ function isRetryableFirestoreReadError(error) {
   );
 }
 
+function isFirestoreSdkFallbackError(error) {
+  return error?.code === 'invalid-argument' || isRetryableFirestoreReadError(error);
+}
+
 function parseRestFirestoreValue(value) {
   if (!value || typeof value !== 'object') return null;
   if ('stringValue' in value) return value.stringValue;
@@ -404,7 +404,9 @@ async function fetchUserProfileViaRest(uid) {
   const url =
     'https://firestore.googleapis.com/v1/projects/' +
     encodeURIComponent(projectId) +
-    '/databases/(default)/documents/users/' +
+    '/databases/' +
+    encodeURIComponent(getFirebaseDatabaseId()) +
+    '/documents/users/' +
     encodeURIComponent(uid);
 
   const res = await fetch(url, {
@@ -455,13 +457,29 @@ export async function getUserProfile(uid) {
   try {
     await ensureFirestoreReady();
 
-    const profileRef = doc(db, 'users', uid);
+    let profileRef;
+    try {
+      profileRef = doc(getDb(), 'users', uid);
+    } catch (docError) {
+      if (!isFirestoreSdkFallbackError(docError)) {
+        throw docError;
+      }
+      const restResult = await fetchUserProfileViaRest(uid);
+      if (restResult.error) {
+        return { error: restResult.error };
+      }
+      if (restResult.notFound) {
+        return { error: 'User profile not found.' };
+      }
+      return { profile: normalizeProfile(uid, restResult.data) };
+    }
+
     let snapshot;
 
     try {
       snapshot = await readUserProfileSnapshot(profileRef);
     } catch (sdkError) {
-      if (!isRetryableFirestoreReadError(sdkError)) {
+      if (!isFirestoreSdkFallbackError(sdkError)) {
         throw sdkError;
       }
       const restResult = await fetchUserProfileViaRest(uid);
@@ -507,7 +525,7 @@ export async function updateUserProfile(uid, updates) {
 
   try {
 
-    const profileRef = doc(db, 'users', uid);
+    const profileRef = doc(getDb(), 'users', uid);
 
     const snapshot = await getDoc(profileRef);
 
@@ -586,7 +604,7 @@ export async function updateLastLogin(uid) {
 
   try {
 
-    const profileRef = doc(db, 'users', uid);
+    const profileRef = doc(getDb(), 'users', uid);
 
     const snapshot = await getDoc(profileRef);
 
@@ -626,7 +644,7 @@ export async function createTenantMembership(uid, companyId, data = {}) {
       return { error: authCheck.error };
     }
 
-    const memberRef = doc(db, 'companies', companyId, 'users', uid);
+    const memberRef = doc(getDb(), 'companies', companyId, 'users', uid);
     const payload = {
       uid,
       companyId,

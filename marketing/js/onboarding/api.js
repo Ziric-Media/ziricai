@@ -25,6 +25,10 @@ export function startOnboarding(payload) {
   });
 }
 
+export function fetchOnboardingSession(sessionId) {
+  return request(`/api/onboarding/session/${encodeURIComponent(sessionId)}`);
+}
+
 export function completeStep(sessionId, step, data = {}) {
   return request('/api/onboarding/complete-step', {
     method: 'POST',

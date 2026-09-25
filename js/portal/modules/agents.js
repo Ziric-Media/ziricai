@@ -22,11 +22,11 @@ const ROLE_COLORS = {
 
 const CHANNEL_ICONS = {
   whatsapp: { icon: 'fa-brands fa-whatsapp', label: 'WhatsApp' },
-  websiteChat: { icon: 'fa-comments', label: 'Web Chat' },
+  websiteChat: { icon: 'fa-solid fa-comments', label: 'Web Chat' },
   facebookMessenger: { icon: 'fa-brands fa-facebook-messenger', label: 'Messenger' },
   instagram: { icon: 'fa-brands fa-instagram', label: 'Instagram' },
   telegram: { icon: 'fa-brands fa-telegram', label: 'Telegram' },
-  email: { icon: 'fa-envelope', label: 'Email' },
+  email: { icon: 'fa-solid fa-envelope', label: 'Email' },
 };
 
 let searchTerm = '';
@@ -159,7 +159,7 @@ function employeeCard(agent) {
         </div>
       </div>
 
-      ${channels.length ? `<div class="portal-employee-channels">${channels.map((c) => `<span class="channel-tag"><i class="${c.icon}"></i> ${c.label}</span>`).join('')}</div>` : ''}
+      ${channels.length ? `<div class="portal-employee-channels">${channels.map((c) => `<span class="portal-channel-tag"><i class="${c.icon}"></i> ${c.label}</span>`).join('')}</div>` : ''}
     </article>
   `;
 }

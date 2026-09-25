@@ -1422,11 +1422,31 @@ app.get("/api/automations/:companyId/runs", requireTenantScope(), async (req, re
 /** Sarah — AI Operating Assistant */
 initSarahTools();
 
-app.post("/api/sarah/chat", requireTenantScope({ optional: true }), async (req, res) => {
+async function requireSarahChatAuth(req, res, next) {
+    try {
+        const auth = await resolveAuthFromRequest(req);
+        if (!auth.hasBearerToken || !auth.tokenVerified || !auth.uid) {
+            return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+        }
+        next();
+    } catch (err) {
+        console.error("[api/sarah/chat] auth error:", err.message);
+        res.status(500).json({ error: "Authentication check failed" });
+    }
+}
+
+app.post("/api/sarah/chat", requireSarahChatAuth, requireTenantScope({ optional: true }), async (req, res) => {
     try {
         const { message, sessionId, companyId: bodyCompanyId } = req.body || {};
+        const companyId =
+            bodyCompanyId ||
+            req.tenant?.companyId ||
+            (req.tenant?.isSuperAdmin ? null : req.tenant?.profile?.companyId || null);
+        if (!companyId && !req.tenant?.isSuperAdmin) {
+            return res.status(400).json({ error: "companyId is required", code: "COMPANY_REQUIRED" });
+        }
         const ctx = await buildSarahContext(req, {
-            companyId: bodyCompanyId || req.tenant?.companyId,
+            companyId: companyId || undefined,
             sessionId,
             surface: req.body?.surface || "portal",
         });

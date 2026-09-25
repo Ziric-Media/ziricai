@@ -265,6 +265,14 @@ export default {
         const enrichedAppointment = await enrichAppointmentRecord(companyId, appointment);
 
         if (duplicate) {
+            if (customerPhone && companyId) {
+                await syncTestDriveBooked(companyId, customerPhone, {
+                    appointment,
+                    vehicleLabel: vehicleCheck.vehicleLabel,
+                    duplicate: true,
+                    enriched: enrichedAppointment,
+                }).catch(() => {});
+            }
             return {
                 ok: true,
                 duplicate: true,
@@ -292,6 +300,7 @@ export default {
                 appointment,
                 vehicleLabel: vehicleCheck.vehicleLabel,
                 duplicate: false,
+                enriched: enrichedAppointment,
             }).catch(() => {});
         }
 

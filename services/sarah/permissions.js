@@ -14,7 +14,7 @@ const PERMISSION_MATRIX = {
 const SUPERADMIN_ONLY = new Set(["generateReport"]);
 
 export function normalizeRole(role) {
-    return String(role || "owner").toLowerCase().trim();
+    return String(role || "").toLowerCase().trim();
 }
 
 export function getPermissions(role) {
@@ -43,6 +43,8 @@ export function canUseTool(ctx, tool) {
     if (tool.platformOnly || SUPERADMIN_ONLY.has(tool.name)) {
         return false;
     }
+
+    if (!normalizeRole(ctx.role)) return false;
 
     const perms = tool.requiredPermissions || [];
     if (!perms.length) return true;

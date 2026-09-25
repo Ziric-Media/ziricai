@@ -381,8 +381,9 @@ export function renderTrainingHistorySection(items) {
 
 export function renderSectionContent(section, items, history, company) {
   const byType = (type) => items.filter((i) => i.type === type);
+  const byTypes = (...types) => items.filter((i) => types.includes(i.type));
   switch (section) {
-    case 'documents': return renderDocumentsSection(byType('document'));
+    case 'documents': return renderDocumentsSection(byTypes('document', 'manual', 'guide', 'brochure'));
     case 'faqs': return renderFaqsSection(byType('faq'));
     case 'products': return renderProductsSection(byType('product'));
     case 'services': return renderServicesSection(byType('service'));

@@ -1,5 +1,5 @@
 /**
- * Sarah UI widget for Company Portal — floating panel connected to /api/sarah/chat.
+ * Sarah chat UI for Company Portal — full-page module + optional floating shortcut.
  */
 import { state } from '../core/dataStore.js';
 import { navigateTo } from '../router.js';
@@ -9,13 +9,24 @@ import { invalidateHub } from '../core/dataService.js';
 
 let sessionId = null;
 let sending = false;
+/** @type {HTMLElement | null} */
+let chatMount = null;
 
-const SUGGESTIONS = [
+export const SUGGESTIONS = [
   'Show analytics for this month',
   'List recent conversations',
   'Search CRM for leads',
   'Connect WhatsApp',
   'Help with ZiricAI setup',
+];
+
+export const SARAH_CAPABILITIES = [
+  { icon: 'fa-chart-line', label: 'Analytics & reports' },
+  { icon: 'fa-inbox', label: 'Inbox & conversations' },
+  { icon: 'fa-users', label: 'CRM search & leads' },
+  { icon: 'fa-robot', label: 'AI Employees' },
+  { icon: 'fa-book', label: 'Knowledge base' },
+  { icon: 'fa-plug', label: 'Integrations & channels' },
 ];
 
 function applyUiHints(hints = []) {
@@ -35,75 +46,16 @@ function formatActionSummary(actions = []) {
     .filter((a) => a.tool)
     .map((a) => {
       const icon = a.success ? '✓' : '✗';
-      return `${icon} ${a.tool}${a.message ? `: ${a.message.slice(0, 80)}` : ''}`;
+      return `${icon} ${a.tool}${a.message ? `: ${a.message.slice(0, 200)}` : ''}`;
     });
 }
 
-function ensureWidget() {
-  if (document.getElementById('portalSarahWidget')) return;
-
-  const widget = document.createElement('div');
-  widget.id = 'portalSarahWidget';
-  widget.className = 'portal-sarah-widget';
-  widget.innerHTML = `
-    <button type="button" class="portal-sarah-bubble" id="portalSarahBubble" aria-label="Open Sarah assistant">
-      <i class="fa-solid fa-sparkles"></i>
-      <span class="portal-sarah-bubble-label">Sarah</span>
-    </button>
-    <div class="portal-sarah-panel" id="portalSarahPanel" aria-hidden="true">
-      <header class="portal-sarah-header">
-        <div class="portal-sarah-avatar"><i class="fa-solid fa-sparkles"></i></div>
-        <div>
-          <strong>Sarah</strong>
-          <span>AI Operating Assistant</span>
-        </div>
-        <button type="button" class="portal-sarah-close" id="portalSarahClose" aria-label="Close">&times;</button>
-      </header>
-      <div class="portal-sarah-messages" id="portalSarahMessages">
-        <div class="portal-sarah-msg ai">Hi! I'm Sarah. Ask me to view analytics, search CRM, create AI employees, upload knowledge, or connect channels.</div>
-      </div>
-      <div class="portal-sarah-suggestions" id="portalSarahSuggestions"></div>
-      <form class="portal-sarah-form" id="portalSarahForm">
-        <input type="text" id="portalSarahInput" placeholder="Ask Sarah to do something…" autocomplete="off" />
-        <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-paper-plane"></i></button>
-      </form>
-    </div>
-  `;
-  document.body.appendChild(widget);
-
-  const suggestionsEl = document.getElementById('portalSarahSuggestions');
-  suggestionsEl.innerHTML = SUGGESTIONS.map(
-    (q) => `<button type="button" class="portal-sarah-chip" data-q="${q.replace(/"/g, '&quot;')}">${q}</button>`
-  ).join('');
-
-  document.getElementById('portalSarahBubble')?.addEventListener('click', togglePanel);
-  document.getElementById('portalSarahClose')?.addEventListener('click', closePanel);
-  document.getElementById('portalSarahForm')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const input = document.getElementById('portalSarahInput');
-    if (input?.value.trim()) submitMessage(input.value);
-  });
-
-  suggestionsEl.querySelectorAll('.portal-sarah-chip').forEach((btn) => {
-    btn.addEventListener('click', () => submitMessage(btn.dataset.q || btn.textContent));
-  });
-}
-
-function togglePanel() {
-  const widget = document.getElementById('portalSarahWidget');
-  const panel = document.getElementById('portalSarahPanel');
-  const open = widget?.classList.toggle('open');
-  panel?.setAttribute('aria-hidden', open ? 'false' : 'true');
-  if (open) document.getElementById('portalSarahInput')?.focus();
-}
-
-function closePanel() {
-  document.getElementById('portalSarahWidget')?.classList.remove('open');
-  document.getElementById('portalSarahPanel')?.setAttribute('aria-hidden', 'true');
+function q(sel) {
+  return chatMount?.querySelector(sel) ?? null;
 }
 
 function appendMessage(text, role) {
-  const messages = document.getElementById('portalSarahMessages');
+  const messages = q('#portalSarahMessages');
   if (!messages) return;
   const el = document.createElement('div');
   el.className = `portal-sarah-msg ${role}`;
@@ -115,7 +67,7 @@ function appendMessage(text, role) {
 function appendActionBlock(actions) {
   const summaries = formatActionSummary(actions);
   if (!summaries.length) return;
-  const messages = document.getElementById('portalSarahMessages');
+  const messages = q('#portalSarahMessages');
   const el = document.createElement('div');
   el.className = 'portal-sarah-actions';
   el.innerHTML = summaries.map((s) => `<div class="portal-sarah-action">${s}</div>`).join('');
@@ -133,13 +85,13 @@ async function submitMessage(text) {
 
   sending = true;
   appendMessage(trimmed, 'user');
-  const input = document.getElementById('portalSarahInput');
+  const input = q('#portalSarahInput');
   if (input) input.value = '';
 
   const typing = document.createElement('div');
   typing.className = 'portal-sarah-msg typing';
   typing.innerHTML = '<span></span><span></span><span></span>';
-  document.getElementById('portalSarahMessages')?.appendChild(typing);
+  q('#portalSarahMessages')?.appendChild(typing);
 
   const { data, error } = await sarahChat({
     message: trimmed,
@@ -166,12 +118,64 @@ async function submitMessage(text) {
   }
 }
 
+function bindSuggestions(container) {
+  container.querySelectorAll('.portal-sarah-chip').forEach((btn) => {
+    btn.addEventListener('click', () => submitMessage(btn.dataset.q || btn.textContent || ''));
+  });
+}
+
+/**
+ * Mount interactive chat into a container (full-page or embedded).
+ * @param {HTMLElement} container
+ * @param {{ mode?: 'page' | 'widget' }} [options]
+ */
+export function mountSarahChat(container, options = {}) {
+  const mode = options.mode || 'page';
+  chatMount = container;
+  container.classList.add('portal-sarah-chat-mount', mode === 'page' ? 'portal-sarah-chat-mount--page' : 'portal-sarah-chat-mount--widget');
+  container.innerHTML = `
+    <div class="portal-sarah-messages" id="portalSarahMessages" role="log" aria-live="polite">
+      <div class="portal-sarah-msg ai">Hi! I'm Sarah, your AI operating assistant. Ask me to view analytics, search CRM, manage AI employees, upload knowledge, or connect channels — I'll walk you through it.</div>
+    </div>
+    <div class="portal-sarah-suggestions portal-sarah-suggestions--inline" id="portalSarahSuggestions"></div>
+    <form class="portal-sarah-form" id="portalSarahForm">
+      <textarea id="portalSarahInput" rows="${mode === 'page' ? 3 : 1}" placeholder="Ask Sarah to do something…" autocomplete="off"></textarea>
+      <button type="submit" class="btn btn-primary portal-sarah-send"><i class="fa-solid fa-paper-plane"></i><span>Send</span></button>
+    </form>
+  `;
+
+  const suggestionsEl = q('#portalSarahSuggestions');
+  if (suggestionsEl) {
+    suggestionsEl.innerHTML = SUGGESTIONS.map(
+      (text) =>
+        `<button type="button" class="portal-sarah-chip" data-q="${text.replace(/"/g, '&quot;')}">${text}</button>`
+    ).join('');
+    bindSuggestions(suggestionsEl);
+  }
+
+  q('#portalSarahForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = q('#portalSarahInput');
+    if (input?.value.trim()) submitMessage(input.value);
+  });
+
+  q('#portalSarahInput')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      q('#portalSarahForm')?.requestSubmit();
+    }
+  });
+}
+
+/** Remove legacy floating FAB — Sarah is a full module in the sidebar. */
+function removeFloatingShortcut() {
+  document.getElementById('portalSarahWidget')?.remove();
+}
+
 export function initPortalSarah() {
-  ensureWidget();
+  removeFloatingShortcut();
 }
 
 export function openPortalSarah() {
-  ensureWidget();
-  const widget = document.getElementById('portalSarahWidget');
-  if (!widget?.classList.contains('open')) togglePanel();
+  navigateTo('sarah');
 }

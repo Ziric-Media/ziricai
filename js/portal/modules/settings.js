@@ -10,29 +10,9 @@ import { patchPortalBranding, fetchIntegrationChannels } from '../api.js';
 import { DEMO_BRANDING, DEMO_TEAM } from '../demo-data.js';
 import { PORTAL_ROLES, roleLabel, getPermissions } from '../permissions.js';
 
-const ACTIVE_WHATSAPP_STATUSES = new Set(['active', 'connected']);
+import { formatPortalWhatsAppDisplay } from '../integrationDisplay.js';
 
-/** Portal WhatsApp row from tenant integration API (never uses phoneNumberId). */
-export function formatPortalWhatsAppDisplay(integrations = []) {
-  const wa =
-    integrations.find((i) => i.provider === 'whatsapp' || i.channel === 'whatsapp') ||
-    integrations[0];
-  if (!wa?.status) {
-    return { phone: '—', statusText: 'Not registered', icon: '⚠️' };
-  }
-  const status = String(wa.status).toLowerCase();
-  const phone = wa.displayPhoneNumber || '—';
-  if (ACTIVE_WHATSAPP_STATUSES.has(status)) {
-    return { phone, statusText: 'Active', icon: '✅' };
-  }
-  if (status === 'pending_configuration' || status === 'pending') {
-    return { phone, statusText: 'Pending configuration', icon: '⚠️' };
-  }
-  if (status === 'disconnected') {
-    return { phone, statusText: 'Disconnected', icon: '⚠️' };
-  }
-  return { phone, statusText: status, icon: '⚠️' };
-}
+export { formatPortalWhatsAppDisplay } from '../integrationDisplay.js';
 
 export async function renderSettings(container) {
   container.innerHTML = loadingState('Loading settings...');
@@ -140,31 +120,31 @@ export async function renderSettings(container) {
     <div class="settings-panel" id="tab-communications">
       <div class="portal-settings-layout">
         <div class="portal-settings-forms">
-          <div class="portal-form-section">
+          <div class="portal-form-section portal-comm-card">
             <div class="portal-form-section-header">
-              <div class="portal-form-section-icon"><i class="fa-brands fa-whatsapp"></i></div>
+              <div class="portal-form-section-icon wa"><i class="fa-brands fa-whatsapp"></i></div>
               <div>
                 <h4>WhatsApp Greeting</h4>
                 <p>First message customers see when starting a chat</p>
               </div>
             </div>
-            <div class="form-group">
-              <label for="brandWhatsappGreeting">Greeting Message</label>
-              <textarea id="brandWhatsappGreeting" rows="4" placeholder="Hi! Welcome to...">${escapeHtml(branding.whatsappGreeting || company.settings?.whatsappGreeting || '')}</textarea>
+            <div class="portal-field">
+              <label class="portal-field-label" for="brandWhatsappGreeting">Greeting message</label>
+              <textarea class="portal-field-control" id="brandWhatsappGreeting" rows="4" placeholder="Hi! Welcome to...">${escapeHtml(branding.whatsappGreeting || company.settings?.whatsappGreeting || '')}</textarea>
             </div>
           </div>
 
-          <div class="portal-form-section">
+          <div class="portal-form-section portal-comm-card">
             <div class="portal-form-section-header">
-              <div class="portal-form-section-icon"><i class="fa-solid fa-envelope"></i></div>
+              <div class="portal-form-section-icon mail"><i class="fa-solid fa-envelope"></i></div>
               <div>
                 <h4>Email Signature</h4>
                 <p>Appended to outbound emails from your team</p>
               </div>
             </div>
-            <div class="form-group">
-              <label for="brandEmailSig">Signature</label>
-              <textarea id="brandEmailSig" rows="5" placeholder="Best regards,...">${escapeHtml(branding.emailSignature || '')}</textarea>
+            <div class="portal-field">
+              <label class="portal-field-label" for="brandEmailSig">Signature</label>
+              <textarea class="portal-field-control" id="brandEmailSig" rows="5" placeholder="Best regards,...">${escapeHtml(branding.emailSignature || '')}</textarea>
             </div>
           </div>
 
@@ -188,7 +168,7 @@ export async function renderSettings(container) {
     </div>
 
     <div class="settings-panel" id="tab-workspace">
-      <div class="portal-form-section">
+      <div class="portal-form-section portal-workspace-card">
         <div class="portal-form-section-header">
           <div class="portal-form-section-icon"><i class="fa-solid fa-sitemap"></i></div>
           <div>
@@ -196,24 +176,43 @@ export async function renderSettings(container) {
             <p>Provisioned areas under companies/${escapeHtml(state.companyId || '—')}/</p>
           </div>
         </div>
-        <div class="info-row"><span class="label">Departments</span><span class="value">${resources.departments ?? workspace?.departments?.length ?? '—'}</span></div>
-        <div class="info-row"><span class="label">Team members</span><span class="value">${workspace?.teamCount ?? state.team?.length ?? '—'}</span></div>
-        <div class="info-row"><span class="label">AI employees</span><span class="value">${resources.aiEmployees ?? '—'}</span></div>
-        <div class="info-row"><span class="label">Knowledge items</span><span class="value">${resources.knowledge ?? '—'}</span></div>
-        <div class="info-row"><span class="label">CRM contacts</span><span class="value">${resources.crm ?? '—'}</span></div>
-        <div class="info-row"><span class="label">Automations</span><span class="value">${resources.automations ?? '—'}</span></div>
-        ${workspace?.provisionedAt ? `<div class="info-row"><span class="label">Provisioned</span><span class="value">${escapeHtml(String(workspace.provisionedAt).slice(0, 19))}</span></div>` : ''}
-        <div style="margin-top:20px;display:grid;gap:8px;">
+        <div class="portal-workspace-stats">
           ${[
-            ['Dashboard', links.dashboard || '#dashboard'],
-            ['Team', links.team || '#team'],
-            ['AI Employees', links.aiEmployees || '#agents'],
-            ['Knowledge', links.knowledge || '#knowledge'],
-            ['CRM', links.crm || '#customers'],
-            ['Analytics', links.analytics || '#analytics'],
-            ['Billing', links.billing || '#billing'],
-            ['Automation', links.automation || '#automation'],
-          ].map(([label, href]) => `<a class="btn btn-secondary btn-sm" href="${escapeHtml(href)}" style="justify-content:flex-start;">${escapeHtml(label)}</a>`).join('')}
+            ['Departments', resources.departments ?? workspace?.departments?.length ?? '—', 'fa-building'],
+            ['Team members', workspace?.teamCount ?? state.team?.length ?? '—', 'fa-users'],
+            ['AI employees', resources.aiEmployees ?? '—', 'fa-robot'],
+            ['Knowledge items', resources.knowledge ?? '—', 'fa-book'],
+            ['CRM contacts', resources.crm ?? '—', 'fa-address-book'],
+            ['Automations', resources.automations ?? '—', 'fa-bolt'],
+          ].map(([label, value, icon]) => `
+            <div class="portal-workspace-stat">
+              <div class="portal-workspace-stat-icon"><i class="fa-solid ${icon}"></i></div>
+              <div>
+                <div class="portal-workspace-stat-value">${escapeHtml(String(value))}</div>
+                <div class="portal-workspace-stat-label">${escapeHtml(label)}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+        ${workspace?.provisionedAt ? `<p class="portal-workspace-meta"><i class="fa-regular fa-clock"></i> Provisioned ${escapeHtml(String(workspace.provisionedAt).slice(0, 19))}</p>` : ''}
+        <div class="portal-workspace-links">
+          <h5>Jump to</h5>
+          <div class="portal-workspace-link-grid">
+          ${[
+            ['Dashboard', links.dashboard || '#dashboard', 'fa-gauge-high'],
+            ['Team', links.team || '#team', 'fa-users'],
+            ['AI Employees', links.aiEmployees || '#agents', 'fa-robot'],
+            ['Knowledge', links.knowledge || '#knowledge', 'fa-book'],
+            ['CRM', links.crm || '#customers', 'fa-address-book'],
+            ['Analytics', links.analytics || '#analytics', 'fa-chart-line'],
+            ['Billing', links.billing || '#billing', 'fa-credit-card'],
+            ['Automation', links.automation || '#automation', 'fa-bolt'],
+          ].map(([label, href, icon]) => `
+            <a class="portal-workspace-link" href="${escapeHtml(href)}">
+              <span class="portal-workspace-link-icon"><i class="fa-solid ${icon}"></i></span>
+              <span>${escapeHtml(label)}</span>
+              <i class="fa-solid fa-chevron-right"></i>
+            </a>`).join('')}
+          </div>
         </div>
       </div>
     </div>
@@ -227,13 +226,15 @@ export async function renderSettings(container) {
             <p>Read-only tenant information</p>
           </div>
         </div>
-        <div class="info-row"><span class="label">Name</span><span class="value">${escapeHtml(company.name || '—')}</span></div>
-        <div class="info-row"><span class="label">Industry</span><span class="value">${escapeHtml(company.industry || '—')}</span></div>
-        <div class="info-row"><span class="label">Email</span><span class="value">${escapeHtml(company.email || '—')}</span></div>
-        <div class="info-row"><span class="label">Phone</span><span class="value">${escapeHtml(company.phone || '—')}</span></div>
-        <div class="info-row"><span class="label">Website</span><span class="value">${escapeHtml(company.website || '—')}</span></div>
-        <div class="info-row"><span class="label">WhatsApp</span><span class="value">${escapeHtml(whatsappDisplay.phone)} · ${escapeHtml(whatsappDisplay.statusText)} ${whatsappDisplay.icon}</span></div>
-        <div class="info-row"><span class="label">Company ID</span><span class="value"><code>${escapeHtml(state.companyId || '—')}</code></span></div>
+        <div class="portal-info-list">
+          <div class="portal-info-row"><span class="label">Name</span><span class="value">${escapeHtml(company.name || '—')}</span></div>
+          <div class="portal-info-row"><span class="label">Industry</span><span class="value">${escapeHtml(company.industry || '—')}</span></div>
+          <div class="portal-info-row"><span class="label">Email</span><span class="value">${escapeHtml(company.email || '—')}</span></div>
+          <div class="portal-info-row"><span class="label">Phone</span><span class="value">${escapeHtml(company.phone || '—')}</span></div>
+          <div class="portal-info-row"><span class="label">Website</span><span class="value">${escapeHtml(company.website || '—')}</span></div>
+          <div class="portal-info-row"><span class="label">WhatsApp</span><span class="value">${escapeHtml(whatsappDisplay.phone)} · ${escapeHtml(whatsappDisplay.statusText)} ${whatsappDisplay.icon}</span></div>
+          <div class="portal-info-row"><span class="label">Company ID</span><span class="value"><code>${escapeHtml(state.companyId || '—')}</code></span></div>
+        </div>
       </div>
     </div>
 

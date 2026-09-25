@@ -51,6 +51,9 @@ const PERMISSION_MATRIX = {
 
   canExportData: ['owner', 'manager', 'finance'],
 
+  /** Portal knowledge write — owners only (MC may still allow managers via API matrix). */
+  canUploadKnowledge: ['owner'],
+
 };
 
 
@@ -60,6 +63,8 @@ const PERMISSION_MATRIX = {
 export const MODULE_PERMISSIONS = {
 
   dashboard: null,
+
+  sarah: null,
 
   agents: 'canEditAI',
 
@@ -153,11 +158,14 @@ export function roleLabel(role) {
 
 export function can(role, permission) {
 
+  const r = normalizeRole(role);
+  if (r === 'superadmin') return true;
+
   const allowed = PERMISSION_MATRIX[permission];
 
   if (!allowed) return false;
 
-  return allowed.includes(normalizeRole(role));
+  return allowed.includes(r);
 
 }
 
@@ -212,6 +220,8 @@ export const PERMISSION_LABELS = {
   canReply: 'Can Reply',
 
   canEditAI: 'Can Edit AI',
+
+  canUploadKnowledge: 'Can Upload Knowledge',
 
   canManageStaff: 'Can Manage Staff',
 

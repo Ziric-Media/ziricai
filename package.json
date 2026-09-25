@@ -28,6 +28,8 @@
         "verify:tenant-isolation": "node scripts/verify-tenant-isolation.js",
         "verify:corporate-p0-1": "node scripts/verify-corporate-p0-1.js",
         "verify:corporate-p0-2": "node scripts/verify-corporate-p0-2.js",
+        "verify:imports": "node scripts/verify-import-resolution.mjs",
+        "verify:step0-sarah-lockdown": "node scripts/verify-step0-sarah-lockdown.mjs",
         "verify:corporate-p0-3a": "node scripts/verify-corporate-p0-3a.js",
         "verify:corporate-p0-3b": "node scripts/verify-corporate-p0-3b.js",
         "verify:corporate-p0-3e": "node scripts/verify-corporate-p0-3e.js",

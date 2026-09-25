@@ -493,7 +493,7 @@ Always confirm date, time, contact details, and appointment type before finalisi
     }),
     buildEmployeePack({
         id: "pack-collections-ai",
-        name: "Collections AI",
+        name: "Finance AI",
         category: "finance",
         icon: "💰",
         color: "#ca8a04",

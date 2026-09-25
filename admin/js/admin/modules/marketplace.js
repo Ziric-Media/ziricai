@@ -16,19 +16,7 @@ import { listCompanies } from '../services/companies.js';
 import { navigateTo } from '../router.js';
 import { withTimeout } from '../utils.js';
 import { DEMO_COMPANIES } from '../demo-data.js';
-import { getAdminDemoRatingDisplay } from '../../shared/marketplaceAdminDemoPresentation.js';
-
-/** Company list for install target — real items only on production Admin; demo fallback on local dev only. */
-function resolveAdminMarketplaceCompaniesList(result) {
-  if (result?.items?.length) return result.items;
-  if (typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname || '';
-    const localDev =
-      host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local');
-    if (!localDev) return [];
-  }
-  return DEMO_COMPANIES;
-}
+import { resolveListItems } from '../services/dataMode.js';
 
 let selectedCategory = null;
 
@@ -41,7 +29,7 @@ export async function renderMarketplace(container) {
     withTimeout(listCompanies()),
   ]);
 
-  const companies = resolveAdminMarketplaceCompaniesList(companiesRes);
+  const companies = resolveListItems(companiesRes, DEMO_COMPANIES);
   const catalog = catalogRes.error ? null : catalogRes.data;
   const fallbackCatalog = buildFallbackCatalog();
 
@@ -214,7 +202,6 @@ function renderPackCards(packs, installedIds, companyId) {
     const installed = installedIds.has(pack.id);
     const comingSoon = pack.status === 'coming_soon' || pack.installable === false;
     const catColor = pack.color || '#6366f1';
-    const adminRating = getAdminDemoRatingDisplay(pack.canonicalId || pack.id);
 
     return `
       <article class="marketplace-pack-card" style="--pack-color:${catColor}">
@@ -222,7 +209,7 @@ function renderPackCards(packs, installedIds, companyId) {
           <span class="pack-icon">${pack.icon || '📦'}</span>
           <div>
             <h4>${escapeHtml(pack.name)}</h4>
-            <div class="mp-card-meta">${renderStars(adminRating.rating)} <span class="mp-rating-count">(${adminRating.ratingCount || 0})</span>
+            <div class="mp-card-meta">${renderStars(pack.rating)} <span class="mp-rating-count">(${pack.ratingCount || 0})</span>
               ${pack.isPaid ? '<span class="mp-price paid">Paid</span>' : '<span class="mp-price free">Free</span>'}
             </div>
             <p class="pack-tagline">${escapeHtml(pack.tagline || pack.description || '')}</p>

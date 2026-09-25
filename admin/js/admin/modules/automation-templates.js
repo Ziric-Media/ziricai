@@ -3,6 +3,7 @@ import { escapeHtml, showToast, loadingState } from '../ui.js';
 import { listTemplates, installTemplate } from '../services/workflows.js';
 import { listCompanies } from '../services/companies.js';
 import { DEMO_COMPANIES } from '../demo-data.js';
+import { resolveListItems } from '../services/dataMode.js';
 import { withTimeout } from '../utils.js';
 
 let onInstalled = null;
@@ -21,7 +22,7 @@ export async function openTemplatesGallery(container, { onClose, onInstall } = {
   ]);
 
   const templates = tplResult.items?.length ? tplResult.items : [];
-  const companies = coResult.items?.length ? coResult.items : DEMO_COMPANIES;
+  const companies = resolveListItems(coResult, DEMO_COMPANIES);
   const scopedCompany = state.selectedCompanyId || '';
 
   container.innerHTML = buildGalleryMarkup(templates, companies, scopedCompany, tplResult.isDemo);

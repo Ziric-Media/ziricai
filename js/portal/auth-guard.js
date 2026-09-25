@@ -11,6 +11,7 @@ import { getPermissions } from './permissions.js';
 import { resolveDemoProfile, DEMO_BRANDING } from './demo-data.js';
 import { shouldUseDemoFallback } from '../shared/dataMode.js';
 import { adminUrl, portalUrl } from '../shared/siteUrls.js';
+import { createLoginBusy } from '../shared/loginBusy.js';
 import {
   fetchPortalCompany,
   fetchPortalNotifications,
@@ -220,38 +221,40 @@ export function initAuthGuard({ onReady, onDenied }) {
 
 export function bindLoginForm() {
   const form = document.getElementById('loginForm');
+  const busy = createLoginBusy(form, document.getElementById('loginStatus'));
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (form.getAttribute('aria-busy') === 'true') return;
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    const status = document.getElementById('loginStatus');
-    if (status) status.textContent = 'Signing in...';
+    busy.start('Signing in...');
 
-    const result = await loginUser(email, password);
-    if (result.error) {
-      if (status) status.textContent = result.error;
-      showToast(result.error, 'error');
-      return;
-    }
-
-    const profile = result.profile || (await resolvePortalProfile(result.user));
-    if (!profile?.companyId) {
-      const msg = profile
-        ? 'No company assigned to this account.'
-        : 'Profile not found. Use onboarding to create your workspace.';
-      if (status) status.textContent = msg;
-      showToast(msg, 'error');
-      return;
-    }
-
-    if (status) status.textContent = 'Opening portal...';
     try {
+      const result = await loginUser(email, password);
+      if (result.error) {
+        busy.stop(result.error);
+        showToast(result.error, 'error');
+        return;
+      }
+
+      busy.step('Loading your workspace...');
+      const profile = result.profile || (await resolvePortalProfile(result.user));
+      if (!profile?.companyId) {
+        const msg = profile
+          ? 'No company assigned to this account.'
+          : 'Profile not found. Use onboarding to create your workspace.';
+        busy.stop(msg);
+        showToast(msg, 'error');
+        return;
+      }
+
+      busy.step('Opening portal...');
       await completeLoginSession(result.user, profile);
-      if (status) status.textContent = '';
+      busy.stop();
     } catch (err) {
       console.error('Portal init failed:', err);
       const message = err?.message || 'Failed to open portal.';
-      if (status) status.textContent = message;
+      busy.stop(message);
       showToast(message, 'error');
     }
   });
