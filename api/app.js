@@ -125,6 +125,14 @@ import {
     provisionAgent,
     getCompanyLinks,
 } from "../services/platform/provisioningService.js";
+import { provisionOperatorTenant } from "../services/platform/operatorTenantProvisionService.js";
+import {
+    listWhatsAppPoolNumbers,
+    upsertWhatsAppPoolNumber,
+    assignWhatsAppPoolNumberToCompany,
+    releaseWhatsAppPoolNumber,
+    ensureEnvSeedNumber,
+} from "../services/platform/whatsappNumberPoolService.js";
 import {
     getCustomerMarketplaceCatalog,
     getInstalledPacks,
@@ -156,6 +164,7 @@ import {
     provisionOnboarding,
     listOnboardingIndustries,
     getOnboardingSession,
+    assertOnboardingSessionOwner,
     getWhatsAppConfig,
     slugifyCompanyName,
 } from "../services/platform/onboardingService.js";
@@ -163,7 +172,7 @@ import { completeOnboarding } from "../services/platform/onboardingOrchestrator.
 import { getAllPlans, getPlan, checkPlanLimit } from "../services/platform/billingPlans.js";
 import { getCommandCenterDashboard } from "../services/operations/commandCenterService.js";
 import { attachTenantContext, requireTenantScope, requireAuthenticatedTenantMember } from "../services/core/tenantContext.js";
-import { resolveAuthFromRequest } from "../services/auth/authService.js";
+import { resolveAuthFromRequest, tryEnsureOwnerProfileForAuthenticatedUser } from "../services/auth/authService.js";
 import { trackSession, invalidateSession, buildSessionResponse } from "../services/auth/sessionService.js";
 import { checkPermission } from "../services/auth/permissionsService.js";
 import { resolveMarketplacePaymentBypass } from "../services/platform/marketplaceAuth.js";
@@ -387,9 +396,20 @@ app.get("/onboarding.html", (req, res) => res.redirect(301, "/#start"));
 /** Auth — current session profile */
 app.get("/api/auth/session", attachTenantContext(), async (req, res) => {
     try {
-        const auth = await resolveAuthFromRequest(req);
+        let auth = await resolveAuthFromRequest(req);
         if (!auth.uid) {
             return res.status(401).json({ error: "Authentication required", code: "UNAUTHORIZED" });
+        }
+        if (!auth.profile) {
+            const linkedProfile = await tryEnsureOwnerProfileForAuthenticatedUser(auth.uid, auth.email);
+            if (linkedProfile) {
+                auth = {
+                    ...auth,
+                    profile: linkedProfile,
+                    role: linkedProfile.role || auth.role,
+                    email: auth.email || linkedProfile.email || null,
+                };
+            }
         }
         auditLog("session_loaded", { uid: auth.uid, email: auth.email });
         const sessionId = trackSession(auth.uid, { userAgent: req.get("user-agent") });
@@ -397,6 +417,25 @@ app.get("/api/auth/session", attachTenantContext(), async (req, res) => {
     } catch (err) {
         console.error("[api/auth/session] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load session" });
+    }
+});
+
+/** Auth — custom token for cross-site handoff (marketing → app/admin) */
+app.post("/api/auth/handoff", attachTenantContext(), async (req, res) => {
+    try {
+        const auth = await resolveAuthFromRequest(req);
+        if (!auth.uid) {
+            return res.status(401).json({ error: "Authentication required", code: "UNAUTHORIZED" });
+        }
+        const { createAuthHandoffToken } = await import("../services/auth/handoffService.js");
+        const customToken = await createAuthHandoffToken(auth.uid);
+        auditLog("auth_handoff_issued", { uid: auth.uid, email: auth.email });
+        res.json({ customToken });
+    } catch (err) {
+        const code = err?.code === "HANDOFF_UNAVAILABLE" ? "HANDOFF_UNAVAILABLE" : "HANDOFF_FAILED";
+        const status = code === "HANDOFF_UNAVAILABLE" ? 503 : 500;
+        console.error("[api/auth/handoff] error:", err.message);
+        res.status(status).json({ error: err.message || "Handoff failed", code });
     }
 });
 
@@ -803,11 +842,27 @@ app.get("/api/onboarding/industries", (req, res) => {
     res.json({ industries: listOnboardingIndustries(), whatsapp: getWhatsAppConfig() });
 });
 
-app.get("/api/onboarding/session/:sessionId", (req, res) => {
-    const session = getOnboardingSession(req.params.sessionId);
-    if (!session) return res.status(404).json({ error: "Session not found" });
-    res.json({ session, whatsapp: getWhatsAppConfig() });
-});
+app.get(
+    "/api/onboarding/session/:sessionId",
+    authRateLimit("onboarding"),
+    requireFirebaseAuth(),
+    async (req, res) => {
+        try {
+            const session = await getOnboardingSession(req.params.sessionId);
+            if (!session) {
+                return res.status(404).json({ error: "Session not found", code: "SESSION_NOT_FOUND" });
+            }
+            assertOnboardingSessionOwner(session, req.firebaseAuth);
+            res.json({ session, whatsapp: getWhatsAppConfig() });
+        } catch (err) {
+            const status = err.status || 500;
+            res.status(status).json({
+                error: err.message || "Failed to load onboarding session",
+                code: err.code || "ONBOARDING_ERROR",
+            });
+        }
+    }
+);
 
 app.post(
     "/api/onboarding/start",
@@ -816,7 +871,11 @@ app.post(
     requireFirebaseAuth(),
     async (req, res) => {
         try {
-            const result = await startOnboarding(req.body || {});
+            const result = await startOnboarding({
+                ...(req.body || {}),
+                uid: req.firebaseAuth?.uid,
+                ownerUid: req.firebaseAuth?.uid,
+            });
             res.status(201).json(result);
         } catch (err) {
             console.error("[api/onboarding/start] error:", err.message);
@@ -995,6 +1054,40 @@ app.patch(
     }
 );
 
+/** Super Admin — link Client Zero WhatsApp from platform env + activate (manual Meta setup). */
+app.post(
+    "/api/platform/companies/:companyId/integrations/whatsapp/sync-client-zero",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const { isClientZeroCompanyId } = await import("../services/clientZero/clientZero.js");
+            const { ensureClientZeroWhatsAppIntegration } = await import(
+                "../services/clientZero/syncWhatsAppIntegration.js"
+            );
+            const companyId = req.params.companyId;
+            if (!isClientZeroCompanyId(companyId)) {
+                return res.status(403).json({ error: "Only Client Zero tenant can use this sync" });
+            }
+            const body = req.body || {};
+            const result = await ensureClientZeroWhatsAppIntegration({
+                forceReconfigure: Boolean(body.force),
+                source: "platform_mc",
+                overrides: {
+                    phoneNumberId: body.phoneNumberId,
+                    businessAccountId: body.businessAccountId,
+                    wabaId: body.wabaId,
+                    displayPhoneNumber: body.displayPhoneNumber,
+                },
+            });
+            res.json({ companyId, ...result });
+        } catch (err) {
+            respondPlatformWhatsAppError(res, err, "api/platform/whatsapp/sync-client-zero");
+        }
+    }
+);
+
 /** Super Admin — activate WhatsApp integration (B-MC-5c-2b). */
 app.post(
     "/api/platform/companies/:companyId/integrations/whatsapp/activate",
@@ -1052,6 +1145,107 @@ app.post(
             });
         } catch (err) {
             respondPlatformWhatsAppError(res, err, "api/platform/whatsapp/deactivate");
+        }
+    }
+);
+
+/** Super Admin — WhatsApp number pool inventory. */
+app.get(
+    "/api/platform/whatsapp-numbers",
+    requirePlatformAccess(),
+    async (req, res) => {
+        try {
+            await ensureEnvSeedNumber();
+            const status = req.query.status ? String(req.query.status) : null;
+            const kind = req.query.kind ? String(req.query.kind) : null;
+            const items = await listWhatsAppPoolNumbers({ status, kind });
+            res.json({
+                items,
+                total: items.length,
+                available: items.filter((n) => n.status === "available").length,
+                inUse: items.filter((n) => n.status === "in_use").length,
+            });
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers] error:", err.message);
+            res.status(status).json({ error: err.message || "Failed to list WhatsApp numbers" });
+        }
+    }
+);
+
+/** Super Admin — add/update a Meta phone identity in the pool. */
+app.post(
+    "/api/platform/whatsapp-numbers",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    requireBodyFields(["phoneNumberId"]),
+    async (req, res) => {
+        try {
+            const number = await upsertWhatsAppPoolNumber(req.body || {});
+            auditLog("platform_whatsapp_pool_upsert", {
+                numberId: number.id,
+                phoneNumberId: number.phoneNumberId,
+                via: req.platformAuth?.via,
+            });
+            res.status(201).json({ number });
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers POST] error:", err.message);
+            res.status(status).json({ error: err.message, code: err.code });
+        }
+    }
+);
+
+/** Super Admin — assign pool number → tenant WhatsApp (Meta identity link). */
+app.post(
+    "/api/platform/companies/:companyId/integrations/whatsapp/assign-pool-number",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    validateCompanyIdParam("params"),
+    requireBodyFields(["numberId"]),
+    async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const body = req.body || {};
+            const result = await assignWhatsAppPoolNumberToCompany({
+                companyId,
+                numberId: body.numberId,
+                activate: body.activate !== false,
+            });
+            auditLog("platform_whatsapp_pool_assign", {
+                companyId,
+                numberId: body.numberId,
+                phoneNumberId: result.number?.phoneNumberId,
+                activated: result.activated,
+                via: req.platformAuth?.via,
+            });
+            res.status(201).json(result);
+        } catch (err) {
+            respondPlatformWhatsAppError(res, err, "api/platform/whatsapp/assign-pool-number");
+        }
+    }
+);
+
+/** Super Admin — release pool number back to AVAILABLE. */
+app.post(
+    "/api/platform/whatsapp-numbers/:numberId/release",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    async (req, res) => {
+        try {
+            const result = await releaseWhatsAppPoolNumber({
+                numberId: req.params.numberId,
+            });
+            auditLog("platform_whatsapp_pool_release", {
+                numberId: req.params.numberId,
+                previousCompanyId: result.previousCompanyId,
+                via: req.platformAuth?.via,
+            });
+            res.json(result);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers/release] error:", err.message);
+            res.status(status).json({ error: err.message, code: err.code });
         }
     }
 );
@@ -1550,6 +1744,37 @@ app.post(
         res.status(500).json({ error: err.message || "Failed to provision company" });
     }
 });
+
+/**
+ * Mission Control New Company — create tenant + real Auth owner + Sarah + KB + CRM.
+ * No synthetic owner UIDs.
+ */
+app.post(
+    "/api/platform/provision/operator-tenant",
+    requirePlatformAccess(),
+    authRateLimit("provision"),
+    requireBodyFields(["name", "ownerEmail"]),
+    async (req, res) => {
+        try {
+            const body = req.body || {};
+            auditLog("provision_operator_tenant", {
+                name: body.name,
+                ownerEmail: body.ownerEmail,
+                via: req.platformAuth?.via,
+            });
+            const result = await provisionOperatorTenant(body);
+            res.status(201).json(result);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/provision/operator-tenant] error:", err.message);
+            res.status(status).json({
+                error: err.message || "Failed to provision operator tenant",
+                code: err.code || undefined,
+                companyId: err.companyId || undefined,
+            });
+        }
+    }
+);
 
 /** Platform provisioning — AI employee resources (superadmin or API key) */
 app.post(
@@ -2142,6 +2367,21 @@ export async function runBackgroundInit() {
         await seedCentralMotorsPilotIfEnabled().catch((err) => {
             console.error("[startup] Central Motors pilot seed skipped:", err.message);
         });
+        try {
+            const { ensureClientZeroWhatsAppIntegration } = await import(
+                "../services/clientZero/syncWhatsAppIntegration.js"
+            );
+            const czWa = await ensureClientZeroWhatsAppIntegration({ source: "startup" });
+            if (czWa.linked && czWa.runtimeReady) {
+                console.error("[startup] Client Zero WhatsApp linked for", czWa.companyId);
+            } else if (czWa.skipped) {
+                console.error("[startup] Client Zero WhatsApp sync skipped:", czWa.reason);
+            } else if (czWa.error) {
+                console.error("[startup] Client Zero WhatsApp sync pending:", czWa.error);
+            }
+        } catch (err) {
+            console.error("[startup] Client Zero WhatsApp sync failed:", err.message);
+        }
         await seedCustomerOpsDemoIfEmpty();
         try {
             await seedPackVersions();

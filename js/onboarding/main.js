@@ -52,12 +52,38 @@ if (!el.stepContent) {
 
 window.initOnboarding = initOnboarding;
 
+const ONBOARDING_SESSION_STORAGE_KEY = 'ziric_onboarding_session_id';
+
+function stepIndexFromSession(currentStep) {
+  const idx = STEPS.findIndex((s) => s.id === currentStep);
+  return idx >= 0 ? idx : 0;
+}
+
 async function bootstrap() {
   try {
-    const { fetchIndustries } = await import('./api.js');
+    const { fetchIndustries, fetchOnboardingSession } = await import('./api.js');
     const data = await fetchIndustries();
     state.industries = data.industries || [];
     state.whatsapp = data.whatsapp || state.whatsapp;
+
+    const savedSessionId = sessionStorage.getItem(ONBOARDING_SESSION_STORAGE_KEY);
+    if (savedSessionId) {
+      try {
+        const resumed = await fetchOnboardingSession(savedSessionId);
+        const session = resumed?.session;
+        if (session?.status === 'in_progress') {
+          state.sessionId = session.sessionId;
+          state.companyId = session.companyId;
+          state.portalUrl = session.portalUrl;
+          state.companyName = session.companyName;
+          state.stepIndex = stepIndexFromSession(session.currentStep);
+          state.whatsappSimulated = session.whatsappState === 'simulated';
+        }
+      } catch {
+        /* not signed in or session unavailable */
+      }
+    }
+
     renderStepList();
     if (STEPS[state.stepIndex]?.id === 'industry') {
       renderStepContent();
@@ -169,23 +195,35 @@ function fallbackIndustries() {
 }
 
 function renderWhatsAppStep() {
-  const simNote = state.whatsapp.simulate
-    ? '<p style="font-size:13px;color:var(--warning);margin-bottom:16px;"><i class="fa-solid fa-flask"></i> Meta not configured — simulating connection steps with demo progress.</p>'
-    : '<p style="font-size:13px;color:var(--success);margin-bottom:16px;"><i class="fa-solid fa-circle-check"></i> WhatsApp credentials detected in server environment.</p>';
+  const embedded = Boolean(state.whatsapp.embeddedSignupEnabled);
+  const simNote = embedded
+    ? '<p style="font-size:13px;color:var(--success);margin-bottom:16px;"><i class="fa-brands fa-meta"></i> Connect your own WhatsApp Business number with Meta Embedded Signup (same flow as the Company Portal).</p>'
+    : state.whatsapp.simulate
+      ? '<p style="font-size:13px;color:var(--warning);margin-bottom:16px;"><i class="fa-solid fa-flask"></i> Meta Embedded Signup is not configured yet — you can skip and connect later in the Company Portal.</p>'
+      : '<p style="font-size:13px;color:var(--success);margin-bottom:16px;"><i class="fa-solid fa-circle-check"></i> Platform WhatsApp is configured — finish setup in Portal if needed.</p>';
+
+  const body = embedded
+    ? `
+    <ol style="margin:0 0 16px 20px;line-height:1.7;color:var(--text-secondary);font-size:14px;">
+      <li>Sign in with your Meta Business account</li>
+      <li>Create or select a WhatsApp Business account</li>
+      <li>Add and verify your business phone number</li>
+      <li>Grant ZiricAI permission to message on your behalf</li>
+    </ol>
+    <p class="muted" style="font-size:13px;">Use a number not active on WhatsApp mobile or another API provider.</p>
+    <div id="waOnboardingStatus" class="wizard-status" style="margin-top:12px;"></div>`
+    : `<div class="wa-steps" id="waSteps">
+      ${waStepRow('Ready for Setup', 'WhatsApp integration prepared for your workspace', 'fa-whatsapp')}
+      ${waStepRow('Connect in Portal', 'Use Integrations → Connect WhatsApp after onboarding', 'fa-arrow-right')}
+    </div>`;
 
   return `
     <div class="step-header">
       <h1>Connect WhatsApp</h1>
-      <p>Link your Meta Business account and verify your webhook in a few clicks.</p>
+      <p>Link your Meta Business account so customers can message your AI employee on WhatsApp.</p>
     </div>
     ${simNote}
-    <div class="wa-steps" id="waSteps">
-      ${waStepRow('Verify Meta Account', 'Checking Business Manager access', 'fa-meta')}
-      ${waStepRow('Connect Phone Number', 'Register WhatsApp Business API number', 'fa-phone')}
-      ${waStepRow('Verify Webhook', 'Confirm /webhook endpoint with Meta', 'fa-link')}
-      ${waStepRow('Send Test Message', 'Deliver test message to your number', 'fa-paper-plane')}
-      ${waStepRow('Connected', 'WhatsApp channel live', 'fa-circle-check')}
-    </div>
+    ${body}
   `;
 }
 
@@ -270,7 +308,7 @@ function renderCompleteStep() {
       <ul class="complete-checklist">
         <li><i class="fa-solid fa-circle-check"></i> 14-day trial started</li>
         <li><i class="fa-solid fa-circle-check"></i> Default AI employee active</li>
-        <li><i class="fa-solid fa-circle-check"></i> WhatsApp channel ${state.whatsappSimulated ? 'simulated (add Meta credentials for live)' : 'connected'}</li>
+        <li><i class="fa-solid fa-circle-check"></i> WhatsApp: ${state.whatsappSimulated ? 'simulated (connect Meta in Portal)' : 'connected or pending in Portal'}</li>
         <li><i class="fa-solid fa-circle-check"></i> Knowledge base seeded</li>
       </ul>
       <div class="complete-stats">
@@ -288,11 +326,23 @@ function renderActions() {
   const isFirst = state.stepIndex === 0;
   const isLast = state.stepIndex === STEPS.length - 1;
 
+  const waEmbedded = step.id === 'whatsapp' && state.whatsapp.embeddedSignupEnabled;
+  const nextLabel = waEmbedded
+    ? '<i class="fa-brands fa-meta"></i> Continue with Meta'
+    : step.id === 'whatsapp'
+      ? 'Continue'
+      : step.id === 'train'
+        ? 'Start Training'
+        : 'Continue';
+
   el.wizardActions.innerHTML = `
     ${isFirst ? '<span></span>' : '<button type="button" class="btn btn-secondary" id="btnBack"><i class="fa-solid fa-arrow-left"></i> Back</button>'}
-    ${isLast
-      ? `<button type="button" class="btn btn-primary" id="btnPortal"><i class="fa-solid fa-arrow-right"></i> Open Company Portal</button>`
-      : `<button type="button" class="btn btn-primary" id="btnNext">${step.id === 'whatsapp' ? 'Connect' : step.id === 'train' ? 'Start Training' : 'Continue'} <i class="fa-solid fa-arrow-right"></i></button>`}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+      ${waEmbedded ? '<button type="button" class="btn btn-secondary" id="btnWaSkip">Skip for now</button>' : ''}
+      ${isLast
+        ? `<button type="button" class="btn btn-primary" id="btnPortal"><i class="fa-solid fa-arrow-right"></i> Open Company Portal</button>`
+        : `<button type="button" class="btn btn-primary" id="btnNext">${nextLabel}${waEmbedded ? '' : ' <i class="fa-solid fa-arrow-right"></i>'}</button>`}
+    </div>
   `;
 
   document.getElementById('btnBack')?.addEventListener('click', () => {
@@ -303,6 +353,7 @@ function renderActions() {
   });
 
   document.getElementById('btnNext')?.addEventListener('click', () => handleNext());
+  document.getElementById('btnWaSkip')?.addEventListener('click', () => handleWhatsAppSkip());
   document.getElementById('btnPortal')?.addEventListener('click', () => {
     const url = state.portalUrl || portalUrl(state.companyId || '');
     window.location.href = url;
@@ -434,8 +485,8 @@ async function handleAccountStep() {
   state.companyName = companyName;
 
   setStatus('Creating your account...');
-  const [{ registerUser }, { createUserProfile, createTenantMembership }, { startOnboarding }] =
-    await Promise.all([import('../auth.js'), import('../users.js'), loadOnboardingApi()]);
+  const [{ registerUser }, { startOnboarding }] =
+    await Promise.all([import('../auth.js'), loadOnboardingApi()]);
   const authResult = await registerUser(ownerEmail, password);
   if (authResult.error) throw new Error(authResult.error);
 
@@ -444,31 +495,16 @@ async function handleAccountStep() {
   state.sessionId = onboard.sessionId;
   state.companyId = onboard.companyId;
   state.portalUrl = onboard.portalUrl;
+  state.whatsappSimulated = onboard.whatsappState === 'simulated';
+  sessionStorage.setItem(ONBOARDING_SESSION_STORAGE_KEY, onboard.sessionId);
 
-  setStatus('Setting up your profile...');
-  const profileResult = await createUserProfile(authResult.user.uid, {
-    fullName: ownerName,
-    email: ownerEmail,
-    role: 'owner',
-    company: companyName,
-    companyId: state.companyId,
-    status: 'active',
-  });
-  if (profileResult.error) {
-    console.warn('Profile write:', profileResult.error);
+  if (onboard.resumed) {
+    setStatus('Resuming your onboarding...', 'success');
+  } else if (onboard.alreadyLive) {
+    setStatus('Your workspace is already live — open Portal to continue.', 'success');
+  } else {
+    setStatus('Account created!', 'success');
   }
-
-  const memberResult = await createTenantMembership(authResult.user.uid, state.companyId, {
-    email: ownerEmail,
-    fullName: ownerName,
-    role: 'owner',
-    status: 'active',
-  });
-  if (memberResult.error) {
-    console.warn('Membership write:', memberResult.error);
-  }
-
-  setStatus('Account created!', 'success');
 }
 
 async function handleIndustryStep() {
@@ -484,18 +520,79 @@ async function handleIndustryStep() {
   }
 }
 
+async function handleWhatsAppSkip() {
+  if (state.busy) return;
+  state.busy = true;
+  try {
+    await finalizeWhatsAppOnboardingStep({ skipped: true });
+    state.stepIndex = Math.min(state.stepIndex + 1, STEPS.length - 1);
+    render();
+  } catch (err) {
+    setStatus(err.message || 'Something went wrong', 'error');
+  } finally {
+    state.busy = false;
+  }
+}
+
+async function finalizeWhatsAppOnboardingStep(stepData = {}) {
+  if (!state.sessionId) throw new Error('Session expired.');
+  const { completeStep } = await loadOnboardingApi();
+  const result = await completeStep(state.sessionId, 'whatsapp', stepData);
+  const wa = result?.whatsapp || {};
+  state.whatsappSimulated = wa.state === 'simulated' || wa.simulated === true;
+  if (wa.state === 'connected' && wa.connected) {
+    setStatus('WhatsApp connected!', 'success');
+  } else if (wa.state === 'pending' || wa.skipped) {
+    setStatus('WhatsApp ready — connect anytime from Integrations in your Company Portal.', 'success');
+  } else if (wa.state === 'simulated') {
+    setStatus('Continue in Portal → Integrations to connect WhatsApp.', 'success');
+  } else if (wa.state === 'failed') {
+    setStatus(wa.error || 'WhatsApp setup failed — retry in Portal.', 'error');
+  } else {
+    setStatus('WhatsApp step saved.', 'success');
+  }
+  return result;
+}
+
 async function handleWhatsAppStep() {
   if (!state.sessionId) throw new Error('Session expired.');
+  if (!state.companyId) throw new Error('Workspace not ready — go back to account step.');
+
+  if (state.whatsapp.embeddedSignupEnabled) {
+    const statusEl = document.getElementById('waOnboardingStatus');
+    const btn = document.getElementById('btnNext');
+    if (btn) btn.disabled = true;
+    const { fetchWhatsAppEmbeddedSignupConfig, completeWhatsAppEmbeddedSignup } =
+      await loadOnboardingApi();
+    const { runMetaEmbeddedSignupConnect } = await import('../shared/metaEmbeddedSignupClient.js');
+
+    const config = await fetchWhatsAppEmbeddedSignupConfig(state.companyId);
+    if (!config?.enabled) {
+      throw new Error('WhatsApp Embedded Signup is not available — skip and connect later in Portal.');
+    }
+
+    await runMetaEmbeddedSignupConnect({
+      config,
+      companyId: state.companyId,
+      completeSignup: completeWhatsAppEmbeddedSignup,
+      onStatus: (msg) => {
+        if (statusEl) statusEl.textContent = msg;
+        setStatus(msg);
+      },
+    });
+
+    await finalizeWhatsAppOnboardingStep({ embeddedSignupCompleted: true });
+    return;
+  }
+
   const rows = document.querySelectorAll('[data-wa-step]');
   for (let i = 0; i < rows.length; i += 1) {
     rows[i].classList.add('running');
-    await delay(600 + i * 200);
+    await delay(400 + i * 150);
     rows[i].classList.remove('running');
     rows[i].classList.add('done');
   }
-  const { completeStep } = await loadOnboardingApi();
-  await completeStep(state.sessionId, 'whatsapp', {});
-  setStatus('WhatsApp connected!', 'success');
+  await finalizeWhatsAppOnboardingStep({});
 }
 
 async function handleKnowledgeStep() {
@@ -537,8 +634,9 @@ async function handleTrainStep() {
   }
 
   const { completeStep } = await loadOnboardingApi();
-  await completeStep(state.sessionId, 'train', {});
-  setStatus('Training complete!', 'success');
+  const result = await completeStep(state.sessionId, 'train', {});
+  const training = result?.training || {};
+  setStatus(training.message || 'Knowledge setup complete.', 'success');
   state.stepIndex += 1;
   render();
 }

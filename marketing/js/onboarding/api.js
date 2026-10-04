@@ -25,6 +25,10 @@ export function startOnboarding(payload) {
   });
 }
 
+export function fetchOnboardingSession(sessionId) {
+  return request(`/api/onboarding/session/${encodeURIComponent(sessionId)}`);
+}
+
 export function completeStep(sessionId, step, data = {}) {
   return request('/api/onboarding/complete-step', {
     method: 'POST',
@@ -47,4 +51,24 @@ export async function uploadKnowledge(companyId, file, title) {
 
 export function fetchHealth() {
   return request('/api/health');
+}
+
+export function fetchWhatsAppEmbeddedSignupConfig(companyId) {
+  const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
+  return request(`/api/integrations/whatsapp/embedded-signup-config${qs}`);
+}
+
+export async function completeWhatsAppEmbeddedSignup(companyId, payload) {
+  try {
+    const data = await request(
+      `/api/companies/${encodeURIComponent(companyId)}/integrations/whatsapp/embedded-signup`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }
+    );
+    return { data };
+  } catch (err) {
+    return { error: err?.message || 'WhatsApp connect failed' };
+  }
 }

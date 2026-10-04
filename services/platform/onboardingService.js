@@ -18,7 +18,7 @@ import { upsertGlobalUserProfile, upsertOwnerMembership } from "../auth/authServ
 import { portalUrlForCompany } from "../core/siteUrls.js";
 import { updateCompany, saveCompanyBranding } from "../tenants/companyService.js";
 import { upsertTenantUser } from "../tenants/userService.js";
-import { finalizeTenantOnboarding, syncWhatsAppIntegrationStatus } from "./tenantBootstrap.js";
+import { finalizeTenantOnboarding } from "./tenantBootstrap.js";
 import { getWorkspaceSnapshot } from "../portal/workspaceService.js";
 import { listAiEmployees } from "../tenants/aiEmployeeService.js";
 import { listKnowledgeDocuments } from "../tenants/knowledgeService.js";
@@ -28,9 +28,20 @@ import {
     bindSelfServeCompanyData,
     resolveSeedDemoLead,
 } from "./selfServeOwnerBinding.js";
-
-/** In-memory onboarding sessions (dev/demo; persist to Firestore in production). */
-const sessions = new Map();
+import {
+    saveOnboardingSession,
+    getOnboardingSessionRecord,
+    findLatestInProgressSessionForUid,
+    findLatestLiveSessionForUid,
+    SESSION_STATUS,
+} from "./onboardingSessionStore.js";
+import {
+    resolveWhatsAppOnboardingState,
+    buildHonestTrainingStepResult,
+    buildHonestWebsiteImportResult,
+} from "./onboardingSessionHonesty.js";
+import { getWhatsAppIntegration } from "../tenants/integrationService.js";
+import { ensureWhatsAppReadyForSetup } from "./whatsappNumberPoolService.js";
 
 export const ONBOARDING_STEPS = [
     "account",
@@ -80,8 +91,45 @@ function hashSeed(str) {
     return Math.abs(h);
 }
 
-export function getOnboardingSession(sessionId) {
-    return sessions.get(sessionId) || null;
+export async function getOnboardingSession(sessionId) {
+    return getOnboardingSessionRecord(sessionId);
+}
+
+function formatStartResponse(session, extra = {}) {
+    return {
+        sessionId: session.sessionId,
+        companyId: session.companyId,
+        portalUrl: session.portalUrl,
+        plan: session.plan,
+        planLabel: session.planLabel,
+        currentStep: session.currentStep,
+        completedSteps: session.completedSteps || [],
+        whatsapp: getWhatsAppConfig(),
+        industries: ONBOARDING_INDUSTRIES,
+        sessionStatus: session.status,
+        whatsappState: session.whatsappState || "unconfigured",
+        trainingState: session.trainingState || "unconfigured",
+        ...extra,
+    };
+}
+
+export function assertOnboardingSessionOwner(session, auth) {
+    if (auth?.isSuperAdmin) return;
+    if (!auth?.uid) {
+        throw Object.assign(new Error("Authentication required"), { status: 401, code: "UNAUTHORIZED" });
+    }
+    if (session.uid && session.uid !== auth.uid) {
+        throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
+    }
+}
+
+function assertSessionAllowsStepMutation(session) {
+    if (session.status === SESSION_STATUS.LIVE) {
+        throw Object.assign(new Error("Onboarding already complete"), {
+            status: 409,
+            code: "ONBOARDING_COMPLETE",
+        });
+    }
 }
 
 /**
@@ -96,7 +144,7 @@ export async function assertOnboardingSessionAccess(req, sessionId) {
         throw Object.assign(new Error("Authentication required"), { status: 401, code: "UNAUTHORIZED" });
     }
 
-    const session = sessions.get(sessionId);
+    const session = await getOnboardingSessionRecord(sessionId);
     if (!session) {
         throw Object.assign(new Error("Onboarding session not found"), { status: 404, code: "SESSION_NOT_FOUND" });
     }
@@ -105,9 +153,7 @@ export async function assertOnboardingSessionAccess(req, sessionId) {
         return { session, auth };
     }
 
-    if (session.uid && session.uid !== auth.uid) {
-        throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
-    }
+    assertOnboardingSessionOwner(session, auth);
 
     if (auth.profile && !userBelongsToCompany(auth.profile, session.companyId)) {
         throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
@@ -124,8 +170,13 @@ export async function assertOnboardingSessionAccess(req, sessionId) {
 export function getWhatsAppConfig() {
     const phoneId = process.env.PHONE_NUMBER_ID || "";
     const configured = Boolean(phoneId && process.env.WHATSAPP_TOKEN);
+    const embeddedSignupEnabled = Boolean(
+        String(process.env.META_APP_ID || process.env.FB_APP_ID || "").trim() &&
+            String(process.env.WHATSAPP_EMBEDDED_CONFIG_ID || "").trim()
+    );
     return {
         configured,
+        embeddedSignupEnabled,
         verifyTokenSet: Boolean(
             process.env.VERIFY_TOKEN ||
                 process.env.WHATSAPP_VERIFY_TOKEN ||
@@ -136,7 +187,7 @@ export function getWhatsAppConfig() {
         defaultCompanyIdSet: Boolean(process.env.DEFAULT_COMPANY_ID),
         phoneNumberId: phoneId ? `***${phoneId.slice(-4)}` : null,
         webhookUrl: "/webhook",
-        simulate: !configured,
+        simulate: !configured && !embeddedSignupEnabled,
     };
 }
 
@@ -157,6 +208,16 @@ export async function startOnboarding(payload = {}) {
     if (!ownerName?.trim()) throw new Error("ownerName is required");
 
     const ownerUid = resolveSelfServeOwnerUid({ uid, ownerName, ownerEmail, companyName });
+
+    const existingInProgress = await findLatestInProgressSessionForUid(ownerUid);
+    if (existingInProgress) {
+        return formatStartResponse(existingInProgress, { resumed: true });
+    }
+
+    const existingLive = await findLatestLiveSessionForUid(ownerUid);
+    if (existingLive) {
+        return formatStartResponse(existingLive, { alreadyLive: true });
+    }
 
     const slug = slugifyCompanyName(companyName);
     const companyId = `${slug}-${Date.now().toString(36).slice(-4)}`;
@@ -195,15 +256,26 @@ export async function startOnboarding(payload = {}) {
         industry: null,
         packId: null,
         whatsappConnected: false,
+        whatsappState: "unconfigured",
+        whatsappSimulated: false,
         knowledgeItems: [],
         trained: false,
+        trainingState: "unconfigured",
         portalUrl: provisionResult.links?.portalUrl || portalUrlForCompany(companyId),
         links: provisionResult.links,
+        status: SESSION_STATUS.IN_PROGRESS,
         createdAt: timestamp,
         updatedAt: timestamp,
+        lastError: null,
     };
 
-    sessions.set(sessionId, session);
+    await saveOnboardingSession(session);
+
+    try {
+        await ensureWhatsAppReadyForSetup(companyId);
+    } catch (err) {
+        console.warn("[onboarding/start] WhatsApp ready-for-setup skipped:", err.message);
+    }
 
     await upsertGlobalUserProfile(ownerUid, {
         email: ownerEmail.trim(),
@@ -219,22 +291,14 @@ export async function startOnboarding(payload = {}) {
         status: "active",
     });
 
-    return {
-        sessionId,
-        companyId,
-        portalUrl: session.portalUrl,
-        plan: session.plan,
-        planLabel: session.planLabel,
-        currentStep: session.currentStep,
-        completedSteps: session.completedSteps,
-        whatsapp: getWhatsAppConfig(),
-        industries: ONBOARDING_INDUSTRIES,
-    };
+    return formatStartResponse(session, { created: true });
 }
 
 export async function completeOnboardingStep(sessionId, step, data = {}) {
-    const session = sessions.get(sessionId);
+    const session = await getOnboardingSessionRecord(sessionId);
     if (!session) throw new Error("Onboarding session not found");
+
+    assertSessionAllowsStepMutation(session);
 
     const stepIndex = ONBOARDING_STEPS.indexOf(step);
     if (stepIndex < 0) throw new Error(`Unknown step: ${step}`);
@@ -309,10 +373,50 @@ export async function completeOnboardingStep(sessionId, step, data = {}) {
 
         case "whatsapp": {
             const wa = getWhatsAppConfig();
-            session.whatsappConnected = true;
-            session.whatsappSimulated = wa.simulate;
-            await syncWhatsAppIntegrationStatus(session.companyId);
-            result.whatsapp = { connected: true, simulated: wa.simulate, ...wa };
+            try {
+                await ensureWhatsAppReadyForSetup(session.companyId);
+            } catch (err) {
+                session.lastError = err.message;
+                result.whatsapp = {
+                    state: "failed",
+                    connected: false,
+                    simulated: false,
+                    pending: false,
+                    error: err.message,
+                };
+                session.whatsappState = "failed";
+                session.whatsappConnected = false;
+                session.whatsappSimulated = false;
+                break;
+            }
+            if (data.skipped === true) {
+                const integ = await getWhatsAppIntegration(session.companyId);
+                const honest = resolveWhatsAppOnboardingState(wa, integ);
+                session.whatsappState = honest.state === "simulated" ? "pending" : honest.state;
+                session.whatsappConnected = false;
+                session.whatsappSimulated = false;
+                result.whatsapp = {
+                    ...honest,
+                    state: session.whatsappState,
+                    skipped: true,
+                    configured: wa.configured,
+                    embeddedSignupEnabled: wa.embeddedSignupEnabled,
+                    webhookUrl: wa.webhookUrl,
+                };
+                break;
+            }
+            const integ = await getWhatsAppIntegration(session.companyId);
+            const honest = resolveWhatsAppOnboardingState(wa, integ);
+            session.whatsappState = honest.state;
+            session.whatsappConnected = honest.connected;
+            session.whatsappSimulated = honest.simulated;
+            result.whatsapp = {
+                ...honest,
+                configured: wa.configured,
+                embeddedSignupEnabled: wa.embeddedSignupEnabled,
+                webhookUrl: wa.webhookUrl,
+                embeddedSignupCompleted: Boolean(data.embeddedSignupCompleted),
+            };
             break;
         }
 
@@ -333,9 +437,10 @@ export async function completeOnboardingStep(sessionId, step, data = {}) {
                     title: `Website — ${data.websiteUrl.trim()}`,
                     type: "website",
                     url: data.websiteUrl.trim(),
-                    content: `Imported website content placeholder for ${data.websiteUrl.trim()}. Full crawl runs in production.`,
+                    content: `[Onboarding placeholder — not a live crawl] URL: ${data.websiteUrl.trim()}`,
                 });
                 items.push(saved);
+                result.websiteImport = buildHonestWebsiteImportResult({ placeholder: true });
             }
             if (data.documents?.length) {
                 for (const doc of data.documents) {
@@ -348,9 +453,13 @@ export async function completeOnboardingStep(sessionId, step, data = {}) {
         }
 
         case "train": {
-            session.trained = true;
+            session.trained = false;
+            session.trainingState = "simulated";
+            session.knowledgeSetupComplete = true;
             session.trainedAt = timestamp;
-            result.training = { status: "complete", chunks: 42 + (session.knowledgeItems?.length || 0) * 12 };
+            result.training = buildHonestTrainingStepResult({
+                knowledgeItemCount: session.knowledgeItems?.length || 0,
+            });
             break;
         }
 
@@ -362,7 +471,7 @@ export async function completeOnboardingStep(sessionId, step, data = {}) {
 
         case "complete": {
             session.completedAt = timestamp;
-            session.status = "live";
+            session.status = SESSION_STATUS.LIVE;
 
             if (data.branding) {
                 await saveCompanyBranding(session.companyId, data.branding);
@@ -399,7 +508,7 @@ export async function completeOnboardingStep(sessionId, step, data = {}) {
                 ownerName: session.ownerName,
                 industry: session.industry,
                 industryId: session.industryId,
-                whatsappConnected: session.whatsappConnected,
+                whatsappConnected: session.whatsappConnected === true,
                 seedDemoLead: resolveSeedDemoLead(data.seedDemoLead),
                 onboardingCompletedAt: timestamp,
             });
@@ -443,7 +552,8 @@ export async function completeOnboardingStep(sessionId, step, data = {}) {
     const nextIdx = Math.min(stepIndex + 1, ONBOARDING_STEPS.length - 1);
     session.currentStep = ONBOARDING_STEPS[nextIdx];
     session.updatedAt = timestamp;
-    sessions.set(sessionId, session);
+    session.lastError = result.error || session.lastError || null;
+    await saveOnboardingSession(session);
 
     return {
         ...result,
