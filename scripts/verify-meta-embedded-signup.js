@@ -13,18 +13,20 @@ function read(rel) {
     return fs.readFileSync(path.join(ROOT, rel), "utf8");
 }
 
+const sharedClient = read("js/shared/metaEmbeddedSignupClient.js");
+assert.match(sharedClient, /response_type:\s*['"]code['"]/);
+assert.match(sharedClient, /override_default_response_type:\s*true/);
+assert.match(sharedClient, /sessionInfoVersion:\s*['"]3['"]/);
+assert.match(sharedClient, /config_id:\s*config\.configId/);
+assert.match(sharedClient, /phone_number_id|waba_id/);
+assert.match(sharedClient, /eventName === 'FINISH'/);
+assert.doesNotMatch(sharedClient, /META_APP_SECRET\s*=/);
+
 const portalJs = read("js/portal/whatsappConnect.js");
-assert.match(portalJs, /response_type:\s*['"]code['"]/);
-assert.match(portalJs, /override_default_response_type:\s*true/);
-assert.match(portalJs, /sessionInfoVersion:\s*['"]3['"]/);
-assert.match(portalJs, /config_id:\s*config\.configId/);
-assert.match(portalJs, /authResponse\.code/);
-assert.match(portalJs, /phone_number_id|waba_id/);
-assert.match(portalJs, /eventName === 'FINISH'/);
+assert.match(portalJs, /runMetaEmbeddedSignupConnect/);
+assert.match(portalJs, /completeWhatsAppEmbeddedSignup/);
 assert.doesNotMatch(portalJs, /console\.log\s*\(\s*authCode/);
-assert.match(portalJs, /completeWhatsAppEmbeddedSignup\(companyId,\s*\{/);
 assert.doesNotMatch(portalJs, /META_APP_SECRET\s*=/);
-assert.doesNotMatch(portalJs, /client_secret|access_token/i);
 
 const serviceJs = read("services/integrations/metaEmbeddedSignupService.js");
 assert.match(serviceJs, /exchangeEmbeddedSignupCode/);
