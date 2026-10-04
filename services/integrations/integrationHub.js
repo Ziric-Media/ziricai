@@ -12,9 +12,75 @@ import { handleWebhookRequest, handleWhatsAppWebhook, handleLegacyWhatsAppWebhoo
 import { ingest, ingestBatch } from "./conversationPipeline.js";
 import { requireTenantOrPlatformAccess } from "../core/tenantContext.js";
 import { requirePlatformAccess } from "../auth/platformAuth.js";
-import { listChannelIntegrations } from "../tenants/integrationService.js";
+import { listIntegrations } from "../tenants/integrationService.js";
+import { resolvePilotDataCompanyId } from "../storage/centralMotorsPilot.js";
+import { CHANNELS } from "./types/unifiedMessage.js";
+import {
+    getEmbeddedSignupPublicConfig,
+    completeEmbeddedSignupForTenant,
+    toEmbeddedSignupHttpError,
+} from "./metaEmbeddedSignupService.js";
+import { checkPermission } from "../auth/permissionsService.js";
+import { requireAuthenticatedTenantMember } from "../core/tenantContext.js";
+import { isClientZeroCompanyId } from "../clientZero/clientZero.js";
+import {
+    ensureClientZeroWhatsAppIntegration,
+    getClientZeroWhatsAppWebhookHint,
+    resolveClientZeroWhatsAppEnv,
+} from "../clientZero/syncWhatsAppIntegration.js";
 
 let initialized = false;
+
+const ACTIVE_INTEGRATION_STATUSES = new Set(["active", "connected"]);
+
+/**
+ * Merge tenant integration docs into adapter channel catalog rows.
+ * @param {object[]} channels
+ * @param {object[]} integrations sanitized integration records
+ */
+export function mergeTenantIntegrationsIntoChannels(channels, integrations = []) {
+    const byChannel = new Map();
+    for (const rec of integrations) {
+        const key = rec.channel || rec.provider;
+        if (key) byChannel.set(key, rec);
+    }
+
+    return channels.map((ch) => {
+        const rec = byChannel.get(ch.channel);
+        if (!rec) return ch;
+        const status = String(rec.status || "").toLowerCase();
+        const tenantConnected = ACTIVE_INTEGRATION_STATUSES.has(status);
+        return {
+            ...ch,
+            configured: tenantConnected,
+            integrationStatus: rec.status || null,
+            displayPhoneNumber: rec.displayPhoneNumber || null,
+            phoneNumberId: rec.phoneNumberId || null,
+        };
+    });
+}
+
+async function listSanitizedIntegrations(companyId) {
+    const items = await listIntegrations(companyId);
+    return items.map((rec) => {
+        const {
+            config,
+            accessToken,
+            whatsappToken,
+            token,
+            privateKey,
+            credentials,
+            ...safe
+        } = rec;
+        return {
+            ...safe,
+            channel: safe.channel || safe.provider,
+            phoneNumberId: safe.phoneNumberId
+                ? `***${String(safe.phoneNumberId).slice(-4)}`
+                : null,
+        };
+    });
+}
 
 function isOutboundRetryable(err) {
     return isRetryableOutboundError(err);
@@ -133,19 +199,100 @@ export function mountIntegrationRoutes(app) {
     app.get("/api/integrations/logs/:companyId", requireTenantOrPlatformAccess(), (req, res) => {
         const limit = Number(req.query.limit) || 50;
         const channel = req.query.channel || undefined;
-        const logs = getIntegrationLogs(req.params.companyId, { limit, channel });
-        res.json({ items: logs, count: logs.length });
+        const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+        const logs = getIntegrationLogs(dataCompanyId, { limit, channel });
+        res.json({ items: logs, count: logs.length, companyId: req.params.companyId });
     });
 
     app.get("/api/integrations/channels/:companyId", requireTenantOrPlatformAccess(), async (req, res) => {
-        const companyId = req.params.companyId;
-        const integrations = await listChannelIntegrations(companyId, "whatsapp");
+        const portalCompanyId = req.params.companyId;
+        const dataCompanyId = resolvePilotDataCompanyId(portalCompanyId);
+        const integrations = await listSanitizedIntegrations(dataCompanyId);
+        let channels = getChannelStatus(dataCompanyId);
+        channels = mergeTenantIntegrationsIntoChannels(channels, integrations);
+
+        const waRow = channels.find((c) => c.channel === CHANNELS.WHATSAPP);
+        const waIntegration = integrations.find(
+            (i) => (i.channel || i.provider) === CHANNELS.WHATSAPP
+        );
+        if (waRow && waIntegration && waRow.configured) {
+            waRow.description = waRow.displayPhoneNumber
+                ? `Connected · ${waRow.displayPhoneNumber}`
+                : "WhatsApp Business API connected for this workspace";
+        }
+
         res.json({
-            companyId,
-            channels: getChannelStatus(companyId),
+            companyId: portalCompanyId,
+            dataCompanyId,
+            channels,
             integrations,
         });
     });
+
+    app.get("/api/integrations/whatsapp/embedded-signup-config", requireTenantOrPlatformAccess(), (req, res) => {
+        const base = getEmbeddedSignupPublicConfig();
+        const czEnv = resolveClientZeroWhatsAppEnv();
+        res.json({
+            ...base,
+            clientZero: {
+                companyId: czEnv.companyId,
+                webhookUrl: getClientZeroWhatsAppWebhookHint(),
+                platformPhoneConfigured: Boolean(czEnv.phoneNumberId && process.env.WHATSAPP_TOKEN),
+            },
+        });
+    });
+
+    app.post(
+        "/api/companies/:companyId/integrations/whatsapp/sync-client-zero",
+        requireTenantOrPlatformAccess(),
+        async (req, res) => {
+            try {
+                const companyId = req.params.companyId;
+                if (!isClientZeroCompanyId(companyId)) {
+                    return res.status(403).json({ error: "Only Client Zero tenant can use this sync" });
+                }
+                const body = req.body || {};
+                const result = await ensureClientZeroWhatsAppIntegration({
+                    forceReconfigure: Boolean(body.force),
+                    source: "portal_sync",
+                    overrides: {
+                        phoneNumberId: body.phoneNumberId,
+                        businessAccountId: body.businessAccountId,
+                        wabaId: body.wabaId,
+                        displayPhoneNumber: body.displayPhoneNumber,
+                    },
+                });
+                res.json(result);
+            } catch (err) {
+                const status = err.status || 500;
+                console.error("[api/whatsapp/sync-client-zero] error:", err.message);
+                res.status(status).json({ error: err.message || "Sync failed" });
+            }
+        }
+    );
+
+    app.post(
+        "/api/companies/:companyId/integrations/whatsapp/embedded-signup",
+        requireAuthenticatedTenantMember(),
+        checkPermission("canManageIntegrations"),
+        async (req, res) => {
+            try {
+                const companyId = req.params.companyId;
+                if (String(req.tenant?.companyId || req.tenantMemberAuth?.companyId || "") !== String(companyId)) {
+                    return res.status(403).json({ error: "Access denied for this company", code: "TENANT_FORBIDDEN" });
+                }
+                const result = await completeEmbeddedSignupForTenant(companyId, req.body || {});
+                res.json(result);
+            } catch (err) {
+                const { status, body } = toEmbeddedSignupHttpError(err);
+                console.error("[api/whatsapp/embedded-signup] error:", err.message, {
+                    status,
+                    metaCode: err.meta?.code ?? null,
+                });
+                res.status(status).json(body);
+            }
+        }
+    );
 }
 
 export {

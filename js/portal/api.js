@@ -79,6 +79,26 @@ export async function fetchKnowledgeDocuments(companyId, { knowledgeBaseId } = {
   return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/documents${qs}`);
 }
 
+export async function createKnowledgeDocument(companyId, data) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/documents`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function uploadKnowledgeFile(companyId, { title, type, file, knowledgeBaseId }) {
+  const form = new FormData();
+  form.append('title', title);
+  form.append('type', type || 'document');
+  form.append('file', file);
+  if (knowledgeBaseId) form.append('knowledgeBaseId', knowledgeBaseId);
+  return request(`/api/companies/${encodeURIComponent(companyId)}/knowledge/upload`, {
+    method: 'POST',
+    body: form,
+  });
+}
+
 export async function fetchAiEmployees(companyId) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/ai-employees`);
 }
@@ -315,6 +335,33 @@ export async function fetchIntegrationLogs(companyId, { limit = 50, channel } = 
   const params = new URLSearchParams({ limit: String(limit) });
   if (channel) params.set('channel', channel);
   return request(`/api/integrations/logs/${encodeURIComponent(companyId)}?${params}`);
+}
+
+export async function fetchWhatsAppEmbeddedSignupConfig(companyId) {
+  const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
+  return request(`/api/integrations/whatsapp/embedded-signup-config${qs}`);
+}
+
+export async function syncClientZeroWhatsApp(companyId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/integrations/whatsapp/sync-client-zero`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function completeWhatsAppEmbeddedSignup(companyId, payload) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/integrations/whatsapp/embedded-signup`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 export async function sarahChat(payload) {

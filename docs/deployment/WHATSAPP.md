@@ -90,8 +90,13 @@ Meta Developer Console → WhatsApp → Configuration:
 
 Outbound retries use exponential backoff (1s, 2s, 4s) via the integration retry queue. Inbound processing (`PROCESS_INBOUND_MESSAGE`) is never failed solely because outbound delivery failed.
 
+## Meta Developer Console errors (Direct Signup V2)
+
+If the Meta console shows CSP errors to `*.on.aws/events` and **WhatsAppDirectSignupConfigV2ComposeMessageStep** with Graph error **100**, the in-wizard test send failed — you can still finish setup manually (webhook + token + phone ID). See **[META_CONSOLE_SETUP.md](./META_CONSOLE_SETUP.md)** and run `node scripts/verify-meta-whatsapp-config.js` locally with your `.env`.
+
 ## Related docs
 
+- [META_CONSOLE_SETUP.md](./META_CONSOLE_SETUP.md) — Meta console wizard errors, manual Client Zero path
 - [Integration Hub](../architecture/INTEGRATION_HUB.md) — adapter architecture and webhook routes
 - [Railway deployment](./RAILWAY.md) — hosting the API + webhook endpoint
 

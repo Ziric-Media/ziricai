@@ -24,6 +24,8 @@ const CONFIGURABLE_FIELDS = [
     "displayPhoneNumber",
     "businessAccountId",
     "credentialsSource",
+    "verifiedBusinessName",
+    "embeddedSignupCompletedAt",
 ];
 const REGISTER_FIELDS = [...CONFIGURABLE_FIELDS];
 
@@ -101,16 +103,10 @@ async function assertNoCrossTenantActivePhone(companyId, phoneNumberId) {
     }
 }
 
-function envWhatsAppConfigured() {
-    const phoneId = process.env.PHONE_NUMBER_ID || "";
-    const token = process.env.WHATSAPP_TOKEN || "";
-    return {
-        configured: Boolean(phoneId && token),
-        phoneNumberId: phoneId,
-    };
-}
-
-/** Server-side runtime readiness (uses raw integration record, not masked API fields). */
+/** Server-side runtime readiness (uses raw integration record, not masked API fields).
+ * Shared-token multi-phone: WHATSAPP_TOKEN is global; phoneNumberId is per-tenant Graph identity.
+ * env.PHONE_NUMBER_ID is bootstrap/seed only — mismatch is not a readiness failure.
+ */
 export function assessRuntimeReadiness(integration) {
     const missing = [];
     if (!integration?.phoneNumberId) {
@@ -119,16 +115,7 @@ export function assessRuntimeReadiness(integration) {
 
     const source = integration?.credentialsSource || null;
     if (source === "env") {
-        const env = envWhatsAppConfigured();
-        if (!env.phoneNumberId) missing.push("env.PHONE_NUMBER_ID");
         if (!process.env.WHATSAPP_TOKEN) missing.push("env.WHATSAPP_TOKEN");
-        if (
-            integration.phoneNumberId &&
-            env.phoneNumberId &&
-            String(integration.phoneNumberId) !== String(env.phoneNumberId)
-        ) {
-            missing.push("phoneNumberId_env_mismatch");
-        }
     } else if (source === "tenant") {
         missing.push("tenant_credentials_not_configured");
     } else if (source === null || source === undefined) {
@@ -142,21 +129,13 @@ export function assessRuntimeReadiness(integration) {
 }
 
 function validateEnvActivation(integration, opts = {}) {
-    const env = envWhatsAppConfigured();
-    if (!env.configured) {
-        throw platformError("Environment WhatsApp credentials are not configured", 422);
+    if (!process.env.WHATSAPP_TOKEN) {
+        throw platformError("Environment WHATSAPP_TOKEN is not configured", 422);
     }
-    if (
-        integration.phoneNumberId &&
-        env.phoneNumberId &&
-        String(integration.phoneNumberId) !== String(env.phoneNumberId) &&
-        !opts.acknowledgeEnvCredentials
-    ) {
-        throw platformError(
-            "phoneNumberId does not match environment PHONE_NUMBER_ID; set acknowledgeEnvCredentials to proceed",
-            422
-        );
-    }
+    // Shared-token multi-phone: tenant phoneNumberId is the Graph send identity.
+    // env PHONE_NUMBER_ID may differ (pool numbers under the same WABA).
+    void integration;
+    void opts;
 }
 
 async function persistIntegration(companyId, docId, patch) {
@@ -260,6 +239,66 @@ export async function activatePlatformWhatsAppIntegration(companyId, opts = {}) 
  * @param {string} companyId
  * @param {{ reason?: string }} [opts]
  */
+/**
+ * Persist Embedded Signup result including server-only access token (never returned to clients).
+ * @param {string} companyId
+ * @param {object} payload
+ */
+export async function applyEmbeddedSignupIntegration(companyId, payload = {}) {
+    await requireCompany(companyId);
+
+    const phoneNumberId = payload.phoneNumberId ? String(payload.phoneNumberId).trim() : null;
+    if (!phoneNumberId || !isValidPhoneNumberId(phoneNumberId)) {
+        throw platformError("Invalid phoneNumberId from Meta Embedded Signup", 400);
+    }
+
+    await assertNoCrossTenantActivePhone(companyId, phoneNumberId);
+
+    const existing = await getWhatsAppIntegration(companyId);
+    const credentialsSource = payload.credentialsSource === "tenant" ? "tenant" : "env";
+    const now = new Date().toISOString();
+
+    const record = {
+        provider: PROVIDER_WHATSAPP,
+        channel: PROVIDER_WHATSAPP,
+        phoneNumberId,
+        displayPhoneNumber: payload.displayPhoneNumber || existing?.displayPhoneNumber || null,
+        businessAccountId: payload.businessAccountId || existing?.businessAccountId || null,
+        verifiedBusinessName: payload.verifiedBusinessName || existing?.verifiedBusinessName || null,
+        credentialsSource,
+        embeddedSignupCompletedAt: payload.embeddedSignupCompletedAt || now,
+        status: WHATSAPP_STATUS_PENDING,
+    };
+
+    if (credentialsSource === "tenant" && payload.accessToken) {
+        record.accessToken = String(payload.accessToken).trim();
+    } else if (credentialsSource === "env") {
+        delete record.accessToken;
+    }
+
+    let saved;
+    if (!existing?.id) {
+        saved = await createIntegrationDoc(companyId, record);
+    } else {
+        if (
+            existing.status === WHATSAPP_STATUS_ACTIVE &&
+            existing.phoneNumberId &&
+            String(existing.phoneNumberId) !== phoneNumberId
+        ) {
+            throw platformError(
+                "This workspace already has a different WhatsApp number connected. Disconnect it in Mission Control before connecting a new number.",
+                409
+            );
+        }
+        saved = await persistIntegration(companyId, existing.id, {
+            ...record,
+            status: existing.status === WHATSAPP_STATUS_ACTIVE ? WHATSAPP_STATUS_ACTIVE : WHATSAPP_STATUS_PENDING,
+        });
+    }
+
+    return saved;
+}
+
 export async function deactivatePlatformWhatsAppIntegration(companyId, opts = {}) {
     await requireCompany(companyId);
     const existing = await requireIntegration(companyId);

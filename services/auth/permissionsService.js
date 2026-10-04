@@ -3,6 +3,15 @@
  */
 import { isSuperAdminRole, normalizeRole as authNormalizeRole } from "./authService.js";
 
+const ROLE_ALIASES = {
+    member: "support",
+    staff: "support",
+    agent: "sales",
+    admin: "manager",
+    administrator: "manager",
+    readonly: "viewer",
+};
+
 export const PORTAL_ROLES = [
     "owner",
     "manager",
@@ -11,19 +20,21 @@ export const PORTAL_ROLES = [
     "reception",
     "marketing",
     "finance",
+    "viewer",
     "superadmin",
 ];
 
 /** @type {Record<string, string[]>} */
 const PERMISSION_MATRIX = {
-    canViewInbox: ["owner", "manager", "sales", "support", "reception"],
+    canViewInbox: ["owner", "manager", "sales", "support", "reception", "viewer"],
     canReply: ["owner", "manager", "sales", "support", "reception"],
     canEditAI: ["owner", "manager", "marketing"],
     canManageStaff: ["owner", "manager"],
     canViewBilling: ["owner", "finance"],
     canExportData: ["owner", "manager", "finance"],
+    canManageWorkspace: ["owner", "manager"],
     canManageIntegrations: ["owner", "manager"],
-    canUploadKnowledge: ["owner", "manager", "marketing"],
+    canUploadKnowledge: ["owner"],
     canRunAutomations: ["owner", "manager", "marketing"],
 };
 
@@ -39,7 +50,18 @@ export const ROUTE_PERMISSIONS = {
 };
 
 export function normalizeRole(role) {
-    return authNormalizeRole(role) || "owner";
+    const raw = authNormalizeRole(role);
+    if (!raw) return "owner";
+    return ROLE_ALIASES[raw] || raw;
+}
+
+export function assertInvitablePortalRole(role) {
+    const r = normalizeRole(role);
+    const allowed = PORTAL_ROLES.filter((x) => x !== "owner" && x !== "superadmin");
+    if (!allowed.includes(r)) {
+        throw new Error(`Invalid team role "${role}". Allowed: ${allowed.join(", ")}`);
+    }
+    return r;
 }
 
 /**

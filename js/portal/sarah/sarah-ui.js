@@ -35,7 +35,11 @@ function applyUiHints(hints = []) {
       navigateTo(hint.navigate);
       showToast(`Opened ${hint.navigate}`, 'info');
     }
-    if (hint.openWizard) {
+    if (hint.openWizard === 'connectWhatsApp') {
+      import('../whatsappConnect.js').then(({ openWhatsAppConnectWizard }) => {
+        openWhatsAppConnectWizard({ companyId: state.companyId || state.company?.id });
+      });
+    } else if (hint.openWizard) {
       showToast(`Wizard: ${hint.openWizard}`, 'info');
     }
   }

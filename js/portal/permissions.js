@@ -2,6 +2,16 @@
 
 
 
+/** Legacy / invite aliases map to these canonical portal roles. */
+const ROLE_ALIASES = {
+  member: 'support',
+  staff: 'support',
+  agent: 'sales',
+  admin: 'manager',
+  administrator: 'manager',
+  readonly: 'viewer',
+};
+
 export const PORTAL_ROLES = [
   'owner',
   'manager',
@@ -10,8 +20,12 @@ export const PORTAL_ROLES = [
   'reception',
   'marketing',
   'finance',
+  'viewer',
   'superadmin',
 ];
+
+/** Roles shown in team invite + permissions matrix (no platform roles). */
+export const STAFF_PORTAL_ROLES = PORTAL_ROLES.filter((r) => r !== 'superadmin');
 
 
 
@@ -30,6 +44,7 @@ const ROLE_LABELS = {
   marketing: 'Marketing',
 
   finance: 'Finance',
+  viewer: 'Viewer (read-only)',
 
 };
 
@@ -39,7 +54,7 @@ const ROLE_LABELS = {
 
 const PERMISSION_MATRIX = {
 
-  canViewInbox: ['owner', 'manager', 'sales', 'support', 'reception'],
+  canViewInbox: ['owner', 'manager', 'sales', 'support', 'reception', 'viewer'],
 
   canReply: ['owner', 'manager', 'sales', 'support', 'reception'],
 
@@ -50,6 +65,15 @@ const PERMISSION_MATRIX = {
   canViewBilling: ['owner', 'finance'],
 
   canExportData: ['owner', 'manager', 'finance'],
+
+  /** Branding, communications templates, workspace links. */
+  canManageWorkspace: ['owner', 'manager'],
+
+  /** WhatsApp and third-party channel configuration. */
+  canManageIntegrations: ['owner', 'manager'],
+
+  /** Portal knowledge write — owners only. */
+  canUploadKnowledge: ['owner'],
 
 };
 
@@ -81,7 +105,7 @@ export const MODULE_PERMISSIONS = {
 
   billing: 'canViewBilling',
 
-  integrations: 'canEditAI',
+  integrations: 'canManageIntegrations',
 
   settings: null,
 
@@ -125,10 +149,11 @@ export function getPermissions(role) {
 /** @param {string | undefined | null} role */
 
 export function normalizeRole(role) {
-  return String(role || 'owner')
+  const raw = String(role || 'owner')
     .toLowerCase()
     .trim()
     .replace(/[\s_-]+/g, '');
+  return ROLE_ALIASES[raw] || raw;
 }
 
 
@@ -155,11 +180,14 @@ export function roleLabel(role) {
 
 export function can(role, permission) {
 
+  const r = normalizeRole(role);
+  if (r === 'superadmin') return true;
+
   const allowed = PERMISSION_MATRIX[permission];
 
   if (!allowed) return false;
 
-  return allowed.includes(normalizeRole(role));
+  return allowed.includes(r);
 
 }
 
@@ -215,11 +243,22 @@ export const PERMISSION_LABELS = {
 
   canEditAI: 'Can Edit AI',
 
+  canUploadKnowledge: 'Can Upload Knowledge',
+
   canManageStaff: 'Can Manage Staff',
+
+  canManageWorkspace: 'Can Manage Workspace Settings',
+
+  canManageIntegrations: 'Can Manage Integrations',
 
   canViewBilling: 'Can View Billing',
 
   canExportData: 'Can Export Data',
 
 };
+
+/** Roles assignable when inviting (never owner or superadmin). */
+export function invitableRoles() {
+  return STAFF_PORTAL_ROLES.filter((r) => r !== 'owner');
+}
 
