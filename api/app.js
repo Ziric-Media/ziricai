@@ -19,7 +19,6 @@ import {
     deleteAiEmployee,
     getDefaultAiEmployee,
 } from "../services/tenants/aiEmployeeService.js";
-import { assertAiEmployeeCreationAllowed } from "../services/tenants/aiEmployeeEntitlement.js";
 import {
     getConversation,
     listConversations,
@@ -69,14 +68,7 @@ import {
     getPlatformIntegrationsBoard,
     getPlatformAnalyticsOverview,
     getPlatformSupportCases,
-    getPlatformSupportEscalations,
-    getPlatformSupportOperations,
-    getPlatformSupportOperationDetail,
-    getPlatformSupportAttention,
 } from "../services/operations/platformMissionControlService.js";
-import { getPlatformCommunications } from "../services/platformIntelligence/getPlatformCommunications.js";
-import { getPlatformUserNetwork } from "../services/platformIntelligence/getPlatformUserNetwork.js";
-import { getPlatformIntelligence } from "../services/platformIntelligence/getPlatformIntelligence.js";
 import {
     listWorkflows,
     getWorkflow,
@@ -191,23 +183,9 @@ import { authRateLimit } from "../services/auth/authRateLimiter.js";
 import { auditLog } from "../services/audit/auditLog.js";
 import { isDemoTenant } from "../services/core/dataMode.js";
 import { buildSarahContext } from "../services/sarah/sarahContext.js";
-import { assertSarahChatAccess } from "../services/sarah/sarahAuth.js";
 import { handleSarahChat } from "../services/sarah/sarahOrchestrator.js";
 import { getToolsForContext } from "../services/sarah/toolRegistry.js";
 import { initSarahTools } from "../services/sarah/tools/index.js";
-import {
-    loadSarahSession,
-    getLatestSarahSessionForUser,
-    createNewSarahSession,
-    serializeSarahSessionForClient,
-} from "../services/sarah/sarahSessionStore.js";
-import {
-    loadMcSarahSession,
-    getLatestMcSarahSessionForOperator,
-    createNewMcSarahSession,
-    serializeMcSarahSessionForClient,
-    mcScopeKey,
-} from "../services/sarah/mcSessionStore.js";
 import {
     searchKnowledge,
     getKnowledgeStats,
@@ -537,40 +515,6 @@ app.get("/api/operations/platform-support-cases", requirePlatformAccess(), async
     }
 });
 
-app.get("/api/operations/platform-support-escalations", requirePlatformAccess(), async (req, res) => {
-    try {
-        res.json(await getPlatformSupportEscalations());
-    } catch (err) {
-        console.error("[api/operations/platform-support-escalations] error:", err.message);
-        res.status(500).json({ error: err.message || "Failed to load support escalations" });
-    }
-});
-
-app.get("/api/operations/platform-support-operations", requirePlatformAccess(), async (req, res) => {
-    try {
-        const period = req.query?.period ? String(req.query.period) : "day";
-        const date = req.query?.date ? String(req.query.date) : undefined;
-        const periodKey = req.query?.periodKey ? String(req.query.periodKey) : undefined;
-        res.json(await getPlatformSupportOperations({ period, date, periodKey }));
-    } catch (err) {
-        console.error("[api/operations/platform-support-operations] error:", err.message);
-        res.status(500).json({ error: err.message || "Failed to load support operations" });
-    }
-});
-
-app.get("/api/operations/platform-support-attention", requirePlatformAccess(), async (req, res) => {
-    try {
-        const period = req.query?.period ? String(req.query.period) : "day";
-        const date = req.query?.date ? String(req.query.date) : undefined;
-        const periodKey = req.query?.periodKey ? String(req.query.periodKey) : undefined;
-        const queue = req.query?.queue ? String(req.query.queue) : undefined;
-        res.json(await getPlatformSupportAttention({ period, date, periodKey, queue }));
-    } catch (err) {
-        console.error("[api/operations/platform-support-attention] error:", err.message);
-        res.status(500).json({ error: err.message || "Failed to load support attention centre" });
-    }
-});
-
 app.post("/api/operations/platform-proactive-detection/run", requirePlatformAccess(), async (req, res) => {
     try {
         const { runPlatformProactiveDetectionScan } = await import(
@@ -594,58 +538,6 @@ app.post("/api/operations/platform-proactive-detection/run", requirePlatformAcce
     }
 });
 
-app.get(
-    "/api/operations/platform-support-operations/:companyId/audits/:auditId",
-    requirePlatformAccess(),
-    async (req, res) => {
-        try {
-            res.json(
-                await getPlatformSupportOperationDetail(req.params.companyId, req.params.auditId)
-            );
-        } catch (err) {
-            const status = err.status || 500;
-            console.error("[api/operations/platform-support-operations/detail] error:", err.message);
-            res.status(status).json({ error: err.message || "Failed to load audit detail" });
-        }
-    }
-);
-
-function platformIntelligenceQueryFromReq(req) {
-    const period = req.query?.period ? String(req.query.period) : "day";
-    const date = req.query?.date ? String(req.query.date) : undefined;
-    const periodKey = req.query?.periodKey ? String(req.query.periodKey) : undefined;
-    return { period, date, periodKey };
-}
-
-/** Platform Intelligence — unified read facade (PI-4C: day|week|month, segment snapshots) */
-app.get("/api/operations/platform-intelligence", requirePlatformAccess(), async (req, res) => {
-    try {
-        res.json(await getPlatformIntelligence(platformIntelligenceQueryFromReq(req)));
-    } catch (err) {
-        console.error("[api/operations/platform-intelligence] error:", err.message);
-        res.status(500).json({ error: err.message || "Failed to load platform intelligence" });
-    }
-});
-
-/** Platform Intelligence — communication rollups (delegates to unified facade) */
-app.get("/api/operations/platform-communications", requirePlatformAccess(), async (req, res) => {
-    try {
-        res.json(await getPlatformCommunications(platformIntelligenceQueryFromReq(req)));
-    } catch (err) {
-        console.error("[api/operations/platform-communications] error:", err.message);
-        res.status(500).json({ error: err.message || "Failed to load platform communications" });
-    }
-});
-
-app.get("/api/operations/platform-user-network", requirePlatformAccess(), async (req, res) => {
-    try {
-        res.json(await getPlatformUserNetwork(platformIntelligenceQueryFromReq(req)));
-    } catch (err) {
-        console.error("[api/operations/platform-user-network] error:", err.message);
-        res.status(500).json({ error: err.message || "Failed to load platform user network" });
-    }
-});
-
 /** Mission Control Sarah — platform operator assistant (read-oriented tools) */
 app.post("/api/operations/sarah/chat", requirePlatformAccess(), async (req, res) => {
     try {
@@ -653,104 +545,16 @@ app.post("/api/operations/sarah/chat", requirePlatformAccess(), async (req, res)
         if (!message) return res.status(400).json({ error: "message is required" });
         const sessionId = req.body?.sessionId ? String(req.body.sessionId) : null;
         const companyId = req.body?.companyId ? String(req.body.companyId).trim() : null;
-        const auth = await assertSarahChatAccess(req, {
-            surface: "mission_control",
-            companyId: companyId || null,
-        });
         const ctx = await buildSarahContext(req, {
-            companyId: auth.companyId,
+            companyId: companyId || undefined,
             sessionId,
             surface: "mission_control",
-            persona: auth.persona,
-            pageContext: req.body?.pageContext || null,
-            platformOperatorAuth: Boolean(req.platformAuth || auth.tenant?.isSuperAdmin),
         });
         const result = await handleSarahChat(ctx, { message, sessionId });
-        res.json({
-            ...result,
-            surface: "mission_control",
-            persona: ctx.persona,
-            scopedCompanyId: companyId || null,
-        });
+        res.json({ ...result, surface: "mission_control", scopedCompanyId: companyId || null });
     } catch (err) {
         console.error("[api/operations/sarah/chat] error:", err.message);
         res.status(err.status || 500).json({ error: err.message || "Sarah chat failed" });
-    }
-});
-
-function parseMcScopedCompanyId(raw) {
-    if (raw === null || raw === undefined || raw === "") return null;
-    const id = String(raw).trim();
-    return id || null;
-}
-
-async function resolveMcOperatorUid(req) {
-    const auth = await resolveAuthFromRequest(req);
-    if (!auth.uid) {
-        throw Object.assign(
-            new Error("Firebase operator session required for Mission Control Sarah sessions"),
-            { status: 401, code: "UNAUTHORIZED" }
-        );
-    }
-    return auth.uid;
-}
-
-app.get("/api/operations/sarah/sessions/active", requirePlatformAccess(), async (req, res) => {
-    try {
-        const uid = await resolveMcOperatorUid(req);
-        const scopedCompanyId = parseMcScopedCompanyId(req.query.companyId);
-        const session = await getLatestMcSarahSessionForOperator(uid, { scopedCompanyId });
-        res.json({
-            session: serializeMcSarahSessionForClient(session),
-            scopedCompanyId,
-            scopeKey: mcScopeKey(scopedCompanyId),
-        });
-    } catch (err) {
-        console.error("[api/operations/sarah/sessions/active] error:", err.message);
-        res.status(err.status || 500).json({ error: err.message || "Failed to load Sarah session" });
-    }
-});
-
-app.get("/api/operations/sarah/sessions/:sessionId", requirePlatformAccess(), async (req, res) => {
-    try {
-        const uid = await resolveMcOperatorUid(req);
-        const scopedCompanyId = parseMcScopedCompanyId(req.query.companyId);
-        const scopeKey = mcScopeKey(scopedCompanyId);
-        const session = await loadMcSarahSession({
-            sessionId: String(req.params.sessionId || ""),
-            operatorUid: uid,
-            scopeKey,
-        });
-        if (!session) {
-            return res.status(404).json({ error: "Sarah session not found" });
-        }
-        res.json({
-            session: serializeMcSarahSessionForClient(session),
-            scopedCompanyId: session.scopedCompanyId,
-            scopeKey: session.scopeKey,
-        });
-    } catch (err) {
-        console.error("[api/operations/sarah/sessions/:sessionId] error:", err.message);
-        res.status(err.status || 500).json({ error: err.message || "Failed to load Sarah session" });
-    }
-});
-
-app.post("/api/operations/sarah/sessions", requirePlatformAccess(), async (req, res) => {
-    try {
-        const uid = await resolveMcOperatorUid(req);
-        const scopedCompanyId = parseMcScopedCompanyId(req.body?.companyId);
-        const session = await createNewMcSarahSession({
-            operatorUid: uid,
-            scopedCompanyId,
-        });
-        res.status(201).json({
-            session: serializeMcSarahSessionForClient(session),
-            scopedCompanyId,
-            scopeKey: session.scopeKey,
-        });
-    } catch (err) {
-        console.error("[api/operations/sarah/sessions] error:", err.message);
-        res.status(err.status || 500).json({ error: err.message || "Failed to create Sarah session" });
     }
 });
 
@@ -1709,41 +1513,27 @@ app.get("/api/automations/:companyId/runs", requireTenantScope(), async (req, re
 /** Sarah — AI Operating Assistant */
 initSarahTools();
 
-app.post("/api/sarah/chat", async (req, res) => {
+app.post("/api/sarah/chat", requireTenantScope({ optional: true }), async (req, res) => {
     try {
-        const { message, sessionId, companyId: bodyCompanyId, surface: bodySurface } = req.body || {};
-        const surface = bodySurface || "portal";
-        const auth = await assertSarahChatAccess(req, {
-            surface,
-            companyId: bodyCompanyId || req.tenant?.companyId,
-        });
+        const { message, sessionId, companyId: bodyCompanyId } = req.body || {};
         const ctx = await buildSarahContext(req, {
-            companyId: auth.companyId,
+            companyId: bodyCompanyId || req.tenant?.companyId,
             sessionId,
-            surface,
-            persona: auth.persona,
-            pageContext: req.body?.pageContext || null,
+            surface: req.body?.surface || "portal",
         });
 
         const result = await handleSarahChat(ctx, { message, sessionId });
-        res.json({ ...result, persona: ctx.persona, toolPolicy: ctx.toolPolicy });
+        res.json(result);
     } catch (err) {
         console.error("[api/sarah/chat] error:", err.message);
         res.status(err.status || 500).json({ error: err.message || "Sarah chat failed" });
     }
 });
 
-app.get("/api/sarah/tools", async (req, res) => {
+app.get("/api/sarah/tools", requireTenantScope({ optional: true }), async (req, res) => {
     try {
-        const surface = req.query?.surface || "portal";
-        const auth = await assertSarahChatAccess(req, {
-            surface,
-            companyId: req.query?.companyId || req.tenant?.companyId,
-        });
         const ctx = await buildSarahContext(req, {
-            companyId: auth.companyId,
-            surface,
-            persona: auth.persona,
+            companyId: req.query?.companyId || req.tenant?.companyId,
         });
         const tools = getToolsForContext(ctx).map((t) => ({
             name: t.name,
@@ -1751,87 +1541,10 @@ app.get("/api/sarah/tools", async (req, res) => {
             requiredPermissions: t.requiredPermissions || [],
             platformOnly: Boolean(t.platformOnly),
         }));
-        res.json({ tools, role: ctx.role, companyId: ctx.companyId, persona: ctx.persona, toolPolicy: ctx.toolPolicy });
+        res.json({ tools, role: ctx.role, companyId: ctx.companyId });
     } catch (err) {
         console.error("[api/sarah/tools] error:", err.message);
         res.status(err.status || 500).json({ error: err.message || "Failed to list Sarah tools" });
-    }
-});
-
-app.get("/api/sarah/sessions/active", async (req, res) => {
-    try {
-        const surface = req.query?.surface || "portal";
-        const auth = await assertSarahChatAccess(req, {
-            surface,
-            companyId: req.query?.companyId || req.tenant?.companyId,
-        });
-        const uid = auth.tenant?.uid;
-        if (!uid) {
-            return res.status(401).json({ error: "Authentication required" });
-        }
-        const session = await getLatestSarahSessionForUser(auth.companyId, uid, surface);
-        res.json({
-            session: serializeSarahSessionForClient(session),
-            companyId: auth.companyId,
-        });
-    } catch (err) {
-        console.error("[api/sarah/sessions/active] error:", err.message);
-        res.status(err.status || 500).json({ error: err.message || "Failed to load Sarah session" });
-    }
-});
-
-app.get("/api/sarah/sessions/:sessionId", async (req, res) => {
-    try {
-        const surface = req.query?.surface || "portal";
-        const auth = await assertSarahChatAccess(req, {
-            surface,
-            companyId: req.query?.companyId || req.tenant?.companyId,
-        });
-        const uid = auth.tenant?.uid;
-        if (!uid) {
-            return res.status(401).json({ error: "Authentication required" });
-        }
-        const session = await loadSarahSession({
-            companyId: auth.companyId,
-            sessionId: String(req.params.sessionId || ""),
-            userId: uid,
-        });
-        if (!session) {
-            return res.status(404).json({ error: "Sarah session not found" });
-        }
-        res.json({
-            session: serializeSarahSessionForClient(session),
-            companyId: auth.companyId,
-        });
-    } catch (err) {
-        console.error("[api/sarah/sessions/:sessionId] error:", err.message);
-        res.status(err.status || 500).json({ error: err.message || "Failed to load Sarah session" });
-    }
-});
-
-app.post("/api/sarah/sessions", async (req, res) => {
-    try {
-        const surface = req.body?.surface || "portal";
-        const auth = await assertSarahChatAccess(req, {
-            surface,
-            companyId: req.body?.companyId || req.tenant?.companyId,
-        });
-        const uid = auth.tenant?.uid;
-        if (!uid) {
-            return res.status(401).json({ error: "Authentication required" });
-        }
-        const session = await createNewSarahSession({
-            companyId: auth.companyId,
-            userId: uid,
-            surface,
-        });
-        res.status(201).json({
-            session: serializeSarahSessionForClient(session),
-            companyId: auth.companyId,
-        });
-    } catch (err) {
-        console.error("[api/sarah/sessions] error:", err.message);
-        res.status(err.status || 500).json({ error: err.message || "Failed to create Sarah session" });
     }
 });
 
@@ -1891,15 +1604,6 @@ app.get("/api/companies/:companyId/ai-employees/:agentId", requireTenantScope(),
 
 app.post("/api/companies/:companyId/ai-employees", requireTenantScope(), checkPermission("canEditAI"), async (req, res) => {
     try {
-        const gate = await assertAiEmployeeCreationAllowed(req.params.companyId);
-        if (!gate.allowed) {
-            return res.status(403).json({
-                success: false,
-                error: gate.message,
-                errorCode: gate.errorCode,
-                usage: gate.usage,
-            });
-        }
         const body = req.body || {};
         const agent = await createAiEmployee(req.params.companyId, {
             ...body,

@@ -6,18 +6,31 @@ import admin from "firebase-admin";
 import { app } from "../../js/firebase.js";
 import { getFirebaseProjectId, getFirebaseDatabaseId } from "../../js/firebase-config.js";
 import { getDoc, globalUserRef, tenantDocRef } from "../database/firestoreClient.js";
-import { TENANT_COLLECTIONS } from "../database/schema.js";
+import { TENANT_COLLECTIONS, ROOT } from "../database/schema.js";
 import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { upsertTenantUser } from "../tenants/userService.js";
+import { getCompany } from "../tenants/companyService.js";
 import { getAdminFirestore, hasAdminCredentials } from "../database/firestoreAdmin.js";
+import { auditLog } from "../audit/auditLog.js";
 
 const SUPERADMIN_ROLES = new Set(["superadmin", "super admin", "super-admin", "super_admin"]);
 const PLACEHOLDER_API_KEY = "your_firebase_web_api_key";
 
+const ROLE_ALIASES = {
+    member: "support",
+    staff: "support",
+    agent: "sales",
+    admin: "manager",
+    administrator: "manager",
+    readonly: "viewer",
+};
+
 export function normalizeRole(role) {
-    return String(role || "")
+    const raw = String(role || "")
         .toLowerCase()
         .replace(/[\s_-]+/g, "");
+    if (!raw) return "";
+    return ROLE_ALIASES[raw] || raw;
 }
 
 export function isSuperAdminRole(role) {
@@ -335,4 +348,118 @@ export async function upsertGlobalUserProfile(uid, data = {}) {
         },
         { merge: true }
     );
+}
+
+function normalizeOwnerEmail(email) {
+    return String(email || "")
+        .trim()
+        .toLowerCase();
+}
+
+function companyOwnerMatchesAuth(company, uid, email) {
+    if (!company) return false;
+    const authEmail = normalizeOwnerEmail(email);
+    const ownerEmail = normalizeOwnerEmail(company.ownerEmail);
+    if (authEmail && ownerEmail && authEmail === ownerEmail) return true;
+    const ownerUid = company.ownerUid || company.ownerId || null;
+    return Boolean(ownerUid && uid && ownerUid === uid);
+}
+
+/**
+ * When MC creates a company with ownerEmail but skips users/{uid} + membership, link the signed-in owner.
+ * @param {{ uid?: string|null, email?: string|null, profile?: object|null }} ctx
+ * @param {string} companyId
+ * @returns {Promise<boolean>}
+ */
+export async function tryEnsureCompanyOwnerPortalAccess(ctx, companyId) {
+    const uid = ctx?.uid;
+    if (!uid || !companyId) return false;
+
+    const company = await getCompany(companyId);
+    if (!company || !companyOwnerMatchesAuth(company, uid, ctx.email)) return false;
+
+    const displayName =
+        ctx.profile?.fullName ||
+        ctx.profile?.name ||
+        company.ownerName ||
+        company.contactName ||
+        company.name ||
+        "Owner";
+
+    await upsertGlobalUserProfile(uid, {
+        email: ctx.email || company.ownerEmail || null,
+        fullName: displayName,
+        name: displayName,
+        role: "owner",
+        companyId,
+        company: companyId,
+        status: "active",
+    });
+
+    await upsertOwnerMembership(uid, companyId, {
+        email: ctx.email || company.ownerEmail || null,
+        fullName: displayName,
+        role: "owner",
+        status: "active",
+    });
+
+    auditLog("owner_portal_access_linked", {
+        uid,
+        companyId,
+        email: ctx.email || company.ownerEmail || null,
+    });
+
+    return true;
+}
+
+async function findCompaniesOwnedByAuth(uid, email) {
+    const admin = getAdminFirestore();
+    if (!admin || !hasAdminCredentials()) return [];
+
+    const matches = new Map();
+    const rawEmail = String(email || "").trim();
+
+    if (rawEmail) {
+        for (const candidate of [rawEmail, normalizeOwnerEmail(rawEmail)]) {
+            if (!candidate) continue;
+            const snap = await admin.collection(ROOT.COMPANIES).where("ownerEmail", "==", candidate).limit(8).get();
+            snap.docs.forEach((doc) => {
+                matches.set(doc.id, { id: doc.id, ...doc.data() });
+            });
+        }
+    }
+
+    if (uid) {
+        for (const field of ["ownerUid", "ownerId"]) {
+            const snap = await admin.collection(ROOT.COMPANIES).where(field, "==", uid).limit(8).get();
+            snap.docs.forEach((doc) => {
+                matches.set(doc.id, { id: doc.id, ...doc.data() });
+            });
+        }
+    }
+
+    return [...matches.values()].sort((a, b) => {
+        if (a.id === "ziricai") return -1;
+        if (b.id === "ziricai") return 1;
+        return String(a.name || a.id).localeCompare(String(b.name || b.id));
+    });
+}
+
+/**
+ * Bootstrap users/{uid} + membership when the Firebase account matches a company ownerEmail/ownerUid.
+ * @param {string} uid
+ * @param {string|null} email
+ * @returns {Promise<object|null>}
+ */
+export async function tryEnsureOwnerProfileForAuthenticatedUser(uid, email) {
+    if (!uid) return null;
+
+    const companies = await findCompaniesOwnedByAuth(uid, email);
+    for (const company of companies) {
+        const linked = await tryEnsureCompanyOwnerPortalAccess({ uid, email }, company.id);
+        if (linked) {
+            return getUserProfile(uid);
+        }
+    }
+    return null;
 }
