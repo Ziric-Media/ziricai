@@ -87,6 +87,8 @@ export async function getPlatformExecutiveOverview() {
         tenantCensus: {
             total: census.total,
             productionCustomer: census["PRODUCTION CUSTOMER"],
+            clientZero: census["CLIENT ZERO"] ?? census["COMPANY ZERO"] ?? 0,
+            companyZero: census["CLIENT ZERO"] ?? census["COMPANY ZERO"] ?? 0,
             pilot: census.PILOT,
             acceptance: census.ACCEPTANCE,
             demoShowcase: census["DEMO/SHOWCASE"],
@@ -288,18 +290,56 @@ export async function getPlatformAnalyticsOverview() {
 }
 
 /**
- * Support cases — placeholder until portal support tickets API is authoritative.
+ * Platform support aggregation (PI-4F-1 — tenant SupportCase SoT).
  */
 export async function getPlatformSupportCases() {
+    const { getPlatformSupportReadModel } = await import("../support/platformSupportReadModel.js");
+    return getPlatformSupportReadModel({ attentionOnly: false });
+}
+
+/** Sarah / MC attention queue — escalated + critical open items only. */
+export async function getPlatformSupportEscalations() {
+    const { getPlatformSupportReadModel } = await import("../support/platformSupportReadModel.js");
+    const model = await getPlatformSupportReadModel({ attentionOnly: true });
     return {
-        generatedAt: new Date().toISOString(),
-        cases: [],
-        counts: { open: 0, assigned: 0, waiting: 0, resolved: 0 },
-        meta: {
-            dataSource: "support_pipeline",
-            readOnly: true,
-            unavailable: true,
-            note: "Client Portal → Support will feed Mission Control Inbox when the shared support ticket store is connected. No synthetic tickets are created here.",
+        generatedAt: model.generatedAt,
+        meta: model.meta,
+        counts: {
+            attentionQueue: model.counts.attentionQueue,
+            critical: model.bySeverity?.critical ?? 0,
+            high: model.bySeverity?.high ?? 0,
+            medium: model.bySeverity?.medium ?? 0,
+            low: model.bySeverity?.low ?? 0,
         },
+        attentionQueue: model.attentionQueue,
     };
+}
+
+/** PI-4F-4 — Sarah support activity + remediation audit (read model). */
+export async function getPlatformSupportOperations(query = {}) {
+    const { getPlatformSupportOperationsReadModel } = await import(
+        "../support/platformSupportOperationsReadModel.js"
+    );
+    return getPlatformSupportOperationsReadModel(query);
+}
+
+/** PI-4F-5 — Attention Centre (🔴 / 🟡 / 🟢). */
+export async function getPlatformSupportAttention(query = {}) {
+    const { getPlatformSupportAttentionReadModel } = await import(
+        "../support/platformSupportAttentionReadModel.js"
+    );
+    return getPlatformSupportAttentionReadModel(query);
+}
+
+export async function getPlatformSupportOperationDetail(companyId, auditId) {
+    const { getPlatformSupportOperationDetail } = await import(
+        "../support/platformSupportOperationsReadModel.js"
+    );
+    const detail = await getPlatformSupportOperationDetail(companyId, auditId);
+    if (!detail) {
+        const err = new Error("Support operation audit not found");
+        err.status = 404;
+        throw err;
+    }
+    return detail;
 }

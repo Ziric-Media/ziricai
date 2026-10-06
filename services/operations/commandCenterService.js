@@ -52,14 +52,15 @@ export async function getCommandCenterDashboard() {
     }
 
     const metrics = opsMetrics?.metrics || {};
-    const isDemo = opsMetrics?.isDemo !== false;
+    const tenant = opsMetrics?.tenantMetrics;
+    const isDemo = opsMetrics?.isDemo !== false && !tenant;
 
     const workforce = {
-        totalEmployees: metrics.aiEmployeesOnline || DEMO_WORKFORCE.totalEmployees,
-        activeConversations: metrics.activeConversations || DEMO_WORKFORCE.activeNow,
-        humanTakeovers: metrics.humanTakeovers || DEMO_WORKFORCE.humanTakeovers,
-        accuracyPct: metrics.aiSuccessRate || DEMO_WORKFORCE.accuracyPct,
-        messagesToday: metrics.messagesToday || DEMO_WORKFORCE.messagesToday,
+        totalEmployees: metrics.aiEmployeesOnline ?? DEMO_WORKFORCE.totalEmployees,
+        activeConversations: metrics.activeConversations ?? DEMO_WORKFORCE.activeNow,
+        humanTakeovers: metrics.humanTakeovers ?? DEMO_WORKFORCE.humanTakeovers,
+        accuracyPct: metrics.aiSuccessRate ?? DEMO_WORKFORCE.accuracyPct,
+        messagesToday: metrics.messagesTotal ?? metrics.messagesToday ?? DEMO_WORKFORCE.messagesToday,
     };
 
     const whatsappConfigured = Boolean(process.env.PHONE_NUMBER_ID && process.env.WHATSAPP_TOKEN);
@@ -79,15 +80,31 @@ export async function getCommandCenterDashboard() {
         platform: DEMO_HEALTH.platform,
     };
 
+    const business = tenant
+        ? {
+              revenueToday: null,
+              revenueCurrency: "ZAR",
+              leadsToday: tenant.counts?.leads ?? null,
+              customersWaiting: tenant.counts?.activeConversations ?? null,
+              highPriorityComplaints: null,
+              testDrivesBooked: tenant.counts?.testDrivesBooked ?? null,
+              financeEnquiries: tenant.counts?.financeEnquiries ?? null,
+              dataQuality: "real",
+          }
+        : {
+              ...DEMO_BUSINESS,
+              revenueToday: metrics.estimatedRevenue || DEMO_BUSINESS.revenueToday,
+              dataQuality: "demo",
+          };
+
     return {
         isDemo,
+        primaryCompanyId: opsMetrics?.primaryCompanyId || null,
+        tenantMetrics: tenant || null,
         workforce,
-        business: {
-            ...DEMO_BUSINESS,
-            revenueToday: metrics.estimatedRevenue || DEMO_BUSINESS.revenueToday,
-        },
+        business,
         health,
-        mapDots: DEMO_MAP_DOTS,
+        mapDots: tenant ? [] : DEMO_MAP_DOTS,
         activity: activity?.items?.slice(0, 12) || [],
         trends: opsMetrics?.trends || {},
         timestamp: new Date().toISOString(),

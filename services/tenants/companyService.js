@@ -70,6 +70,17 @@ function normalizeCompanyRecord(companyId, data = {}, existing = {}) {
         ownerUid: data.ownerUid ?? data.ownerId ?? existing.ownerUid ?? existing.ownerId ?? null,
         branding: data.branding ?? existing.branding ?? defaultBranding(name),
         settings: data.settings ?? existing.settings ?? {},
+        organisationType: data.organisationType ?? existing.organisationType ?? null,
+        organizationType: data.organizationType ?? existing.organizationType ?? null,
+        sector: data.sector ?? existing.sector ?? null,
+        sectorId: data.sectorId ?? existing.sectorId ?? null,
+        /** PI-4F-6 — proactive scan scope: production | pilot | test | gate */
+        environment: data.environment ?? existing.environment ?? null,
+        /** PI-4F-6 — explicit opt-in/out for proactive customer-health detection */
+        proactiveMonitoring:
+            data.proactiveMonitoring !== undefined
+                ? data.proactiveMonitoring
+                : existing.proactiveMonitoring ?? null,
         createdAt: existing.createdAt ?? data.createdAt ?? timestamp,
         updatedAt: timestamp,
         provisionedAt: data.provisionedAt ?? existing.provisionedAt ?? null,
@@ -314,6 +325,12 @@ const PLATFORM_ADMIN_EXTRA_FIELDS = [
     "provisioningLinks",
 ];
 
+function isMaskedSecretKey(value) {
+    const s = String(value || "");
+    if (!s) return false;
+    return s.includes("•") || /•{3,}/u.test(s) || /\*{4,}/.test(s);
+}
+
 export function assertAllowedCompanyStatus(status) {
     const value = String(status || "").toLowerCase();
     const allowed = new Set(Object.values(COMPANY_STATUS));
@@ -340,6 +357,33 @@ export async function updatePlatformCompanyAdmin(companyId, body = {}) {
         if (safeBody[key] !== undefined) {
             record[key] = safeBody[key];
         }
+    }
+
+    if (
+        safeBody.openAiApiKey !== undefined &&
+        isMaskedSecretKey(safeBody.openAiApiKey) &&
+        existing.openAiApiKey
+    ) {
+        record.openAiApiKey = existing.openAiApiKey;
+    }
+
+    if (safeBody.tenantClass !== undefined) {
+        const tenantClass = String(safeBody.tenantClass || "").trim();
+        record.settings = {
+            ...(existing.settings || {}),
+            ...(record.settings || {}),
+            tenantClass,
+        };
+        if (tenantClass === "CLIENT ZERO" || tenantClass === "COMPANY ZERO") {
+            record.settings.isClientZero = true;
+            record.settings.companyZero = true;
+        }
+    } else if (safeBody.settings && typeof safeBody.settings === "object") {
+        record.settings = {
+            ...(existing.settings || {}),
+            ...(record.settings || {}),
+            ...safeBody.settings,
+        };
     }
 
     await persistCompanyRoot(companyId, record, { merge: true });
@@ -409,7 +453,21 @@ export async function enrichCompanyIntegrationStatus(company) {
     if (!company?.id) return company;
 
     try {
-        const wa = await getWhatsAppIntegration(company.id);
+        const { isClientZeroCompanyId } = await import("../clientZero/clientZero.js");
+        const { ensureClientZeroWhatsAppIntegration } = await import(
+            "../clientZero/syncWhatsAppIntegration.js"
+        );
+
+        let wa = await getWhatsAppIntegration(company.id);
+        const pendingClientZero =
+            isClientZeroCompanyId(company.id) &&
+            wa?.phoneNumberId &&
+            String(wa.status || "").toLowerCase() === "pending_configuration";
+
+        if (pendingClientZero) {
+            ensureClientZeroWhatsAppIntegration({ source: "mc_company_list" }).catch(() => null);
+        }
+
         return {
             ...applyWhatsAppDisplayFromIntegration(company, wa),
             whatsappIntegration: buildWhatsAppIntegrationSummary(wa),

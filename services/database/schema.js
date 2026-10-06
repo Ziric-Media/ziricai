@@ -39,9 +39,15 @@ export const TENANT_COLLECTIONS = {
     MARKETPLACE: "marketplace",
     /** Tenant Industry Pack installation registry (metadata + references). */
     MARKETPLACE_INSTALLS: "marketplaceInstalls",
+    /** Paid / granted pack entitlements (PORTAL-4C-6). */
+    MARKETPLACE_ENTITLEMENTS: "marketplaceEntitlements",
     /** MC-U-4C — tenant support cases (Portal SoT; MC reads via platform API in 4D). */
     SUPPORT_CASES: "supportCases",
     SUPPORT_CASE_ACTIVITIES: "supportCaseActivities",
+    /** PI-4F-3 — Sarah remediation audit trail (tenant-scoped). */
+    SUPPORT_REMEDIATION_AUDITS: "supportRemediationAudits",
+    /** Portal Sarah conversation sessions (tenant + user scoped). */
+    SARAH_SESSIONS: "sarahSessions",
 };
 
 /** Subcollections under companies/{companyId}/analytics (flat names for TenantRepository) */
@@ -103,6 +109,17 @@ export const FIELD_SCHEMA = {
         id: "string",
         name: "string",
         industry: "string",
+        /** Platform Intelligence segment — see docs/architecture/PLATFORM_INTELLIGENCE.md */
+        organisationType: "string",
+        sector: "string",
+        subSector: "string",
+        /** PI-4F-6 — production | pilot | test | gate */
+        environment: "string",
+        /** PI-4F-6 — participate in proactive health detection when true */
+        proactiveMonitoring: "boolean",
+        country: "string",
+        region: "string",
+        city: "string",
         plan: "string",
         status: "string",
         email: "string",
@@ -378,6 +395,11 @@ export function tenantMarketplaceInstallPath(companyId, packId) {
     return `${tenantCollectionPath(companyId, TENANT_COLLECTIONS.MARKETPLACE_INSTALLS)}/${packId}`;
 }
 
+/** Document path: companies/{companyId}/marketplaceEntitlements/{packId} */
+export function tenantMarketplaceEntitlementPath(companyId, packId) {
+    return `${tenantCollectionPath(companyId, TENANT_COLLECTIONS.MARKETPLACE_ENTITLEMENTS)}/${packId}`;
+}
+
 /** Collection path: platform/marketplace/packs/{packId}/versions */
 export function platformPackVersionCollectionPath(packId) {
     return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.PACKS}/${packId}/versions`;
@@ -402,3 +424,110 @@ export function platformReviewPath(reviewId) {
 export function platformRatingPath(packId) {
     return `${ROOT.PLATFORM}/${PLATFORM_MARKETPLACE.ROOT}/${PLATFORM_MARKETPLACE.RATINGS}/${packId}`;
 }
+
+/**
+ * Mission Control Sarah operator sessions (platform-scoped, not tenant data).
+ * Firestore document paths must have an even number of segments:
+ * platform / missionControl / sarahSessions / {sessionId}
+ */
+export const PLATFORM_SARAH = {
+    ROOT_DOC: "missionControl",
+    SESSIONS: "sarahSessions",
+};
+
+/** Collection path (3 segments): platform/missionControl/sarahSessions */
+export function platformSarahSessionsCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_SARAH.ROOT_DOC}/${PLATFORM_SARAH.SESSIONS}`;
+}
+
+/** Document path (4 segments) */
+export function platformSarahSessionPath(sessionId) {
+    return `${platformSarahSessionsCollectionPath()}/${sessionId}`;
+}
+
+/** Platform onboarding wizard sessions (CORPORATE-P0-2c). */
+export const PLATFORM_ONBOARDING = {
+    SESSIONS: "onboardingSessions",
+};
+
+export function platformOnboardingSessionsCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_ONBOARDING.SESSIONS}`;
+}
+
+export function platformOnboardingSessionPath(sessionId) {
+    return `${platformOnboardingSessionsCollectionPath()}/${sessionId}`;
+}
+
+/** Platform WhatsApp test/production number pool (Mission Control onboarding). */
+export const PLATFORM_WHATSAPP_POOL = {
+    ROOT: "whatsapp",
+    NUMBERS: "numbers",
+};
+
+/** Collection path: platform/whatsapp/numbers */
+export function platformWhatsAppNumbersCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_WHATSAPP_POOL.ROOT}/${PLATFORM_WHATSAPP_POOL.NUMBERS}`;
+}
+
+/** Document path: platform/whatsapp/numbers/{numberId} */
+export function platformWhatsAppNumberPath(numberId) {
+    return `${platformWhatsAppNumbersCollectionPath()}/${numberId}`;
+}
+
+/** Platform Intelligence — communication events & rollups (PI-4A+). */
+export const PLATFORM_INTELLIGENCE = {
+    ROOT_DOC: "intelligence",
+    MESSAGE_EVENTS: "messageEvents",
+    ROLLUP_DAILY: "rollupDaily",
+    DAILY_IDENTITY: "dailyIdentity",
+    CHANNEL_IDENTITIES: "channelIdentities",
+    END_USERS: "endUsers",
+    DAILY_PLATFORM_USER: "dailyPlatformUser",
+    ROLLUP_USER_DAILY: "rollupUserDaily",
+    ROLLUP_DIMENSIONAL: "rollupDimensional",
+    PERIOD_CLAIMS: "periodClaims",
+};
+
+export function platformIntelligenceMessageEventPath(eventId) {
+    return `${ROOT.PLATFORM}/${PLATFORM_INTELLIGENCE.ROOT_DOC}/${PLATFORM_INTELLIGENCE.MESSAGE_EVENTS}/${eventId}`;
+}
+
+export function platformIntelligenceRollupDailyCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_INTELLIGENCE.ROOT_DOC}/${PLATFORM_INTELLIGENCE.ROLLUP_DAILY}`;
+}
+
+export function platformIntelligenceRollupDailyPath(rollupDocId) {
+    return `${platformIntelligenceRollupDailyCollectionPath()}/${rollupDocId}`;
+}
+
+export function platformIntelligenceDailyIdentityPath(identityDocId) {
+    return `${ROOT.PLATFORM}/${PLATFORM_INTELLIGENCE.ROOT_DOC}/${PLATFORM_INTELLIGENCE.DAILY_IDENTITY}/${identityDocId}`;
+}
+
+export function platformIntelligenceChannelIdentityPath(docId) {
+    return `${ROOT.PLATFORM}/${PLATFORM_INTELLIGENCE.ROOT_DOC}/${PLATFORM_INTELLIGENCE.CHANNEL_IDENTITIES}/${docId}`;
+}
+
+export function platformIntelligenceEndUserPath(platformUserId) {
+    return `${ROOT.PLATFORM}/${PLATFORM_INTELLIGENCE.ROOT_DOC}/${PLATFORM_INTELLIGENCE.END_USERS}/${platformUserId}`;
+}
+
+export function platformIntelligenceDailyPlatformUserPath(docId) {
+    return `${ROOT.PLATFORM}/${PLATFORM_INTELLIGENCE.ROOT_DOC}/${PLATFORM_INTELLIGENCE.DAILY_PLATFORM_USER}/${docId}`;
+}
+
+export function platformIntelligenceRollupUserDailyPath(docId) {
+    return `${ROOT.PLATFORM}/${PLATFORM_INTELLIGENCE.ROOT_DOC}/${PLATFORM_INTELLIGENCE.ROLLUP_USER_DAILY}/${docId}`;
+}
+
+export function platformIntelligenceDimensionalRollupCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_INTELLIGENCE.ROOT_DOC}/${PLATFORM_INTELLIGENCE.ROLLUP_DIMENSIONAL}`;
+}
+
+export function platformIntelligencePeriodClaimPath(claimId) {
+    const safe = String(claimId || "unknown").replace(/[/\\]/g, "_");
+    return `${ROOT.PLATFORM}/${PLATFORM_INTELLIGENCE.ROOT_DOC}/${PLATFORM_INTELLIGENCE.PERIOD_CLAIMS}/${safe}`;
+}
+
+/** Platform-wide rollup bucket (not a tenant). */
+export const PLATFORM_INTELLIGENCE_PLATFORM_COMPANY_ID = "__platform__";

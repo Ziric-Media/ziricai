@@ -1,34 +1,32 @@
 /**
- * MC-U-4C — Tenant-scoped SupportCase (authoritative store).
+ * MC-U-4C + PI-4F-1 — Tenant-scoped SupportCase (authoritative store).
  */
 import { ServiceBase } from "../core/serviceBase.js";
 import { TENANT_COLLECTIONS } from "../database/schema.js";
 import { toIsoTimestamp } from "../core/timestampUtils.js";
 import { normalizeRole } from "../auth/authService.js";
 import { publish, EventTypes } from "../events/index.js";
+import {
+    SUPPORT_CASE_STATUSES,
+    SUPPORT_CASE_PRIORITIES,
+    SUPPORT_CASE_SOURCES,
+    SUPPORT_CASE_CATEGORIES,
+    ALLOWED_LIFECYCLE_TRANSITIONS,
+    severityFromPriority,
+    priorityFromSeverity,
+} from "../support/supportCaseModel.js";
+import { evaluateEscalationPolicy } from "../support/escalationPolicy.js";
 
-export const SUPPORT_CASE_STATUSES = ["open", "assigned", "waiting", "resolved"];
-export const SUPPORT_CASE_PRIORITIES = ["low", "medium", "high"];
-export const SUPPORT_CASE_SOURCES = ["portal", "sarah", "conversation", "email", "system", "operator"];
-export const SUPPORT_CASE_CATEGORIES = [
-    "general",
-    "billing",
-    "integrations",
-    "ai_employee",
-    "knowledge",
-    "marketplace",
-    "account",
-    "other",
-];
+export {
+    SUPPORT_CASE_STATUSES,
+    SUPPORT_CASE_PRIORITIES,
+    SUPPORT_CASE_SOURCES,
+    SUPPORT_CASE_CATEGORIES,
+};
 
 const PATCH_ROLES = new Set(["owner", "manager", "support"]);
 
-const ALLOWED_TRANSITIONS = {
-    open: new Set(["assigned", "waiting", "resolved"]),
-    assigned: new Set(["waiting", "resolved", "open"]),
-    waiting: new Set(["assigned", "resolved"]),
-    resolved: new Set(),
-};
+const ALLOWED_TRANSITIONS = ALLOWED_LIFECYCLE_TRANSITIONS;
 
 class SupportCaseService extends ServiceBase {
     constructor() {
@@ -166,13 +164,26 @@ export async function createSupportCase(companyId, input, ctx = {}) {
     }
 
     const now = new Date().toISOString();
+    const severityInput = input.severity ? String(input.severity).toLowerCase() : null;
+    const priority = assertPriority(
+        input.priority || (severityInput && priorityFromSeverity(severityInput)) || "medium"
+    );
+
     const payload = {
         subject,
+        issue: input.issue ? String(input.issue).trim() : subject,
         description: input.description ? String(input.description).trim() : null,
         category: assertCategory(input.category),
-        priority: assertPriority(input.priority),
+        priority,
+        severity: severityInput || severityFromPriority(priority),
         status: "open",
         source: assertSource(input.source),
+        affectedService: input.affectedService ? String(input.affectedService).toLowerCase() : null,
+        diagnosis: input.diagnosis || null,
+        actionsAttempted: Array.isArray(input.actionsAttempted) ? input.actionsAttempted : [],
+        sarahConfidence: input.sarahConfidence ?? null,
+        escalation: null,
+        resolution: null,
         customerId: input.customerId ? String(input.customerId) : null,
         conversationId: input.conversationId ? String(input.conversationId) : null,
         createdByUserId,
@@ -247,6 +258,13 @@ export async function patchSupportCase(companyId, caseId, patch, ctx) {
 
     if (patch.priority !== undefined) {
         updates.priority = assertPriority(patch.priority);
+        updates.severity = severityFromPriority(updates.priority);
+    }
+
+    if (patch.severity !== undefined) {
+        const sev = String(patch.severity).toLowerCase();
+        updates.severity = sev;
+        updates.priority = assertPriority(priorityFromSeverity(sev));
     }
 
     if (patch.category !== undefined) {
@@ -295,5 +313,283 @@ export async function patchSupportCase(companyId, caseId, patch, ctx) {
         });
     }
 
+    return serializeSupportCase(saved);
+}
+
+export async function recordSupportDiagnosis(companyId, caseId, diagnosis, ctx = {}) {
+    const existing = await caseService.get(companyId, caseId);
+    if (!existing) {
+        throw Object.assign(new Error("Support case not found"), { status: 404, code: "NOT_FOUND" });
+    }
+    const prevPd = existing.diagnosis?.proactiveDetection || null;
+    const payload = {
+        diagnosis: {
+            summary: String(diagnosis.summary || "").trim(),
+            issueClass: diagnosis.issueClass || null,
+            affectedService: diagnosis.affectedService || existing.affectedService,
+            checksPerformed: diagnosis.checksPerformed || [],
+            evidence: diagnosis.evidence || [],
+            confidence: diagnosis.confidence || null,
+            proactiveDetection:
+                diagnosis.proactiveDetection !== undefined ? diagnosis.proactiveDetection : prevPd,
+            recordedAt: new Date().toISOString(),
+            recordedBy: ctx.uid || "sarah",
+        },
+        lastActivityAt: new Date().toISOString(),
+        lastActivitySummary: "Diagnosis recorded",
+    };
+    if (diagnosis.sarahConfidence != null || diagnosis.confidence != null) {
+        payload.sarahConfidence = diagnosis.sarahConfidence ?? diagnosis.confidence;
+    }
+    if (existing.status === "open") {
+        payload.status = "investigating";
+    }
+    const saved = await caseService.update(companyId, caseId, payload);
+    await recordActivity(companyId, {
+        type: "diagnosis_recorded",
+        caseId,
+        actorUserId: ctx.uid || null,
+        message: payload.diagnosis.summary || "Diagnosis recorded",
+        fromStatus: existing.status,
+        toStatus: payload.status || existing.status,
+    });
+    return serializeSupportCase(saved);
+}
+
+export async function appendRemediationAttempt(companyId, caseId, attempt, ctx = {}) {
+    const existing = await caseService.get(companyId, caseId);
+    if (!existing) {
+        throw Object.assign(new Error("Support case not found"), { status: 404, code: "NOT_FOUND" });
+    }
+    const entry = {
+        tool: String(attempt.tool || "unknown"),
+        outcome: String(attempt.outcome || "pending"),
+        message: attempt.message ? String(attempt.message) : null,
+        verified: attempt.verified === true,
+        at: new Date().toISOString(),
+        actor: ctx.uid || attempt.actor || "sarah",
+    };
+    const actions = [...(existing.actionsAttempted || []), entry];
+    const failedCount = actions.filter((a) => a.outcome === "failed").length;
+    const policy = evaluateEscalationPolicy({
+        issueClass: existing.diagnosis?.issueClass,
+        category: existing.category,
+        severity: existing.severity || severityFromPriority(existing.priority),
+        failedRemediationCount: failedCount,
+        requiresDestructiveAction: attempt.destructive === true,
+        billingDispute: attempt.billingDispute === true,
+    });
+
+    const updates = {
+        actionsAttempted: actions,
+        lastActivityAt: entry.at,
+        lastActivitySummary: `Remediation: ${entry.tool} → ${entry.outcome}`,
+    };
+
+    if (policy.mustEscalate && existing.status !== "resolved") {
+        updates.status = "escalated";
+        updates.escalation = {
+            escalatedAt: entry.at,
+            reason: policy.reasons.join("; ") || "Policy escalation",
+            ruleId: policy.matchedRule,
+            failedRemediationCount: failedCount,
+        };
+    }
+
+    const saved = await caseService.update(companyId, caseId, updates);
+    await recordActivity(companyId, {
+        type: "remediation_attempted",
+        caseId,
+        actorUserId: ctx.uid || null,
+        message: updates.lastActivitySummary,
+    });
+    return { supportCase: serializeSupportCase(saved), escalationPolicy: policy };
+}
+
+export async function escalateSupportCase(companyId, caseId, input, ctx = {}) {
+    const existing = await caseService.get(companyId, caseId);
+    if (!existing) {
+        throw Object.assign(new Error("Support case not found"), { status: 404, code: "NOT_FOUND" });
+    }
+    const now = new Date().toISOString();
+    const reason = String(input.reason || input.escalationReason || "Escalated to platform operator").trim();
+    const updates = {
+        status: "escalated",
+        escalation: {
+            escalatedAt: now,
+            reason,
+            ruleId: input.ruleId || input.matchedRule || "manual",
+            sarahConfidence: input.sarahConfidence ?? existing.sarahConfidence,
+            recommendedOperatorAction: input.recommendedOperatorAction || null,
+        },
+        sarahConfidence: input.sarahConfidence ?? existing.sarahConfidence,
+        lastActivityAt: now,
+        lastActivitySummary: `Escalated: ${reason.slice(0, 120)}`,
+    };
+    const saved = await caseService.update(companyId, caseId, updates);
+    await recordActivity(companyId, {
+        type: "escalated",
+        caseId,
+        actorUserId: ctx.uid || null,
+        message: reason,
+        toStatus: "escalated",
+    });
+    return serializeSupportCase(saved);
+}
+
+export async function resolveSupportCaseWithVerification(companyId, caseId, resolution, ctx = {}) {
+    const existing = await caseService.get(companyId, caseId);
+    if (!existing) {
+        throw Object.assign(new Error("Support case not found"), { status: 404, code: "NOT_FOUND" });
+    }
+    const now = new Date().toISOString();
+    const updates = {
+        status: "resolved",
+        resolvedAt: now,
+        resolution: {
+            summary: String(resolution.summary || "Resolved").trim(),
+            resolvedBy: ctx.uid || resolution.resolvedBy || "sarah",
+            autoResolved: resolution.autoResolved === true,
+            verifiedAt: resolution.verifiedAt || now,
+        },
+        lastActivityAt: now,
+        lastActivitySummary: "Case resolved",
+    };
+    const saved = await caseService.update(companyId, caseId, updates);
+    await recordActivity(companyId, {
+        type: "resolved",
+        caseId,
+        actorUserId: ctx.uid || null,
+        toStatus: "resolved",
+        message: updates.resolution.summary,
+    });
+    return serializeSupportCase(saved);
+}
+
+/**
+ * PI-4F-6 — Close legacy proactive false positives without implying Sarah verified resolution.
+ * @param {object} auditPayload — cleanup audit (caseId, cleanupReason, originalEvidence, …)
+ */
+export async function supersedeSupportCaseForDetectionCleanup(companyId, caseId, auditPayload) {
+    const existing = await caseService.get(companyId, caseId);
+    if (!existing) {
+        throw Object.assign(new Error("Support case not found"), { status: 404, code: "NOT_FOUND" });
+    }
+    if (String(existing.status || "").toLowerCase() === "resolved") {
+        return { skipped: true, reason: "already_resolved", supportCase: serializeSupportCase(existing) };
+    }
+
+    const prev = assertStatus(existing.status);
+    const next = "resolved";
+    if (prev !== next) {
+        assertTransition(prev, next);
+    }
+
+    const now = new Date().toISOString();
+    const summary =
+        "Superseded by PI-4F-6 detection-rule correction (legacy proactive false positive — not verified by Sarah)";
+
+    const updates = {
+        status: next,
+        resolvedAt: now,
+        resolution: {
+            summary,
+            autoResolved: false,
+            superseded: true,
+            verifiedAt: null,
+            cleanup: auditPayload,
+        },
+        lastActivityAt: now,
+        lastActivitySummary: "Superseded (system cleanup)",
+    };
+
+    const saved = await caseService.update(companyId, caseId, updates);
+
+    await activityService.create(companyId, {
+        type: "proactive_cleanup_audit",
+        caseId,
+        actorUserId: "system_cleanup",
+        message: auditPayload.cleanupReason || summary,
+        fromStatus: prev,
+        toStatus: next,
+        audit: auditPayload,
+    });
+
+    await recordActivity(companyId, {
+        type: "resolved",
+        caseId,
+        actorUserId: "system_cleanup",
+        fromStatus: prev,
+        toStatus: next,
+        message: summary,
+    });
+
+    return { skipped: false, supportCase: serializeSupportCase(saved), audit: auditPayload };
+}
+
+/**
+ * PI-4F-6 — Align stale proactive case metadata before scan investigation (system path, no transition guard).
+ */
+export async function realignProactiveCaseMetadata(companyId, caseId, finding = {}) {
+    const existing = await caseService.get(companyId, caseId);
+    if (!existing) {
+        throw Object.assign(new Error("Support case not found"), { status: 404, code: "NOT_FOUND" });
+    }
+
+    const ruleId = finding.ruleId || existing.diagnosis?.proactiveDetection?.ruleId;
+    const updates = {
+        lastActivityAt: new Date().toISOString(),
+        lastActivitySummary: "Proactive case metadata realigned for scan investigation",
+    };
+
+    if (finding.category) {
+        updates.category = assertCategory(finding.category);
+    }
+    if (finding.severity) {
+        updates.severity = String(finding.severity).toLowerCase();
+        updates.priority = assertPriority(priorityFromSeverity(updates.severity));
+    }
+
+    if (ruleId === "whatsapp_setup_incomplete") {
+        updates.category = assertCategory("integrations");
+        updates.severity = "low";
+        updates.priority = assertPriority("low");
+        const credEsc =
+            existing.escalation?.ruleId === "credentials_or_security" ||
+            String(existing.escalation?.reason || "").toLowerCase().includes("credential");
+        if (credEsc || existing.status === "escalated") {
+            updates.status = "investigating";
+            updates.escalation = null;
+        }
+    }
+
+    const saved = await caseService.update(companyId, caseId, updates);
+    return serializeSupportCase(saved);
+}
+
+/** PI-4F-6 — Persist proactive scan investigation audit on the support case. */
+export async function recordProactiveScanInvestigationAudit(companyId, caseId, auditPayload) {
+    await activityService.create(companyId, {
+        type: "proactive_scan_investigation",
+        caseId,
+        actorUserId: "proactive-detection",
+        message: `Proactive scan: ${auditPayload.dedupeResult || "investigate"} rule=${auditPayload.findingRule}`,
+        audit: auditPayload,
+    });
+
+    const existing = await caseService.get(companyId, caseId);
+    if (!existing) return null;
+
+    const pd = existing.diagnosis?.proactiveDetection || {};
+    const saved = await caseService.update(companyId, caseId, {
+        diagnosis: {
+            ...(existing.diagnosis || {}),
+            proactiveDetection: {
+                ...pd,
+                lastScanAudit: auditPayload,
+            },
+        },
+        lastActivityAt: new Date().toISOString(),
+    });
     return serializeSupportCase(saved);
 }
