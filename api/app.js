@@ -68,6 +68,10 @@ import {
     getPlatformIntegrationsBoard,
     getPlatformAnalyticsOverview,
     getPlatformSupportCases,
+    getPlatformSupportEscalations,
+    getPlatformSupportOperations,
+    getPlatformSupportOperationDetail,
+    getPlatformSupportAttention,
 } from "../services/operations/platformMissionControlService.js";
 import {
     listWorkflows,
@@ -514,6 +518,56 @@ app.get("/api/operations/platform-support-cases", requirePlatformAccess(), async
         res.status(500).json({ error: err.message || "Failed to load support cases" });
     }
 });
+
+app.get("/api/operations/platform-support-escalations", requirePlatformAccess(), async (req, res) => {
+    try {
+        res.json(await getPlatformSupportEscalations());
+    } catch (err) {
+        console.error("[api/operations/platform-support-escalations] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load support escalations" });
+    }
+});
+
+app.get("/api/operations/platform-support-operations", requirePlatformAccess(), async (req, res) => {
+    try {
+        const period = req.query?.period ? String(req.query.period) : "day";
+        const date = req.query?.date ? String(req.query.date) : undefined;
+        const periodKey = req.query?.periodKey ? String(req.query.periodKey) : undefined;
+        res.json(await getPlatformSupportOperations({ period, date, periodKey }));
+    } catch (err) {
+        console.error("[api/operations/platform-support-operations] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load support operations" });
+    }
+});
+
+app.get("/api/operations/platform-support-attention", requirePlatformAccess(), async (req, res) => {
+    try {
+        const period = req.query?.period ? String(req.query.period) : "day";
+        const date = req.query?.date ? String(req.query.date) : undefined;
+        const periodKey = req.query?.periodKey ? String(req.query.periodKey) : undefined;
+        const queue = req.query?.queue ? String(req.query.queue) : undefined;
+        res.json(await getPlatformSupportAttention({ period, date, periodKey, queue }));
+    } catch (err) {
+        console.error("[api/operations/platform-support-attention] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load support attention centre" });
+    }
+});
+
+app.get(
+    "/api/operations/platform-support-operations/:companyId/audits/:auditId",
+    requirePlatformAccess(),
+    async (req, res) => {
+        try {
+            res.json(
+                await getPlatformSupportOperationDetail(req.params.companyId, req.params.auditId)
+            );
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/operations/platform-support-operations/detail] error:", err.message);
+            res.status(status).json({ error: err.message || "Failed to load audit detail" });
+        }
+    }
+);
 
 app.post("/api/operations/platform-proactive-detection/run", requirePlatformAccess(), async (req, res) => {
     try {
