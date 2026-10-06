@@ -62,6 +62,7 @@ import {
     parsePlatformDashboardQuery,
     PlatformDashboardValidationError,
 } from "../services/operations/platformDashboardService.js";
+import { getPlatformIntelligence } from "../services/platformIntelligence/getPlatformIntelligence.js";
 import {
     getPlatformExecutiveOverview,
     getPlatformBillingConsole,
@@ -454,6 +455,23 @@ app.post("/api/auth/logout", attachTenantContext(), async (req, res) => {
     } catch (err) {
         console.error("[api/auth/logout] error:", err.message);
         res.status(500).json({ error: err.message || "Logout failed" });
+    }
+});
+
+function platformIntelligenceQueryFromReq(req) {
+    const period = req.query?.period ? String(req.query.period) : "day";
+    const date = req.query?.date ? String(req.query.date) : undefined;
+    const periodKey = req.query?.periodKey ? String(req.query.periodKey) : undefined;
+    return { period, date, periodKey };
+}
+
+/** Platform Intelligence — unified read facade (PI-4C; MC Dashboard 2.0) */
+app.get("/api/operations/platform-intelligence", requirePlatformAccess(), async (req, res) => {
+    try {
+        res.json(await getPlatformIntelligence(platformIntelligenceQueryFromReq(req)));
+    } catch (err) {
+        console.error("[api/operations/platform-intelligence] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to load platform intelligence" });
     }
 });
 
