@@ -54,29 +54,81 @@ function normalizeQuerySnap(snapshot) {
     };
 }
 
-function applyAdminConstraints(baseQuery, constraints) {
-    let q = baseQuery;
+/** Plain application-level query constraint descriptors (portable Web SDK + Admin SDK). */
+export function queryWhere(field, op, value) {
+    return { type: "where", field, op, value };
+}
+
+export function queryOrderBy(field, direction = "asc") {
+    return { type: "orderBy", field, direction };
+}
+
+export function queryLimit(value) {
+    return { type: "limit", value };
+}
+
+export function queryStartAfter(cursorRef) {
+    return { type: "startAfter", cursorRef };
+}
+
+function isDescriptorQuery(q) {
+    return Boolean(q?.collectionRef && Array.isArray(q.constraints));
+}
+
+async function buildAdminQuery(collectionRef, constraints) {
+    let q = collectionRef.__adminCol;
     for (const c of constraints) {
-        const type = c.type || c._queryConstraints?.[0]?.type;
-        if (type === "where" || c._fieldPath) {
-            const field = c._field?.canonicalString?.() || c._fieldPath?.canonicalString?.() || c.fieldPath;
-            const op = c._op || c.op;
-            const value = c._value ?? c.value;
-            if (field) q = q.where(field, op, value);
-        } else if (type === "orderBy") {
-            const field = c._field?.canonicalString?.() || c.fieldPath;
-            const dir = c._direction || c.direction || "asc";
-            if (field) q = q.orderBy(field, dir);
-        } else if (type === "limit") {
-            q = q.limit(c._limit ?? c.limit ?? c);
-        } else if (type === "startAfter") {
-            const cursor = c._values?.[0] ?? c._doc ?? c;
-            if (cursor?.exists !== undefined) {
-                q = q.startAfter(cursor);
+        if (!c?.type) continue;
+        switch (c.type) {
+            case "where":
+                q = q.where(c.field, c.op, c.value);
+                break;
+            case "orderBy":
+                q = q.orderBy(c.field, c.direction || "asc");
+                break;
+            case "limit":
+                q = q.limit(c.value);
+                break;
+            case "startAfter": {
+                const cursorRef = c.cursorRef;
+                if (!cursorRef?.__admin) break;
+                const snap = await cursorRef.__admin.get();
+                if (snap.exists) q = q.startAfter(snap);
+                break;
             }
+            default:
+                break;
         }
     }
     return q;
+}
+
+async function buildClientConstraints(constraints) {
+    const out = [];
+    for (const c of constraints) {
+        if (!c?.type) continue;
+        switch (c.type) {
+            case "where":
+                out.push(where(c.field, c.op, c.value));
+                break;
+            case "orderBy":
+                out.push(orderBy(c.field, c.direction || "asc"));
+                break;
+            case "limit":
+                out.push(limit(c.value));
+                break;
+            case "startAfter": {
+                const cursorRef = c.cursorRef;
+                if (!cursorRef || cursorRef.__admin) break;
+                const snap = await clientGetDoc(cursorRef);
+                if (snap.exists()) out.push(startAfter(snap));
+                break;
+            }
+            default:
+                break;
+        }
+    }
+    return out;
 }
 
 let pingPromise = null;
@@ -138,22 +190,23 @@ export async function getDoc(ref) {
 }
 
 export async function getDocs(q) {
-    if (q?.collectionRef?.__adminCol) {
-        const adminQ = applyAdminConstraints(q.collectionRef.__adminCol, q.constraints || []);
-        return normalizeQuerySnap(await adminQ.get());
+    if (isDescriptorQuery(q)) {
+        if (q.collectionRef?.__adminCol) {
+            const adminQ = await buildAdminQuery(q.collectionRef, q.constraints || []);
+            return normalizeQuerySnap(await adminQ.get());
+        }
+        const clientConstraints = await buildClientConstraints(q.constraints || []);
+        return clientGetDocs(clientQuery(q.collectionRef, ...clientConstraints));
     }
     if (q?.__adminCol) {
-        const adminQ = applyAdminConstraints(q.__adminCol, q.constraints || []);
+        const adminQ = await buildAdminQuery({ __adminCol: q.__adminCol }, q.constraints || []);
         return normalizeQuerySnap(await adminQ.get());
     }
     return clientGetDocs(q);
 }
 
 export function query(collectionRef, ...constraints) {
-    if (collectionRef?.__adminCol) {
-        return { collectionRef, constraints };
-    }
-    return clientQuery(collectionRef, ...constraints);
+    return { collectionRef, constraints };
 }
 
 export async function setDoc(ref, data, options = {}) {
