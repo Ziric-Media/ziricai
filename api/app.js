@@ -1596,7 +1596,8 @@ function sarahChatRateLimit(req, res, next) {
     return next();
 }
 
-app.post("/api/sarah/chat", sarahChatRateLimit, requireTenantScope({ optional: true }), async (req, res) => {
+/** Landing auth is enforced in assertSarahChatAccess — attach tenant only (no requireTenantScope). */
+app.post("/api/sarah/chat", sarahChatRateLimit, attachTenantContext(), async (req, res) => {
     try {
         const surface = String(req.body?.surface || "portal").toLowerCase();
         const rawMessage = req.body?.message;
