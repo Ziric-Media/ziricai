@@ -17,6 +17,7 @@ import { renderSupportPanel } from './modules/support-panel.js';
 import { renderSupportOperations } from './modules/support-operations.js';
 import { renderSupportAttention } from './modules/support-attention.js';
 import { renderAgents } from './modules/agents.js';
+import { renderMarketplace } from './modules/marketplace.js';
 import { renderKnowledge } from './modules/knowledge.js';
 import { renderSettings } from './modules/settings.js';
 
@@ -41,6 +42,7 @@ const RENDERERS = {
   supportOperations: renderSupportOperations,
   supportAttention: renderSupportAttention,
   agents: renderAgents,
+  marketplace: renderMarketplace,
   knowledge: renderKnowledge,
   settings: renderSettings,
 };

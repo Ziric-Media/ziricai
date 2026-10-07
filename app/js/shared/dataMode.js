@@ -19,3 +19,15 @@ export function shouldUseDemoFallback(ctx = {}) {
   if (ctx?.isDemo === true && ctx?.isProvisioned !== true) return true;
   return false;
 }
+
+/** Portal modules: never inject demo content when hub/workspace marks tenant provisioned. */
+export function shouldUsePortalDemoContentFallback(ctx = {}) {
+  if (ctx?.isProvisioned === true) return false;
+  return shouldUseDemoFallback(ctx);
+}
+
+export function resolvePortalProvisionedFlag(state = {}) {
+  if (state.hubData?.isProvisioned === true) return true;
+  if (state.workspace?.company) return true;
+  return false;
+}

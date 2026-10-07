@@ -21,6 +21,32 @@
   to = "https://marketing.ziricai.com/#start"
   status = 302
 
+# Never SPA-fallback node_modules — missing Firebase packages must 404 as JS, not return index.html.
+[[redirects]]
+  from = "/node_modules/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+# Do not SPA-fallback real static assets (missing .js would otherwise return text/html).
+[[redirects]]
+  from = "/js/*"
+  to = "/js/:splat"
+  status = 200
+  force = false
+
+[[redirects]]
+  from = "/css/*"
+  to = "/css/:splat"
+  status = 200
+  force = false
+
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 200
+  force = false
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

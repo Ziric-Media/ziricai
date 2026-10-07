@@ -13,12 +13,26 @@ import {
   installMarketplacePack,
 } from '../api.js';
 import { listCompanies } from '../services/companies.js';
-import { navigateTo } from '../router.js';
 import { withTimeout } from '../utils.js';
 import { DEMO_COMPANIES } from '../demo-data.js';
 import { resolveListItems } from '../services/dataMode.js';
 
 let selectedCategory = null;
+
+function packMatchesCategory(pack, categoryId, categories = []) {
+  if (!categoryId) return true;
+  if (pack.category === categoryId || pack.legacyCategory === categoryId) return true;
+  const cat = categories.find((c) => c.id === categoryId);
+  if (!cat?.legacyIds?.length) return false;
+  return (
+    cat.legacyIds.includes(pack.category) ||
+    cat.legacyIds.includes(pack.legacyCategory)
+  );
+}
+
+function countPacksInCategory(packs, categoryId, categories) {
+  return packs.filter((p) => packMatchesCategory(p, categoryId, categories)).length;
+}
 
 export async function renderMarketplace(container) {
   container.innerHTML = loadingState('Loading AI Marketplace...');
@@ -129,7 +143,7 @@ function buildMarkup(catalog, companies, companyId, installed, updates, isOfflin
       <h3 class="marketplace-section-title"><i class="fa-solid fa-grid-2"></i> Browse by Industry</h3>
       <div class="marketplace-category-grid" id="categoryGrid">
         ${catalog.categories.map((cat) => {
-          const packCount = catalog.packs.filter((p) => p.category === cat.id).length;
+          const packCount = countPacksInCategory(catalog.packs, cat.id, catalog.categories);
           return `
             <button type="button" class="marketplace-category-card" data-category="${escapeHtml(cat.id)}" style="--cat-color:${cat.color}">
               <span class="cat-icon">${cat.icon}</span>
@@ -249,11 +263,13 @@ function bindEvents(container, catalog, companies, companyId, installed) {
     if (sort) params.set('sort', sort);
     const res = await fetchMarketplaceCatalog(params.toString());
     const packs = res.data?.packs || catalog.packs;
-    packGrid.innerHTML = renderPackCards(
-      selectedCategory ? packs.filter((p) => p.category === selectedCategory || p.legacyCategory === selectedCategory) : packs.filter((p) => p.installable !== false && p.status !== 'coming_soon'),
-      installedIds,
-      companyId
+    const filtered = packs.filter(
+      (p) =>
+        packMatchesCategory(p, selectedCategory, catalog.categories) &&
+        p.installable !== false &&
+        p.status !== 'coming_soon'
     );
+    packGrid.innerHTML = renderPackCards(filtered, installedIds, companyId);
     bindInstallButtons(container, companyId);
   };
 
@@ -266,7 +282,7 @@ function bindEvents(container, catalog, companies, companyId, installed) {
     if (!btn) return;
     selectedCategory = btn.dataset.category;
     const cat = catalog.categories.find((c) => c.id === selectedCategory);
-    const packs = catalog.packs.filter((p) => p.category === selectedCategory);
+    const packs = catalog.packs.filter((p) => packMatchesCategory(p, selectedCategory, catalog.categories));
     packGrid.innerHTML = renderPackCards(packs, installedIds, companyId);
     if (titleEl) titleEl.innerHTML = `<i class="fa-solid fa-box-open"></i> ${escapeHtml(cat?.label || 'Packs')}`;
     clearBtn?.classList.remove('hidden');
@@ -288,7 +304,12 @@ function bindEvents(container, catalog, companies, companyId, installed) {
   bindInstallButtons(container, companyId);
 
   container.querySelectorAll('.installed-actions [data-nav]').forEach((btn) => {
-    btn.addEventListener('click', () => navigateTo(btn.dataset.nav));
+    btn.addEventListener('click', async () => {
+      const page = btn.dataset.nav;
+      if (!page) return;
+      const { navigateTo } = await import('../router.js');
+      navigateTo(page);
+    });
   });
 }
 

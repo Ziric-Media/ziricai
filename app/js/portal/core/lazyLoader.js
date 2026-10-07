@@ -8,6 +8,7 @@ const moduleCache = new Map();
 
 const MODULE_IDS = [
   'dashboard',
+  'sarah',
   'agents',
   'knowledge',
   'customers',
@@ -32,6 +33,7 @@ function portalAssetVersion() {
 
 const EXPORT_MAP = {
   dashboard: 'renderDashboard',
+  sarah: 'renderSarah',
   agents: 'renderAgents',
   knowledge: 'renderKnowledge',
   customers: 'renderCustomers',

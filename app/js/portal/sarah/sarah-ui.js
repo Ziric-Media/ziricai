@@ -4,7 +4,13 @@
 import { state } from '../core/dataStore.js';
 import { navigateTo } from '../router.js';
 import { showToast } from '../../admin/ui.js';
-import { sarahChat } from '../api.js';
+import {
+  sarahChat,
+  fetchSarahActiveSession,
+  fetchSarahSession,
+} from '../api.js';
+import { getSarahPageContext } from '../core/sarahPageContext.js';
+import { MODULE_LABELS } from '../core/appShell.js';
 import { invalidateHub } from '../core/dataService.js';
 
 let sessionId = null;
@@ -12,12 +18,36 @@ let sending = false;
 /** @type {HTMLElement | null} */
 let chatMount = null;
 
+const WELCOME =
+  "Hi! I'm Sarah, your AI operating assistant. Ask me to view analytics, search CRM, manage AI employees, upload knowledge, or connect channels — I'll walk you through it.";
+
+function sessionStorageKey(companyId) {
+  return `ziricai.portal.sarahSession.${companyId || 'unknown'}`;
+}
+
+function persistSessionId(companyId, id) {
+  if (!companyId || !id) return;
+  try {
+    sessionStorage.setItem(sessionStorageKey(companyId), id);
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function readPersistedSessionId(companyId) {
+  try {
+    return sessionStorage.getItem(sessionStorageKey(companyId));
+  } catch {
+    return null;
+  }
+}
+
 export const SUGGESTIONS = [
-  'Show analytics for this month',
-  'List recent conversations',
-  'Search CRM for leads',
-  'Connect WhatsApp',
-  'Help with ZiricAI setup',
+  'What is in my workspace?',
+  'Where do I connect WhatsApp?',
+  'What is the difference between Sarah and an AI employee?',
+  'How many AI employees do I have?',
+  'Is my WhatsApp connected?',
 ];
 
 export const SARAH_CAPABILITIES = [
@@ -32,8 +62,15 @@ export const SARAH_CAPABILITIES = [
 function applyUiHints(hints = []) {
   for (const hint of hints) {
     if (hint.navigate) {
-      navigateTo(hint.navigate);
-      showToast(`Opened ${hint.navigate}`, 'info');
+      const page = String(hint.navigate).trim();
+      if (!MODULE_LABELS[page]) {
+        console.warn('[Sarah] Unknown navigate target:', page);
+        showToast(`That page (${page}) isn't available in the portal.`, 'warning');
+        continue;
+      }
+      const label = MODULE_LABELS[page];
+      navigateTo(page);
+      showToast(`Taking you to ${label}…`, 'info');
     }
     if (hint.openWizard === 'connectWhatsApp') {
       import('../whatsappConnect.js').then(({ openWhatsAppConnectWizard }) => {
@@ -58,14 +95,14 @@ function q(sel) {
   return chatMount?.querySelector(sel) ?? null;
 }
 
-function appendMessage(text, role) {
+function appendMessage(text, role, { skipScroll = false } = {}) {
   const messages = q('#portalSarahMessages');
   if (!messages) return;
   const el = document.createElement('div');
   el.className = `portal-sarah-msg ${role}`;
   el.textContent = text;
   messages.appendChild(el);
-  messages.scrollTop = messages.scrollHeight;
+  if (!skipScroll) messages.scrollTop = messages.scrollHeight;
 }
 
 function appendActionBlock(actions) {
@@ -77,6 +114,45 @@ function appendActionBlock(actions) {
   el.innerHTML = summaries.map((s) => `<div class="portal-sarah-action">${s}</div>`).join('');
   messages?.appendChild(el);
   messages.scrollTop = messages.scrollHeight;
+}
+
+function renderStoredMessages(messages = []) {
+  const container = q('#portalSarahMessages');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!messages.length) {
+    appendMessage(WELCOME, 'ai');
+    return;
+  }
+  for (const msg of messages) {
+    const role = msg.role === 'user' ? 'user' : 'ai';
+    appendMessage(msg.content || '', role, { skipScroll: true });
+    if (msg.actions?.length) appendActionBlock(msg.actions);
+  }
+  container.scrollTop = container.scrollHeight;
+}
+
+async function restoreSarahConversation(companyId) {
+  const persistedId = readPersistedSessionId(companyId);
+  if (persistedId) {
+    const { data, error } = await fetchSarahSession(persistedId, companyId);
+    if (!error && data?.session?.messages?.length) {
+      sessionId = data.session.sessionId;
+      persistSessionId(companyId, sessionId);
+      renderStoredMessages(data.session.messages);
+      return;
+    }
+  }
+
+  const { data, error } = await fetchSarahActiveSession(companyId);
+  if (error || !data?.session?.messages?.length) {
+    renderStoredMessages([]);
+    return;
+  }
+
+  sessionId = data.session.sessionId;
+  persistSessionId(companyId, sessionId);
+  renderStoredMessages(data.session.messages);
 }
 
 async function submitMessage(text) {
@@ -101,6 +177,7 @@ async function submitMessage(text) {
     message: trimmed,
     sessionId,
     companyId: state.companyId,
+    pageContext: getSarahPageContext(),
   });
 
   typing.remove();
@@ -113,6 +190,7 @@ async function submitMessage(text) {
   }
 
   sessionId = data.sessionId || sessionId;
+  persistSessionId(state.companyId, sessionId);
   appendMessage(data.reply || 'Done.', 'ai');
   appendActionBlock(data.actions);
   applyUiHints(data.uiHints);
@@ -133,13 +211,16 @@ function bindSuggestions(container) {
  * @param {HTMLElement} container
  * @param {{ mode?: 'page' | 'widget' }} [options]
  */
-export function mountSarahChat(container, options = {}) {
+export async function mountSarahChat(container, options = {}) {
   const mode = options.mode || 'page';
   chatMount = container;
-  container.classList.add('portal-sarah-chat-mount', mode === 'page' ? 'portal-sarah-chat-mount--page' : 'portal-sarah-chat-mount--widget');
+  container.classList.add(
+    'portal-sarah-chat-mount',
+    mode === 'page' ? 'portal-sarah-chat-mount--page' : 'portal-sarah-chat-mount--widget'
+  );
   container.innerHTML = `
     <div class="portal-sarah-messages" id="portalSarahMessages" role="log" aria-live="polite">
-      <div class="portal-sarah-msg ai">Hi! I'm Sarah, your AI operating assistant. Ask me to view analytics, search CRM, manage AI employees, upload knowledge, or connect channels — I'll walk you through it.</div>
+      <div class="portal-sarah-msg ai">Loading conversation…</div>
     </div>
     <div class="portal-sarah-suggestions portal-sarah-suggestions--inline" id="portalSarahSuggestions"></div>
     <form class="portal-sarah-form" id="portalSarahForm">
@@ -169,6 +250,12 @@ export function mountSarahChat(container, options = {}) {
       q('#portalSarahForm')?.requestSubmit();
     }
   });
+
+  if (state.companyId) {
+    await restoreSarahConversation(state.companyId);
+  } else {
+    renderStoredMessages([]);
+  }
 }
 
 /** Remove legacy floating FAB — Sarah is a full module in the sidebar. */

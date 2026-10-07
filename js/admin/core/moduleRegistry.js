@@ -16,6 +16,7 @@ export const MODULES = [
   'supportOperations',
   'supportAttention',
   'agents',
+  'marketplace',
   'knowledge',
   'settings',
 ];
@@ -35,6 +36,7 @@ export const MODULE_LABELS = {
   supportOperations: 'Sarah Operations',
   supportAttention: 'Attention Centre',
   agents: 'AI Employees',
+  marketplace: 'AI Marketplace',
   knowledge: 'Knowledge Base',
   settings: 'Settings',
 };

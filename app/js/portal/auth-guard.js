@@ -1,16 +1,19 @@
 import {
   observeAuthState,
   loginUser,
-  logoutUser,
   isSuperAdminRole,
   resolveAuthProfile,
 } from '../auth.js';
 import { state, setState } from './core/dataStore.js';
 import { showToast } from '../admin/ui.js';
-import { getPermissions } from './permissions.js';
+import { getPermissions, roleLabel } from './permissions.js';
+import { refreshNav } from './router.js';
 import { resolveDemoProfile, DEMO_BRANDING } from './demo-data.js';
 import { shouldUseDemoFallback } from '../shared/dataMode.js';
 import { adminUrl, portalUrl } from '../shared/siteUrls.js';
+import { handleSignedOutVisitor, logoutAndReturnToLanding } from '../shared/logoutToLanding.js';
+import { createLoginBusy } from '../shared/loginBusy.js';
+import { applyUserAvatars } from '../shared/userAvatarUi.js';
 import {
   fetchPortalCompany,
   fetchPortalNotifications,
@@ -24,17 +27,20 @@ import { DEMO_COMPANY_ID } from './demo-data.js';
 /** @type {((user: import('firebase/auth').User, profile: object) => void | Promise<void>) | null} */
 let onAuthReady = null;
 
-const DEFAULT_PORTAL_FAVICON = 'assets/favicon-portal.svg';
+const DEFAULT_PORTAL_FAVICON = 'assets/favicon.png';
 
 function applyFavicon(url) {
   const href = url?.trim() || DEFAULT_PORTAL_FAVICON;
+  const isSvg = /\.svg(\?|$)/i.test(href);
   for (const rel of ['icon', 'apple-touch-icon']) {
     let link = document.querySelector(`link[rel="${rel}"]`);
     if (!link) {
       link = document.createElement('link');
       link.rel = rel;
-      if (rel === 'icon') link.type = 'image/svg+xml';
       document.head.appendChild(link);
+    }
+    if (rel === 'icon') {
+      link.type = isSvg ? 'image/svg+xml' : 'image/png';
     }
     link.href = href;
   }
@@ -61,17 +67,27 @@ async function loadTenantContext(profile) {
   ]);
 
   const workspace = workspaceRes.data || null;
+  const companyPayload = companyRes.data?.company || companyRes.data;
   const company =
     workspace?.company ||
-    companyRes.data?.company ||
-    { id: companyId, name: workspace?.company?.name || 'Your Company' };
+    (companyPayload && typeof companyPayload === 'object' && companyPayload.id
+      ? companyPayload
+      : null) ||
+    {
+      id: companyId,
+      name:
+        companyPayload?.name ||
+        workspace?.company?.name ||
+        (typeof companyPayload === 'object' ? companyPayload?.company?.name : null) ||
+        'Your Company',
+    };
 
   const isProvisioned = Boolean(workspace?.company);
   const useDemoBranding = shouldUseDemoFallback({ companyId, isDemo: isDemoTenant, isProvisioned });
   const storedBranding = useDemoBranding ? localStorage.getItem(`ziric-portal-branding-${companyId}`) : null;
   const branding = storedBranding
     ? JSON.parse(storedBranding)
-    : workspace?.branding || companyRes.data?.branding || company.branding || (useDemoBranding ? DEMO_BRANDING : { primaryColor: '#1e40af', faviconUrl: 'assets/favicon-portal.svg' });
+    : workspace?.branding || companyRes.data?.branding || company.branding || (useDemoBranding ? DEMO_BRANDING : { primaryColor: '#1e40af', faviconUrl: 'assets/favicon.png' });
 
   const subscription = companyRes.data?.subscription || companyRes.data?.usage || null;
   const team = teamRes.data?.items?.length ? teamRes.data.items : workspace?.team || [];
@@ -97,6 +113,8 @@ async function loadTenantContext(profile) {
   updateShellUI(profile, company, branding);
   updateNotificationBadge();
 
+  refreshNav();
+
   prefetchHub(companyId).catch((err) => console.warn('[portal] hub prefetch:', err.message));
   import('./core/notificationPolling.js')
     .then((m) => {
@@ -112,9 +130,20 @@ async function completeLoginSession(user, profile) {
     return;
   }
 
-  await loadTenantContext(profile);
+  const permissions = getPermissions(profile.role);
+  setState({
+    user,
+    profile,
+    companyId: profile.companyId,
+    permissions,
+    company: { id: profile.companyId, name: profile.fullName || profile.email || 'Your Company' },
+  });
+  updateShellUI(profile, { name: profile.fullName || profile.email || 'Your Company' }, {});
   hideAuthScreens();
   await onAuthReady?.(user, profile);
+  loadTenantContext(profile).catch((err) => {
+    console.warn('[portal] tenant context load:', err?.message || err);
+  });
 }
 
 function showSuperAdminRedirect() {
@@ -145,16 +174,13 @@ function hideAuthScreens() {
 
 function updateShellUI(profile, company, branding) {
   const name = profile?.fullName || profile?.name || profile?.email || 'User';
-  const initial = name.charAt(0).toUpperCase();
 
-  document.querySelectorAll('#userMenu .avatar, #sidebarAvatar').forEach((el) => {
-    el.textContent = initial;
-  });
+  applyUserAvatars(profile, profile?.email);
   document.querySelectorAll('#userMenu .name, #sidebarUserName').forEach((el) => {
     el.textContent = name;
   });
   document.querySelectorAll('#userMenu .role, #sidebarUserRole').forEach((el) => {
-    el.textContent = profile?.role || 'member';
+    el.textContent = roleLabel(profile?.role);
   });
   const emailEl = document.getElementById('sidebarUserEmail');
   if (emailEl) emailEl.textContent = profile?.email || '';
@@ -174,8 +200,17 @@ export function updateNotificationBadge() {
   badge.classList.toggle('hidden', n <= 0);
 }
 
+function portalDemoFallbackAllowed() {
+  if (typeof location === 'undefined') return false;
+  const host = location.hostname;
+  return host === 'localhost' || host === '127.0.0.1';
+}
+
 async function resolvePortalProfile(user) {
-  return resolveAuthProfile(user, { demoFallback: resolveDemoProfile });
+  return resolveAuthProfile(user, {
+    demoFallback: resolveDemoProfile,
+    allowDemo: portalDemoFallbackAllowed(),
+  });
 }
 
 export function initAuthGuard({ onReady, onDenied }) {
@@ -184,6 +219,7 @@ export function initAuthGuard({ onReady, onDenied }) {
   observeAuthState(async (user) => {
     if (!user) {
       setState({ user: null, profile: null, companyId: null, company: null, permissions: {} });
+      if (handleSignedOutVisitor()) return;
       showLoginScreen();
       onDenied?.();
       return;
@@ -220,38 +256,40 @@ export function initAuthGuard({ onReady, onDenied }) {
 
 export function bindLoginForm() {
   const form = document.getElementById('loginForm');
+  const busy = createLoginBusy(form, document.getElementById('loginStatus'));
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (form.getAttribute('aria-busy') === 'true') return;
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    const status = document.getElementById('loginStatus');
-    if (status) status.textContent = 'Signing in...';
+    busy.start('Signing in...');
 
-    const result = await loginUser(email, password);
-    if (result.error) {
-      if (status) status.textContent = result.error;
-      showToast(result.error, 'error');
-      return;
-    }
-
-    const profile = result.profile || (await resolvePortalProfile(result.user));
-    if (!profile?.companyId) {
-      const msg = profile
-        ? 'No company assigned to this account.'
-        : 'Profile not found. Use onboarding to create your workspace.';
-      if (status) status.textContent = msg;
-      showToast(msg, 'error');
-      return;
-    }
-
-    if (status) status.textContent = 'Opening portal...';
     try {
+      const result = await loginUser(email, password);
+      if (result.error) {
+        busy.stop(result.error);
+        showToast(result.error, 'error');
+        return;
+      }
+
+      busy.step('Loading your workspace...');
+      const profile = result.profile || (await resolvePortalProfile(result.user));
+      if (!profile?.companyId) {
+        const msg = profile
+          ? 'No company assigned to this account.'
+          : 'Profile not found. Use onboarding to create your workspace.';
+        busy.stop(msg);
+        showToast(msg, 'error');
+        return;
+      }
+
+      busy.step('Opening portal...');
       await completeLoginSession(result.user, profile);
-      if (status) status.textContent = '';
+      busy.stop();
     } catch (err) {
       console.error('Portal init failed:', err);
       const message = err?.message || 'Failed to open portal.';
-      if (status) status.textContent = message;
+      busy.stop(message);
       showToast(message, 'error');
     }
   });
@@ -259,9 +297,9 @@ export function bindLoginForm() {
 
 export function bindLogout() {
   document.addEventListener('click', async (e) => {
-    if (e.target?.id === 'logoutBtn' || e.target?.closest?.('#headerLogoutBtn')) {
-      await logoutUser();
-      showToast('Signed out', 'info');
+    if (e.target?.closest?.('#logoutBtn') || e.target?.closest?.('#headerLogoutBtn')) {
+      e.preventDefault();
+      await logoutAndReturnToLanding();
     }
   });
 }

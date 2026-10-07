@@ -10,6 +10,7 @@ export const NAV_SECTIONS = [
     label: 'Operate',
     items: [
       { id: 'dashboard', label: 'Overview', icon: 'fa-gauge-high' },
+      { id: 'sarah', label: 'Sarah', icon: 'fa-sparkles' },
       { id: 'conversations', label: 'Inbox', icon: 'fa-inbox', live: true },
       { id: 'customers', label: 'CRM', icon: 'fa-users' },
       { id: 'appointments', label: 'Appointments', icon: 'fa-calendar-check' },
@@ -165,12 +166,6 @@ function bindMobileDrawer() {
   toggle?.addEventListener('click', () => {
     sidebar?.classList.toggle('open');
     overlay?.classList.toggle('open', sidebar?.classList.contains('open'));
-  });
-
-  overlay?.addEventListener('click', () => {
-    sidebar?.classList.remove('open');
-    overlay.classList.remove('open');
-    document.getElementById('notificationDrawer')?.classList.remove('open');
   });
 
   document.addEventListener('click', (e) => {

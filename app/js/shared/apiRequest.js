@@ -2,12 +2,12 @@
 
 
 
-import { auth } from '../firebase.js';
+import { auth, ensureAuthReadyForApi } from '../firebase.js';
 
 /** Resolve API origin: injected config, same-origin Netlify proxy, or production default. */
 const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
 
-function resolveApiBase() {
+export function resolveApiBase() {
   if (typeof window === 'undefined') return PRODUCTION_API_URL;
 
   const cfg = window.__ZIRICAI_CONFIG__;
@@ -30,8 +30,7 @@ function resolveApiBase() {
   return PRODUCTION_API_URL;
 }
 
-const API_BASE = resolveApiBase();
-
+const API_BASE = typeof window !== 'undefined' ? resolveApiBase() : PRODUCTION_API_URL;
 
 
 /** @type {((message: string, type?: string) => void) | null} */
@@ -67,6 +66,8 @@ export function registerApiErrorToast(fn) {
 async function withAuthHeaders(options = {}) {
 
   const headers = { ...(options.headers || {}) };
+
+  await ensureAuthReadyForApi();
 
   const user = auth.currentUser;
 
@@ -143,6 +144,5 @@ export async function apiRequest(path, options = {}) {
 
 
 /** Exposed for onboarding and other modules that use raw fetch. */
-
-export { withAuthHeaders };
+export { withAuthHeaders, resolveApiBase as getApiBase };
 

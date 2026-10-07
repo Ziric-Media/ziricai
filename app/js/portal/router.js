@@ -1,6 +1,6 @@
 import { state, setState } from './core/dataStore.js';
 import { canAccessModule } from './permissions.js';
-import { errorState } from '../admin/ui.js';
+import { errorState, showToast } from '../admin/ui.js';
 import { loadModule, showModuleSkeleton, prefetchModules } from './core/lazyLoader.js';
 import {
   applySidebarVisibility,
@@ -8,12 +8,19 @@ import {
   MODULE_LABELS,
   renderSidebarNav,
 } from './core/appShell.js';
+import { dismissShellOverlays } from './core/shellOverlay.js';
 
 export { MODULE_LABELS, applySidebarVisibility };
 
 export function navigateTo(page, params = {}) {
+  dismissShellOverlays();
+
   const role = state.profile?.role;
+  const requested = page;
   if (!canAccessModule(role, page)) {
+    if (requested !== 'dashboard') {
+      showToast('That section is not available for your role.', 'warning');
+    }
     page = 'dashboard';
   }
 
