@@ -241,7 +241,7 @@
         return delay;
     }
 
-    // ===== DEMO MODAL (Watch AI Live) =====
+    // ===== DEMO MODAL (scripted WhatsApp sample) =====
     const demoScenarios = {
         sales: {
             title: 'Central Motors — Sales AI',
@@ -448,10 +448,30 @@
     const sarahDefaultReply = pk?.getDefaultReply?.() || window.ZiricBillingPlans?.getDefaultPlatformReply?.() ||
         'Great question! ZiricAI deploys AI employees to handle customer enquiries 24/7 on WhatsApp, web, and social. Setup takes under 10 minutes, and every plan includes a 14-day free trial. Ask about pricing, setup, industries, WhatsApp, or security — or click Start Free Trial to get going!';
 
+    const SARAH_DEGRADED_INTRO =
+        "I'm having trouble connecting to my full ZiricAI systems right now, but I can still answer some basic questions about ZiricAI.";
+
+    /** Same-origin /api proxy on Netlify when apiBase is "" (matches js/auth.js). */
     function getSarahApiBase() {
-        return window.__ZIRICAI_CONFIG__?.apiBase ??
-            window.__ZIRICAI_CONFIG__?.sites?.api ??
-            (typeof location !== 'undefined' && /localhost|127\.0\.0\.1/.test(location.hostname) ? '' : 'https://ziricai-production.up.railway.app');
+        if (typeof window === 'undefined') return 'https://ziricai-production.up.railway.app';
+        const cfg = window.__ZIRICAI_CONFIG__;
+        if (cfg?.apiBase !== undefined && cfg.apiBase !== null) return cfg.apiBase;
+        if (cfg?.sites?.api) return cfg.sites.api;
+        const host = location.hostname || '';
+        if (host === 'localhost' || host === '127.0.0.1') return '';
+        if (/\.ziricai\.com$/i.test(host) && host !== 'api.ziricai.com') return '';
+        return 'https://ziricai-production.up.railway.app';
+    }
+
+    function getSarahChatUrl() {
+        const base = getSarahApiBase();
+        const path = '/api/sarah/chat';
+        if (base === '' || base == null) return path;
+        return `${String(base).replace(/\/$/, '')}${path}`;
+    }
+
+    function getLandingSarahCompanyId() {
+        return window.__ZIRICAI_CONFIG__?.landingSarahCompanyId || 'ziricai';
     }
 
     function isGenericSarahReply(reply) {
@@ -491,35 +511,54 @@
         return sarahDefaultReply;
     }
 
-    async function fetchSarahReplyFromApi(text) {
-        const apiBase = getSarahApiBase();
-        if (!apiBase) return null;
+    let sarahDegradedAnnounced = false;
 
+    function withDegradedIntro(reply) {
+        if (!reply || sarahDegradedAnnounced) return reply;
+        sarahDegradedAnnounced = true;
+        return `${SARAH_DEGRADED_INTRO} ${reply}`;
+    }
+
+    async function fetchSarahReplyFromApi(text) {
         try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 4500);
-            const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/sarah/chat`, {
+            const timeout = setTimeout(() => controller.abort(), 28000);
+            const res = await fetch(getSarahChatUrl(), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                body: JSON.stringify({ message: text, sessionId: sarahSessionId, surface: 'landing' }),
+                body: JSON.stringify({
+                    message: text,
+                    sessionId: sarahSessionId,
+                    surface: 'landing',
+                    companyId: getLandingSarahCompanyId(),
+                }),
                 signal: controller.signal,
             });
             clearTimeout(timeout);
-            if (!res.ok) return null;
+            if (!res.ok) {
+                return { ok: false, reply: null, degraded: false };
+            }
             const data = await res.json();
             if (data.sessionId) sarahSessionId = data.sessionId;
-            return data.reply?.trim() || null;
+            const reply = data.reply?.trim() || null;
+            return { ok: true, reply, degraded: Boolean(data.degraded) };
         } catch {
-            return null;
+            return { ok: false, reply: null, degraded: false };
         }
     }
 
     async function getSarahReply(text) {
+        const api = await fetchSarahReplyFromApi(text);
+        if (api.ok && api.reply && api.reply.length > 12) {
+            if (api.degraded) return withDegradedIntro(api.reply);
+            return api.reply;
+        }
+
         const localReply = getSarahReplyLocal(text);
-        if (!isGenericSarahReply(localReply)) return localReply;
-        const apiReply = await fetchSarahReplyFromApi(text);
-        if (apiReply && !isGenericSarahReply(apiReply)) return apiReply;
-        return localReply || apiReply || sarahDefaultReply;
+        if (!isGenericSarahReply(localReply)) {
+            return api.ok ? localReply : withDegradedIntro(localReply);
+        }
+        return api.reply || localReply || sarahDefaultReply;
     }
 
     function initSarahChat() {

@@ -187,6 +187,7 @@ import { validateCompanyIdParam, requireBodyFields, isValidCompanyId } from "../
 import { authRateLimit } from "../services/auth/authRateLimiter.js";
 import { auditLog } from "../services/audit/auditLog.js";
 import { isDemoTenant } from "../services/core/dataMode.js";
+import { assertSarahChatAccess } from "../services/sarah/sarahAuth.js";
 import { buildSarahContext } from "../services/sarah/sarahContext.js";
 import { handleSarahChat } from "../services/sarah/sarahOrchestrator.js";
 import { getToolsForContext } from "../services/sarah/toolRegistry.js";
@@ -1585,20 +1586,55 @@ app.get("/api/automations/:companyId/runs", requireTenantScope(), async (req, re
 /** Sarah — AI Operating Assistant */
 initSarahTools();
 
-app.post("/api/sarah/chat", requireTenantScope({ optional: true }), async (req, res) => {
+const SARAH_LANDING_MAX_MESSAGE_CHARS = 500;
+
+function sarahChatRateLimit(req, res, next) {
+    const surface = String(req.body?.surface || "portal").toLowerCase();
+    if (surface === "landing") {
+        return authRateLimit("sarah-landing")(req, res, next);
+    }
+    return next();
+}
+
+app.post("/api/sarah/chat", sarahChatRateLimit, requireTenantScope({ optional: true }), async (req, res) => {
     try {
-        const { message, sessionId, companyId: bodyCompanyId } = req.body || {};
+        const surface = String(req.body?.surface || "portal").toLowerCase();
+        const rawMessage = req.body?.message;
+        if (rawMessage != null && typeof rawMessage !== "string") {
+            return res.status(400).json({ error: "message must be a string", code: "INVALID_MESSAGE" });
+        }
+        const message = String(rawMessage || "").trim();
+        const { sessionId } = req.body || {};
+
+        if (surface === "landing") {
+            if (!message) {
+                return res.status(400).json({ error: "message is required", code: "MISSING_MESSAGE" });
+            }
+            if (message.length > SARAH_LANDING_MAX_MESSAGE_CHARS) {
+                return res.status(400).json({
+                    error: `Message must be at most ${SARAH_LANDING_MAX_MESSAGE_CHARS} characters`,
+                    code: "MESSAGE_TOO_LONG",
+                });
+            }
+        }
+
+        const access = await assertSarahChatAccess(req, {
+            surface,
+            companyId: req.body?.companyId ?? req.tenant?.companyId ?? null,
+        });
+
         const ctx = await buildSarahContext(req, {
-            companyId: bodyCompanyId || req.tenant?.companyId,
+            companyId: access.companyId,
             sessionId,
-            surface: req.body?.surface || "portal",
+            surface: access.surface,
+            persona: access.persona,
         });
 
         const result = await handleSarahChat(ctx, { message, sessionId });
         res.json(result);
     } catch (err) {
         console.error("[api/sarah/chat] error:", err.message);
-        res.status(err.status || 500).json({ error: err.message || "Sarah chat failed" });
+        res.status(err.status || 500).json({ error: err.message || "Sarah chat failed", code: err.code });
     }
 });
 

@@ -2,9 +2,10 @@
 <html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZiricAI · AI Business OS</title>
-    <link rel="icon" type="image/svg+xml" href="assets/favicon-portal.svg">
+    <link rel="icon" href="assets/favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="assets/favicon.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="css/onboarding.css">
@@ -40,14 +41,19 @@
     <div class="container header-inner">
         <a href="#" class="logo"><img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img"></a>
         <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
-        <nav class="nav-links" id="navLinks">
-            <a href="#hire-ai-employees">Hire AI Employees</a>
-            <a href="#ai-employees-catalog">Catalog</a>
-            <a href="#industries">Industries</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#faq">FAQ</a>
-            <button class="btn btn-sm" onclick="launchWizard()">Start Free Trial</button>
-        </nav>
+        <div class="header-nav-panel" id="headerNavPanel">
+            <nav class="nav-links" id="navLinks">
+                <a href="#hire-ai-employees">Hire AI Employees</a>
+                <a href="#ai-employees-catalog">Catalog</a>
+                <a href="#industries">Industries</a>
+                <a href="#pricing">Pricing</a>
+                <a href="#faq">FAQ</a>
+            </nav>
+            <div class="nav-ctas">
+                <a href="login.html" class="btn btn-sm">Log in</a>
+                <button type="button" class="btn btn-sm" onclick="launchWizard()">Start Free Trial</button>
+            </div>
+        </div>
     </div>
 </header>
 
@@ -69,7 +75,7 @@
             <p class="hero-sub">ZiricAI is an AI Business Operating System that allows organizations to deploy, manage, and coordinate AI Employees across every department of their business — without writing a single line of code.</p>
             <div class="hero-actions">
                 <button class="btn btn-glow btn-lg" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
-                <button class="btn btn-ghost btn-lg" id="watchDemoBtn"><i class="fa-solid fa-play"></i> Watch AI Live</button>
+                <button class="btn btn-ghost btn-lg" id="watchDemoBtn"><i class="fa-solid fa-play"></i> See a Demo</button>
             </div>
             <p class="hero-trust-line"><i class="fa-solid fa-shield-check"></i> No credit card required · Setup in under 10 minutes · POPIA-ready</p>
         </div>
@@ -653,56 +659,7 @@
             <h2>Simple, scalable pricing</h2>
             <p>Every plan includes setup, AI training, and access to future platform updates.</p>
         </div>
-        <div class="pricing-grid">
-            <div class="pricing-card">
-                <div class="pricing-plan">Starter</div>
-                <div class="pricing-price">R999 <small>/month</small></div>
-                <ul class="pricing-features">
-                    <li><i class="fa-solid fa-check"></i> 1 AI Employee</li>
-                    <li><i class="fa-solid fa-check"></i> WhatsApp + Website Chat</li>
-                    <li><i class="fa-solid fa-check"></i> 2,000 conversations/mo</li>
-                    <li><i class="fa-solid fa-check"></i> Basic Knowledge Base</li>
-                    <li><i class="fa-solid fa-check"></i> Email Support</li>
-                </ul>
-                <button class="btn" onclick="launchWizard()">Start Free Trial</button>
-            </div>
-            <div class="pricing-card featured">
-                <div class="pricing-plan">Professional</div>
-                <div class="pricing-price">R2,999 <small>/month</small></div>
-                <ul class="pricing-features">
-                    <li><i class="fa-solid fa-check"></i> Up to 5 AI Employees</li>
-                    <li><i class="fa-solid fa-check"></i> Social Media + CRM</li>
-                    <li><i class="fa-solid fa-check"></i> Analytics Dashboard</li>
-                    <li><i class="fa-solid fa-check"></i> Team accounts</li>
-                    <li><i class="fa-solid fa-check"></i> Workflow automation</li>
-                </ul>
-                <button class="btn" onclick="launchWizard()">Start Free Trial</button>
-            </div>
-            <div class="pricing-card">
-                <div class="pricing-plan">Business</div>
-                <div class="pricing-price">R7,999 <small>/month</small></div>
-                <ul class="pricing-features">
-                    <li><i class="fa-solid fa-check"></i> Unlimited AI Employees</li>
-                    <li><i class="fa-solid fa-check"></i> Unlimited Knowledge</li>
-                    <li><i class="fa-solid fa-check"></i> API Access</li>
-                    <li><i class="fa-solid fa-check"></i> Multiple departments</li>
-                    <li><i class="fa-solid fa-check"></i> Priority Support</li>
-                </ul>
-                <button class="btn" onclick="launchWizard()">Start Free Trial</button>
-            </div>
-            <div class="pricing-card">
-                <div class="pricing-plan">Enterprise</div>
-                <div class="pricing-price">Custom</div>
-                <ul class="pricing-features">
-                    <li><i class="fa-solid fa-check"></i> Custom AI development</li>
-                    <li><i class="fa-solid fa-check"></i> On-premise deployment</li>
-                    <li><i class="fa-solid fa-check"></i> Dedicated infrastructure</li>
-                    <li><i class="fa-solid fa-check"></i> SLA + Staff training</li>
-                    <li><i class="fa-solid fa-check"></i> Custom workflows</li>
-                </ul>
-                <button class="btn btn-outline" onclick="showToast('Contact sales for enterprise pricing','info')">Contact Sales</button>
-            </div>
-        </div>
+        <div class="pricing-grid" id="landingPricingGrid" aria-live="polite" aria-busy="true"></div>
         <p class="pricing-note">14-day free trial on all plans. No credit card required.</p>
     </div>
 </section>
@@ -769,7 +726,7 @@
     <p>Join businesses across Africa building their digital workforce with ZiricAI — the world's first digital AI employment agency.</p>
     <div class="hero-actions">
         <button class="btn btn-glow btn-lg" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
-        <button class="btn btn-ghost btn-lg" id="watchDemoBtn2"><i class="fa-solid fa-play"></i> Watch AI Live</button>
+        <button class="btn btn-ghost btn-lg" id="watchDemoBtn2"><i class="fa-solid fa-play"></i> See a Demo</button>
     </div>
 </section>
 
@@ -792,34 +749,28 @@
             </div>
             <div class="footer-col">
                 <h5>Company</h5>
-                <a href="#industries">About</a>
-                <a href="#" onclick="showToast('Careers page coming soon','info');return false;">Careers</a>
-                <a href="#" onclick="showToast('Partners program coming soon','info');return false;">Partners</a>
-                <a href="#" onclick="showToast('Contact: hello@ziric.ai','info');return false;">Contact</a>
+                <a href="#introducing-ziricai">About</a>
+                <a href="mailto:hello@ziric.ai">Contact</a>
+                <a href="login.html">Sign in</a>
             </div>
             <div class="footer-col">
                 <h5>Resources</h5>
-                <a href="#" onclick="showToast('Documentation coming soon','info');return false;">Documentation</a>
-                <a href="#" onclick="showToast('API docs coming soon','info');return false;">API</a>
-                <a href="#faq">Help Center</a>
-                <a href="#" onclick="showToast('Blog coming soon','info');return false;">Blog</a>
+                <a href="#faq">Help centre</a>
+                <a href="/privacy">Privacy policy</a>
             </div>
             <div class="footer-col">
-                <h5>Developers</h5>
-                <a href="#" onclick="showToast('API docs coming soon','info');return false;">API Reference</a>
-                <a href="#" onclick="showToast('Webhooks docs coming soon','info');return false;">Webhooks</a>
-                <a href="#" onclick="showToast('SDK coming soon','info');return false;">SDK</a>
-                <a href="ziric-superadmin-console.html">Platform Admin</a>
-                <a href="company-portal.html">Company Portal</a>
+                <h5>Platform</h5>
+                <a href="#" data-site-link="app">Company Portal</a>
+                <a href="#" data-site-link="admin">Mission Control</a>
             </div>
         </div>
         <div class="footer-bottom">
             <span>&copy; 2026 ZiricAI — built by Ziric Media</span>
             <div class="footer-bottom-links">
                 <a href="/privacy">Privacy Policy</a>
-                <a href="#">Terms</a>
-                <a href="ziric-superadmin-console.html">Super Admin</a>
-                <a href="company-portal.html">Portal</a>
+                <a href="login.html">Sign in</a>
+                <a href="#" data-site-link="app">Portal</a>
+                <a href="#" data-site-link="admin">Mission Control</a>
             </div>
         </div>
     </div>
@@ -827,16 +778,16 @@
 
 </div><!-- /landingView -->
 
-<!-- ===== WATCH AI LIVE — DEMO MODAL ===== -->
+<!-- ===== DEMO MODAL (scripted WhatsApp sample) ===== -->
 <div class="demo-overlay" id="demoOverlay">
-    <div class="demo-modal demo-modal-split" role="dialog" aria-label="AI Live Demo">
+    <div class="demo-modal demo-modal-split" role="dialog" aria-label="Sample WhatsApp demo">
         <div class="demo-modal-header">
-            <h3 id="demoModalTitle"><i class="fa-brands fa-whatsapp"></i> Watch AI Live</h3>
+            <h3 id="demoModalTitle"><i class="fa-brands fa-whatsapp"></i> See a Demo</h3>
             <button class="demo-close" id="demoClose" aria-label="Close">&times;</button>
         </div>
         <div class="demo-modal-body">
             <div class="demo-controls">
-                <p class="demo-controls-label">Live scenario</p>
+                <p class="demo-controls-label">Demo scenario</p>
                 <div class="demo-scenario-tabs" id="demoScenarioTabs">
                     <button type="button" class="demo-scenario-tab active" data-scenario="sales"><i class="fa-solid fa-car"></i> Sales enquiry</button>
                     <button type="button" class="demo-scenario-tab" data-scenario="sarah"><i class="fa-solid fa-calendar-check"></i> Appointment booking</button>
@@ -845,7 +796,7 @@
                 <div class="demo-live-feed" id="demoLiveFeed">
                     <div class="demo-feed-line"><span class="dot"></span> Waiting for customer message…</div>
                 </div>
-                <p class="demo-modal-note"><i class="fa-solid fa-circle-info"></i> Messages appear on the phone in real time — just like your customers see them.</p>
+                <p class="demo-modal-note"><i class="fa-solid fa-circle-info"></i> Scripted sample conversation for illustration — not a live AI session.</p>
             </div>
             <div class="demo-phone-wrap">
                 <div class="device-simulator device-iphone device-iphone-compact">
@@ -908,7 +859,7 @@
         </a>
         <div class="onboarding-header-meta">
             <span class="trial-pill"><i class="fa-solid fa-gift"></i> 14-day free trial</span>
-            <a href="company-portal.html" class="link-muted">Sign in</a>
+            <a href="login.html" class="link-muted">Sign in</a>
         </div>
     </header>
 
@@ -931,7 +882,7 @@
     </main>
 
     <footer class="onboarding-footer">
-        <span>&copy; ZiricAI &middot; POPIA-ready &middot; <a href="ziric-superadmin-console.html">Platform Admin</a></span>
+        <span>&copy; ZiricAI &middot; POPIA-ready &middot; <a href="#" data-site-link="admin">Mission Control</a></span>
     </footer>
 </div>
 
@@ -942,12 +893,12 @@
             <div class="sarah-panel-avatar"><img src="assets/sarah-avatar.svg" alt="" width="40" height="40"></div>
             <div>
                 <strong>Sarah</strong>
-                <span>Reception AI · Online</span>
+                <span>ZiricAI assistant · Online</span>
             </div>
             <button class="sarah-panel-close" id="sarahPanelClose" aria-label="Close chat">&times;</button>
         </div>
         <div class="sarah-panel-messages" id="sarahMessages">
-            <div class="sarah-msg ai">Hi 👋 I'm Sarah. Ask me anything about ZiricAI — pricing, setup, industries, WhatsApp integration. No signup required!</div>
+            <div class="sarah-msg ai">Hi 👋 I'm Sarah, ZiricAI's AI assistant. Ask me about the platform, pricing, industries, or how to get started — no signup required.</div>
         </div>
         <div class="sarah-panel-suggestions" id="sarahSuggestions">
             <button type="button" data-q="How much does ZiricAI cost?">Pricing</button>
@@ -971,12 +922,12 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="js/shared/billingPlans.browser.js"></script>
+<script src="js/landing/pricing-landing.browser.js"></script>
 <script src="js/shared/platformKnowledge.browser.js"></script>
 <script src="js/shared/marketplacePacks.browser.js"></script>
 <script src="js/shared/aiEmployeesCatalog.browser.js"></script>
 <script src="js/shared/industryTemplates.browser.js"></script>
 <script src="js/ziricai-landing.js"></script>
-<script type="module" src="js/landing/pricing.js"></script>
 <script>
     function launchWizard() {
         const landing = document.getElementById('landingView');
@@ -1051,7 +1002,7 @@
 
     // ===== MOBILE MENU =====
     document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
-        document.getElementById('navLinks')?.classList.toggle('open');
+        document.getElementById('headerNavPanel')?.classList.toggle('open');
     });
 
     document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => {
@@ -1059,7 +1010,7 @@
         else showToast('Sarah chat loading — try again in a moment', 'info');
     });
 
-    // FAQ accordion, Watch AI Live demo, Sarah chat — js/ziricai-landing.js
+    // FAQ accordion, demo modal, Sarah chat — js/ziricai-landing.js
 
     // ===== AGENT CARD CLICK — handled by ziricai-landing.js hire/catalog sections =====
 

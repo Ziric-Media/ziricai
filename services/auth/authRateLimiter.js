@@ -11,6 +11,8 @@ const DEFAULTS = {
     "platform-companies": { windowMs: 60_000, max: 30 },
     "platform-integrations": { windowMs: 60_000, max: 20 },
     "health-probe": { windowMs: 60_000, max: 120 },
+    /** Anonymous ziricai.com Sarah widget — POST /api/sarah/chat surface=landing */
+    "sarah-landing": { windowMs: 60_000, max: 30 },
 };
 
 function hit(key, { windowMs, max }) {

@@ -1,5 +1,6 @@
 /**
  * Sarah orchestrator — OpenAI function-calling conversation loop + demo fallback.
+ * Gate 1 baseline: a336ab0 + public landing guards and degraded demo fallback.
  */
 import OpenAI from "openai";
 import { bootstrapEnv } from "../env/startupEnv.js";
@@ -19,6 +20,7 @@ import {
     getPlatformAnswer,
     PLATFORM_DEFAULT_REPLY,
 } from "./platformKnowledge.js";
+import { SARAH_PERSONA, resolvePersonaFromSurface } from "./sarahPersona.js";
 
 bootstrapEnv();
 
@@ -52,6 +54,11 @@ const DEMO_INTENTS = [
     { keys: ["quote", "quotation"], tool: "generateQuote", args: { customerName: "Customer", items: [{ description: "Service", amount: 0 }] } },
     { keys: ["appointment", "book", "schedule"], tool: "bookAppointment", args: { customerName: "Customer", scheduledAt: "tomorrow 2pm", service: "Consultation" } },
 ];
+
+function isPublicLandingCtx(ctx) {
+    const persona = ctx.persona || resolvePersonaFromSurface(ctx.surface);
+    return persona === SARAH_PERSONA.PUBLIC_RECEPTION || ctx.surface === "landing";
+}
 
 function extractEmployeeFromMessage(message) {
     const lower = message.toLowerCase();
@@ -100,7 +107,32 @@ function matchDemoIntent(message, sessionContext = {}) {
     return null;
 }
 
+async function runPublicLandingDemoMode(_ctx, message, session) {
+    const platformMatch = matchPlatformQuestion(message);
+    let reply = null;
+    if (typeof platformMatch === "string") reply = platformMatch;
+    else if (platformMatch?.answer) reply = platformMatch.answer;
+    if (!reply) {
+        reply = getPlatformAnswer("general").answer || PLATFORM_DEFAULT_REPLY;
+    }
+
+    appendMessage(session.id, "user", message);
+    appendMessage(session.id, "assistant", reply);
+    return {
+        reply,
+        sessionId: session.id,
+        actions: [],
+        uiHints: [],
+        mode: "demo",
+        degraded: true,
+    };
+}
+
 async function runDemoMode(ctx, message, session) {
+    if (isPublicLandingCtx(ctx)) {
+        return runPublicLandingDemoMode(ctx, message, session);
+    }
+
     const sessionContext = getSessionContext(session.id);
     const platformMatch = matchPlatformQuestion(message);
 
@@ -166,6 +198,7 @@ export async function handleSarahChat(ctx, input) {
 
     const session = getOrCreateSession(input.sessionId, ctx.companyId);
     ctx.sessionId = session.id;
+    ctx.sarahSession = session;
     ctx.lastUserMessage = message;
     ctx.message = message;
 
@@ -198,7 +231,7 @@ export async function handleSarahChat(ctx, input) {
                 messages: currentMessages,
                 tools: tools.length ? tools : undefined,
                 tool_choice: tools.length ? "auto" : undefined,
-                max_tokens: 800,
+                max_tokens: ctx.surface === "landing" ? 900 : 800,
             });
 
             const choice = response.choices[0]?.message;
@@ -283,4 +316,3 @@ function dedupeUiHints(hints) {
 }
 
 export { initSarahTools };
-
