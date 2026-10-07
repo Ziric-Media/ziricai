@@ -16,6 +16,7 @@ export async function renderSupportAttention(container) {
   const cat = data.requiresAttentionCategories || {};
 
   container.innerHTML = `
+    <div class="attention-page">
     <header class="page-header">
       <div>
         <h1>Attention Centre</h1>
@@ -51,7 +52,8 @@ export async function renderSupportAttention(container) {
     ${renderQueueTable('Sarah monitoring', yellow, 'yellow')}
     ${renderRecurring(data.recurring || [])}
     ${renderPlatformPatterns(data.platformPatterns)}
-    <div id="attentionDetail" class="panel-card" hidden></div>
+    <div id="attentionDetail" class="panel-card attention-detail-panel" hidden></div>
+    </div>
   `;
 
   container.querySelector('#backDashboard')?.addEventListener('click', () => navigateTo('dashboard'));
@@ -61,25 +63,45 @@ export async function renderSupportAttention(container) {
   });
 }
 
+function severityPill(severity) {
+  const raw = String(severity || '').trim().toLowerCase();
+  const slug = raw.replace(/[^a-z0-9]+/g, '-') || 'unknown';
+  const label = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '—';
+  return `<span class="severity-pill severity-pill--${escapeHtml(slug)}">${escapeHtml(label)}</span>`;
+}
+
 function renderQueueTable(title, rows, tone) {
+  const head = `
+    <div class="attention-queue-head">
+      <h3 class="attention-queue-title">${escapeHtml(title)}</h3>
+      <span class="attention-queue-count">${formatNumber(rows.length)}</span>
+    </div>`;
   if (!rows.length) {
-    return `<section class="panel-card"><h3>${escapeHtml(title)}</h3><p class="pi-panel-hint">None in current sample.</p></section>`;
+    return `
+    <section class="panel-card attention-queue attention-queue--${tone} attention-queue--empty">
+      ${head}
+      <div class="attention-empty-state">
+        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+        <p>Nothing queued here right now.</p>
+        <span class="pi-panel-hint">Sarah will surface items when they need your input.</span>
+      </div>
+    </section>`;
   }
   return `
     <section class="panel-card attention-queue attention-queue--${tone}">
-      <h3>${escapeHtml(title)}</h3>
-      <div class="table-wrap">
-        <table class="data-table">
+      ${head}
+      <div class="table-wrap attention-table-wrap">
+        <table class="data-table attention-data-table">
           <thead><tr><th>Organisation</th><th>Issue</th><th>Severity</th><th>Why</th></tr></thead>
           <tbody>
             ${rows
               .map(
                 (r) => `
-              <tr class="mc-audit-row" data-attention-row data-payload="${escapeHtml(encodeURIComponent(JSON.stringify(r.evidence || {})))}">
-                <td>${escapeHtml(r.companyName)}</td>
-                <td>${escapeHtml(String(r.issue || '').slice(0, 48))}</td>
-                <td>${escapeHtml(r.severity || '—')}</td>
-                <td>${escapeHtml(String(r.attentionReason || '').slice(0, 64))}</td>
+              <tr class="mc-audit-row attention-row" data-attention-row data-payload="${escapeHtml(encodeURIComponent(JSON.stringify(r.evidence || {})))}">
+                <td class="attention-org">${escapeHtml(r.companyName)}</td>
+                <td class="attention-issue">${escapeHtml(String(r.issue || '').slice(0, 80))}</td>
+                <td>${severityPill(r.severity)}</td>
+                <td class="attention-why">${escapeHtml(String(r.attentionReason || '').slice(0, 96))}</td>
               </tr>`
               )
               .join('')}
