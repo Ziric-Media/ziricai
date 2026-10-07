@@ -58,6 +58,9 @@ import {
   ORGANISATION_TYPE_LABELS,
   segmentFromCompanyRecord,
 } from '../../shared/organisationTaxonomy.js';
+import { countCompaniesByOrganisationType } from '../services/companyOrganisationCounts.js';
+
+export { countCompaniesByOrganisationType };
 
 let filters = { search: '', plan: '', status: '', tenantClass: '' };
 /** When set, list is scoped to this organisation segment (Government / Public Service nav). */
@@ -308,12 +311,6 @@ function applyFilters(companies) {
       !listOrganisationType || segment.organisationType === listOrganisationType;
     return matchesSearch && matchesPlan && matchesStatus && matchesClass && matchesOrgType;
   });
-}
-
-export function countCompaniesByOrganisationType(companies, organisationType) {
-  return companies.filter(
-    (c) => segmentFromCompanyRecord(c).organisationType === organisationType
-  ).length;
 }
 
 function companyInitials(name) {

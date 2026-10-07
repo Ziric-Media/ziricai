@@ -8,7 +8,7 @@ import { withTimeout } from './utils.js';
 import { DEMO_COMPANIES } from './demo-data.js';
 import { isDemoDataAllowed, resolveListItems } from './services/dataMode.js';
 import { formatScopeOptionLabel } from './services/scopeDisplay.js';
-import { countCompaniesByOrganisationType } from './modules/companies.js';
+import { countCompaniesByOrganisationType } from './services/companyOrganisationCounts.js';
 import { ORGANISATION_TYPE } from '../shared/organisationTaxonomy.js';
 
 export async function bootstrap() {
