@@ -1,11 +1,15 @@
 import { state, setState } from './state.js';
-import { applyTheme, toggleTheme, showToast } from './ui.js';
+import { applyTheme, toggleTheme, showToast, escapeHtml } from './ui.js';
 import { initRouter, navigateTo } from './router.js';
 import { initAuthGuard, bindLoginForm, bindLogout } from './auth-guard.js';
+import { consumeAuthHandoffFromUrl } from '../shared/authHandoff.js';
 import { listCompanies } from './services/companies.js';
 import { withTimeout } from './utils.js';
 import { DEMO_COMPANIES } from './demo-data.js';
 import { isDemoDataAllowed, resolveListItems } from './services/dataMode.js';
+import { formatScopeOptionLabel } from './services/scopeDisplay.js';
+import { countCompaniesByOrganisationType } from './modules/companies.js';
+import { ORGANISATION_TYPE } from '../shared/organisationTaxonomy.js';
 
 export async function bootstrap() {
   if (location.protocol === 'file:') {
@@ -15,12 +19,15 @@ export async function bootstrap() {
   }
 
   try {
+    await consumeAuthHandoffFromUrl();
     applyTheme(state.theme);
     bindLoginForm();
     bindLogout();
     initRouter();
     bindShellEvents();
     document.addEventListener('ziric:companies-updated', refreshCompanies);
+    document.addEventListener('ziric:agents-updated', updateAgentCountBadge);
+    document.addEventListener('ziric:knowledge-updated', updateKnowledgeCountBadge);
 
     initAuthGuard({
       onReady: () => {
@@ -47,17 +54,74 @@ async function refreshCompanies() {
   setState({ companies: items });
   updateCompanySelector();
   const companyCount = document.getElementById('companyCount');
-  if (companyCount) companyCount.textContent = String(state.companies.length || '—');
+  if (companyCount) {
+    companyCount.textContent = String(state.companies.length || '—');
+    companyCount.title = 'Tenant records (not production customer count)';
+  }
+  const governmentCount = document.getElementById('governmentCount');
+  if (governmentCount) {
+    governmentCount.textContent = String(
+      countCompaniesByOrganisationType(state.companies, ORGANISATION_TYPE.GOVERNMENT) || '0'
+    );
+  }
+  const publicServiceCount = document.getElementById('publicServiceCount');
+  if (publicServiceCount) {
+    publicServiceCount.textContent = String(
+      countCompaniesByOrganisationType(
+        state.companies,
+        ORGANISATION_TYPE.POLITICAL_PUBLIC_SERVICE
+      ) || '0'
+    );
+  }
   const agentCount = document.getElementById('agentCount');
-  if (agentCount) agentCount.textContent = state.companies.length ? '—' : '4';
+  if (agentCount) agentCount.textContent = '—';
+  const knowledgeCount = document.getElementById('knowledgeCount');
+  if (knowledgeCount) knowledgeCount.textContent = '—';
+}
+
+function updateKnowledgeCountBadge(event) {
+  const knowledgeCount = document.getElementById('knowledgeCount');
+  if (!knowledgeCount) return;
+
+  const detail = event?.detail || {};
+  if (!state.selectedCompanyId || detail.loadState === 'scope_required') {
+    knowledgeCount.textContent = '—';
+    return;
+  }
+  if (detail.loadState === 'error' || detail.count == null) {
+    knowledgeCount.textContent = '—';
+    return;
+  }
+  knowledgeCount.textContent = String(detail.count);
+}
+
+function updateAgentCountBadge(event) {
+  const agentCount = document.getElementById('agentCount');
+  if (!agentCount) return;
+
+  const detail = event?.detail || {};
+  if (!state.selectedCompanyId || detail.loadState === 'scope_required') {
+    agentCount.textContent = '—';
+    return;
+  }
+  if (detail.loadState === 'error' || detail.count == null) {
+    agentCount.textContent = '—';
+    return;
+  }
+  agentCount.textContent = String(detail.count);
 }
 
 function updateCompanySelector() {
   const select = document.getElementById('companySelector');
   if (!select) return;
   select.innerHTML = `
-    <option value="">All Companies</option>
-    ${state.companies.map((c) => `<option value="${c.id}" ${state.selectedCompanyId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+    <option value="">All Tenants</option>
+    ${state.companies
+      .map(
+        (c) =>
+          `<option value="${escapeHtml(c.id)}" ${state.selectedCompanyId === c.id ? 'selected' : ''}>${escapeHtml(formatScopeOptionLabel(c))}</option>`
+      )
+      .join('')}
   `;
 }
 
@@ -71,7 +135,11 @@ function bindShellEvents() {
   document.getElementById('companySelector')?.addEventListener('change', (e) => {
     const value = e.target.value || null;
     setState({ selectedCompanyId: value });
-    showToast(value ? `Scoped to selected company` : 'Showing all companies', 'info');
+    if (!value) {
+      updateAgentCountBadge({ detail: { loadState: 'scope_required', count: null } });
+      updateKnowledgeCountBadge({ detail: { loadState: 'scope_required', count: null } });
+    }
+    showToast(value ? 'Scoped to selected tenant' : 'Showing all tenants', 'info');
     navigateTo(state.currentPage);
   });
 

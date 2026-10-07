@@ -191,98 +191,247 @@ export function renderDocumentsSection(items) {
 
 export function renderFaqsSection(items) {
   if (!items.length) {
-    return emptyState('No FAQs yet. Create your first FAQ to train your AI employee.', '<button class="btn btn-primary btn-sm" type="button" id="kbFaqFromEmpty"><i class="fa-solid fa-plus"></i> Create FAQ</button>');
+    return emptyState(
+      'No FAQs yet. Create your first FAQ to train your AI employee.',
+      '<button class="btn btn-primary btn-sm" type="button" id="kbFaqFromEmpty"><i class="fa-solid fa-plus"></i> Create FAQ</button>'
+    );
   }
   return `
-    <div class="kb-faq-list">
-      ${items.map((faq) => `
-        <div class="kb-faq-card" data-id="${escapeHtml(faq.id)}">
-          <div class="kb-faq-header">
-            <div class="kb-faq-q"><i class="fa-solid fa-circle-question"></i> ${escapeHtml(faq.question || faq.title)}</div>
-            <div class="kb-faq-actions">
-              <button class="btn btn-secondary btn-sm kb-edit-faq" type="button" data-id="${escapeHtml(faq.id)}" title="Edit"><i class="fa-solid fa-pen"></i></button>
-              <button class="btn btn-secondary btn-sm kb-delete" type="button" data-id="${escapeHtml(faq.id)}" title="Delete"><i class="fa-solid fa-trash"></i></button>
-            </div>
+    ${sectionToolbar('kbAddFaqBtn', 'Create FAQ', 'fa-circle-question')}
+    <div class="kb-service-list">
+      ${items.map((faq) => {
+        const title = faq.question || faq.title || 'FAQ';
+        return `
+        <div class="kb-service-card kb-entry-card" data-id="${escapeHtml(faq.id)}">
+          ${kbEntryCardHeader({
+            badgeHtml: '<i class="fa-solid fa-circle-question"></i> FAQ',
+            icon: 'fa-circle-question',
+            title,
+            editClass: 'kb-edit-faq',
+            id: faq.id,
+          })}
+          <p class="kb-narrative-preview">${kbPreviewText(faq.answer || faq.content || '')}</p>
+          <div class="kb-service-meta">
+            <span>${knowledgeStatusBadge(faq.status)}</span>
+            <span>Updated ${escapeHtml(formatDate(faq.lastTrained))}</span>
           </div>
-          <div class="kb-faq-a">${escapeHtml(faq.answer || faq.content || '')}</div>
-          <div class="kb-faq-footer">${knowledgeStatusBadge(faq.status)} · ${escapeHtml(formatDate(faq.lastTrained))}</div>
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
     </div>
   `;
 }
 
+function sectionToolbar(buttonId, label, icon = 'fa-plus') {
+  return `
+    <div class="kb-section-toolbar">
+      <button class="btn btn-primary btn-sm" type="button" id="${buttonId}"><i class="fa-solid ${icon}"></i> ${escapeHtml(label)}</button>
+    </div>`;
+}
+
+function sectionToolbarDual(structuredId, structuredLabel, explainId, explainLabel, icon = 'fa-plus') {
+  return `
+    <div class="kb-section-toolbar kb-section-toolbar-dual">
+      <button class="btn btn-primary btn-sm" type="button" id="${structuredId}">
+        <i class="fa-solid ${icon}"></i> ${escapeHtml(structuredLabel)}
+      </button>
+      <button class="btn btn-secondary btn-sm" type="button" id="${explainId}">
+        <i class="fa-solid fa-book-open"></i> ${escapeHtml(explainLabel)}
+      </button>
+    </div>`;
+}
+
+function emptyStateDualActions(structuredId, structuredLabel, explainId, explainLabel, icon = 'fa-plus') {
+  return `
+    <div class="kb-empty-actions">
+      <button class="btn btn-primary btn-sm" type="button" id="${structuredId}">
+        <i class="fa-solid ${icon}"></i> ${escapeHtml(structuredLabel)}
+      </button>
+      <button class="btn btn-secondary btn-sm" type="button" id="${explainId}">
+        <i class="fa-solid fa-book-open"></i> ${escapeHtml(explainLabel)}
+      </button>
+    </div>`;
+}
+
+export function isNarrativeKnowledgeEntry(item) {
+  if (!item) return false;
+  if (item.entryMode === 'narrative') return true;
+  if (item.entryMode === 'structured') return false;
+  const hasStructuredFields =
+    item.price ||
+    item.specifications ||
+    item.imageUrl ||
+    item.features ||
+    item.warranty ||
+    item.waitingTime ||
+    item.requirements;
+  return Boolean(item.content && !hasStructuredFields);
+}
+
+const KB_PREVIEW_CHARS = 320;
+
+function kbPreviewText(text, max = KB_PREVIEW_CHARS) {
+  const body = String(text || '');
+  return `${escapeHtml(body.slice(0, max))}${body.length > max ? '…' : ''}`;
+}
+
+function kbEntryActions(editClass, id) {
+  return `
+    <div class="kb-service-actions">
+      <button class="btn btn-secondary btn-sm ${editClass}" type="button" data-id="${escapeHtml(id)}" title="Edit"><i class="fa-solid fa-pen"></i></button>
+      <button class="btn btn-secondary btn-sm kb-delete" type="button" data-id="${escapeHtml(id)}" title="Delete"><i class="fa-solid fa-trash"></i></button>
+    </div>`;
+}
+
+function kbEntryCardHeader({ badgeHtml, icon, title, editClass, id }) {
+  return `
+    <div class="kb-service-header">
+      <div class="kb-entry-heading">
+        ${badgeHtml ? `<div class="kb-narrative-badge">${badgeHtml}</div>` : ''}
+        <h4><i class="fa-solid ${icon}"></i> ${escapeHtml(title)}</h4>
+      </div>
+      ${kbEntryActions(editClass, id)}
+    </div>`;
+}
+
+const NARRATIVE_BADGE = '<i class="fa-solid fa-book-open"></i> Explanation';
+
 export function renderProductsSection(items) {
   if (!items.length) {
-    return emptyState('No products added yet. Add individual product entries for your AI to recommend.');
+    return emptyState(
+      'No products yet. Add structured catalog items one-by-one, or write free-form explanations Sarah can learn from.',
+      emptyStateDualActions(
+        'kbAddProductBtn',
+        'Structured product',
+        'kbAddProductExplainBtn',
+        'Product explanation'
+      )
+    );
   }
   return `
-    <div class="kb-product-grid">
-      ${items.map((p) => `
-        <div class="kb-product-card" data-id="${escapeHtml(p.id)}">
-          <div class="kb-product-image">
-            ${p.imageUrl
-              ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-car\\'></i>'" />`
-              : '<i class="fa-solid fa-car"></i>'}
+    ${sectionToolbarDual(
+      'kbAddProductBtn',
+      'Structured product',
+      'kbAddProductExplainBtn',
+      'Product explanation'
+    )}
+    <div class="kb-service-list">
+      ${items.map((p) => {
+        const title = p.name || p.title || 'Product';
+        if (isNarrativeKnowledgeEntry(p)) {
+          return `
+        <div class="kb-service-card kb-entry-card kb-narrative-card" data-id="${escapeHtml(p.id)}">
+          ${kbEntryCardHeader({
+            badgeHtml: NARRATIVE_BADGE,
+            icon: 'fa-box',
+            title,
+            editClass: 'kb-edit-product',
+            id: p.id,
+          })}
+          <p class="kb-narrative-preview">${kbPreviewText(p.content || '')}</p>
+        </div>`;
+        }
+        const detail = [p.specifications, p.features].filter(Boolean).join('\n');
+        return `
+        <div class="kb-service-card kb-entry-card" data-id="${escapeHtml(p.id)}">
+          ${kbEntryCardHeader({
+            badgeHtml: '<i class="fa-solid fa-box"></i> Structured',
+            icon: 'fa-box',
+            title,
+            editClass: 'kb-edit-product',
+            id: p.id,
+          })}
+          ${detail ? `<p class="kb-narrative-preview">${kbPreviewText(detail)}</p>` : ''}
+          <div class="kb-service-meta">
+            <span><strong>Price:</strong> ${escapeHtml(p.price || '—')}</span>
+            ${p.warranty ? `<span><strong>Warranty:</strong> ${escapeHtml(p.warranty)}</span>` : ''}
+            ${p.imageUrl ? `<span><strong>Image:</strong> linked</span>` : ''}
           </div>
-          <div class="kb-product-body">
-            <h4>${escapeHtml(p.name || p.title)}</h4>
-            <div class="kb-product-price">${escapeHtml(p.price || '—')}</div>
-            <p class="kb-product-spec">${escapeHtml(p.specifications || '')}</p>
-            ${p.features ? `<div class="kb-product-features"><i class="fa-solid fa-star"></i> ${escapeHtml(p.features)}</div>` : ''}
-            ${p.warranty ? `<div class="kb-product-warranty"><i class="fa-solid fa-shield"></i> ${escapeHtml(p.warranty)}</div>` : ''}
-          </div>
-          <div class="kb-product-actions">
-            <button class="btn btn-secondary btn-sm kb-edit-product" type="button" data-id="${escapeHtml(p.id)}"><i class="fa-solid fa-pen"></i> Edit</button>
-            <button class="btn btn-secondary btn-sm kb-delete" type="button" data-id="${escapeHtml(p.id)}"><i class="fa-solid fa-trash"></i></button>
-          </div>
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
     </div>
   `;
 }
 
 export function renderServicesSection(items) {
   if (!items.length) {
-    return emptyState('No services defined yet. Add services your AI employee can explain and quote.');
+    return emptyState(
+      'No services yet. Add structured service cards, or write explanations Sarah can learn from.',
+      emptyStateDualActions(
+        'kbAddServiceBtn',
+        'Structured service',
+        'kbAddServiceExplainBtn',
+        'Service explanation',
+        'fa-briefcase'
+      )
+    );
   }
   return `
+    ${sectionToolbarDual(
+      'kbAddServiceBtn',
+      'Structured service',
+      'kbAddServiceExplainBtn',
+      'Service explanation',
+      'fa-briefcase'
+    )}
     <div class="kb-service-list">
-      ${items.map((s) => `
-        <div class="kb-service-card" data-id="${escapeHtml(s.id)}">
-          <div class="kb-service-header">
-            <h4><i class="fa-solid fa-briefcase"></i> ${escapeHtml(s.name || s.title)}</h4>
-            <div class="kb-service-actions">
-              <button class="btn btn-secondary btn-sm kb-edit-service" type="button" data-id="${escapeHtml(s.id)}"><i class="fa-solid fa-pen"></i></button>
-              <button class="btn btn-secondary btn-sm kb-delete" type="button" data-id="${escapeHtml(s.id)}"><i class="fa-solid fa-trash"></i></button>
-            </div>
-          </div>
-          <p>${escapeHtml(s.description || '')}</p>
+      ${items.map((s) => {
+        const title = s.name || s.title || 'Service';
+        if (isNarrativeKnowledgeEntry(s)) {
+          return `
+        <div class="kb-service-card kb-entry-card kb-narrative-card" data-id="${escapeHtml(s.id)}">
+          ${kbEntryCardHeader({
+            badgeHtml: NARRATIVE_BADGE,
+            icon: 'fa-briefcase',
+            title,
+            editClass: 'kb-edit-service',
+            id: s.id,
+          })}
+          <p class="kb-narrative-preview">${kbPreviewText(s.content || s.description || '')}</p>
+        </div>`;
+        }
+        return `
+        <div class="kb-service-card kb-entry-card" data-id="${escapeHtml(s.id)}">
+          ${kbEntryCardHeader({
+            badgeHtml: '<i class="fa-solid fa-briefcase"></i> Structured',
+            icon: 'fa-briefcase',
+            title,
+            editClass: 'kb-edit-service',
+            id: s.id,
+          })}
+          ${s.description ? `<p class="kb-narrative-preview">${kbPreviewText(s.description)}</p>` : ''}
           <div class="kb-service-meta">
             <span><strong>Price:</strong> ${escapeHtml(s.price || '—')}</span>
             <span><strong>Wait time:</strong> ${escapeHtml(s.waitingTime || '—')}</span>
           </div>
           ${s.requirements ? `<div class="kb-service-req"><strong>Requirements:</strong> ${escapeHtml(s.requirements)}</div>` : ''}
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
     </div>
   `;
 }
 
 export function renderPoliciesSection(items) {
   if (!items.length) {
-    return emptyState('No policies added. Define refund, privacy, and warranty policies for your AI.');
+    return emptyState(
+      'No policies added. Define refund, privacy, and warranty policies for your AI.',
+      '<button class="btn btn-primary btn-sm" type="button" id="kbAddPolicyBtn"><i class="fa-solid fa-plus"></i> Add Policy</button>'
+    );
   }
   return `
-    <div class="kb-policy-grid">
+    ${sectionToolbar('kbAddPolicyBtn', 'Add Policy', 'fa-shield-halved')}
+    <div class="kb-service-list">
       ${items.map((p) => `
-        <div class="kb-policy-card" data-id="${escapeHtml(p.id)}">
-          <div class="kb-policy-icon"><i class="fa-solid fa-shield-halved"></i></div>
-          <h4>${escapeHtml(p.title)}</h4>
-          <p class="kb-policy-preview">${escapeHtml(p.preview || (p.content || '').slice(0, 120))}${(p.content || '').length > 120 ? '…' : ''}</p>
-          <div class="kb-policy-footer">
-            ${knowledgeStatusBadge(p.status)}
-            <button class="btn btn-secondary btn-sm kb-edit-policy" type="button" data-id="${escapeHtml(p.id)}"><i class="fa-solid fa-pen"></i> Edit</button>
+        <div class="kb-service-card kb-entry-card" data-id="${escapeHtml(p.id)}">
+          ${kbEntryCardHeader({
+            badgeHtml: '<i class="fa-solid fa-shield-halved"></i> Policy',
+            icon: 'fa-shield-halved',
+            title: p.title || 'Policy',
+            editClass: 'kb-edit-policy',
+            id: p.id,
+          })}
+          <p class="kb-narrative-preview">${kbPreviewText(p.content || p.preview || '')}</p>
+          <div class="kb-service-meta">
+            <span>${knowledgeStatusBadge(p.status)}</span>
           </div>
         </div>
       `).join('')}
@@ -292,21 +441,27 @@ export function renderPoliciesSection(items) {
 
 export function renderPriceListsSection(items) {
   if (!items.length) {
-    return emptyState('No price lists yet. Add structured pricing your AI can reference.');
+    return emptyState(
+      'No price lists yet. Add structured pricing your AI can reference.',
+      '<button class="btn btn-primary btn-sm" type="button" id="kbAddPriceBtn"><i class="fa-solid fa-plus"></i> Add Price List</button>'
+    );
   }
   return `
-    <div class="kb-price-list">
+    ${sectionToolbar('kbAddPriceBtn', 'Add Price List', 'fa-tags')}
+    <div class="kb-service-list">
       ${items.map((pl) => `
-        <div class="kb-price-card" data-id="${escapeHtml(pl.id)}">
-          <div class="kb-price-header">
-            <h4><i class="fa-solid fa-tags"></i> ${escapeHtml(pl.title)}</h4>
-            <div>
-              <button class="btn btn-secondary btn-sm kb-edit-price" type="button" data-id="${escapeHtml(pl.id)}"><i class="fa-solid fa-pen"></i></button>
-              <button class="btn btn-secondary btn-sm kb-delete" type="button" data-id="${escapeHtml(pl.id)}"><i class="fa-solid fa-trash"></i></button>
-            </div>
+        <div class="kb-service-card kb-entry-card" data-id="${escapeHtml(pl.id)}">
+          ${kbEntryCardHeader({
+            badgeHtml: '<i class="fa-solid fa-tags"></i> Price list',
+            icon: 'fa-tags',
+            title: pl.title || 'Price list',
+            editClass: 'kb-edit-price',
+            id: pl.id,
+          })}
+          <pre class="kb-narrative-preview kb-price-content">${escapeHtml(pl.content || '')}</pre>
+          <div class="kb-service-meta">
+            <span>Last trained: ${escapeHtml(formatDate(pl.lastTrained))}</span>
           </div>
-          <pre class="kb-price-content">${escapeHtml(pl.content || '')}</pre>
-          <div class="kb-price-footer">Last trained: ${escapeHtml(formatDate(pl.lastTrained))}</div>
         </div>
       `).join('')}
     </div>

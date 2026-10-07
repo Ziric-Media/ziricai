@@ -48,6 +48,13 @@ export async function fetchPlatformCompanies() {
   return request('/api/platform/companies');
 }
 
+export async function fetchPlatformCompany(companyId) {
+  if (!companyId) {
+    return { error: 'companyId is required', status: 400, data: null };
+  }
+  return request(`/api/platform/companies/${encodeURIComponent(companyId)}`);
+}
+
 export async function createPlatformCompany(body) {
   return request('/api/platform/companies', {
     method: 'POST',
@@ -105,6 +112,18 @@ export async function configurePlatformWhatsAppIntegration(companyId, body = {})
   );
 }
 
+/** Client Zero — link WhatsApp from Railway/Meta env and activate. */
+export async function syncPlatformClientZeroWhatsApp(companyId, body = {}) {
+  return request(
+    `/api/platform/companies/${encodeURIComponent(companyId)}/integrations/whatsapp/sync-client-zero`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
 /** Activate WhatsApp integration (B-MC-5c-2b). */
 export async function activatePlatformWhatsAppIntegration(companyId, body = {}) {
   return request(
@@ -127,6 +146,45 @@ export async function deactivatePlatformWhatsAppIntegration(companyId, body = {}
       body: JSON.stringify(body),
     }
   );
+}
+
+/** WhatsApp number pool inventory (AVAILABLE / IN USE). */
+export async function fetchWhatsAppPoolNumbers(query = {}) {
+  const params = new URLSearchParams();
+  if (query.status) params.set('status', query.status);
+  if (query.kind) params.set('kind', query.kind);
+  const qs = params.toString();
+  return request(`/api/platform/whatsapp-numbers${qs ? `?${qs}` : ''}`);
+}
+
+/** Add/update a Meta phone identity in the Ziric pool. */
+export async function upsertWhatsAppPoolNumber(body = {}) {
+  return request('/api/platform/whatsapp-numbers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Assign pool number to tenant WhatsApp (Meta identity link + optional activate). */
+export async function assignWhatsAppPoolNumber(companyId, body = {}) {
+  return request(
+    `/api/platform/companies/${encodeURIComponent(companyId)}/integrations/whatsapp/assign-pool-number`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+/** Release pool number back to AVAILABLE. */
+export async function releaseWhatsAppPoolNumber(numberId) {
+  return request(`/api/platform/whatsapp-numbers/${encodeURIComponent(numberId)}/release`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
 }
 
 export async function fetchAdminConfig() {
@@ -258,6 +316,17 @@ export async function provisionCompanyWorkspace(companyId, companyData = {}) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ companyId, ...companyData }),
+  });
+}
+
+/**
+ * Mission Control New Company — full operator tenant (Auth owner + Sarah + KB + CRM).
+ */
+export async function provisionOperatorTenant(companyData = {}) {
+  return request('/api/platform/provision/operator-tenant', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(companyData),
   });
 }
 

@@ -2,9 +2,11 @@ import { state, getSelectedCompany, setState } from '../state.js';
 import {
   pageHeader,
   loadingState,
+  errorState,
   showToast,
   escapeHtml,
 } from '../ui.js';
+import { isDemoDataAllowed } from '../services/dataMode.js';
 import { withTimeout } from '../utils.js';
 import {
   listKnowledge,
@@ -16,6 +18,11 @@ import {
   createTrainingJob,
   advanceTrainingJob,
   loadTrainingQueue,
+  resolveDefaultKnowledgeSection,
+  resolveKnowledgeBaseLabel,
+  resolveKnowledgeBaseIdForWrite,
+  resolveAuthoritativeKnowledgeBaseId,
+  knowledgeItemsToTrainingHistory,
 } from '../services/knowledge.js';
 import { uploadKnowledgeFile, addKnowledgeEntry } from '../api.js';
 import { DEMO_COMPANIES } from '../demo-data.js';
@@ -25,27 +32,177 @@ import {
   renderTrainingQueue,
   renderSectionContent,
   sectionTitle,
+  isNarrativeKnowledgeEntry,
 } from './knowledge-ui.js';
 
 let activeSection = 'documents';
+let lastKnowledgeCompanyId = null;
 
-export async function renderKnowledge(container) {
-  container.innerHTML = loadingState('Loading AI Training Center...');
+/** Set during bindEvents so section switches can re-bind add buttons. */
+let kbUiContext = null;
 
-  const companyId = state.selectedCompanyId || state.companies[0]?.id || 'demo-central-motors';
-  const company = getSelectedCompany() || state.companies.find((c) => c.id === companyId) || DEMO_COMPANIES[0];
+/** @type {Map<string, { at: number, data: { knowledgeRes: object, historyRes: object } }>} */
+const kbListCache = new Map();
+const KB_LIST_CACHE_MS = 45_000;
+const KB_FETCH_TIMEOUT_MS = 15000;
 
-  const [knowledgeRes, historyRes] = await Promise.all([
-    withTimeout(listKnowledge(companyId)),
-    withTimeout(listTrainingHistory(companyId)),
-  ]);
+function bustKnowledgeCache(companyId) {
+  if (!companyId) {
+    kbListCache.clear();
+    return;
+  }
+  for (const key of kbListCache.keys()) {
+    if (key.startsWith(`${companyId}:`)) kbListCache.delete(key);
+  }
+}
+
+async function loadKnowledgeBundle(companyId, knowledgeBaseId, { force = false } = {}) {
+  const key = `${companyId || ''}:${knowledgeBaseId || ''}`;
+  const hit = kbListCache.get(key);
+  if (!force && hit && Date.now() - hit.at < KB_LIST_CACHE_MS) {
+    return hit.data;
+  }
+  const knowledgeRes = await withTimeout(
+    listKnowledge(companyId, { knowledgeBaseId }),
+    KB_FETCH_TIMEOUT_MS
+  );
+  let historyRes;
+  if (isDemoDataAllowed()) {
+    historyRes = await withTimeout(listTrainingHistory(companyId), KB_FETCH_TIMEOUT_MS);
+  } else {
+    const derived = knowledgeItemsToTrainingHistory(knowledgeRes.items || []);
+    historyRes = {
+      items: derived,
+      isDemo: false,
+      source: 'derived',
+      loadState: derived.length ? 'ok' : 'empty',
+    };
+  }
+  const data = { knowledgeRes, historyRes };
+  kbListCache.set(key, { at: Date.now(), data });
+  return data;
+}
+
+function notifyKnowledgeSidebar({ companyId, count, loadState }) {
+  document.dispatchEvent(
+    new CustomEvent('ziric:knowledge-updated', {
+      detail: { companyId, count, loadState },
+    })
+  );
+}
+
+function resolveScopedKnowledgeBaseId(companyId, company, existingItems = []) {
+  const agents = (state.agents || []).filter((a) => a.companyId === companyId);
+  return resolveAuthoritativeKnowledgeBaseId({ company, agents, existingItems });
+}
+
+async function resolveWriteKnowledgeBaseId(companyId, company, existingItems = []) {
+  const agents = (state.agents || []).filter((a) => a.companyId === companyId);
+  return resolveKnowledgeBaseIdForWrite(companyId, { company, agents, existingItems });
+}
+
+function sourceBadgeLabel(source) {
+  if (source === 'demo') return 'Demo fallback';
+  return 'Live API';
+}
+
+export async function renderKnowledge(container, options = {}) {
+  const companyId = state.selectedCompanyId || (isDemoDataAllowed() ? (state.companies[0]?.id || 'demo-central-motors') : null);
+  const company = companyId
+    ? (getSelectedCompany() || state.companies.find((c) => c.id === companyId) || (isDemoDataAllowed() ? DEMO_COMPANIES[0] : null))
+    : null;
+
+  const knowledgeBaseId = resolveScopedKnowledgeBaseId(companyId, company);
+  const cacheKey = `${companyId || ''}:${knowledgeBaseId || ''}`;
+  const hasWarmCache =
+    !options.force &&
+    kbListCache.has(cacheKey) &&
+    Date.now() - kbListCache.get(cacheKey).at < KB_LIST_CACHE_MS;
+
+  if (!hasWarmCache) {
+    container.innerHTML = loadingState('Loading AI Training Center...');
+  }
+
+  const { knowledgeRes, historyRes } = await loadKnowledgeBundle(companyId, knowledgeBaseId, {
+    force: Boolean(options.force),
+  });
+
+  if (knowledgeRes.loadState === 'scope_required') {
+    notifyKnowledgeSidebar({ companyId: null, count: null, loadState: 'scope_required' });
+    const companyHints = (state.companies || [])
+      .slice(0, 5)
+      .map((c) => escapeHtml(c.name))
+      .join(', ');
+    container.innerHTML = `
+      ${pageHeader(
+        'Knowledge Base',
+        'AI Training Center — tenant-scoped knowledge for each company.',
+        '<span class="crm-source-badge">Live API</span>'
+      )}
+      <div class="profile-card" style="text-align:center;padding:48px 24px;">
+        <div style="font-size:40px;margin-bottom:12px;">🏢</div>
+        <div style="font-weight:600;margin-bottom:8px;">Company scope required</div>
+        <div style="color:var(--text-muted);font-size:14px;margin-bottom:16px;max-width:520px;margin-left:auto;margin-right:auto;">
+          Knowledge loads per tenant — not across all companies at once.
+          Use the <strong>Scope</strong> dropdown in the top bar and choose a company
+          ${companyHints ? `(e.g. ${companyHints})` : ''} to view its knowledge base.
+        </div>
+        <button class="btn btn-primary" type="button" id="selectCompanyScopeKnowledge">
+          <i class="fa-solid fa-building"></i> Open Scope selector
+        </button>
+      </div>
+    `;
+    container.querySelector('#selectCompanyScopeKnowledge')?.addEventListener('click', () => {
+      const select = document.getElementById('companySelector');
+      select?.focus();
+      select?.click();
+    });
+    return;
+  }
+
+  if (knowledgeRes.loadState === 'error') {
+    notifyKnowledgeSidebar({ companyId, count: null, loadState: 'error' });
+    container.innerHTML = `
+      ${pageHeader(
+        'Knowledge Base',
+        'AI Training Center — tenant-scoped knowledge for each company.',
+        '<span class="crm-source-badge">Live API</span>'
+      )}
+      ${errorState('Unable to load knowledge. Please check your connection and try again.')}
+      <div style="text-align:center;margin-top:-24px;padding-bottom:32px;">
+        <button class="btn btn-primary" type="button" id="retryKnowledge">
+          <i class="fa-solid fa-rotate-right"></i> Retry
+        </button>
+      </div>
+    `;
+    container.querySelector('#retryKnowledge')?.addEventListener('click', () => renderKnowledge(container));
+    return;
+  }
 
   const items = knowledgeRes.items || [];
   const history = historyRes.items || [];
   const stats = computeKnowledgeStats(items);
   const queue = loadTrainingQueue().filter((j) => j.companyId === companyId);
+  const kbLabel = resolveKnowledgeBaseLabel({
+    items,
+    company,
+    apiKnowledgeBaseId: knowledgeRes.knowledgeBaseId,
+  });
+
+  if (companyId !== lastKnowledgeCompanyId) {
+    activeSection = resolveDefaultKnowledgeSection(items);
+    lastKnowledgeCompanyId = companyId;
+  }
+
+  notifyKnowledgeSidebar({
+    companyId,
+    count: items.length,
+    loadState: knowledgeRes.loadState || (items.length ? 'ok' : 'empty'),
+  });
 
   setState({ knowledge: items });
+
+  const writeKnowledgeBaseId = await resolveWriteKnowledgeBaseId(companyId, company, items);
 
   container.innerHTML = buildPageMarkup({
     company,
@@ -54,19 +211,29 @@ export async function renderKnowledge(container) {
     history,
     stats,
     queue,
+    kbLabel,
+    writeKnowledgeBaseId,
     isDemo: knowledgeRes.isDemo,
+    source: knowledgeRes.source || 'api',
+    loadState: knowledgeRes.loadState || 'ok',
   });
 
-  bindEvents(container, { companyId, company, items });
+  bindEvents(container, { companyId, company, items, writeKnowledgeBaseId });
+  bindWebsiteImport(container);
   resumeActiveJobs(container, companyId, company);
 }
 
-function buildPageMarkup({ company, companyId, items, history, stats, queue, isDemo }) {
+function buildPageMarkup({ company, companyId, items, history, stats, queue, kbLabel, isDemo, source = 'api', loadState = 'ok' }) {
+  const kbBadge = kbLabel
+    ? `<span class="crm-source-badge" title="Knowledge base used by this tenant's AI employees">KB: ${escapeHtml(kbLabel)}</span>`
+    : '';
   return `
     ${pageHeader(
       'Knowledge Base',
       `AI Training Center — ${escapeHtml(company?.name || 'Company')} knowledge brain`,
       `<div class="kb-header-actions">
+        <span class="crm-source-badge">${escapeHtml(sourceBadgeLabel(source))}</span>
+        ${kbBadge}
         <button class="btn btn-secondary btn-sm" type="button" id="kbUploadBtn"><i class="fa-solid fa-upload"></i> Upload Knowledge</button>
         <button class="btn btn-secondary btn-sm" type="button" id="kbCreateFaqBtn"><i class="fa-solid fa-plus"></i> Create FAQ</button>
         <button class="btn btn-secondary btn-sm" type="button" id="kbImportWebBtn"><i class="fa-solid fa-globe"></i> Import Website</button>
@@ -74,6 +241,7 @@ function buildPageMarkup({ company, companyId, items, history, stats, queue, isD
       </div>`
     )}
     ${isDemo ? `<div class="demo-banner"><i class="fa-solid fa-flask"></i> Showing demo data — Firestore unavailable or empty. Changes persist locally.</div>` : ''}
+    ${loadState === 'empty' && !items.length ? `<div class="demo-banner" style="background:var(--surface-2);color:var(--text-muted)"><i class="fa-solid fa-database"></i> No knowledge documents yet for this company — upload or create content to train Sarah.</div>` : ''}
 
     ${renderKbStats(stats)}
 
@@ -189,7 +357,7 @@ function buildModals(companyId, company) {
         </div>
         <div class="wizard-footer">
           <button class="btn btn-secondary kb-modal-close" type="button" data-modal="kbProductModal">Cancel</button>
-          <button class="btn btn-primary" type="button" id="kbProductSubmit">Save Product</button>
+          <button class="btn btn-primary" type="button" id="kbProductSubmit"><i class="fa-solid fa-brain"></i> Save & Train</button>
         </div>
       </div>
     </div>
@@ -213,7 +381,40 @@ function buildModals(companyId, company) {
         </div>
         <div class="wizard-footer">
           <button class="btn btn-secondary kb-modal-close" type="button" data-modal="kbServiceModal">Cancel</button>
-          <button class="btn btn-primary" type="button" id="kbServiceSubmit">Save Service</button>
+          <button class="btn btn-primary" type="button" id="kbServiceSubmit"><i class="fa-solid fa-brain"></i> Save & Train</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product / Service explanation (free-form) -->
+    <div class="wizard-overlay" id="kbExplainModal">
+      <div class="wizard-modal kb-modal kb-modal-wide">
+        <div class="wizard-header">
+          <div>
+            <h2 id="kbExplainModalTitle"><i class="fa-solid fa-book-open"></i> Add explanation</h2>
+            <p class="wizard-sub" id="kbExplainModalSub">Describe products or services in your own words for Sarah to learn</p>
+          </div>
+          <button class="btn btn-secondary btn-sm kb-modal-close" type="button" data-modal="kbExplainModal">✕</button>
+        </div>
+        <div class="wizard-body">
+          <input type="hidden" id="kbExplainEditId" value="" />
+          <input type="hidden" id="kbExplainKind" value="product" />
+          <div class="form-group"><label>Title *</label><input type="text" id="kbExplainTitle" placeholder="e.g. Our subscription plans" /></div>
+          <div class="form-group">
+            <label>Knowledge Content *</label>
+            <div class="kb-rich-editor">
+              <div class="kb-editor-toolbar">
+                <button type="button" class="kb-toolbar-btn" data-cmd="bold" title="Bold"><i class="fa-solid fa-bold"></i></button>
+                <button type="button" class="kb-toolbar-btn" data-cmd="italic" title="Italic"><i class="fa-solid fa-italic"></i></button>
+                <button type="button" class="kb-toolbar-btn" data-cmd="insertUnorderedList" title="List"><i class="fa-solid fa-list-ul"></i></button>
+              </div>
+              <div class="kb-editor-area" id="kbExplainContent" contenteditable="true" data-placeholder="Explain what you offer, pricing notes, who it is for, and how Sarah should talk about it…"></div>
+            </div>
+          </div>
+        </div>
+        <div class="wizard-footer">
+          <button class="btn btn-secondary kb-modal-close" type="button" data-modal="kbExplainModal">Cancel</button>
+          <button class="btn btn-primary" type="button" id="kbExplainSubmit"><i class="fa-solid fa-brain"></i> Save & Train AI</button>
         </div>
       </div>
     </div>
@@ -222,7 +423,7 @@ function buildModals(companyId, company) {
     <div class="wizard-overlay" id="kbPolicyModal">
       <div class="wizard-modal kb-modal kb-modal-wide">
         <div class="wizard-header">
-          <div><h2 id="kbPolicyModalTitle"><i class="fa-solid fa-shield-halved"></i> Edit Policy</h2></div>
+          <div><h2 id="kbPolicyModalTitle"><i class="fa-solid fa-shield-halved"></i> Add Policy</h2></div>
           <button class="btn btn-secondary btn-sm kb-modal-close" type="button" data-modal="kbPolicyModal">✕</button>
         </div>
         <div class="wizard-body">
@@ -232,14 +433,151 @@ function buildModals(companyId, company) {
         </div>
         <div class="wizard-footer">
           <button class="btn btn-secondary kb-modal-close" type="button" data-modal="kbPolicyModal">Cancel</button>
-          <button class="btn btn-primary" type="button" id="kbPolicySubmit">Save Policy</button>
+          <button class="btn btn-primary" type="button" id="kbPolicySubmit"><i class="fa-solid fa-brain"></i> Save & Train</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Price List Modal -->
+    <div class="wizard-overlay" id="kbPriceModal">
+      <div class="wizard-modal kb-modal kb-modal-wide">
+        <div class="wizard-header">
+          <div><h2 id="kbPriceModalTitle"><i class="fa-solid fa-tags"></i> Add Price List</h2></div>
+          <button class="btn btn-secondary btn-sm kb-modal-close" type="button" data-modal="kbPriceModal">✕</button>
+        </div>
+        <div class="wizard-body">
+          <input type="hidden" id="kbPriceEditId" value="" />
+          <div class="form-group"><label>Title *</label><input type="text" id="kbPriceTitle" placeholder="e.g. 2026 Service Menu" /></div>
+          <div class="form-group">
+            <label>Pricing content *</label>
+            <textarea id="kbPriceContent" rows="10" placeholder="List packages, prices, and terms your AI should quote from…"></textarea>
+          </div>
+        </div>
+        <div class="wizard-footer">
+          <button class="btn btn-secondary kb-modal-close" type="button" data-modal="kbPriceModal">Cancel</button>
+          <button class="btn btn-primary" type="button" id="kbPriceSubmit"><i class="fa-solid fa-brain"></i> Save & Train</button>
         </div>
       </div>
     </div>
   `;
 }
 
-function bindEvents(container, { companyId, company, items }) {
+function kbWriteOptions() {
+  return { knowledgeBaseId: kbUiContext?.writeKnowledgeBaseId };
+}
+
+function requireWriteKb() {
+  if (kbUiContext?.writeKnowledgeBaseId) return true;
+  showToast('Knowledge base not configured for this tenant', 'error');
+  return false;
+}
+
+function normalizeWebsiteImportUrl(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return null;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    return new URL(withScheme).href;
+  } catch {
+    return null;
+  }
+}
+
+/** Delegated handler — #kbImportWebsiteBtn is re-rendered when switching KB sections. */
+function bindWebsiteImport(container) {
+  if (container.dataset.kbWebsiteImportBound === '1') return;
+  container.dataset.kbWebsiteImportBound = '1';
+
+  container.addEventListener('click', async (e) => {
+    const btn = e.target.closest('#kbImportWebsiteBtn');
+    if (!btn) return;
+
+    const { companyId, company, writeKnowledgeBaseId } = kbUiContext || {};
+    if (!companyId || !requireWriteKb()) return;
+
+    const input = container.querySelector('#kbWebsiteUrl');
+    const normalized = normalizeWebsiteImportUrl(input?.value);
+    if (!normalized) {
+      showToast('Enter a valid website URL (e.g. ziricai.com or https://…)', 'warning');
+      return;
+    }
+
+    if (input) input.value = normalized;
+    btn.disabled = true;
+    const hostname = new URL(normalized).hostname;
+
+    try {
+      const result = await addKnowledgeEntry({
+        companyId,
+        knowledgeBaseId: writeKnowledgeBaseId,
+        title: hostname,
+        type: 'website',
+        url: normalized,
+        content: `Website import registered for ${normalized}`,
+        status: 'processing',
+        source: 'mission-control',
+      });
+
+      if (result.error) {
+        showToast(result.error, 'error');
+        return;
+      }
+
+      showToast(`Importing ${hostname} — registered for training`, 'success');
+      activeSection = 'website';
+      bustKnowledgeCache(companyId);
+      await renderKnowledge(container, { force: true });
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+function bindSectionContentEvents(container, { openModal }) {
+  container.querySelector('#kbUploadFromEmpty')?.addEventListener('click', () => openModal('kbUploadModal'));
+  const openFaqModal = () => {
+    resetFaqForm(container);
+    openModal('kbFaqModal');
+  };
+  container.querySelector('#kbFaqFromEmpty')?.addEventListener('click', openFaqModal);
+  container.querySelector('#kbAddFaqBtn')?.addEventListener('click', openFaqModal);
+  container.querySelector('#kbAddProductBtn')?.addEventListener('click', () => {
+    resetProductForm(container);
+    openModal('kbProductModal');
+  });
+  container.querySelector('#kbAddProductExplainBtn')?.addEventListener('click', () => {
+    resetExplainForm(container, 'product');
+    openModal('kbExplainModal');
+  });
+  container.querySelector('#kbAddServiceBtn')?.addEventListener('click', () => {
+    resetServiceForm(container);
+    openModal('kbServiceModal');
+  });
+  container.querySelector('#kbAddServiceExplainBtn')?.addEventListener('click', () => {
+    resetExplainForm(container, 'service');
+    openModal('kbExplainModal');
+  });
+  container.querySelector('#kbAddPolicyBtn')?.addEventListener('click', () => {
+    resetPolicyForm(container);
+    openModal('kbPolicyModal');
+  });
+  container.querySelector('#kbAddPriceBtn')?.addEventListener('click', () => {
+    resetPriceForm(container);
+    openModal('kbPriceModal');
+  });
+}
+
+function runTrainingAnimation(container, { companyId, company, title, type }, onComplete) {
+  bustKnowledgeCache(companyId);
+  onComplete?.();
+  if (!isDemoDataAllowed()) return;
+  const job = createTrainingJob({ companyId, title, type });
+  refreshQueuePanel(container, companyId);
+  animateJob(container, job.id, companyId, company);
+}
+
+function bindEvents(container, { companyId, company, items, writeKnowledgeBaseId }) {
+  kbUiContext = { companyId, company, writeKnowledgeBaseId, container };
   const backdrop = document.getElementById('overlay');
   const openModal = (id) => {
     container.querySelector(`#${id}`)?.classList.add('open');
@@ -272,12 +610,7 @@ function bindEvents(container, { companyId, company, items }) {
     });
   });
 
-  /* Empty state shortcuts */
-  container.querySelector('#kbUploadFromEmpty')?.addEventListener('click', () => openModal('kbUploadModal'));
-  container.querySelector('#kbFaqFromEmpty')?.addEventListener('click', () => {
-    resetFaqForm(container);
-    openModal('kbFaqModal');
-  });
+  bindSectionContentEvents(container, { openModal });
 
   /* Upload zone */
   const uploadZone = container.querySelector('#kbUploadZone');
@@ -298,6 +631,7 @@ function bindEvents(container, { companyId, company, items }) {
   });
 
   container.querySelector('#kbUploadSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const title = container.querySelector('#kbUploadTitle').value.trim();
     const file = uploadFile?.files[0];
     if (!title || !file) {
@@ -310,30 +644,26 @@ function bindEvents(container, { companyId, company, items }) {
     const job = createTrainingJob({ companyId, title: file.name, type: 'document' });
     refreshQueuePanel(container, companyId);
 
-    let result = await uploadKnowledgeFile({ companyId, title, type: typeMap[ext] || 'document', file });
-    if (result.error) {
-      result = await createKnowledge({
-        companyId,
-        type: 'document',
-        title,
-        fileName: file.name,
-        pages: Math.floor(Math.random() * 40) + 5,
-        status: 'training',
-        uploadedBy: state.profile?.displayName || state.user?.email || 'Admin',
-        chunks: Math.floor(Math.random() * 100) + 20,
-        lastTrained: new Date().toISOString(),
-      });
-    }
+    const result = await uploadKnowledgeFile({
+      companyId,
+      knowledgeBaseId: writeKnowledgeBaseId,
+      title,
+      type: typeMap[ext] || 'document',
+      file,
+    });
     if (result.error) {
       showToast(result.error, 'error');
       return;
     }
     showToast(`"${file.name}" uploaded — training started`, 'success');
+    bustKnowledgeCache(companyId);
+    renderKnowledge(container, { force: true });
     animateJob(container, job.id, companyId, company);
   });
 
   /* FAQ */
   container.querySelector('#kbFaqSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const editId = container.querySelector('#kbFaqEditId').value;
     const question = container.querySelector('#kbFaqQuestion').value.trim();
     const answer = container.querySelector('#kbFaqAnswer').value.trim();
@@ -347,21 +677,21 @@ function bindEvents(container, { companyId, company, items }) {
       title: question.slice(0, 60),
       question,
       answer,
-      status: 'trained',
+      content: answer,
+      status: 'active',
       uploadedBy: state.profile?.displayName || 'Admin',
-      lastTrained: new Date().toISOString(),
-      chunks: 2,
     };
     const result = editId
-      ? await updateKnowledge(editId, payload)
-      : await createKnowledge(payload);
+      ? await updateKnowledge(editId, payload, kbWriteOptions())
+      : await createKnowledge(payload, kbWriteOptions());
     if (result.error) {
       showToast(result.error, 'error');
       return;
     }
     closeModal('kbFaqModal');
     showToast(editId ? 'FAQ updated' : 'FAQ created and trained', 'success');
-    renderKnowledge(container);
+    bustKnowledgeCache(companyId);
+    renderKnowledge(container, { force: true });
   });
 
   /* Manual knowledge */
@@ -373,6 +703,7 @@ function bindEvents(container, { companyId, company, items }) {
   });
 
   container.querySelector('#kbManualSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const title = container.querySelector('#kbManualTitle').value.trim();
     const contentEl = container.querySelector('#kbManualContent');
     const content = contentEl?.innerText?.trim() || '';
@@ -385,11 +716,9 @@ function bindEvents(container, { companyId, company, items }) {
       type: 'manual',
       title,
       content,
-      status: 'trained',
+      status: 'active',
       uploadedBy: state.profile?.displayName || 'Admin',
-      lastTrained: new Date().toISOString(),
-      chunks: Math.ceil(content.length / 200),
-    });
+    }, kbWriteOptions());
     if (result.error) {
       showToast(result.error, 'error');
       return;
@@ -397,61 +726,25 @@ function bindEvents(container, { companyId, company, items }) {
     const job = createTrainingJob({ companyId, title, type: 'manual' });
     closeModal('kbManualModal');
     showToast('Manual knowledge saved — training AI…', 'success');
+    bustKnowledgeCache(companyId);
+    renderKnowledge(container, { force: true });
     animateJob(container, job.id, companyId, company);
-    renderKnowledge(container);
   });
 
-  /* Website import */
-  container.querySelector('#kbImportWebsiteBtn')?.addEventListener('click', async () => {
-    const url = container.querySelector('#kbWebsiteUrl')?.value.trim();
-    if (!url) {
-      showToast('Enter a website URL', 'warning');
-      return;
-    }
-    try {
-      new URL(url);
-    } catch {
-      showToast('Enter a valid URL (https://...)', 'warning');
-      return;
-    }
-    const hostname = new URL(url).hostname;
-    const job = createTrainingJob({ companyId, title: hostname, type: 'website' });
-    refreshQueuePanel(container, companyId);
-
-    let result = await addKnowledgeEntry({ companyId, title: hostname, type: 'website', url });
-    if (result.error) {
-      result = await createKnowledge({
-        companyId,
-        type: 'website',
-        title: hostname,
-        url,
-        pagesScraped: Math.floor(Math.random() * 30) + 10,
-        status: 'training',
-        uploadedBy: state.profile?.displayName || 'Admin',
-        lastTrained: new Date().toISOString(),
-        chunks: Math.floor(Math.random() * 80) + 20,
-      });
-    }
-    showToast(`Importing ${hostname} — scraping pages…`, 'success');
-    animateJob(container, job.id, companyId, company, () => {
-      showToast(`Website import complete — ${hostname} trained`, 'success');
-      renderKnowledge(container);
-    });
-  });
-
-  /* Product / Service / Policy saves */
-  bindEditModals(container, companyId, items, { openModal, closeModal });
+  /* Product / Service / Policy / Price saves */
+  bindEditModals(container, companyId, items, { openModal, closeModal, company });
 
   /* Delete & retrain */
   container.addEventListener('click', async (e) => {
     const deleteBtn = e.target.closest('.kb-delete');
     if (deleteBtn) {
       if (!confirm('Delete this knowledge item?')) return;
-      const result = await deleteKnowledge(deleteBtn.dataset.id);
+      const result = await deleteKnowledge(deleteBtn.dataset.id, { companyId });
       if (result.error) showToast(result.error, 'error');
       else {
         showToast('Deleted', 'success');
-        renderKnowledge(container);
+        bustKnowledgeCache(companyId);
+        renderKnowledge(container, { force: true });
       }
       return;
     }
@@ -462,15 +755,14 @@ function bindEvents(container, { companyId, company, items }) {
       const job = createTrainingJob({ companyId, title, type: 'document' });
       refreshQueuePanel(container, companyId);
       showToast(`Retraining "${title}"…`, 'info');
-      animateJob(container, job.id, companyId, company, () => {
-        showToast(`"${title}" retrained successfully`, 'success');
-        renderKnowledge(container);
-      });
+      bustKnowledgeCache(companyId);
+      renderKnowledge(container, { force: true });
+      animateJob(container, job.id, companyId, company);
     }
   });
 }
 
-function bindEditModals(container, companyId, items, { openModal, closeModal }) {
+function bindEditModals(container, companyId, items, { openModal, closeModal, company }) {
   container.addEventListener('click', (e) => {
     const faqEdit = e.target.closest('.kb-edit-faq');
     if (faqEdit) {
@@ -488,8 +780,13 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
     if (prodEdit) {
       const item = items.find((i) => i.id === prodEdit.dataset.id);
       if (!item) return;
-      fillProductForm(container, item);
-      openModal('kbProductModal');
+      if (isNarrativeKnowledgeEntry(item)) {
+        fillExplainForm(container, item, 'product');
+        openModal('kbExplainModal');
+      } else {
+        fillProductForm(container, item);
+        openModal('kbProductModal');
+      }
       return;
     }
 
@@ -497,8 +794,13 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
     if (svcEdit) {
       const item = items.find((i) => i.id === svcEdit.dataset.id);
       if (!item) return;
-      fillServiceForm(container, item);
-      openModal('kbServiceModal');
+      if (isNarrativeKnowledgeEntry(item)) {
+        fillExplainForm(container, item, 'service');
+        openModal('kbExplainModal');
+      } else {
+        fillServiceForm(container, item);
+        openModal('kbServiceModal');
+      }
       return;
     }
 
@@ -509,17 +811,29 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
       container.querySelector('#kbPolicyEditId').value = item.id;
       container.querySelector('#kbPolicyTitle').value = item.title || '';
       container.querySelector('#kbPolicyContent').value = item.content || '';
+      container.querySelector('#kbPolicyModalTitle').innerHTML = '<i class="fa-solid fa-pen"></i> Edit Policy';
       openModal('kbPolicyModal');
+      return;
+    }
+
+    const priceEdit = e.target.closest('.kb-edit-price');
+    if (priceEdit) {
+      const item = items.find((i) => i.id === priceEdit.dataset.id);
+      if (!item) return;
+      fillPriceForm(container, item);
+      openModal('kbPriceModal');
     }
   });
 
   container.querySelector('#kbProductSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const editId = container.querySelector('#kbProductEditId').value;
     const name = container.querySelector('#kbProductName').value.trim();
     if (!name) { showToast('Product name is required', 'warning'); return; }
     const payload = {
       companyId,
       type: 'product',
+      entryMode: 'structured',
       title: name,
       name,
       price: container.querySelector('#kbProductPrice').value.trim(),
@@ -527,44 +841,87 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
       imageUrl: container.querySelector('#kbProductImage').value.trim(),
       features: container.querySelector('#kbProductFeatures').value.trim(),
       warranty: container.querySelector('#kbProductWarranty').value.trim(),
-      status: 'trained',
+      status: 'active',
       uploadedBy: state.profile?.displayName || 'Admin',
-      lastTrained: new Date().toISOString(),
-      chunks: 4,
     };
-    const result = editId ? await updateKnowledge(editId, payload) : await createKnowledge(payload);
+    const result = editId
+      ? await updateKnowledge(editId, payload, kbWriteOptions())
+      : await createKnowledge(payload, kbWriteOptions());
     if (result.error) { showToast(result.error, 'error'); return; }
     closeModal('kbProductModal');
-    showToast(editId ? 'Product updated' : 'Product added', 'success');
-    renderKnowledge(container);
+    showToast(editId ? 'Product updated — training AI…' : 'Product saved — training AI…', 'success');
+    runTrainingAnimation(container, { companyId, company, title: name, type: 'product' }, () =>
+      renderKnowledge(container, { force: true })
+    );
   });
 
   container.querySelector('#kbServiceSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const editId = container.querySelector('#kbServiceEditId').value;
     const name = container.querySelector('#kbServiceName').value.trim();
     if (!name) { showToast('Service name is required', 'warning'); return; }
     const payload = {
       companyId,
       type: 'service',
+      entryMode: 'structured',
       title: name,
       name,
       description: container.querySelector('#kbServiceDesc').value.trim(),
       price: container.querySelector('#kbServicePrice').value.trim(),
       waitingTime: container.querySelector('#kbServiceWait').value.trim(),
       requirements: container.querySelector('#kbServiceReq').value.trim(),
-      status: 'trained',
+      status: 'active',
       uploadedBy: state.profile?.displayName || 'Admin',
-      lastTrained: new Date().toISOString(),
-      chunks: 3,
     };
-    const result = editId ? await updateKnowledge(editId, payload) : await createKnowledge(payload);
+    const result = editId
+      ? await updateKnowledge(editId, payload, kbWriteOptions())
+      : await createKnowledge(payload, kbWriteOptions());
     if (result.error) { showToast(result.error, 'error'); return; }
     closeModal('kbServiceModal');
-    showToast(editId ? 'Service updated' : 'Service added', 'success');
-    renderKnowledge(container);
+    showToast(editId ? 'Service updated — training AI…' : 'Service saved — training AI…', 'success');
+    runTrainingAnimation(container, { companyId, company, title: name, type: 'service' }, () =>
+      renderKnowledge(container, { force: true })
+    );
+  });
+
+  container.querySelector('#kbExplainSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
+    const editId = container.querySelector('#kbExplainEditId').value;
+    const kind = container.querySelector('#kbExplainKind').value || 'product';
+    const title = container.querySelector('#kbExplainTitle').value.trim();
+    const contentEl = container.querySelector('#kbExplainContent');
+    const content = contentEl?.innerText?.trim() || '';
+    if (!title || !content) {
+      showToast('Title and knowledge content are required', 'warning');
+      return;
+    }
+    const payload = {
+      companyId,
+      type: kind,
+      entryMode: 'narrative',
+      title,
+      name: title,
+      content,
+      status: 'active',
+      uploadedBy: state.profile?.displayName || 'Admin',
+    };
+    const result = editId
+      ? await updateKnowledge(editId, payload, kbWriteOptions())
+      : await createKnowledge(payload, kbWriteOptions());
+    if (result.error) {
+      showToast(result.error, 'error');
+      return;
+    }
+    closeModal('kbExplainModal');
+    const label = kind === 'service' ? 'Service explanation' : 'Product explanation';
+    showToast(editId ? `${label} updated — training AI…` : `${label} saved — training AI…`, 'success');
+    runTrainingAnimation(container, { companyId, company, title, type: kind }, () =>
+      renderKnowledge(container, { force: true })
+    );
   });
 
   container.querySelector('#kbPolicySubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
     const editId = container.querySelector('#kbPolicyEditId').value;
     const title = container.querySelector('#kbPolicyTitle').value.trim();
     const content = container.querySelector('#kbPolicyContent').value.trim();
@@ -575,16 +932,43 @@ function bindEditModals(container, companyId, items, { openModal, closeModal }) 
       title,
       content,
       preview: content.slice(0, 120),
-      status: 'trained',
+      status: 'active',
       uploadedBy: state.profile?.displayName || 'Admin',
-      lastTrained: new Date().toISOString(),
-      chunks: 3,
     };
-    const result = await updateKnowledge(editId, payload);
+    const result = editId
+      ? await updateKnowledge(editId, payload, kbWriteOptions())
+      : await createKnowledge(payload, kbWriteOptions());
     if (result.error) { showToast(result.error, 'error'); return; }
     closeModal('kbPolicyModal');
-    showToast('Policy updated', 'success');
-    renderKnowledge(container);
+    showToast(editId ? 'Policy updated — training AI…' : 'Policy saved — training AI…', 'success');
+    runTrainingAnimation(container, { companyId, company, title, type: 'policy' }, () =>
+      renderKnowledge(container, { force: true })
+    );
+  });
+
+  container.querySelector('#kbPriceSubmit')?.addEventListener('click', async () => {
+    if (!requireWriteKb()) return;
+    const editId = container.querySelector('#kbPriceEditId').value;
+    const title = container.querySelector('#kbPriceTitle').value.trim();
+    const content = container.querySelector('#kbPriceContent').value.trim();
+    if (!title || !content) { showToast('Title and pricing content are required', 'warning'); return; }
+    const payload = {
+      companyId,
+      type: 'price-list',
+      title,
+      content,
+      status: 'active',
+      uploadedBy: state.profile?.displayName || 'Admin',
+    };
+    const result = editId
+      ? await updateKnowledge(editId, payload, kbWriteOptions())
+      : await createKnowledge(payload, kbWriteOptions());
+    if (result.error) { showToast(result.error, 'error'); return; }
+    closeModal('kbPriceModal');
+    showToast(editId ? 'Price list updated — training AI…' : 'Price list saved — training AI…', 'success');
+    runTrainingAnimation(container, { companyId, company, title, type: 'price-list' }, () =>
+      renderKnowledge(container, { force: true })
+    );
   });
 }
 
@@ -616,6 +1000,88 @@ function resetFaqForm(container) {
   container.querySelector('#kbFaqModalTitle').innerHTML = '<i class="fa-solid fa-circle-question"></i> Create FAQ';
 }
 
+function resetProductForm(container) {
+  container.querySelector('#kbProductEditId').value = '';
+  container.querySelector('#kbProductName').value = '';
+  container.querySelector('#kbProductPrice').value = '';
+  container.querySelector('#kbProductSpecs').value = '';
+  container.querySelector('#kbProductImage').value = '';
+  container.querySelector('#kbProductFeatures').value = '';
+  container.querySelector('#kbProductWarranty').value = '';
+  container.querySelector('#kbProductModalTitle').innerHTML = '<i class="fa-solid fa-box"></i> Add Product';
+}
+
+function resetServiceForm(container) {
+  container.querySelector('#kbServiceEditId').value = '';
+  container.querySelector('#kbServiceName').value = '';
+  container.querySelector('#kbServiceDesc').value = '';
+  container.querySelector('#kbServicePrice').value = '';
+  container.querySelector('#kbServiceWait').value = '';
+  container.querySelector('#kbServiceReq').value = '';
+  container.querySelector('#kbServiceModalTitle').innerHTML = '<i class="fa-solid fa-briefcase"></i> Add Service';
+}
+
+const EXPLAIN_COPY = {
+  product: {
+    addTitle: '<i class="fa-solid fa-book-open"></i> Product explanation',
+    editTitle: '<i class="fa-solid fa-pen"></i> Edit product explanation',
+    sub: 'Describe your products in plain language — Sarah will use this when recommending and answering questions.',
+    placeholder: 'Explain what you sell, variants, pricing guidance, and how Sarah should present it…',
+  },
+  service: {
+    addTitle: '<i class="fa-solid fa-book-open"></i> Service explanation',
+    editTitle: '<i class="fa-solid fa-pen"></i> Edit service explanation',
+    sub: 'Describe your services in plain language — Sarah will use this when quoting and explaining options.',
+    placeholder: 'Explain what the service includes, typical pricing, timelines, and how Sarah should describe it…',
+  },
+};
+
+function resetExplainForm(container, kind) {
+  const copy = EXPLAIN_COPY[kind] || EXPLAIN_COPY.product;
+  container.querySelector('#kbExplainEditId').value = '';
+  container.querySelector('#kbExplainKind').value = kind;
+  container.querySelector('#kbExplainTitle').value = '';
+  const contentEl = container.querySelector('#kbExplainContent');
+  if (contentEl) contentEl.innerText = '';
+  container.querySelector('#kbExplainModalTitle').innerHTML = copy.addTitle;
+  const sub = container.querySelector('#kbExplainModalSub');
+  if (sub) sub.textContent = copy.sub;
+  if (contentEl) contentEl.dataset.placeholder = copy.placeholder;
+}
+
+function fillExplainForm(container, item, kind) {
+  const copy = EXPLAIN_COPY[kind] || EXPLAIN_COPY.product;
+  container.querySelector('#kbExplainEditId').value = item.id;
+  container.querySelector('#kbExplainKind').value = kind;
+  container.querySelector('#kbExplainTitle').value = item.name || item.title || '';
+  const contentEl = container.querySelector('#kbExplainContent');
+  if (contentEl) contentEl.innerText = item.content || item.description || '';
+  container.querySelector('#kbExplainModalTitle').innerHTML = copy.editTitle;
+  const sub = container.querySelector('#kbExplainModalSub');
+  if (sub) sub.textContent = copy.sub;
+}
+
+function resetPolicyForm(container) {
+  container.querySelector('#kbPolicyEditId').value = '';
+  container.querySelector('#kbPolicyTitle').value = '';
+  container.querySelector('#kbPolicyContent').value = '';
+  container.querySelector('#kbPolicyModalTitle').innerHTML = '<i class="fa-solid fa-shield-halved"></i> Add Policy';
+}
+
+function resetPriceForm(container) {
+  container.querySelector('#kbPriceEditId').value = '';
+  container.querySelector('#kbPriceTitle').value = '';
+  container.querySelector('#kbPriceContent').value = '';
+  container.querySelector('#kbPriceModalTitle').innerHTML = '<i class="fa-solid fa-tags"></i> Add Price List';
+}
+
+function fillPriceForm(container, item) {
+  container.querySelector('#kbPriceEditId').value = item.id;
+  container.querySelector('#kbPriceTitle').value = item.title || '';
+  container.querySelector('#kbPriceContent').value = item.content || '';
+  container.querySelector('#kbPriceModalTitle').innerHTML = '<i class="fa-solid fa-pen"></i> Edit Price List';
+}
+
 function showSelectedFile(container, file) {
   const el = container.querySelector('#kbUploadFilename');
   if (el) el.textContent = file.name;
@@ -633,13 +1099,17 @@ async function switchSection(container, section, companyId, company) {
   const header = container.querySelector('.kb-section-header h2');
   if (header) header.innerHTML = `<i class="fa-solid fa-brain"></i> ${sectionTitle(section)}`;
 
-  const [knowledgeRes, historyRes] = await Promise.all([
-    listKnowledge(companyId),
-    listTrainingHistory(companyId),
-  ]);
+  const knowledgeBaseId = resolveScopedKnowledgeBaseId(companyId, company);
+  const { knowledgeRes, historyRes } = await loadKnowledgeBundle(companyId, knowledgeBaseId);
   const content = container.querySelector('#kbSectionContent');
   if (content) {
     content.innerHTML = renderSectionContent(section, knowledgeRes.items || [], historyRes.items || [], company);
+    bindSectionContentEvents(container, {
+      openModal: (id) => {
+        container.querySelector(`#${id}`)?.classList.add('open');
+        document.getElementById('overlay')?.classList.add('open');
+      },
+    });
   }
 }
 
@@ -649,18 +1119,17 @@ function refreshQueuePanel(container, companyId) {
   if (panel) panel.innerHTML = renderTrainingQueue(queue);
 }
 
-function animateJob(container, jobId, companyId, company, onComplete) {
-  const stepDelay = 1200;
+function animateJob(container, jobId, companyId, company) {
+  if (!isDemoDataAllowed()) return;
+
+  const stepDelay = 450;
   let step = 0;
   const tick = () => {
     advanceTrainingJob(jobId);
     refreshQueuePanel(container, companyId);
     step += 1;
     const job = loadTrainingQueue().find((j) => j.id === jobId);
-    if (job?.status === 'completed') {
-      onComplete?.();
-      return;
-    }
+    if (job?.status === 'completed') return;
     if (step < 6) setTimeout(tick, stepDelay);
   };
   setTimeout(tick, stepDelay);

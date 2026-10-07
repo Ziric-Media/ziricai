@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZiricAI Mission Control</title>
-    <link rel="icon" href="assets/favicon-superadmin.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="assets/favicon-superadmin.svg">
+    <link rel="icon" href="assets/favicon.png?v=c940699a0ff6-269682fa" type="image/png">
+    <link rel="apple-touch-icon" href="assets/favicon.png?v=c940699a0ff6-269682fa">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="css/admin-dashboard.css">
+    <link rel="stylesheet" href="css/admin-dashboard.css?v=c940699a0ff6-269682fa">
     <script type="importmap">
     {
       "imports": {
@@ -19,7 +19,7 @@
       }
     }
     </script>
-<script>window.__ZIRICAI_CONFIG__={"apiBase":"","assetVersion":"true","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"firebase":{"apiKey":"AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"482382497730","appId":"1:482382497730:web:6bc2f8668a1598fa13f85b","measurementId":"G-92ZVT0731S","databaseId":"default"}};</script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"","assetVersion":"c940699a0ff6-269682fa","sites":{"marketing":"https://marketing.ziricai.com","publicWeb":"https://ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"landingSarahCompanyId":"ziricai","firebase":{"apiKey":"AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"482382497730","appId":"1:482382497730:web:6bc2f8668a1598fa13f85b","measurementId":"G-92ZVT0731S","databaseId":"default"}};</script>
 </head>
 <body>
 
@@ -27,7 +27,7 @@
     <div class="auth-screen open" id="loginScreen">
         <div class="auth-card">
             <div class="auth-brand">
-                <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="auth-logo-img" width="200" height="48">
+                <img src="assets/ZIRICAI LOGO.png?v=c940699a0ff6-269682fa" alt="ZiricAI" class="auth-logo-img" width="200" height="48">
                 <p class="auth-brand-tagline">Mission Control</p>
             </div>
             <h1 class="auth-title">Sign in</h1>
@@ -38,7 +38,10 @@
                 <button class="btn btn-primary auth-login-submit" type="submit">Sign In</button>
             </form>
             <p id="loginStatus" style="margin-top:16px;font-size:13px;color:var(--text-muted);"></p>
-            <p style="margin-top:12px;font-size:12px;color:var(--text-muted);">No account? Use <a href="superadmin-register.html">superadmin-register.html</a></p>
+            <p style="margin-top:12px;font-size:12px;color:var(--text-muted);">
+                No account? Use <a href="superadmin-register.html">superadmin-register.html</a>.
+                Or use <a href="#" data-site-link="login">ZiricAI.com sign in</a> (portal or Mission Control).
+            </p>
         </div>
     </div>
 
@@ -57,7 +60,7 @@
     <div id="appShell" class="hidden">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-brand">
-                <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img">
+                <img src="assets/ZIRICAI LOGO.png?v=c940699a0ff6-269682fa" alt="ZiricAI" class="logo-img">
                 <div class="logo-text">
                     <span>Mission Control</span>
                 </div>
@@ -70,6 +73,14 @@
                 <a href="#" data-page="companies">
                     <span class="icon">🏢</span><span>Companies</span>
                     <span class="badge" id="companyCount" title="Tenant records (not production customer count)">0</span>
+                </a>
+                <a href="#" data-page="government">
+                    <span class="icon">🏛️</span><span>Government</span>
+                    <span class="badge" id="governmentCount" title="Government organisations">0</span>
+                </a>
+                <a href="#" data-page="publicService">
+                    <span class="icon">🏛️</span><span>Public Service</span>
+                    <span class="badge" id="publicServiceCount" title="Political / public service organisations">0</span>
                 </a>
                 <a href="#" data-page="crm">
                     <span class="icon">👥</span><span>CRM</span>
@@ -92,6 +103,12 @@
                 <a href="#" data-page="support">
                     <span class="icon">🎫</span><span>Support</span>
                 </a>
+                <a href="#" data-page="supportOperations">
+                    <span class="icon">🛠️</span><span>Sarah Operations</span>
+                </a>
+                <a href="#" data-page="supportAttention">
+                    <span class="icon">🔔</span><span>Attention Centre</span>
+                </a>
                 <div class="section-label">Workspace</div>
                 <a href="#" data-page="agents">
                     <span class="icon">🤖</span><span>AI Employees</span>
@@ -106,6 +123,19 @@
                     <span class="icon">⚙️</span><span>Settings</span>
                 </a>
             </nav>
+            <div class="sidebar-footer" id="sidebarFooter">
+                <div class="sidebar-user">
+                    <div class="avatar" id="sidebarAvatar">S</div>
+                    <div class="sidebar-user-info">
+                        <span class="name" id="sidebarUserName">Super Admin</span>
+                        <span class="email" id="sidebarUserEmail">admin@ziricai.com</span>
+                        <span class="role-tag" id="sidebarUserRole">superadmin</span>
+                    </div>
+                </div>
+                <button class="btn btn-secondary btn-sm sidebar-logout" type="button" id="logoutBtn">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+                </button>
+            </div>
         </aside>
 
         <div class="main">
@@ -142,6 +172,18 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script type="module" src="js/admin/main.js"></script>
+    <script type="module" src="js/admin/main.js?v=c940699a0ff6-269682fa"></script>
+<script type="module">
+import { getSiteUrls, marketingLoginUrl } from './js/shared/siteUrls.js';
+document.querySelectorAll('[data-site-link]').forEach((el) => {
+  const key = el.getAttribute('data-site-link');
+  if (key === 'login') {
+    el.href = marketingLoginUrl();
+    return;
+  }
+  const urls = getSiteUrls();
+  if (urls[key]) el.href = urls[key];
+});
+</script>
 </body>
 </html>

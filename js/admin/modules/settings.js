@@ -1,4 +1,6 @@
-import { state } from '../state.js';
+import { state, setState } from '../state.js';
+import { profilePhotoSettingsMarkup, bindProfilePhotoSettings } from '../../shared/profilePhotoSettings.js';
+import { applyUserAvatars } from '../../shared/userAvatarUi.js';
 import {
   escapeHtml,
   pageHeader,
@@ -48,16 +50,30 @@ export async function renderSettings(container) {
       </div>
     </div>
 
-    <div class="profile-card" style="margin-top:16px;">
+    <div class="profile-card profile-card-account" style="margin-top:16px;">
       <h4>Account</h4>
-      <div class="info-row"><span class="label">Signed in as</span><span class="value">${escapeHtml(state.user?.email || '—')}</span></div>
-      <div class="info-row"><span class="label">Role</span><span class="value">${escapeHtml(state.profile?.role || '—')}</span></div>
+      ${profilePhotoSettingsMarkup({
+        photoURL: state.profile?.photoURL,
+        displayName: state.profile?.fullName || state.profile?.name,
+        email: state.user?.email,
+        extraRows: [
+          { label: 'Signed in as', value: state.user?.email || '—' },
+          { label: 'Role', value: state.profile?.role || '—' },
+        ],
+      })}
       <div style="margin-top:16px;">
         <button class="btn btn-secondary btn-sm" type="button" id="refreshSettingsBtn">↻ Refresh Status</button>
-        <button class="btn btn-secondary btn-sm" type="button" id="logoutBtn">Sign Out</button>
       </div>
     </div>
   `;
+
+  bindProfilePhotoSettings(container, {
+    showToast,
+    async onProfileUpdated(profile) {
+      setState({ profile });
+      applyUserAvatars(profile, state.user?.email);
+    },
+  });
 
   container.querySelector('#refreshSettingsBtn')?.addEventListener('click', () => {
     showToast('Refreshing...', 'info');

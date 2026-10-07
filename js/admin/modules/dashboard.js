@@ -9,9 +9,39 @@ import {
   getPlatformDashboardView,
   healthFromPlatformSnapshot,
 } from '../services/operationsService.js';
-import { fetchPlatformExecutiveOverview } from '../services/platformConsole.js';
+import {
+  fetchPlatformExecutiveOverview,
+  fetchPlatformIntegrations,
+  fetchPlatformSupportCases,
+} from '../services/platformConsole.js';
+import {
+  resolvePlatformIntelligenceQuery,
+  fetchPlatformIntelligence,
+  fetchCommunicationsSnapshots,
+  buildDashboardAssessment,
+} from '../services/platformIntelligenceClient.js';
+import {
+  renderPiPeriodToolbar,
+  renderChannelCoverage,
+  renderOrganisationNetwork,
+  renderPeopleNetwork,
+  renderCommunicationsNetwork,
+  renderSectorIntelligence,
+  renderSarahAssessment,
+  bindPiDashboardEvents,
+} from './platformDashboardPi.js';
+import {
+  renderSarahSupportActivity,
+  bindSupportOpsDashboardEvents,
+} from './platformSupportOperationsPi.js';
+import { fetchPlatformSupportOperations } from '../services/platformConsole.js';
+import { navigateTo } from '../router.js';
 
 let hourlyChart = null;
+let piPresetId = localStorage.getItem('mc-pi-period') || 'thisMonth';
+let piSectorRank = 'organisations';
+let piCustomDate = localStorage.getItem('mc-pi-custom-date') || '';
+let piCustomGrain = localStorage.getItem('mc-pi-custom-grain') || 'day';
 
 export async function renderDashboard(container) {
   container.innerHTML = loadingState('Loading Mission Control...');
@@ -95,6 +125,8 @@ function dashboardHeader(userName, view) {
 function classificationBadgeClass(classification) {
   const map = {
     'PRODUCTION CUSTOMER': 'production',
+    'CLIENT ZERO': 'client-zero',
+    'COMPANY ZERO': 'client-zero',
     PILOT: 'pilot',
     ACCEPTANCE: 'acceptance',
     'DEMO/SHOWCASE': 'demo',
@@ -109,6 +141,7 @@ function renderPlatformCensus(census) {
   const b = census.byClass;
   const cells = [
     { label: 'Production', value: b.productionCustomer ?? 0 },
+    { label: 'Client Zero', value: b.clientZero ?? b.companyZero ?? 0 },
     { label: 'Pilot', value: b.pilot ?? 0 },
     { label: 'Acceptance', value: b.acceptance ?? 0 },
     { label: 'Demo', value: b.demoShowcase ?? 0 },
@@ -175,16 +208,57 @@ function availabilityForValue(value) {
 
 async function renderPlatformDashboard(container, view, userName, health) {
   const partial = view.meta?.partial ? viewPartialNote() : '';
-  const execRes = await fetchPlatformExecutiveOverview();
+  const periodQuery = resolvePlatformIntelligenceQuery(piPresetId, {
+    customDate: piCustomDate,
+    customPeriod: piCustomGrain,
+  });
+
+  const [intelRes, commSnaps, execRes, intRes, supportRes, supportOpsRes] = await Promise.all([
+    fetchPlatformIntelligence(periodQuery),
+    fetchCommunicationsSnapshots(),
+    fetchPlatformExecutiveOverview(),
+    fetchPlatformIntegrations(),
+    fetchPlatformSupportCases(),
+    fetchPlatformSupportOperations({
+      period: periodQuery.period,
+      date: periodQuery.date,
+      periodKey: periodQuery.periodKey,
+    }),
+  ]);
+
+  const intel = intelRes.data;
+  const intelError = intelRes.error;
   const exec = execRes.data || {};
   const tenants = exec.tenants || {};
   const billing = exec.billing || {};
   const wa = exec.integrations?.whatsapp || {};
+  const assessment = buildDashboardAssessment({
+    intel,
+    exec,
+    integrations: intRes.data,
+    support: supportRes.data,
+  });
+
+  const piErrorBanner = intelError
+    ? `<div class="pi-error-banner"><i class="fa-solid fa-triangle-exclamation"></i> Platform Intelligence unavailable: ${escapeHtml(intelError)}</div>`
+    : '';
 
   container.innerHTML = `
     ${dashboardHeader(userName, view)}
+    ${renderPiPeriodToolbar(piPresetId, periodQuery.label)}
+    ${renderChannelCoverage(intel)}
+    ${piErrorBanner}
+    <div class="pi-network-grid">
+      ${renderOrganisationNetwork(intel)}
+      ${renderPeopleNetwork(intel)}
+    </div>
+    ${renderCommunicationsNetwork(intel, commSnaps, periodQuery.label)}
+    ${renderSectorIntelligence(intel, piSectorRank)}
+    ${renderSarahAssessment(assessment)}
+    ${renderSarahSupportActivity(supportOpsRes.data, periodQuery.label)}
     ${renderPlatformCensus(view.census)}
     ${partial}
+    <h3 class="pi-ops-section-title"><i class="fa-solid fa-gears"></i> Platform operations</h3>
     <div class="kpi-grid kpi-grid-ops">
       ${kpiCard('Total tenants', formatNumber(tenants.total ?? view.census?.total ?? 0), 'fa-building', 'blue', null)}
       ${kpiCard('Active tenants', formatNumber(tenants.activeOperational ?? 0), 'fa-circle-check', 'green', null)}
@@ -195,7 +269,7 @@ async function renderPlatformDashboard(container, view, userName, health) {
       ${kpiCard('New this month', formatNumber(tenants.newThisMonth ?? 0), 'fa-chart-line', 'blue', null)}
       ${kpiCard('Past due', formatNumber(tenants.pastDue ?? 0), 'fa-triangle-exclamation', 'red', null)}
     </div>
-    <p class="panel-hint">${escapeHtml(billing.partialNote || exec.usage?.note || 'Usage and message rollups show — until platform rollup jobs are connected.')}</p>
+    <p class="panel-hint">${escapeHtml(billing.partialNote || '')}</p>
     ${renderPilotSpotlight(view.pilotSpotlight)}
     <div class="ops-grid ops-row-1">
       <div class="activity-section ops-activity">
@@ -219,10 +293,39 @@ async function renderPlatformDashboard(container, view, userName, health) {
     </div>
     <footer class="dashboard-footer">
       <span>&copy; 2026 ZiricAI Mission Control</span>
-      <span class="version">v1.1.0 · platform view</span>
+      <span class="version">v2.0.0 · Platform Intelligence</span>
     </footer>
   `;
   bindDashboardEvents(container);
+  bindSupportOpsDashboardEvents(container, {
+    onOpenOperations: () => navigateTo('supportOperations'),
+  });
+  bindPiDashboardEvents(container, {
+    onPresetChange: (id) => {
+      piPresetId = id;
+      localStorage.setItem('mc-pi-period', id);
+      if (id !== 'custom') renderDashboard(container);
+    },
+    onCustomApply: ({ date, grain }) => {
+      piCustomDate = date || '';
+      piCustomGrain = grain || 'day';
+      localStorage.setItem('mc-pi-custom-date', piCustomDate);
+      localStorage.setItem('mc-pi-custom-grain', piCustomGrain);
+      piPresetId = 'custom';
+      localStorage.setItem('mc-pi-period', 'custom');
+      renderDashboard(container);
+    },
+    onRankChange: (rank) => {
+      piSectorRank = rank;
+      renderDashboard(container);
+    },
+  });
+  if (piPresetId === 'custom') {
+    const customEl = container.querySelector('#piCustomPeriod');
+    if (customEl) customEl.hidden = false;
+    const dateInput = container.querySelector('#piCustomDate');
+    if (dateInput && piCustomDate) dateInput.value = piCustomDate;
+  }
 }
 
 function renderTenantDashboard(container, view, userName) {

@@ -5,6 +5,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { resolveWebFirebaseConfig } from '../js/firebase-config.js';
@@ -12,9 +13,19 @@ import { resolveWebFirebaseConfig } from '../js/firebase-config.js';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCES = path.join(ROOT, '_sources');
 
+/** Root HTML shells are edited at repo root; _sources copies must not win on mtime alone. */
+const ROOT_PREFERRED_HTML = new Set([
+  'ziric-superadmin-console.html',
+  'company-portal.html',
+  'ziricai.html',
+]);
+
 function sourcePath(name) {
   const fromSources = path.join(SOURCES, name);
   const fromRoot = path.join(ROOT, name);
+  if (ROOT_PREFERRED_HTML.has(name) && fs.existsSync(fromRoot)) {
+    return fromRoot;
+  }
   if (fs.existsSync(fromSources) && fs.existsSync(fromRoot)) {
     const sourcesMtime = fs.statSync(fromSources).mtimeMs;
     const rootMtime = fs.statSync(fromRoot).mtimeMs;
@@ -74,25 +85,45 @@ const PRODUCTION_API_URL =
 
 /** Deployment identity for Portal asset cache busting (Netlify build env). */
 function resolveAssetVersion() {
-  return process.env.COMMIT_REF || process.env.NETLIFY || 'dev';
+  const ref = process.env.COMMIT_REF || process.env.CACHED_COMMIT_REF || '';
+  let base = '';
+  if (ref && ref !== 'true' && ref !== 'false') base = ref;
+  else {
+    try {
+      base = execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8' }).trim();
+    } catch {
+      base = 'dev';
+    }
+  }
+  // Include CSS fingerprints so Netlify/browser caches bust when styles change without a new git SHA.
+  try {
+    const hasher = crypto.createHash('sha256');
+    for (const name of ['admin-dashboard.css', 'company-portal.css']) {
+      const cssPath = path.join(ROOT, 'css', name);
+      if (fs.existsSync(cssPath)) hasher.update(fs.readFileSync(cssPath));
+    }
+    return `${base.slice(0, 12)}-${hasher.digest('hex').slice(0, 8)}`;
+  } catch {
+    return base;
+  }
 }
 
 function siteConfigBlock(site) {
   const apiBase =
     process.env.API_BASE_URL !== undefined
       ? process.env.API_BASE_URL
-      : useCdnFirebase && (site === 'marketing' || site === 'app' || site === 'admin')
+      : site === 'marketing' || site === 'app' || site === 'admin'
         ? ''
-        : site === 'marketing' || site === 'app' || site === 'admin'
-          ? PRODUCTION_API_URL
-          : '';
+        : '';
   const marketing = process.env.MARKETING_BASE_URL || 'https://marketing.ziricai.com';
+  const publicWeb = process.env.PUBLIC_WEB_URL || process.env.ZIRICAI_ROOT_URL || 'https://ziricai.com';
   const app = process.env.APP_BASE_URL || 'https://app.ziricai.com';
   const admin = process.env.ADMIN_BASE_URL || 'https://admin.ziricai.com';
   return `<script>window.__ZIRICAI_CONFIG__=${JSON.stringify({
     apiBase,
     assetVersion: resolveAssetVersion(),
-    sites: { marketing, app, admin, api: apiBase || PRODUCTION_API_URL },
+    sites: { marketing, publicWeb, app, admin, api: apiBase || PRODUCTION_API_URL },
+    landingSarahCompanyId: process.env.LANDING_SARAH_COMPANY_ID || 'ziricai',
     firebase: firebaseConfigFromEnv(),
   })};</script>`;
 }
@@ -115,6 +146,33 @@ function copyDir(src, dest) {
 function copyFile(src, dest) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.copyFileSync(src, dest);
+}
+
+/** Logo + favicon.png for MC and portal; optional legacy SVG favicons for white-label hints. */
+function copyPlatformBrandAssets(targetDir, extraAssetNames = []) {
+  fs.mkdirSync(path.join(targetDir, 'assets'), { recursive: true });
+  const names = ['favicon.png', 'ZIRICAI LOGO.png', 'sarah-avatar.svg', ...extraAssetNames];
+  for (const name of names) {
+    const src = path.join(ROOT, 'assets', name);
+    if (fs.existsSync(src)) {
+      copyFile(src, path.join(targetDir, 'assets', name));
+    }
+  }
+}
+
+function bumpBrandAssetUrls(html, assetVersion) {
+  return html
+    .replace(/assets\/ZIRICAI LOGO\.png(?!\?)/g, `assets/ZIRICAI LOGO.png?v=${assetVersion}`)
+    .replace(/assets\/favicon\.png(?!\?)/g, `assets/favicon.png?v=${assetVersion}`)
+    .replace(/assets\/sarah-avatar\.svg(?!\?)/g, `assets/sarah-avatar.svg?v=${assetVersion}`);
+}
+
+/** Legacy marketing pages still reference favicon-portal.svg in repo copies. */
+function normalizePlatformFavicon(html) {
+  return html.replace(
+    /<link rel="icon" type="image\/svg\+xml" href="assets\/favicon-portal\.svg">/gi,
+    '<link rel="icon" href="assets/favicon.png" type="image/png">\n    <link rel="apple-touch-icon" href="assets/favicon.png">'
+  );
 }
 
 function readText(file) {
@@ -185,7 +243,7 @@ const FIREBASE_IMPORTMAP_CDN_BLOCK = `<script type="importmap">
     </script>`;
 
 function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node' } = {}) {
-  let out = html;
+  let out = normalizePlatformFavicon(html);
   if (importmapMode === 'cdn') {
     out = out.replace(/<script type="importmap">[\s\S]*?<\/script>/, FIREBASE_IMPORTMAP_CDN_BLOCK);
   }
@@ -197,21 +255,26 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
   if (site === 'marketing') {
     out = out.replace(/href="index\.html"/g, 'href="./"');
     out = out.replace(/href="index\.html#/g, 'href="./#');
+    out = out.replace(/href="login\.html"/g, 'href="./login.html"');
+    out = out.replace(/href="login\.html#/g, 'href="./login.html#');
     // Cross-site links in marketing footer
-    out = out.replace(/href="index\.html" class="link-muted">Sign in/g, 'href="#" data-site-link="app" class="link-muted">Sign in');
+    out = out.replace(/href="index\.html" class="link-muted">Sign in/g, 'href="./login.html" class="link-muted">Sign in');
+    out = out.replace(/href="company-portal\.html" class="link-muted">Sign in/g, 'href="./login.html" class="link-muted">Sign in');
     out = out.replace(/Platform Admin<\/a>/g, 'Platform Admin</a>');
     out = out.replace(/<a href="index\.html">Portal<\/a>/g, '<a href="#" data-site-link="app">Portal</a>');
     out = out.replace(/<a href="index\.html">Super Admin<\/a>/g, '<a href="#" data-site-link="admin">Super Admin</a>');
     out = out.replace(/<a href="index\.html">Platform Admin<\/a>/g, '<a href="#" data-site-link="admin">Platform Admin</a>');
     out = out.replace(/<a href="index\.html">Company Portal<\/a>/g, '<a href="#" data-site-link="app">Company Portal</a>');
+    out = out.replace(/href="company-portal\.html"/g, 'href="./login.html"');
   }
 
   if (site === 'app') {
     const assetVersion = resolveAssetVersion();
     out = out.replace(
-      /Platform admin\? Use <a href="index\.html">Super Admin Console<\/a>/,
+      /Platform admin\? Use <a href="[^"]*">Super Admin Console<\/a>/,
       'Platform admin? Use <a href="#" data-site-link="admin">Super Admin Console</a>'
     );
+    out = out.replace(/href="login\.html" data-site-link="login"/g, 'href="#" data-site-link="login"');
     out = out.replace(
       /open http:\/\/localhost:3000\/index\.html/,
       'open http://localhost:3000/app/'
@@ -231,11 +294,21 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
   }
 
   if (site === 'admin') {
+    const assetVersion = resolveAssetVersion();
+    out = out.replace(/href="login\.html" data-site-link="login"/g, 'href="#" data-site-link="login"');
     out = out.replace(
       /open http:\/\/localhost:3000\/index\.html/,
       'open http://localhost:3000/admin/'
     );
     out = out.replace(/superadmin-register\.html/g, 'superadmin-register.html');
+    out = out.replace(
+      /href="css\/admin-dashboard\.css"/,
+      `href="css/admin-dashboard.css?v=${assetVersion}"`
+    );
+    out = out.replace(
+      /src="js\/admin\/main\.js"/,
+      `src="js/admin/main.js?v=${assetVersion}"`
+    );
   }
 
   if (out.includes('__ZIRICAI_CONFIG__')) {
@@ -247,11 +320,19 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
     out = out.replace('</head>', `${siteConfigBlock(site)}\n</head>`);
   }
 
+  if (site === 'admin' || site === 'app' || site === 'marketing') {
+    out = bumpBrandAssetUrls(out, resolveAssetVersion());
+  }
+
   if (out.includes('data-site-link') && !out.includes('getSiteUrls')) {
     out = out.replace('</body>', `<script type="module">
-import { getSiteUrls } from './js/shared/siteUrls.js';
+import { getSiteUrls, marketingLoginUrl } from './js/shared/siteUrls.js';
 document.querySelectorAll('[data-site-link]').forEach((el) => {
   const key = el.getAttribute('data-site-link');
+  if (key === 'login') {
+    el.href = marketingLoginUrl();
+    return;
+  }
   const urls = getSiteUrls();
   if (urls[key]) el.href = urls[key];
 });
@@ -267,32 +348,48 @@ function prepareMarketing() {
   rmDir(path.join(dir, 'js'));
   rmDir(path.join(dir, 'assets'));
 
-  writeText('marketing/index.html', patchHtml(readText('ziricai.html'), { site: 'marketing' }));
+  // Static publish dirs never include node_modules — always use gstatic CDN importmap.
+  writeText('marketing/index.html', patchHtml(readText('ziricai.html'), { site: 'marketing', importmapMode: 'cdn' }));
+  if (fs.existsSync(path.join(ROOT, 'login.html'))) {
+    writeText('marketing/login.html', patchHtml(readText('login.html'), { site: 'marketing', importmapMode: 'cdn' }));
+  }
 
   for (const name of fs.readdirSync(ROOT)) {
     if (name.startsWith('industry-') && name.endsWith('.html')) {
-      writeText(`marketing/${name}`, patchHtml(readText(name), { site: 'marketing' }));
+      writeText(`marketing/${name}`, patchHtml(readText(name), { site: 'marketing', importmapMode: 'cdn' }));
+    }
+  }
+
+  for (const name of fs.readdirSync(dir)) {
+    if (name.endsWith('.html') && name !== 'index.html' && name !== 'login.html') {
+      const srcPath = path.join(dir, name);
+      if (!fs.existsSync(srcPath)) continue;
+      const raw = fs.readFileSync(srcPath, 'utf8');
+      writeText(`marketing/${name}`, patchHtml(raw, { site: 'marketing', importmapMode: 'cdn' }));
     }
   }
 
   copyDir(path.join(ROOT, 'js/onboarding'), path.join(dir, 'js/onboarding'));
   copyDir(path.join(ROOT, 'js/landing'), path.join(dir, 'js/landing'));
   copyDir(path.join(ROOT, 'js/shared'), path.join(dir, 'js/shared'));
-  for (const f of ['auth.js', 'firebase-config.js', 'firebase.js', 'users.js', 'ziricai-landing.js']) {
-    copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
+  for (const f of ['auth.js', 'firebase-config.js', 'firebase.js', 'users.js', 'ziricai-landing.js', 'unified-login.js']) {
+    if (fs.existsSync(path.join(ROOT, 'js', f))) {
+      copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
+    }
   }
 
-  for (const css of ['onboarding.css', 'ziricai-landing.css']) {
+  for (const css of ['onboarding.css', 'ziricai-landing.css', 'admin-dashboard.css']) {
     copyFile(path.join(ROOT, 'css', css), path.join(dir, 'css', css));
   }
 
-  copyFile(path.join(ROOT, 'assets/favicon-portal.svg'), path.join(dir, 'assets/favicon-portal.svg'));
-  if (fs.existsSync(path.join(ROOT, 'assets/sarah-avatar.svg'))) {
-    copyFile(path.join(ROOT, 'assets/sarah-avatar.svg'), path.join(dir, 'assets/sarah-avatar.svg'));
-  }
-  if (fs.existsSync(path.join(ROOT, 'assets/ZIRICAI LOGO.png'))) {
-    copyFile(path.join(ROOT, 'assets/ZIRICAI LOGO.png'), path.join(dir, 'assets/ZIRICAI LOGO.png'));
-  }
+  copyPlatformBrandAssets(dir, ['favicon-portal.svg']);
+
+  const apiTarget = process.env.PRODUCTION_API_URL || PRODUCTION_API_URL;
+  fs.writeFileSync(
+    path.join(dir, '_redirects'),
+    `# Generated by prepare-sites.js — API proxy when netlify.toml is not picked up on deploy\n/api/*  ${apiTarget}/api/:splat  200!\n/login  /login.html  301\n`,
+    'utf8'
+  );
 }
 
 function prepareApp() {
@@ -301,7 +398,7 @@ function prepareApp() {
   rmDir(path.join(dir, 'js'));
   rmDir(path.join(dir, 'assets'));
 
-  writeText('app/index.html', patchHtml(readText('company-portal.html'), { site: 'app' }));
+  writeText('app/index.html', patchHtml(readText('company-portal.html'), { site: 'app', importmapMode: 'cdn' }));
 
   const marketingOnboarding = process.env.MARKETING_BASE_URL || 'https://marketing.ziricai.com';
   writeText(
@@ -325,6 +422,10 @@ function prepareApp() {
   copyFile(path.join(ROOT, 'js/admin/ui.js'), path.join(dir, 'js/admin/ui.js'));
   copyFile(path.join(ROOT, 'js/admin/utils.js'), path.join(dir, 'js/admin/utils.js'));
   copyFile(path.join(ROOT, 'js/admin/demo-data.js'), path.join(dir, 'js/admin/demo-data.js'));
+  copyFile(
+    path.join(ROOT, 'js/admin/services/knowledgeDisplay.js'),
+    path.join(dir, 'js/admin/services/knowledgeDisplay.js')
+  );
   for (const f of ['auth.js', 'firebase-config.js', 'firebase.js', 'users.js']) {
     copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
   }
@@ -332,10 +433,7 @@ function prepareApp() {
   for (const css of ['admin-dashboard.css', 'company-portal.css']) {
     copyFile(path.join(ROOT, 'css', css), path.join(dir, 'css', css));
   }
-  copyFile(path.join(ROOT, 'assets/favicon-portal.svg'), path.join(dir, 'assets/favicon-portal.svg'));
-  if (fs.existsSync(path.join(ROOT, 'assets/ZIRICAI LOGO.png'))) {
-    copyFile(path.join(ROOT, 'assets/ZIRICAI LOGO.png'), path.join(dir, 'assets/ZIRICAI LOGO.png'));
-  }
+  copyPlatformBrandAssets(dir, ['favicon-portal.svg']);
 }
 
 function prepareAdmin() {
@@ -344,11 +442,11 @@ function prepareAdmin() {
   rmDir(path.join(dir, 'js'));
   rmDir(path.join(dir, 'assets'));
 
-  writeText('admin/index.html', patchHtml(readText('ziric-superadmin-console.html'), { site: 'admin' }));
+  writeText('admin/index.html', patchHtml(readText('ziric-superadmin-console.html'), { site: 'admin', importmapMode: 'cdn' }));
 
   for (const page of ['superadmin-register.html', 'register-admin.html', 'workspace-centralmotors.html']) {
     if (fs.existsSync(path.join(ROOT, page))) {
-      writeText(`admin/${page}`, patchHtml(readText(page), { site: 'admin' }));
+      writeText(`admin/${page}`, patchHtml(readText(page), { site: 'admin', importmapMode: 'cdn' }));
     }
   }
 
@@ -359,10 +457,7 @@ function prepareAdmin() {
   }
 
   copyFile(path.join(ROOT, 'css/admin-dashboard.css'), path.join(dir, 'css/admin-dashboard.css'));
-  copyFile(path.join(ROOT, 'assets/favicon-superadmin.svg'), path.join(dir, 'assets/favicon-superadmin.svg'));
-  if (fs.existsSync(path.join(ROOT, 'assets/ZIRICAI LOGO.png'))) {
-    copyFile(path.join(ROOT, 'assets/ZIRICAI LOGO.png'), path.join(dir, 'assets/ZIRICAI LOGO.png'));
-  }
+  copyPlatformBrandAssets(dir, ['favicon-superadmin.svg']);
 }
 
 const target = process.argv[2];

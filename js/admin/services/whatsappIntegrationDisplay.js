@@ -20,7 +20,9 @@ export function whatsappIntegrationTableLabel(company) {
   if (!wa?.status) return 'Not registered';
 
   const status = String(wa.status).toLowerCase();
-  if (status === WA_STATUS_PENDING) return 'Pending';
+  if (status === WA_STATUS_PENDING) {
+    return wa.phoneNumberId ? 'Pending' : 'Ready for Setup';
+  }
   if (status === WA_STATUS_DISCONNECTED) return 'Disconnected';
   if (isActiveIntegrationStatus(status)) {
     if (wa.runtimeReady === false) return 'Active · Runtime not ready';
@@ -33,6 +35,7 @@ export function whatsappIntegrationTableIconClass(company) {
   const label = whatsappIntegrationTableLabel(company);
   if (label === 'Active') return 'wa-active';
   if (label.startsWith('Active ·')) return 'wa-active-warn';
+  if (label === 'Ready for Setup') return 'wa-ready';
   if (label === 'Pending') return 'wa-pending';
   if (label === 'Disconnected') return 'wa-disconnected';
   return 'wa-none';
@@ -49,7 +52,7 @@ const MISSING_LABELS = {
   phoneNumberId: 'Phone number ID is required',
   'env.PHONE_NUMBER_ID': 'Server PHONE_NUMBER_ID is not configured',
   'env.WHATSAPP_TOKEN': 'Server WHATSAPP_TOKEN is not configured',
-  phoneNumberId_env_mismatch: 'Phone number ID does not match server environment',
+  phoneNumberId_env_mismatch: 'Phone number ID differs from server bootstrap (informational)',
   tenant_credentials_not_configured: 'Tenant credentials are not configured',
   credentialsSource: 'Credentials source is not configured',
 };

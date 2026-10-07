@@ -3,12 +3,13 @@
  */
 import { state } from '../state.js';
 import { escapeHtml } from '../ui.js';
-import { sendMissionControlSarahChat } from '../services/platformConsole.js';
-
-let sessionId = `mc-${Date.now()}`;
-/** @type {{ role: 'user'|'assistant', text: string }[]} */
-let transcript = [];
-let sending = false;
+import { sarahPageAvatarMarkup } from '../../shared/sarahAvatar.js';
+import {
+  sendMissionControlSarahChat,
+  fetchMcSarahActiveSession,
+  fetchMcSarahSession,
+  createMcSarahSession,
+} from '../services/platformConsole.js';
 
 const STARTERS = [
   'Which tenants have WhatsApp connected?',
@@ -26,13 +27,172 @@ const MC_CAPABILITIES = [
   { icon: 'fa-shield-halved', label: 'Operator guidance (read-only APIs)' },
 ];
 
+const WELCOME =
+  "Hi! I'm Sarah for Mission Control. Ask about tenants, billing, integrations, or support — I'll use read-only platform APIs.";
+
+/** @type {string|null} */
+let sessionId = null;
+let sending = false;
+/** @type {HTMLElement|null} */
+let messagesEl = null;
+/** @type {HTMLElement|null} */
+let pageRoot = null;
+
+function currentScopedCompanyId() {
+  return state.selectedCompanyId || null;
+}
+
+function scopeKeyForCompany(scopedCompanyId) {
+  return scopedCompanyId ? `tenant:${scopedCompanyId}` : 'platform';
+}
+
+function scopeKey() {
+  return scopeKeyForCompany(currentScopedCompanyId());
+}
+
+function sessionStorageKey(scope) {
+  return `ziricai.mc.sarahSession.${scope}`;
+}
+
+function persistSessionId(scope, id) {
+  if (!id) return;
+  try {
+    sessionStorage.setItem(sessionStorageKey(scope), id);
+  } catch {
+    /* ignore */
+  }
+}
+
+function readPersistedSessionId(scope) {
+  try {
+    return sessionStorage.getItem(sessionStorageKey(scope));
+  } catch {
+    return null;
+  }
+}
+
+function scopeLabel(scopedCompanyId) {
+  if (scopedCompanyId) {
+    const company = state.companies.find((c) => c.id === scopedCompanyId);
+    return company?.name ? `${company.name} (${scopedCompanyId})` : scopedCompanyId;
+  }
+  return 'Platform (all tenants)';
+}
+
+function scopeTagHtml(scopedCompanyId) {
+  if (scopedCompanyId) {
+    return `<p class="mc-sarah-context-tag"><span class="ops-tag">Tenant context: ${escapeHtml(scopeLabel(scopedCompanyId))}</span></p>`;
+  }
+  return '<p class="mc-sarah-context-tag"><span class="ops-tag">Platform context</span></p>';
+}
+
+function applyMcUiHints(hints = []) {
+  for (const hint of hints) {
+    if (!hint?.navigateMc) continue;
+    // Dynamic import avoids router ↔ sarah-mc circular binding issues.
+    import('../router.js').then(({ navigateTo }) => {
+      navigateTo(hint.navigateMc, {
+        companyId: hint.companyId !== undefined ? hint.companyId : undefined,
+      });
+    });
+  }
+}
+
+function appendBubble(text, role) {
+  if (!messagesEl) return;
+  const el = document.createElement('div');
+  el.className = `portal-sarah-msg ${role === 'user' ? 'user' : 'ai'}`;
+  el.textContent = text;
+  messagesEl.appendChild(el);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function renderStoredMessages(messages = []) {
+  if (!messagesEl) return;
+  messagesEl.innerHTML = '';
+  if (!messages.length) {
+    appendBubble(WELCOME, 'ai');
+    return;
+  }
+  for (const msg of messages) {
+    const role = msg.role === 'user' ? 'user' : 'ai';
+    appendBubble(msg.content || '', role);
+  }
+}
+
+async function restoreConversationForScope(scopedCompanyId) {
+  const sk = scopeKeyForCompany(scopedCompanyId);
+  sessionId = null;
+
+  const persistedId = readPersistedSessionId(sk);
+  if (persistedId) {
+    const { data, error } = await fetchMcSarahSession(persistedId, scopedCompanyId);
+    if (!error && data?.session?.messages?.length) {
+      sessionId = data.session.sessionId;
+      persistSessionId(sk, sessionId);
+      renderStoredMessages(data.session.messages);
+      return;
+    }
+  }
+
+  const { data, error } = await fetchMcSarahActiveSession(scopedCompanyId);
+  if (!error && data?.session?.messages?.length) {
+    sessionId = data.session.sessionId;
+    persistSessionId(sk, sessionId);
+    renderStoredMessages(data.session.messages);
+    return;
+  }
+
+  renderStoredMessages([]);
+}
+
+function bindChatHandlers() {
+  const chatRoot = pageRoot?.querySelector('#mcSarahPageChat');
+  if (!chatRoot) return;
+
+  chatRoot.querySelectorAll('.portal-sarah-chip').forEach((btn) => {
+    btn.addEventListener('click', () => submitSarah(btn.dataset.q || ''));
+  });
+
+  chatRoot.querySelector('#mcSarahForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = chatRoot.querySelector('#mcSarahInput');
+    const value = input?.value || '';
+    submitSarah(value);
+    if (input) input.value = '';
+  });
+
+  chatRoot.querySelector('#mcSarahInput')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      chatRoot.querySelector('#mcSarahForm')?.requestSubmit();
+    }
+  });
+
+  chatRoot.querySelector('#mcSarahNewConversation')?.addEventListener('click', async () => {
+    if (sending) return;
+    const scoped = currentScopedCompanyId();
+    const { data, error } = await createMcSarahSession(scoped);
+    if (error) {
+      appendBubble(`Could not start a new conversation: ${error}`, 'ai');
+      return;
+    }
+    sessionId = data?.session?.sessionId || null;
+    persistSessionId(scopeKeyForCompany(scoped), sessionId);
+    renderStoredMessages([]);
+    appendBubble('Started a new conversation for this scope.', 'ai');
+  });
+}
+
 export async function renderSarah(container) {
-  const scoped = state.selectedCompanyId || null;
+  const scoped = currentScopedCompanyId();
+
+  pageRoot = container;
   container.innerHTML = `
     <div class="portal-sarah-page mc-sarah-page">
       <aside class="portal-sarah-page-aside" aria-label="Sarah assistant info">
         <div class="portal-sarah-page-brand">
-          <div class="portal-sarah-page-avatar" aria-hidden="true"><i class="fa-solid fa-sparkles"></i></div>
+          ${sarahPageAvatarMarkup()}
           <div>
             <h2 class="portal-sarah-page-title">Sarah</h2>
             <p class="portal-sarah-page-subtitle">Mission Control Assistant</p>
@@ -41,11 +201,7 @@ export async function renderSarah(container) {
         <p class="portal-sarah-page-intro">
           Platform operator chat — Sarah uses authorised Mission Control APIs. This is not the customer-facing WhatsApp Sarah.
         </p>
-        ${
-          scoped
-            ? `<p class="mc-sarah-context-tag"><span class="ops-tag">Tenant context: ${escapeHtml(scoped)}</span></p>`
-            : '<p class="mc-sarah-context-tag"><span class="ops-tag">Platform context</span></p>'
-        }
+        ${scopeTagHtml(scoped)}
         <h3 class="portal-sarah-page-aside-heading">Can help with</h3>
         <ul class="portal-sarah-cap-list">
           ${MC_CAPABILITIES.map(
@@ -64,110 +220,78 @@ export async function renderSarah(container) {
             <strong>Conversation</strong>
             <span class="text-muted">Shift+Enter for a new line · Enter to send</span>
           </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="mcSarahNewConversation">New conversation</button>
         </header>
-        <div class="portal-sarah-page-chat" id="mcSarahPageChat"></div>
+        <div class="portal-sarah-page-chat portal-sarah-chat-mount portal-sarah-chat-mount--page" id="mcSarahPageChat">
+          <div class="portal-sarah-messages" id="mcSarahMessages" role="log" aria-live="polite"></div>
+          <div class="portal-sarah-suggestions portal-sarah-suggestions--inline" id="mcSarahSuggestions">
+            ${STARTERS.map(
+              (text) =>
+                `<button type="button" class="portal-sarah-chip" data-q="${escapeHtml(text)}">${escapeHtml(text)}</button>`
+            ).join('')}
+          </div>
+          <form class="portal-sarah-form" id="mcSarahForm">
+            <textarea id="mcSarahInput" rows="3" placeholder="Ask Sarah about the platform or a tenant…" autocomplete="off"></textarea>
+            <button type="submit" class="btn btn-primary portal-sarah-send"><i class="fa-solid fa-paper-plane"></i><span>Send</span></button>
+          </form>
+        </div>
       </section>
     </div>
   `;
 
-  const chatRoot = container.querySelector('#mcSarahPageChat');
-  if (chatRoot) {
-    mountMcSarahChat(chatRoot, container);
-    chatRoot.querySelector('#mcSarahInput')?.focus();
-  }
+  messagesEl = container.querySelector('#mcSarahMessages');
+  bindChatHandlers();
+  await restoreConversationForScope(scoped);
+
+  container.querySelector('#mcSarahInput')?.focus();
 }
 
-function mountMcSarahChat(chatRoot, pageContainer) {
-  const greeting =
-    transcript.length === 0
-      ? '<div class="portal-sarah-msg ai">Hi! I\'m Sarah for Mission Control. Ask about tenants, billing, integrations, or support — I\'ll use read-only platform APIs.</div>'
-      : '';
-  chatRoot.classList.add('portal-sarah-chat-mount', 'portal-sarah-chat-mount--page');
-  chatRoot.innerHTML = `
-    <div class="portal-sarah-messages" id="mcSarahMessages" role="log" aria-live="polite">
-      ${greeting}
-      ${transcript.map((m) => renderBubbleHtml(m)).join('')}
-    </div>
-    <div class="portal-sarah-suggestions portal-sarah-suggestions--inline" id="mcSarahSuggestions">
-      ${STARTERS.map(
-        (text) =>
-          `<button type="button" class="portal-sarah-chip" data-q="${escapeHtml(text)}">${escapeHtml(text)}</button>`
-      ).join('')}
-    </div>
-    <form class="portal-sarah-form" id="mcSarahForm">
-      <textarea id="mcSarahInput" rows="3" placeholder="Ask Sarah about the platform or a tenant…" autocomplete="off"></textarea>
-      <button type="submit" class="btn btn-primary portal-sarah-send"><i class="fa-solid fa-paper-plane"></i><span>Send</span></button>
-    </form>
-  `;
-
-  chatRoot.querySelectorAll('.portal-sarah-chip').forEach((btn) => {
-    btn.addEventListener('click', () => submitSarah(pageContainer, btn.dataset.q || ''));
-  });
-
-  chatRoot.querySelector('#mcSarahForm')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const input = chatRoot.querySelector('#mcSarahInput');
-    submitSarah(pageContainer, input?.value || '');
-    if (input) input.value = '';
-  });
-
-  chatRoot.querySelector('#mcSarahInput')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      chatRoot.querySelector('#mcSarahForm')?.requestSubmit();
-    }
-  });
-
-  scrollThread(chatRoot);
-}
-
-function renderBubbleHtml(msg) {
-  const cls = msg.role === 'user' ? 'user' : 'ai';
-  return `<div class="portal-sarah-msg ${cls}">${escapeHtml(msg.text)}</div>`;
-}
-
-async function submitSarah(pageContainer, message) {
+async function submitSarah(message) {
   const text = String(message || '').trim();
-  if (!text || sending) return;
+  if (!text || sending || !messagesEl) return;
+
+  const scoped = currentScopedCompanyId();
+  const sk = scopeKey();
 
   sending = true;
-  transcript.push({ role: 'user', text });
-  paintThread(pageContainer);
+  appendBubble(text, 'user');
 
-  const chatRoot = pageContainer.querySelector('#mcSarahPageChat');
-  const messages = chatRoot?.querySelector('#mcSarahMessages');
   const typing = document.createElement('div');
   typing.className = 'portal-sarah-msg typing';
   typing.innerHTML = '<span></span><span></span><span></span>';
-  messages?.appendChild(typing);
-  scrollThread(chatRoot);
+  messagesEl.appendChild(typing);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 
   const { data, error } = await sendMissionControlSarahChat({
     message: text,
-    companyId: state.selectedCompanyId || null,
+    companyId: scoped,
     sessionId,
+    pageContext: {
+      page: 'sarah',
+      label: scoped
+        ? `Mission Control Sarah (tenant: ${scoped})`
+        : 'Mission Control Sarah (platform)',
+    },
   });
 
   typing.remove();
   sending = false;
 
-  if (data?.sessionId) sessionId = data.sessionId;
+  if (error) {
+    appendBubble(`Sorry — ${error}`, 'ai');
+    return;
+  }
+
+  if (data?.sessionId) {
+    sessionId = data.sessionId;
+    persistSessionId(sk, sessionId);
+  }
+
   const reply =
     data?.reply ||
     data?.message ||
     data?.content ||
-    (error ? `Sorry — ${error}` : 'No response from Sarah.');
-  transcript.push({ role: 'assistant', text: String(reply) });
-  paintThread(pageContainer);
-}
-
-function paintThread(pageContainer) {
-  const chatRoot = pageContainer.querySelector('#mcSarahPageChat');
-  if (!chatRoot) return;
-  mountMcSarahChat(chatRoot, pageContainer);
-}
-
-function scrollThread(chatRoot) {
-  const messages = chatRoot?.querySelector('#mcSarahMessages');
-  if (messages) messages.scrollTop = messages.scrollHeight;
+    'No response from Sarah.';
+  appendBubble(String(reply), 'ai');
+  applyMcUiHints(data?.uiHints || []);
 }

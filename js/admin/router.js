@@ -3,6 +3,10 @@ import { MODULE_LABELS, MODULES } from './core/moduleRegistry.js';
 
 import { renderDashboard } from './modules/dashboard.js';
 import { renderCompanies } from './modules/companies.js';
+import {
+  renderGovernmentOrganisations,
+  renderPublicServiceOrganisations,
+} from './modules/organisation-segment.js';
 import { renderCrm } from './modules/crm.js';
 import { renderSarah } from './modules/sarah-mc.js';
 import { renderBilling } from './modules/billing.js';
@@ -10,6 +14,8 @@ import { renderPlatformAnalytics } from './modules/platform-analytics.js';
 import { renderSupportInbox } from './modules/support-inbox.js';
 import { renderIntegrations } from './modules/integrations.js';
 import { renderSupportPanel } from './modules/support-panel.js';
+import { renderSupportOperations } from './modules/support-operations.js';
+import { renderSupportAttention } from './modules/support-attention.js';
 import { renderAgents } from './modules/agents.js';
 import { renderKnowledge } from './modules/knowledge.js';
 import { renderSettings } from './modules/settings.js';
@@ -23,6 +29,8 @@ const PAGE_TITLES = { ...MODULE_LABELS };
 const RENDERERS = {
   dashboard: renderDashboard,
   companies: renderCompanies,
+  government: renderGovernmentOrganisations,
+  publicService: renderPublicServiceOrganisations,
   crm: renderCrm,
   sarah: renderSarah,
   billing: renderBilling,
@@ -30,6 +38,8 @@ const RENDERERS = {
   supportInbox: renderSupportInbox,
   integrations: renderIntegrations,
   support: renderSupportPanel,
+  supportOperations: renderSupportOperations,
+  supportAttention: renderSupportAttention,
   agents: renderAgents,
   knowledge: renderKnowledge,
   settings: renderSettings,

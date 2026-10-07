@@ -16,6 +16,20 @@
   status = 200
   force = true
 
+# Client portal lives on app.ziricai.com (app/index.html from company-portal.html).
+[[redirects]]
+  from = "/company-portal.html"
+  to = "https://app.ziricai.com/"
+  status = 302
+  force = true
+
+# Never SPA-fallback node_modules — missing Firebase packages must 404 as JS, not return index.html.
+[[redirects]]
+  from = "/node_modules/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -36,6 +50,16 @@
     Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
+  for = "/js/firebase.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/js/users.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
   for = "/js/*"
   [headers.values]
     Cache-Control = "public, max-age=86400"
@@ -43,7 +67,12 @@
 [[headers]]
   for = "/css/*"
   [headers.values]
-    Cache-Control = "public, max-age=86400"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/css/admin-dashboard.css"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 [context.production.environment]
   # Empty = same-origin /api/* Netlify proxy to Railway (recommended).

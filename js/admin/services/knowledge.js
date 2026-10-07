@@ -17,6 +17,7 @@ import {
   enrichKnowledgeForDisplay,
   computeKnowledgeDisplayStats,
   resolveAuthoritativeKnowledgeBaseId,
+  knowledgeItemsToTrainingHistory,
 } from './knowledgeDisplay.js';
 
 export {
@@ -25,6 +26,7 @@ export {
   resolveKnowledgeBaseLabel,
   resolveAuthoritativeKnowledgeBaseId,
   computeKnowledgeDisplayStats,
+  knowledgeItemsToTrainingHistory,
   PRIMARY_PILOT_KB_ID,
 } from './knowledgeDisplay.js';
 
@@ -312,12 +314,37 @@ export async function deleteKnowledge(id, options = {}) {
   return { success: true, isDemo: true };
 }
 
-export async function listTrainingHistory(companyId) {
-  if (!isDemoDataAllowed()) {
-    return { items: [], isDemo: false, source: 'api', loadState: 'empty' };
+export async function listTrainingHistory(companyId, options = {}) {
+  if (isDemoDataAllowed()) {
+    const items = loadDemoHistory().filter((h) => !companyId || h.companyId === companyId);
+    return { items, isDemo: true, source: 'demo', loadState: items.length ? 'ok' : 'empty' };
   }
-  const items = loadDemoHistory().filter((h) => !companyId || h.companyId === companyId);
-  return { items, isDemo: true, source: 'demo', loadState: items.length ? 'ok' : 'empty' };
+
+  if (options.items) {
+    const items = knowledgeItemsToTrainingHistory(options.items);
+    return {
+      items,
+      isDemo: false,
+      source: 'derived',
+      loadState: items.length ? 'ok' : 'empty',
+    };
+  }
+
+  if (!companyId) {
+    return { items: [], isDemo: false, source: 'derived', loadState: 'scope_required' };
+  }
+
+  const knowledge = await listKnowledge(companyId, {
+    knowledgeBaseId: options.knowledgeBaseId || null,
+  });
+  const items = knowledgeItemsToTrainingHistory(knowledge.items || []);
+  return {
+    items,
+    isDemo: false,
+    source: 'derived',
+    loadState: items.length ? 'ok' : knowledge.loadState === 'error' ? 'error' : 'empty',
+    error: knowledge.error,
+  };
 }
 
 export function computeKnowledgeStats(items) {

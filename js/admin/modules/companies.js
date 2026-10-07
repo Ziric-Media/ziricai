@@ -17,14 +17,21 @@ import {
   deleteCompany,
   suspendCompany,
   activateCompany,
+  mergeSavedCompanyIntoItems,
 } from '../services/companies.js';
 import {
+  fetchPlatformCompany,
   provisionCompanyWorkspace,
+  provisionOperatorTenant,
   fetchPlatformWhatsAppIntegration,
   registerPlatformWhatsAppIntegration,
   configurePlatformWhatsAppIntegration,
   activatePlatformWhatsAppIntegration,
   deactivatePlatformWhatsAppIntegration,
+  syncPlatformClientZeroWhatsApp,
+  fetchWhatsAppPoolNumbers,
+  assignWhatsAppPoolNumber,
+  releaseWhatsAppPoolNumber,
 } from '../api.js';
 import { navigateTo } from '../router.js';
 import { withTimeout } from '../utils.js';
@@ -45,17 +52,94 @@ import {
   tenantClassFilterOptions,
   TENANT_CLASS,
 } from '../../shared/tenantClassification.js';
+import { isClientZeroCompanyId } from '../../shared/clientZero.js';
+import {
+  ORGANISATION_TYPE,
+  ORGANISATION_TYPE_LABELS,
+  segmentFromCompanyRecord,
+} from '../../shared/organisationTaxonomy.js';
 
 let filters = { search: '', plan: '', status: '', tenantClass: '' };
+/** When set, list is scoped to this organisation segment (Government / Public Service nav). */
+let listOrganisationType = null;
+let waModalCompanyId = null;
+let waSelectedPoolNumberId = null;
 let deleteTargetId = null;
 let listLoadState = 'ok';
 let listSource = 'api';
 let listError = null;
-/** @type {string|null} company id for open integration modals */
-let waModalCompanyId = null;
 
-export async function renderCompanies(container) {
-  container.innerHTML = loadingState('Loading tenants...');
+function dismissCompanyShellOverlays() {
+  document.getElementById('overlay')?.classList.remove('open');
+  document.querySelectorAll('.wizard-overlay.open, .slide-over.open').forEach((el) => {
+    el.classList.remove('open');
+  });
+}
+
+/** Refresh tenant list without tearing down the slide-over / modals markup. */
+async function refreshCompaniesView(container) {
+  dismissCompanyShellOverlays();
+  const content = container.querySelector('#companiesContent');
+  const summary = container.querySelector('#tenantSummaryStrip');
+  if (content) {
+    content.classList.add('is-refreshing');
+  }
+
+  const result = await withTimeout(listCompanies());
+  listLoadState = result.loadState || (result.isDemo ? 'demo' : result.items?.length ? 'ok' : 'empty');
+  listSource = result.source || (result.isDemo ? 'demo' : 'api');
+  listError = result.error || null;
+
+  if (listLoadState === 'error') {
+    content?.classList.remove('is-refreshing');
+    await renderCompanies(container, { preserveSegment: true });
+    return;
+  }
+
+  const items = isDemoDataAllowed()
+    ? resolveListItems(result, DEMO_COMPANIES)
+    : (result.items || []);
+  setState({ companies: items });
+
+  if (summary) {
+    summary.outerHTML = buildTenantSummaryStrip(items);
+  }
+  syncTenantClassFilterActive(container);
+  refreshContent(container);
+  content?.classList.remove('is-refreshing');
+  document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
+}
+
+function listPageMeta() {
+  if (listOrganisationType === ORGANISATION_TYPE.GOVERNMENT) {
+    return {
+      title: 'Government',
+      subtitle: 'Government organisations in the platform network.',
+    };
+  }
+  if (listOrganisationType === ORGANISATION_TYPE.POLITICAL_PUBLIC_SERVICE) {
+    return {
+      title: 'Public Service',
+      subtitle: 'Political and public service organisations in the platform network.',
+    };
+  }
+  return {
+    title: 'Tenants',
+    subtitle: 'Tenant records — not production customer count.',
+  };
+}
+
+export async function renderCompanies(container, options = {}) {
+  const soft = options.soft === true;
+  if (!soft) {
+    if (Object.prototype.hasOwnProperty.call(options, 'organisationType')) {
+      listOrganisationType = options.organisationType ?? null;
+    } else if (!options.preserveSegment) {
+      listOrganisationType = null;
+    }
+    dismissCompanyShellOverlays();
+    container.innerHTML = loadingState('Loading tenants...');
+  }
   const result = await withTimeout(listCompanies());
 
   listLoadState = result.loadState || (result.isDemo ? 'demo' : result.items?.length ? 'ok' : 'empty');
@@ -76,7 +160,9 @@ export async function renderCompanies(container) {
         </button>
       </div>
     `;
-    container.querySelector('#retryCompanies')?.addEventListener('click', () => renderCompanies(container));
+    container.querySelector('#retryCompanies')?.addEventListener('click', () =>
+      renderCompanies(container, { preserveSegment: true })
+    );
     return;
   }
 
@@ -97,6 +183,11 @@ function buildTenantSummaryStrip(companies) {
   const summary = summarizeByClassification(companies);
   const cells = [
     { label: 'Production', value: summary[TENANT_CLASS.PRODUCTION_CUSTOMER], key: 'production' },
+    {
+      label: 'Client Zero',
+      value: summary[TENANT_CLASS.CLIENT_ZERO],
+      key: 'client-zero',
+    },
     { label: 'Pilot', value: summary[TENANT_CLASS.PILOT], key: 'pilot' },
     { label: 'Acceptance', value: summary[TENANT_CLASS.ACCEPTANCE], key: 'acceptance' },
     { label: 'Demo', value: summary[TENANT_CLASS.DEMO_SHOWCASE], key: 'demo' },
@@ -104,7 +195,7 @@ function buildTenantSummaryStrip(companies) {
     { label: 'Unknown', value: summary[TENANT_CLASS.UNKNOWN], key: 'unknown' },
   ];
   return `
-    <div class="tenant-summary-grid" aria-label="Tenant classification summary">
+    <div id="tenantSummaryStrip" class="tenant-summary-grid" aria-label="Tenant classification summary">
       <div class="tenant-summary-total">
         <span class="tenant-summary-total-value">${companies.length}</span>
         <span class="tenant-summary-total-label">Tenant records</span>
@@ -140,16 +231,28 @@ function buildListMarkup(companies, isDemo, sourceBadge = '', loadState = 'ok') 
   const emptyMessage = loadState === 'empty'
     ? 'No tenants yet. Add your first tenant workspace to get started.'
     : 'No tenants match your filters.';
-  const hasFilters = Boolean(filters.search || filters.plan || filters.status || filters.tenantClass);
+  const hasFilters = Boolean(
+    filters.search || filters.plan || filters.status || filters.tenantClass || listOrganisationType
+  );
+  const { title, subtitle } = listPageMeta();
   return `
     ${pageHeader(
-      'Tenants',
-      'Tenant records — not production customer count.',
+      title,
+      subtitle,
       `<button class="btn btn-primary btn-sm" type="button" id="openCompanyForm">
         <i class="fa-solid fa-plus"></i> Add Company
       </button>${sourceBadge ? ` ${sourceBadge}` : ''}`
     )}
     ${isDemo ? `<div class="demo-banner"><i class="fa-solid fa-flask"></i> Showing demo data — Firestore unavailable or empty. Changes persist locally.</div>` : ''}
+    ${
+      listOrganisationType
+        ? `<div class="demo-banner" style="background:var(--surface-elevated, #f4f6fb);color:var(--text-secondary,#475569);border:1px solid var(--border,#e2e8f0);">
+        <i class="fa-solid fa-sitemap"></i>
+        Showing ${escapeHtml(ORGANISATION_TYPE_LABELS[listOrganisationType] || listOrganisationType)} organisations only
+        (<button type="button" class="btn btn-link btn-sm" id="viewAllOrganisations">View all tenants</button>)
+      </div>`
+        : ''
+    }
 
     ${buildTenantSummaryStrip(companies)}
     ${buildClassFilterMarkup()}
@@ -200,8 +303,17 @@ function applyFilters(companies) {
     const matchesStatus = !filters.status || c.status === filters.status;
     const { classification } = classifyTenant(c);
     const matchesClass = !filters.tenantClass || classification === filters.tenantClass;
-    return matchesSearch && matchesPlan && matchesStatus && matchesClass;
+    const segment = segmentFromCompanyRecord(c);
+    const matchesOrgType =
+      !listOrganisationType || segment.organisationType === listOrganisationType;
+    return matchesSearch && matchesPlan && matchesStatus && matchesClass && matchesOrgType;
   });
+}
+
+export function countCompaniesByOrganisationType(companies, organisationType) {
+  return companies.filter(
+    (c) => segmentFromCompanyRecord(c).organisationType === organisationType
+  ).length;
 }
 
 function companyInitials(name) {
@@ -336,10 +448,20 @@ function buildFormSlideOver() {
 
         <div class="form-section">
           <h4><i class="fa-solid fa-user-tie"></i> Owner Information</h4>
-          <div class="form-group"><label for="companyOwner">Owner Name</label><input type="text" id="companyOwner" placeholder="e.g. John Smith" /></div>
+          <p class="form-hint" style="margin-top:0;">Required for new companies — creates a real Firebase Auth login (no synthetic UID) and binds the owner to this tenant.</p>
+          <div class="form-group"><label for="companyOwner">Owner Name *</label><input type="text" id="companyOwner" placeholder="e.g. John Smith" /></div>
           <div class="form-row">
-            <div class="form-group"><label for="companyOwnerEmail">Owner Email</label><input type="email" id="companyOwnerEmail" placeholder="owner@company.co.za" /></div>
+            <div class="form-group"><label for="companyOwnerEmail">Owner Email *</label><input type="email" id="companyOwnerEmail" placeholder="owner@company.co.za" required /></div>
             <div class="form-group"><label for="companyOwnerPhone">Owner Phone</label><input type="tel" id="companyOwnerPhone" placeholder="+27 82 555 0101" /></div>
+          </div>
+          <div class="form-group"><label for="companyTenantClass">Tenant classification</label>
+            <select id="companyTenantClass">
+              <option value="PRODUCTION CUSTOMER" selected>Production customer</option>
+              <option value="PILOT">Pilot</option>
+              <option value="ACCEPTANCE">Acceptance</option>
+              <option value="DEMO/SHOWCASE">Demo / Showcase</option>
+              <option value="TEST">Test</option>
+            </select>
           </div>
         </div>
 
@@ -537,11 +659,53 @@ function buildWhatsAppModals() {
         </div>
       </div>
     </div>
+    <div class="wizard-overlay" id="waAssignPoolModal">
+      <div class="wizard-modal" style="max-width:560px;">
+        <div class="wizard-header">
+          <div><h2>Assign ZiricAI test number</h2></div>
+          <button class="btn btn-secondary btn-sm" type="button" data-wa-close="waAssignPoolModal"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="wizard-body">
+          <p class="form-hint" style="margin-top:0;">
+            Selects a Meta phone identity from the Ziric WhatsApp number pool and links it to this tenant.
+            ZiricAI does not create phone numbers in Meta — it registers a supplied test number onto the company.
+          </p>
+          <div id="waPoolNumberList" class="wa-pool-number-list">
+            <p class="text-muted">Loading available numbers…</p>
+          </div>
+          <div class="form-group form-check" style="margin-top:12px;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="waAssignActivate" checked />
+              <span>Activate after assign (Sarah receives WhatsApp for this tenant)</span>
+            </label>
+          </div>
+        </div>
+        <div class="wizard-footer">
+          <button class="btn btn-secondary" type="button" data-wa-close="waAssignPoolModal">Cancel</button>
+          <button class="btn btn-primary" type="button" id="waAssignPoolSubmit" disabled><i class="fa-solid fa-link"></i> Assign &amp; connect</button>
+        </div>
+      </div>
+    </div>
   `;
 }
 
+function renderClientZeroMetaLinkBlock(companyId) {
+  if (!isClientZeroCompanyId(companyId)) return '';
+  return `
+    <div class="integration-card-actions" style="margin-bottom:10px;">
+      <button class="btn btn-primary btn-sm" type="button" id="waSyncClientZero">
+        <i class="fa-brands fa-meta"></i> Link Meta number from Railway
+      </button>
+    </div>
+    <p class="form-hint" style="margin-bottom:12px;">
+      Meta webhook and token are configured — use this after setup in Meta Developer Console.
+      Uses Railway <code>PHONE_NUMBER_ID</code> and <code>WHATSAPP_TOKEN</code> for tenant <strong>${escapeHtml(companyId)}</strong>.
+    </p>`;
+}
+
 function renderWhatsAppIntegrationCardContent(payload) {
-  const { loadState, integration, runtimeReady, missing, error } = payload;
+  const { companyId, loadState, integration, runtimeReady, missing, error } = payload;
+  const clientZeroBlock = companyId ? renderClientZeroMetaLinkBlock(companyId) : '';
 
   if (loadState === 'loading') {
     return `<div class="integration-card-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading integration…</div>`;
@@ -555,6 +719,7 @@ function renderWhatsAppIntegrationCardContent(payload) {
   }
   if (loadState === 'not_registered') {
     return `
+      ${clientZeroBlock}
       <div class="integration-card-status wa-none">
         <span class="integration-status-label">Not registered</span>
       </div>
@@ -564,7 +729,11 @@ function renderWhatsAppIntegrationCardContent(payload) {
 
   const state = integrationCardState(integration, runtimeReady, missing);
   const status = integration?.status || '—';
-  const statusLabel = String(status).replace(/_/g, ' ');
+  const hasPhone = Boolean(integration?.phoneNumberId);
+  const readyForSetup = state === 'pending' && !hasPhone;
+  const statusLabel = readyForSetup
+    ? 'Ready for Setup'
+    : String(status).replace(/_/g, ' ');
   const runtimeBlock = isActiveIntegrationStatus(status)
     ? (runtimeReady
       ? '<div class="integration-runtime ready"><i class="fa-solid fa-circle-check"></i> Runtime ready</div>'
@@ -573,25 +742,34 @@ function renderWhatsAppIntegrationCardContent(payload) {
     : '';
 
   let actions = '';
-  if (state === 'pending' || state === 'disconnected') {
-    const hasPhone = Boolean(integration?.phoneNumberId);
+  if (readyForSetup || ((state === 'pending' || state === 'disconnected') && !hasPhone)) {
     actions = `
       <div class="integration-card-actions">
-        <button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>
+        <button class="btn btn-primary btn-sm" type="button" id="waOpenAssignPool"><i class="fa-brands fa-whatsapp"></i> Use ZiricAI Test Number</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure manually</button>
+      </div>
+      <p class="form-hint">Assign an AVAILABLE number from the Ziric WhatsApp pool. Numbers are never auto-assigned on company create.</p>`;
+  } else if (state === 'pending' || state === 'disconnected') {
+    actions = `
+      <div class="integration-card-actions">
         <button class="btn btn-primary btn-sm" type="button" id="waOpenActivate" ${hasPhone ? '' : 'disabled title="Phone number ID required"'}><i class="fa-solid fa-play"></i> Activate integration</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="waOpenAssignPool"><i class="fa-brands fa-whatsapp"></i> Switch pool number</button>
       </div>`;
   } else if (state === 'active_ready' || state === 'active_not_ready') {
     actions = `
       <div class="integration-card-actions">
         <button class="btn btn-warning btn-sm" type="button" id="waOpenDeactivate"><i class="fa-solid fa-pause"></i> Deactivate integration</button>
         <button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="waReleasePool" title="Release pool number back to AVAILABLE"><i class="fa-solid fa-unlock"></i> Release test number</button>
       </div>`;
   } else {
     actions = `<button class="btn btn-secondary btn-sm" type="button" id="waOpenConfigure"><i class="fa-solid fa-sliders"></i> Configure integration</button>`;
   }
 
   return `
-    <div class="integration-card-status ${escapeHtml(state)}">
+    ${clientZeroBlock}
+    <div class="integration-card-status ${escapeHtml(readyForSetup ? 'wa-ready' : state)}">
       <span class="integration-status-label">${escapeHtml(statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1))}</span>
     </div>
     ${runtimeBlock}
@@ -618,12 +796,13 @@ async function loadWhatsAppIntegrationCard(container, companyId) {
 
   const res = await fetchPlatformWhatsAppIntegration(companyId);
   if (res.status === 404) {
-    card.innerHTML = renderWhatsAppIntegrationCardContent({ loadState: 'not_registered' });
+    card.innerHTML = renderWhatsAppIntegrationCardContent({ companyId, loadState: 'not_registered' });
     bindWhatsAppCardActions(container, companyId);
     return;
   }
   if (res.error) {
     card.innerHTML = renderWhatsAppIntegrationCardContent({
+      companyId,
       loadState: 'error',
       error: res.error,
     });
@@ -633,6 +812,7 @@ async function loadWhatsAppIntegrationCard(container, companyId) {
 
   const data = res.data || {};
   card.innerHTML = renderWhatsAppIntegrationCardContent({
+    companyId,
     loadState: 'loaded',
     integration: data.integration,
     runtimeReady: data.runtimeReady,
@@ -661,6 +841,27 @@ function bindWhatsAppCardActions(container, companyId, integration = null) {
 
   container.querySelector('#waIntegrationRetry')?.addEventListener('click', () => {
     loadWhatsAppIntegrationCard(container, companyId);
+  });
+  container.querySelector('#waSyncClientZero')?.addEventListener('click', async () => {
+    const btn = container.querySelector('#waSyncClientZero');
+    const phoneOverride = container.querySelector('#waConfigurePhoneNumberId')?.value?.trim();
+    if (btn) btn.disabled = true;
+    const syncRes = await syncPlatformClientZeroWhatsApp(companyId, {
+      force: true,
+      ...(phoneOverride ? { phoneNumberId: phoneOverride } : {}),
+    });
+    if (btn) btn.disabled = false;
+    if (syncRes.error) {
+      showToast(syncRes.error, 'error');
+      return;
+    }
+    const data = syncRes.data || {};
+    if (data.runtimeReady) {
+      showToast('Client Zero WhatsApp linked — inbound messages will route to Sarah.', 'success');
+    } else {
+      showToast(data.error || 'Linked with warnings — check Railway WHATSAPP_TOKEN and Firestore.', 'warning');
+    }
+    await loadWhatsAppIntegrationCard(container, companyId);
   });
   container.querySelector('#waOpenRegister')?.addEventListener('click', () => {
     const hint = container.querySelector('#waRegisterCredentialsHint');
@@ -710,6 +911,61 @@ function bindWhatsAppCardActions(container, companyId, integration = null) {
     container.querySelector('#waDeactivateReason').value = '';
     openWaModal(container, 'waDeactivateModal');
   });
+  container.querySelector('#waOpenAssignPool')?.addEventListener('click', async () => {
+    waSelectedPoolNumberId = null;
+    const list = container.querySelector('#waPoolNumberList');
+    const submit = container.querySelector('#waAssignPoolSubmit');
+    if (submit) submit.disabled = true;
+    if (list) list.innerHTML = '<p class="text-muted">Loading available numbers…</p>';
+    openWaModal(container, 'waAssignPoolModal');
+    const res = await fetchWhatsAppPoolNumbers({ status: 'available' });
+    if (res.error) {
+      if (list) list.innerHTML = errorState(res.error);
+      return;
+    }
+    const items = res.data?.items || [];
+    if (!items.length) {
+      if (list) {
+        list.innerHTML = `
+          <p class="form-hint">No AVAILABLE numbers in the pool.</p>
+          <p class="form-hint">Add Meta phone number IDs via the platform WhatsApp pool API, or ensure <code>PHONE_NUMBER_ID</code> is set on the server (auto-seeds as AVAILABLE).</p>`;
+      }
+      return;
+    }
+    if (list) {
+      list.innerHTML = items.map((n) => `
+        <label class="wa-pool-option" style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border-color, #e5e7eb);cursor:pointer;">
+          <input type="radio" name="waPoolNumber" value="${escapeHtml(n.id)}" style="margin-top:4px;" />
+          <span>
+            <strong>${escapeHtml(n.label || n.displayPhoneNumber || n.id)}</strong><br/>
+            <span class="text-muted">${escapeHtml(n.displayPhoneNumber || '—')} · ID ${escapeHtml(n.phoneNumberId || '—')} · ${escapeHtml(n.kind || 'test')}</span>
+          </span>
+        </label>`).join('');
+      list.querySelectorAll('input[name="waPoolNumber"]').forEach((input) => {
+        input.addEventListener('change', () => {
+          waSelectedPoolNumberId = input.value;
+          if (submit) submit.disabled = !waSelectedPoolNumberId;
+        });
+      });
+    }
+  });
+  container.querySelector('#waReleasePool')?.addEventListener('click', async () => {
+    const poolRes = await fetchWhatsAppPoolNumbers({ status: 'in_use' });
+    const items = poolRes.data?.items || [];
+    const leased = items.find((n) => n.assignedCompanyId === companyId);
+    if (!leased) {
+      showToast('No pool number assigned to this company', 'warning');
+      return;
+    }
+    const res = await releaseWhatsAppPoolNumber(leased.id);
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
+    showToast('Test number released back to AVAILABLE', 'success');
+    await loadWhatsAppIntegrationCard(container, companyId);
+    await refreshCompaniesView(container);
+  });
 }
 
 function bindWhatsAppModalEvents(container) {
@@ -737,8 +993,7 @@ function bindWhatsAppModalEvents(container) {
     showToast('WhatsApp integration registered', 'success');
     closeWaModal(container, 'waRegisterModal');
     await loadWhatsAppIntegrationCard(container, waModalCompanyId);
-    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
-    renderCompanies(container);
+    await refreshCompaniesView(container);
   });
 
   container.querySelector('#waConfigureSubmit')?.addEventListener('click', async () => {
@@ -764,8 +1019,7 @@ function bindWhatsAppModalEvents(container) {
     showToast('Integration configuration saved', 'success');
     closeWaModal(container, 'waConfigureModal');
     await loadWhatsAppIntegrationCard(container, waModalCompanyId);
-    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
-    renderCompanies(container);
+    await refreshCompaniesView(container);
   });
 
   container.querySelector('#waActivateSubmit')?.addEventListener('click', async () => {
@@ -797,8 +1051,7 @@ function bindWhatsAppModalEvents(container) {
     showToast(data.runtimeReady ? 'Integration activated' : 'Integration activated — runtime not fully ready', data.runtimeReady ? 'success' : 'warning');
     closeWaModal(container, 'waActivateModal');
     await loadWhatsAppIntegrationCard(container, waModalCompanyId);
-    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
-    renderCompanies(container);
+    await refreshCompaniesView(container);
   });
 
   container.querySelector('#waDeactivateSubmit')?.addEventListener('click', async () => {
@@ -812,8 +1065,28 @@ function bindWhatsAppModalEvents(container) {
     showToast('Integration deactivated', 'success');
     closeWaModal(container, 'waDeactivateModal');
     await loadWhatsAppIntegrationCard(container, waModalCompanyId);
-    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
-    renderCompanies(container);
+    await refreshCompaniesView(container);
+  });
+
+  container.querySelector('#waAssignPoolSubmit')?.addEventListener('click', async () => {
+    if (!waModalCompanyId || !waSelectedPoolNumberId) return;
+    const activate = container.querySelector('#waAssignActivate')?.checked !== false;
+    const res = await assignWhatsAppPoolNumber(waModalCompanyId, {
+      numberId: waSelectedPoolNumberId,
+      activate,
+    });
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
+    const data = res.data || {};
+    showToast(
+      `WhatsApp linked (${data.number?.displayPhoneNumber || data.number?.phoneNumberId || 'pool number'}). Sarah is connected for this tenant.`,
+      'success'
+    );
+    closeWaModal(container, 'waAssignPoolModal');
+    await loadWhatsAppIntegrationCard(container, waModalCompanyId);
+    await refreshCompaniesView(container);
   });
 }
 
@@ -852,6 +1125,7 @@ function bindListEvents(container) {
   const closeForm = () => {
     formPanel?.classList.remove('open');
     backdrop?.classList.remove('open');
+    dismissCompanyShellOverlays();
   };
   const openDeleteModal = () => {
     deleteModal?.classList.add('open');
@@ -869,6 +1143,10 @@ function bindListEvents(container) {
 
   container.querySelector('#clearCompanyFilters')?.addEventListener('click', () => {
     clearAllCompanyFilters(container);
+  });
+
+  container.querySelector('#viewAllOrganisations')?.addEventListener('click', () => {
+    navigateTo('companies');
   });
 
   container.querySelectorAll('.tenant-class-filter-btn').forEach((btn) => {
@@ -948,8 +1226,7 @@ function bindListEvents(container) {
     deleteTargetId = null;
     closeDeleteModal();
     backdrop?.classList.remove('open');
-    document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
-    renderCompanies(container);
+    await refreshCompaniesView(container);
   });
 
   bindDelegatedActions(container, { openForm, openDeleteModal, closeForm });
@@ -1004,7 +1281,9 @@ function bindDelegatedActions(container, { openForm, openDeleteModal }) {
       e.stopPropagation();
       closeAllDropdowns(container);
       const company = state.companies.find((c) => c.id === editBtn.dataset.id);
-      if (company) openCompanyForm(container, company, openForm);
+      if (company) {
+        openCompanyForm(container, company, openForm);
+      }
       return;
     }
 
@@ -1026,8 +1305,7 @@ function bindDelegatedActions(container, { openForm, openDeleteModal }) {
       const result = await suspendCompany(suspendBtn.dataset.id);
       if (result.error) { showToast(result.error, 'error'); return; }
       showToast('Company suspended', 'warning');
-      document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
-      renderCompanies(container);
+      await refreshCompaniesView(container);
       return;
     }
 
@@ -1037,8 +1315,7 @@ function bindDelegatedActions(container, { openForm, openDeleteModal }) {
       const result = await activateCompany(activateBtn.dataset.id);
       if (result.error) { showToast(result.error, 'error'); return; }
       showToast('Company activated', 'success');
-      document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
-      renderCompanies(container);
+      await refreshCompaniesView(container);
     }
   });
 }
@@ -1078,34 +1355,51 @@ function refreshContent(container) {
   });
 }
 
-function openCompanyForm(container, company, openForm) {
-  const isEdit = Boolean(company);
+function parseTemperatureInput(raw, fallback = 0.7) {
+  const text = String(raw ?? '').trim().replace(',', '.');
+  const n = Number(text);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(2, Math.max(0, n));
+}
+
+async function openCompanyForm(container, company, openForm) {
+  let record = company;
+  if (company?.id) {
+    const fresh = await fetchPlatformCompany(company.id);
+    if (!fresh.error && fresh.data?.company) {
+      record = fresh.data.company;
+      setState({ companies: mergeSavedCompanyIntoItems(state.companies, record) });
+    }
+  }
+  const isEdit = Boolean(record);
   container.querySelector('#companyFormTitle').textContent = isEdit ? 'Edit Company' : 'Add Company';
-  container.querySelector('#companyEditId').value = company?.id || '';
-  container.querySelector('#companyName').value = company?.name || '';
-  container.querySelector('#companyIndustry').value = company?.industry || '';
-  container.querySelector('#companyWebsite').value = company?.website || '';
-  container.querySelector('#companyEmail').value = company?.email || '';
-  container.querySelector('#companyPhone').value = company?.phone || '';
-  container.querySelector('#companyLogoUrl').value = company?.logoUrl || '';
-  container.querySelector('#companyOwner').value = company?.owner || '';
-  container.querySelector('#companyOwnerEmail').value = company?.ownerEmail || '';
-  container.querySelector('#companyOwnerPhone').value = company?.ownerPhone || '';
-  container.querySelector('#companyPlan').value = company?.plan || 'business';
-  container.querySelector('#companyStatus').value = company?.status || 'active';
+  container.querySelector('#companyEditId').value = record?.id || '';
+  container.querySelector('#companyName').value = record?.name || '';
+  container.querySelector('#companyIndustry').value = record?.industry || '';
+  container.querySelector('#companyWebsite').value = record?.website || '';
+  container.querySelector('#companyEmail').value = record?.email || '';
+  container.querySelector('#companyPhone').value = record?.phone || '';
+  container.querySelector('#companyLogoUrl').value = record?.logoUrl || '';
+  container.querySelector('#companyOwner').value = record?.owner || '';
+  container.querySelector('#companyOwnerEmail').value = record?.ownerEmail || '';
+  container.querySelector('#companyOwnerPhone').value = record?.ownerPhone || '';
+  container.querySelector('#companyTenantClass').value =
+    record?.settings?.tenantClass || 'PRODUCTION CUSTOMER';
+  container.querySelector('#companyPlan').value = record?.plan || 'business';
+  container.querySelector('#companyStatus').value = record?.status || 'active';
   const planAmount = container.querySelector('#companyPlanAmount');
-  planAmount.value = company?.billing?.planAmount ?? PLAN_AMOUNTS[company?.plan || 'business'] ?? '';
-  planAmount.dataset.userEdited = company ? '1' : '';
-  container.querySelector('#companyBillingStatus').value = company?.billing?.status || 'pending';
-  container.querySelector('#companyAgent').value = company?.agentId || '';
-  container.querySelector('#companyAiModel').value = company?.aiModel || 'gpt-4o-mini';
-  container.querySelector('#companyAiTemperature').value = company?.aiTemperature ?? 0.7;
-  container.querySelector('#companyOpenAiKey').value = company?.openAiApiKey || '';
-  container.querySelector('#companyKnowledgeBase').value = company?.knowledgeBaseId || '';
-  container.querySelector('#companyKnowledgeMaxDocs').value = company?.knowledgeMaxDocs ?? 500;
-  container.querySelector('#companyKnowledgeAutoSync').checked = company?.knowledgeAutoSync !== false;
+  planAmount.value = record?.billing?.planAmount ?? PLAN_AMOUNTS[record?.plan || 'business'] ?? '';
+  planAmount.dataset.userEdited = record ? '1' : '';
+  container.querySelector('#companyBillingStatus').value = record?.billing?.status || 'pending';
+  container.querySelector('#companyAgent').value = record?.agentId || '';
+  container.querySelector('#companyAiModel').value = record?.aiModel || 'gpt-4o-mini';
+  container.querySelector('#companyAiTemperature').value = record?.aiTemperature ?? 0.7;
+  container.querySelector('#companyOpenAiKey').value = record?.openAiApiKey || '';
+  container.querySelector('#companyKnowledgeBase').value = record?.knowledgeBaseId || '';
+  container.querySelector('#companyKnowledgeMaxDocs').value = record?.knowledgeMaxDocs ?? 500;
+  container.querySelector('#companyKnowledgeAutoSync').checked = record?.knowledgeAutoSync !== false;
   openForm();
-  loadWhatsAppIntegrationCard(container, isEdit ? company.id : null);
+  loadWhatsAppIntegrationCard(container, isEdit ? record.id : null);
 }
 
 async function saveCompany(container, closeForm) {
@@ -1115,6 +1409,9 @@ async function saveCompany(container, closeForm) {
   const kbOption = kbSelect.selectedOptions[0];
   const agentOption = agentSelect.selectedOptions[0];
   const plan = container.querySelector('#companyPlan').value;
+  const ownerEmail = container.querySelector('#companyOwnerEmail').value.trim();
+  const ownerName = container.querySelector('#companyOwner').value.trim();
+  const tenantClass = container.querySelector('#companyTenantClass')?.value || 'PRODUCTION CUSTOMER';
 
   const payload = {
     name: container.querySelector('#companyName').value.trim(),
@@ -1123,20 +1420,25 @@ async function saveCompany(container, closeForm) {
     email: container.querySelector('#companyEmail').value.trim(),
     phone: container.querySelector('#companyPhone').value.trim(),
     logoUrl: container.querySelector('#companyLogoUrl').value.trim(),
-    owner: container.querySelector('#companyOwner').value.trim(),
-    ownerEmail: container.querySelector('#companyOwnerEmail').value.trim(),
+    owner: ownerName,
+    ownerEmail,
     ownerPhone: container.querySelector('#companyOwnerPhone').value.trim(),
     plan,
     status: container.querySelector('#companyStatus').value,
     agentId: agentSelect.value || null,
     agentName: agentOption?.dataset?.name || '',
     aiModel: container.querySelector('#companyAiModel').value,
-    aiTemperature: Number(container.querySelector('#companyAiTemperature').value) || 0.7,
-    openAiApiKey: container.querySelector('#companyOpenAiKey').value.trim(),
+    aiTemperature: parseTemperatureInput(container.querySelector('#companyAiTemperature').value),
+    openAiApiKey: (() => {
+      const raw = container.querySelector('#companyOpenAiKey').value.trim();
+      if (raw.includes('•')) return undefined;
+      return raw;
+    })(),
     knowledgeBaseId: kbSelect.value || null,
     knowledgeBaseName: kbOption?.dataset?.name || '',
     knowledgeMaxDocs: Number(container.querySelector('#companyKnowledgeMaxDocs').value) || 500,
     knowledgeAutoSync: container.querySelector('#companyKnowledgeAutoSync').checked,
+    tenantClass,
     billing: {
       planAmount: Number(container.querySelector('#companyPlanAmount').value) || PLAN_AMOUNTS[plan],
       currency: 'ZAR',
@@ -1150,38 +1452,68 @@ async function saveCompany(container, closeForm) {
     return;
   }
 
-  const result = id ? await updateCompany(id, payload) : await createCompany(payload);
+  /* New company — full operator provision (Auth owner + Sarah + KB + CRM). */
+  if (!id) {
+    if (!ownerEmail) {
+      showToast('Owner email is required to create a portal login', 'warning');
+      return;
+    }
+    if (!ownerName) {
+      showToast('Owner name is required', 'warning');
+      return;
+    }
+
+    const provision = await provisionOperatorTenant({
+      ...payload,
+      agentName: 'Sarah (AI)',
+      agentRole: 'sales_consultant',
+      agentRoleLabel: 'Sales Consultant',
+      personality: 'sales_driven',
+    });
+
+    if (provision.error) {
+      showToast(provision.error, 'error');
+      return;
+    }
+
+    const data = provision.data || provision;
+    const tempPw = data.owner?.temporaryPassword;
+    const resetLink = data.owner?.passwordResetLink;
+    let ownerMsg = `Owner ${data.owner?.email || ownerEmail} bound (${data.owner?.uid || 'uid'})`;
+    if (data.owner?.authCreated && tempPw) {
+      ownerMsg += ` — temporary password: ${tempPw}`;
+    } else if (resetLink) {
+      ownerMsg += ' — password reset link generated';
+    }
+    showToast(
+      `Company ${data.companyId} provisioned with Sarah. ${ownerMsg}. WhatsApp: Ready for Setup.`,
+      'success'
+    );
+    if (tempPw) {
+      console.info('[Mission Control] Owner temporary password (share once):', {
+        companyId: data.companyId,
+        email: data.owner?.email,
+        temporaryPassword: tempPw,
+        passwordResetLink: resetLink,
+      });
+    }
+
+    closeForm();
+    await refreshCompaniesView(container);
+    return;
+  }
+
+  const result = await updateCompany(id, payload);
   if (result.error) {
     showToast(result.error, 'error');
     return;
   }
 
-  const companyId = id || result.id || result.item?.id;
-  if (companyId && !id) {
-    const provision = await provisionCompanyWorkspace(companyId, {
-      ...payload,
-      companyId,
-    });
-    if (!provision.error && provision.data?.links) {
-      const links = provision.data.links;
-      await updateCompany(companyId, {
-        agentId: links.agentId,
-        agentName: links.agentName || payload.agentName,
-        knowledgeBaseId: links.knowledgeBaseId,
-        knowledgeBaseName: `${payload.name} KB`,
-        provisioningLinks: links,
-      });
-      showToast('Company created — portal, agent, CRM, and workflows provisioned', 'success');
-    } else if (provision.error) {
-      showToast(`Company saved; provisioning pending (${provision.error})`, 'warning');
-    } else {
-      showToast('Company created', 'success');
-    }
-  } else {
-    showToast(id ? 'Company updated' : 'Company created', 'success');
+  if (result.company) {
+    setState({ companies: mergeSavedCompanyIntoItems(state.companies, result.company) });
   }
 
+  showToast('Company updated', 'success');
   closeForm();
-  document.dispatchEvent(new CustomEvent('ziric:companies-updated'));
-  renderCompanies(container);
+  await refreshCompaniesView(container);
 }

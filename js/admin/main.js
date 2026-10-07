@@ -2,11 +2,14 @@ import { state, setState } from './state.js';
 import { applyTheme, toggleTheme, showToast, escapeHtml } from './ui.js';
 import { initRouter, navigateTo } from './router.js';
 import { initAuthGuard, bindLoginForm, bindLogout } from './auth-guard.js';
+import { consumeAuthHandoffFromUrl } from '../shared/authHandoff.js';
 import { listCompanies } from './services/companies.js';
 import { withTimeout } from './utils.js';
 import { DEMO_COMPANIES } from './demo-data.js';
 import { isDemoDataAllowed, resolveListItems } from './services/dataMode.js';
 import { formatScopeOptionLabel } from './services/scopeDisplay.js';
+import { countCompaniesByOrganisationType } from './modules/companies.js';
+import { ORGANISATION_TYPE } from '../shared/organisationTaxonomy.js';
 
 export async function bootstrap() {
   if (location.protocol === 'file:') {
@@ -16,6 +19,7 @@ export async function bootstrap() {
   }
 
   try {
+    await consumeAuthHandoffFromUrl();
     applyTheme(state.theme);
     bindLoginForm();
     bindLogout();
@@ -53,6 +57,21 @@ async function refreshCompanies() {
   if (companyCount) {
     companyCount.textContent = String(state.companies.length || '—');
     companyCount.title = 'Tenant records (not production customer count)';
+  }
+  const governmentCount = document.getElementById('governmentCount');
+  if (governmentCount) {
+    governmentCount.textContent = String(
+      countCompaniesByOrganisationType(state.companies, ORGANISATION_TYPE.GOVERNMENT) || '0'
+    );
+  }
+  const publicServiceCount = document.getElementById('publicServiceCount');
+  if (publicServiceCount) {
+    publicServiceCount.textContent = String(
+      countCompaniesByOrganisationType(
+        state.companies,
+        ORGANISATION_TYPE.POLITICAL_PUBLIC_SERVICE
+      ) || '0'
+    );
   }
   const agentCount = document.getElementById('agentCount');
   if (agentCount) agentCount.textContent = '—';

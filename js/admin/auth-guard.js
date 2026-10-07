@@ -1,6 +1,9 @@
-import { observeAuthState, loginUser, logoutUser, isSuperAdminRole, resolveAuthProfile } from '../auth.js';
+import { observeAuthState, loginUser, isSuperAdminRole, resolveAuthProfile } from '../auth.js';
 import { setState } from './state.js';
 import { showToast } from './ui.js';
+import { createLoginBusy } from '../shared/loginBusy.js';
+import { handleSignedOutVisitor, logoutAndReturnToLanding } from '../shared/logoutToLanding.js';
+import { applyUserAvatars } from '../shared/userAvatarUi.js';
 
 /** @type {((user: import('firebase/auth').User, profile: object | null) => void | Promise<void>) | null} */
 let onAuthReady = null;
@@ -25,6 +28,7 @@ export function initAuthGuard({ onReady, onDenied }) {
   observeAuthState(async (user) => {
     if (!user) {
       setState({ user: null, profile: null });
+      if (handleSignedOutVisitor()) return;
       showLoginScreen();
       onDenied?.();
       return;
@@ -69,59 +73,68 @@ function hideAuthScreens() {
 
 function updateUserMenu(profile, email) {
   const name = profile?.fullName || profile?.name || email || 'Super Admin';
-  const avatar = document.querySelector('#userMenu .avatar');
   const nameEl = document.querySelector('#userMenu .name');
   const roleEl = document.querySelector('#userMenu .role');
-  if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
   if (nameEl) nameEl.textContent = name;
   if (roleEl) roleEl.textContent = profile?.role || 'superadmin';
 
-  const sidebarAvatar = document.getElementById('sidebarAvatar');
+  applyUserAvatars(profile, email);
+
   const sidebarName = document.getElementById('sidebarUserName');
   const sidebarEmail = document.getElementById('sidebarUserEmail');
-  if (sidebarAvatar) sidebarAvatar.textContent = name.charAt(0).toUpperCase();
+  const sidebarRole = document.getElementById('sidebarUserRole');
   if (sidebarName) sidebarName.textContent = name;
   if (sidebarEmail) sidebarEmail.textContent = email || 'admin@ziricai.com';
+  if (sidebarRole) sidebarRole.textContent = profile?.role || 'superadmin';
 }
 
 export function bindLoginForm() {
   const form = document.getElementById('loginForm');
+  const busy = createLoginBusy(form, document.getElementById('loginStatus'));
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (form.getAttribute('aria-busy') === 'true') return;
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    const status = document.getElementById('loginStatus');
-    if (status) status.textContent = 'Signing in...';
+    busy.start('Signing in...');
 
-    const result = await loginUser(email, password);
-    if (result.error) {
-      if (status) status.textContent = result.error;
-      showToast(result.error, 'error');
-      return;
+    try {
+      const result = await loginUser(email, password);
+      if (result.error) {
+        busy.stop(result.error);
+        showToast(result.error, 'error');
+        return;
+      }
+
+      busy.step('Verifying access...');
+      const { user } = result;
+      const profile = result.profile || (await resolveAuthProfile(user, { allowDemo: false }));
+
+      if (!profile || !isSuperAdminRole(profile.role)) {
+        const msg = 'Super Admin access required for this console.';
+        busy.stop(msg);
+        showToast(msg, 'error');
+        showAccessDenied(msg);
+        return;
+      }
+
+      busy.step('Opening dashboard...');
+      await completeLoginSession(user, profile);
+      busy.stop();
+    } catch (err) {
+      console.error('Console login failed:', err);
+      const message = err?.message || 'Sign in failed. Please try again.';
+      busy.stop(message);
+      showToast(message, 'error');
     }
-
-    const { user } = result;
-    const profile = result.profile || (await resolveAuthProfile(user, { allowDemo: false }));
-
-    if (!profile || !isSuperAdminRole(profile.role)) {
-      const msg = 'Super Admin access required for this console.';
-      if (status) status.textContent = msg;
-      showToast(msg, 'error');
-      showAccessDenied(msg);
-      return;
-    }
-
-    if (status) status.textContent = 'Opening dashboard...';
-    await completeLoginSession(user, profile);
-    if (status) status.textContent = '';
   });
 }
 
 export function bindLogout() {
   document.addEventListener('click', async (e) => {
-    if (e.target?.id === 'logoutBtn' || e.target?.closest?.('#headerLogoutBtn')) {
-      await logoutUser();
-      showToast('Signed out', 'info');
+    if (e.target?.closest?.('#logoutBtn') || e.target?.closest?.('#headerLogoutBtn')) {
+      e.preventDefault();
+      await logoutAndReturnToLanding();
     }
   });
 }

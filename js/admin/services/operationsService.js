@@ -268,7 +268,7 @@ function normalizeTenantDashboardPayload(data) {
     activeConversations: ops.inbox?.unread ?? metrics.activeConversations ?? null,
     crmLeads: ops.crm?.leads ?? null,
     crmQualifiedLeads: metrics.qualifiedLeads ?? null,
-    crmTestDrivesBooked: ops.appointments?.today ?? null,
+    crmTestDrivesBooked: ops.appointments?.booked ?? ops.appointments?.upcoming ?? null,
     crmFinanceEnquiries: metrics.financeEnquiries ?? null,
     crmDealsWon: metrics.dealsWon ?? null,
     messagesTotal: metrics.messagesTotal ?? quickStats.messagesTotal ?? null,

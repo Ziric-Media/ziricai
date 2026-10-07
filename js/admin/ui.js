@@ -80,6 +80,8 @@ export function planBadge(plan) {
 
 const TENANT_CLASS_CSS = {
   'PRODUCTION CUSTOMER': 'production',
+  'CLIENT ZERO': 'client-zero',
+  'COMPANY ZERO': 'client-zero',
   PILOT: 'pilot',
   ACCEPTANCE: 'acceptance',
   'DEMO/SHOWCASE': 'demo',
@@ -89,6 +91,8 @@ const TENANT_CLASS_CSS = {
 
 const TENANT_CLASS_SHORT = {
   'PRODUCTION CUSTOMER': 'PRODUCTION',
+  'CLIENT ZERO': 'CLIENT ZERO',
+  'COMPANY ZERO': 'CLIENT ZERO',
   PILOT: 'PILOT',
   ACCEPTANCE: 'ACCEPTANCE',
   'DEMO/SHOWCASE': 'DEMO',

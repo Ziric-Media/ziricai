@@ -14,7 +14,20 @@ export function isDemoTenant(companyId) {
 export function shouldUseDemoFallback(ctx = {}) {
   const companyId = typeof ctx === 'string' ? ctx : ctx?.companyId;
   if (!companyId) return true;
+  if (ctx?.isProvisioned === true) return false;
   if (isDemoTenant(companyId)) return true;
   if (ctx?.isDemo === true && ctx?.isProvisioned !== true) return true;
+  return false;
+}
+
+/** Portal modules: never inject demo content when hub/workspace marks tenant provisioned. */
+export function shouldUsePortalDemoContentFallback(ctx = {}) {
+  if (ctx?.isProvisioned === true) return false;
+  return shouldUseDemoFallback(ctx);
+}
+
+export function resolvePortalProvisionedFlag(state = {}) {
+  if (state.hubData?.isProvisioned === true) return true;
+  if (state.workspace?.company) return true;
   return false;
 }

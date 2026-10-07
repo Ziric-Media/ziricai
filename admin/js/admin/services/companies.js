@@ -124,12 +124,26 @@ export function normalizeCompanyItem(raw = {}) {
 function mapPlatformCompanyResponse(api) {
   if (api.error) return { error: api.error };
   const company = api.data?.company;
+  const normalized = company ? normalizeCompanyItem(company) : null;
   return {
     success: true,
-    id: company?.id,
-    item: company,
-    company,
+    id: normalized?.id || company?.id,
+    item: normalized,
+    company: normalized,
   };
+}
+
+/** Merge a saved platform company record into a tenant list (in-memory). */
+export function mergeSavedCompanyIntoItems(items, company) {
+  if (!company?.id) return items;
+  const normalized = normalizeCompanyItem(company);
+  const idx = items.findIndex((c) => c.id === normalized.id);
+  if (idx >= 0) {
+    const next = [...items];
+    next[idx] = { ...next[idx], ...normalized };
+    return next;
+  }
+  return [normalized, ...items];
 }
 
 export async function listCompanies() {

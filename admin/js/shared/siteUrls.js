@@ -15,12 +15,14 @@ const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
 const DEFAULT_SITES = LOCAL
   ? {
       marketing: 'http://localhost:3000',
+      publicWeb: 'http://localhost:3000',
       app: 'http://localhost:3000/app',
       admin: 'http://localhost:3000/admin',
       api: '',
     }
   : {
       marketing: 'https://marketing.ziricai.com',
+      publicWeb: 'https://ziricai.com',
       app: 'https://app.ziricai.com',
       admin: 'https://admin.ziricai.com',
       api: PRODUCTION_API_URL,
@@ -45,8 +47,24 @@ export function adminUrl(path = '') {
   return path ? `${base}/${path.replace(/^\//, '')}` : `${base}/`;
 }
 
-/** Marketing landing URL with optional hash. */
-export function marketingUrl(hash = '') {
-  const base = getSiteUrls().marketing.replace(/\/$/, '');
+function publicWebBase() {
+  const sites = getSiteUrls();
+  const base = sites.publicWeb || sites.marketing;
+  return String(base).replace(/\/$/, '');
+}
+
+/** Public marketing homepage (ziricai.com) with optional hash. */
+export function landingHomeUrl(hash = '') {
+  const base = publicWebBase();
   return hash ? `${base}/#${hash.replace(/^#/, '')}` : `${base}/`;
+}
+
+/** @deprecated Prefer landingHomeUrl — same destination when publicWeb is configured. */
+export function marketingUrl(hash = '') {
+  return landingHomeUrl(hash);
+}
+
+/** Unified sign-in on the public marketing site. */
+export function marketingLoginUrl() {
+  return `${publicWebBase()}/login.html`;
 }

@@ -25,6 +25,7 @@ import { provisionAgentWorkspace, fetchSupervisorReviews } from '../api.js';
 import { withTimeout } from '../utils.js';
 import { DEMO_AGENTS, DEMO_COMPANIES } from '../demo-data.js';
 import { listCompanies } from '../services/companies.js';
+import { formatAgentModelLabel } from '../../shared/aiEmployeeDisplay.js';
 
 const MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'];
 const WIZARD_STEPS = 7;
@@ -120,16 +121,28 @@ export async function renderAgents(container) {
 
   if (listLoadState === 'scope_required') {
     notifyAgentsSidebar({ companyId: null, count: null, loadState: 'scope_required' });
+    const companyHints = (state.companies || [])
+      .slice(0, 5)
+      .map((c) => escapeHtml(c.name))
+      .join(', ');
     container.innerHTML = `
       ${pageHeader(
         'AI Employees',
         'Create named AI team members — not chatbots, but dedicated digital employees for each company.',
         '<span class="crm-source-badge">Live API</span>'
       )}
-      ${emptyState(
-        'Select a company to view AI employees.',
-        '<button class="btn btn-primary" type="button" id="selectCompanyScopeAgents"><i class="fa-solid fa-building"></i> Select company</button>'
-      )}
+      <div class="profile-card" style="text-align:center;padding:48px 24px;">
+        <div style="font-size:40px;margin-bottom:12px;">🏢</div>
+        <div style="font-weight:600;margin-bottom:8px;">Company scope required</div>
+        <div style="color:var(--text-muted);font-size:14px;margin-bottom:16px;max-width:520px;margin-left:auto;margin-right:auto;">
+          AI employees load per tenant — not across all companies at once.
+          Use the <strong>Scope</strong> dropdown in the top bar and choose a company
+          ${companyHints ? `(e.g. ${companyHints})` : ''} to view its AI employees.
+        </div>
+        <button class="btn btn-primary" type="button" id="selectCompanyScopeAgents">
+          <i class="fa-solid fa-building"></i> Open Scope selector
+        </button>
+      </div>
     `;
     container.querySelector('#selectCompanyScopeAgents')?.addEventListener('click', () => {
       const select = document.getElementById('companySelector');
@@ -288,7 +301,7 @@ function renderRow(agent, companies) {
         <div>${escapeHtml(roleLabel(agent))}</div>
         ${personality ? `<div class="text-muted" style="font-size:12px">${escapeHtml(personality)}</div>` : ''}
       </td>
-      <td><span class="model-tag">${escapeHtml(agent.model || '—')}</span></td>
+      <td><span class="model-tag">${escapeHtml(formatAgentModelLabel(agent))}</span></td>
       <td>${whatsappBadge(agent)}</td>
       <td>${statusBadge(agent.status === 'training' ? 'inactive' : agent.status)}</td>
       <td>${formatConversations(agent)}</td>

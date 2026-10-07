@@ -19,6 +19,29 @@ const PLACEHOLDER_CONFIG = {
     measurementId: "your_measurement_id",
 };
 
+/** Public Firebase web app config (ziricai). Used when build env omits FIREBASE_* vars. */
+export const PRODUCTION_WEB_CONFIG = {
+    apiKey: "AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8",
+    authDomain: "ziricai.firebaseapp.com",
+    projectId: "ziricai",
+    storageBucket: "ziricai.firebasestorage.app",
+    messagingSenderId: "482382497730",
+    appId: "1:482382497730:web:6bc2f8668a1598fa13f85b",
+    measurementId: "G-92ZVT0731S",
+    databaseId: "default",
+};
+
+/** Merge injected/env overrides without letting empty strings wipe production keys. */
+export function resolveWebFirebaseConfig(overrides = {}) {
+    const merged = { ...PRODUCTION_WEB_CONFIG };
+    for (const [key, value] of Object.entries(overrides)) {
+        if (value !== undefined && value !== null && value !== "") {
+            merged[key] = value;
+        }
+    }
+    return merged;
+}
+
 function configFromEnv() {
     const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
     if (!projectId) return null;
@@ -48,12 +71,16 @@ function configFromEnv() {
 /** @returns {import('firebase/app').FirebaseOptions} */
 export function getFirebaseConfig() {
     if (typeof window !== "undefined" && window.__ZIRICAI_CONFIG__?.firebase) {
-        return { ...PLACEHOLDER_CONFIG, ...window.__ZIRICAI_CONFIG__.firebase };
+        return resolveWebFirebaseConfig(window.__ZIRICAI_CONFIG__.firebase);
     }
 
     if (typeof process !== "undefined" && process.env) {
         const fromEnv = configFromEnv();
         if (fromEnv) return fromEnv;
+    }
+
+    if (typeof window !== "undefined") {
+        return resolveWebFirebaseConfig({});
     }
 
     return { ...PLACEHOLDER_CONFIG };
