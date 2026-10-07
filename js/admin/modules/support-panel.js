@@ -67,9 +67,16 @@ export async function renderSupportPanel(container) {
 }
 
 function renderTicketCard(ticket) {
+  const meta = [
+    ticket.companyName || ticket.companyId,
+    ticket.category || 'General',
+    ticket.id ? `#${ticket.id}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return `
-    <div class="mc-support-card">
-      <div class="rank-name">${escapeHtml(ticket.subject || ticket.id)}</div>
-      <div class="panel-hint">${escapeHtml(ticket.companyName || ticket.companyId)} · ${escapeHtml(ticket.category || 'General')}</div>
-    </div>`;
+    <article class="mc-support-card">
+      <h5 class="mc-support-card-title">${escapeHtml(ticket.subject || ticket.id)}</h5>
+      <p class="mc-support-card-meta">${escapeHtml(meta)}</p>
+    </article>`;
 }

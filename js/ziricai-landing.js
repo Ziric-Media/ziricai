@@ -599,22 +599,42 @@
             return el;
         }
 
+        let sarahSendInFlight = false;
+
         async function sendSarahMessage(text) {
             const trimmed = text.trim();
-            if (!trimmed) return;
+            if (!trimmed || sarahSendInFlight) return;
+
+            sarahSendInFlight = true;
+            form?.querySelector('button[type="submit"]')?.setAttribute('disabled', 'true');
 
             appendMessage(trimmed, 'user');
             input.value = '';
 
             const typing = document.createElement('div');
             typing.className = 'sarah-msg typing';
+            typing.setAttribute('aria-live', 'polite');
+            typing.setAttribute('aria-label', 'Sarah is typing');
             typing.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
             messages.appendChild(typing);
             messages.scrollTop = messages.scrollHeight;
 
-            await delay(800 + Math.random() * 600);
-            typing.remove();
-            const reply = await getSarahReply(trimmed);
+            let reply = sarahDefaultReply;
+            try {
+                const minTypingMs = 450;
+                const [apiReply] = await Promise.all([
+                    getSarahReply(trimmed),
+                    delay(minTypingMs),
+                ]);
+                reply = apiReply;
+            } catch (err) {
+                console.warn('[Sarah landing]', err);
+            } finally {
+                typing.remove();
+                sarahSendInFlight = false;
+                form?.querySelector('button[type="submit"]')?.removeAttribute('disabled');
+            }
+
             appendMessage(reply, 'ai');
             messages.scrollTop = messages.scrollHeight;
         }
