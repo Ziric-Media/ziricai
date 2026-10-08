@@ -98,10 +98,10 @@ for (const page of WAVE1_PAGES) {
   else fail(`missing page: ${page}`);
 }
 
-if (fileExists('industry-automotive.html')) {
-  pass('legacy industry-automotive.html still publishes');
+if (!fileExists('industry-automotive.html')) {
+  pass('legacy industry-automotive.html omitted (301 to /solutions/automotive/)');
 } else {
-  fail('industry-automotive.html not in marketing/');
+  fail('industry-automotive.html must not publish — breaks Netlify 301');
 }
 
 const redirects = read('_redirects');

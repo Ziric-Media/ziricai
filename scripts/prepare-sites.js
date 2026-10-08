@@ -372,6 +372,9 @@ function writeMarketingWebPages() {
   }
 }
 
+/** Legacy paths that 301 to Wave 1 pages — do not publish static HTML (Netlify file wins over redirect). */
+const MARKETING_LEGACY_HTML_SKIP = new Set(['industry-automotive.html']);
+
 function prepareMarketing() {
   const dir = path.join(ROOT, 'marketing');
   rmDir(path.join(dir, 'css'));
@@ -393,12 +396,19 @@ function prepareMarketing() {
 
   for (const name of fs.readdirSync(ROOT)) {
     if (name.startsWith('industry-') && name.endsWith('.html')) {
+      if (MARKETING_LEGACY_HTML_SKIP.has(name)) continue;
       const publishPath = `marketing/${name}`;
       writeText(publishPath, patchHtml(readText(name), { site: 'marketing', importmapMode: 'cdn', publishPath }));
     }
   }
 
+  for (const name of MARKETING_LEGACY_HTML_SKIP) {
+    const legacyPath = path.join(dir, name);
+    if (fs.existsSync(legacyPath)) fs.unlinkSync(legacyPath);
+  }
+
   for (const name of fs.readdirSync(dir)) {
+    if (MARKETING_LEGACY_HTML_SKIP.has(name)) continue;
     if (name.endsWith('.html') && name !== 'index.html' && name !== 'login.html') {
       const srcPath = path.join(dir, name);
       if (!fs.existsSync(srcPath)) continue;
