@@ -1056,6 +1056,147 @@
             .join('');
     }
 
+    // ===== HOME MODERN (scroll reveals, mini chat, carousels) =====
+    const homeMiniChatScript = [
+        { role: 'customer', text: 'Hi — do you have a Hilux Legend in stock?' },
+        { role: 'ai', text: 'Good evening! Yes — we have the 2.8 GD-6 Legend from R724,500. Want financing or a test drive?' },
+        { role: 'customer', text: 'Test drive Saturday morning?' },
+        { role: 'ai', text: 'Booked for Saturday 10:00. Confirmation sent — see you then!' },
+    ];
+
+    function initHomeReveal() {
+        const els = document.querySelectorAll('.home-modern .home-reveal');
+        if (!els.length) return;
+        if (prefersReducedMotion) {
+            els.forEach((el) => el.classList.add('is-visible'));
+            return;
+        }
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            },
+            { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
+        );
+        els.forEach((el) => observer.observe(el));
+    }
+
+    function appendMiniChatBubble(body, msg) {
+        const bubble = document.createElement('div');
+        bubble.className = `home-mini-bubble ${msg.role}`;
+        bubble.textContent = msg.text;
+        body.appendChild(bubble);
+        body.scrollTop = body.scrollHeight;
+        return bubble;
+    }
+
+    function initHomeMiniChat() {
+        const root = document.getElementById('homeMiniChat');
+        const body = document.getElementById('homeMiniChatBody');
+        const typing = document.getElementById('homeMiniChatTyping');
+        if (!root || !body) return;
+
+        let running = false;
+        let token = 0;
+
+        function runLoop() {
+            token++;
+            const myToken = token;
+            running = true;
+            body.innerHTML = '';
+
+            let delay = 800;
+            homeMiniChatScript.forEach((msg) => {
+                if (msg.role === 'ai') {
+                    setTimeout(() => {
+                        if (myToken !== token) return;
+                        typing?.classList.remove('hidden');
+                        body.scrollTop = body.scrollHeight;
+                    }, delay);
+                    delay += 900;
+                    setTimeout(() => {
+                        if (myToken !== token) return;
+                        typing?.classList.add('hidden');
+                        appendMiniChatBubble(body, msg);
+                    }, delay);
+                    delay += 1200;
+                } else {
+                    setTimeout(() => {
+                        if (myToken !== token) return;
+                        appendMiniChatBubble(body, msg);
+                    }, delay);
+                    delay += 1400;
+                }
+            });
+
+            setTimeout(() => {
+                if (myToken !== token) return;
+                runLoop();
+            }, delay + 2400);
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting && !running) runLoop();
+                    if (!entry.isIntersecting) {
+                        token++;
+                        running = false;
+                        typing?.classList.add('hidden');
+                    }
+                });
+            },
+            { threshold: 0.35 }
+        );
+        observer.observe(root);
+    }
+
+    function initMissionActivityTicker() {
+        const feed = document.getElementById('missionActivityTicker');
+        if (!feed || prefersReducedMotion) return;
+        const lines = [...feed.querySelectorAll('.activity-line')];
+        if (lines.length < 2) return;
+
+        let index = 0;
+        lines.forEach((line, i) => line.classList.toggle('is-active', i === 0));
+
+        setInterval(() => {
+            lines[index].classList.remove('is-active');
+            index = (index + 1) % lines.length;
+            lines[index].classList.add('is-active');
+        }, 3200);
+    }
+
+    function initHomeTestimonials() {
+        const grid = document.getElementById('homeTestimonials');
+        if (!grid || prefersReducedMotion) return;
+        const cards = [...grid.querySelectorAll('.testimonial-card')];
+        if (cards.length < 2) return;
+
+        let index = 0;
+        setInterval(() => {
+            cards[index].classList.remove('is-active');
+            index = (index + 1) % cards.length;
+            cards[index].classList.add('is-active');
+        }, 5500);
+    }
+
+    function initHomeModern() {
+        if (!document.getElementById('landingView')?.classList.contains('home-modern')) return;
+        initHomeReveal();
+        initHomeMiniChat();
+        initMissionActivityTicker();
+        initHomeTestimonials();
+
+        document.getElementById('homeChannelsDemoBtn')?.addEventListener('click', () => {
+            document.getElementById('product-tour')?.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+
     // ===== INIT =====
     function init() {
         initCounters();
@@ -1080,6 +1221,7 @@
         initCatalog();
         initIndustries();
         initMarketplace();
+        initHomeModern();
 
         document.getElementById('watchDemoBtn')?.addEventListener('click', () => openDemo('sales'));
         document.getElementById('watchDemoBtn2')?.addEventListener('click', () => openDemo('sales'));
