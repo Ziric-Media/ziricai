@@ -24,7 +24,6 @@ export function renderMarketingHead({ title, description, depth = 0 }) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="${root}css/onboarding.css">
     <link rel="stylesheet" href="${root}css/ziricai-landing.css">
-    <link rel="stylesheet" href="${root}css/admin-dashboard.css">
     <script type="importmap">
     {
       "imports": {

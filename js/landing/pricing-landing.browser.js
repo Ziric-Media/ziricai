@@ -46,20 +46,30 @@
   }
 
   function initLandingPricing() {
-    const grid = document.querySelector(
+    const bp = window.ZiricBillingPlans;
+    if (!bp?.getPublicPlans) return;
+
+    const grids = document.querySelectorAll(
       '#pricing .pricing-grid, #page-pricing .marketing-pricing-grid, .marketing-page-pricing .pricing-grid'
     );
-    const bp = window.ZiricBillingPlans;
-    if (!grid || !bp?.getPublicPlans) return;
+    if (!grids.length) return;
 
     const plans = bp.getPublicPlans();
-    grid.innerHTML = plans.map((plan) => renderPlanCard(plan, Boolean(plan.featured))).join('');
-    grid.removeAttribute('aria-busy');
+    const html = plans.map((plan) => renderPlanCard(plan, Boolean(plan.featured))).join('');
+    grids.forEach((grid) => {
+      grid.innerHTML = html;
+      grid.removeAttribute('aria-busy');
+    });
+  }
+
+  function scheduleInit() {
+    initLandingPricing();
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initLandingPricing);
+    document.addEventListener('DOMContentLoaded', scheduleInit);
   } else {
-    initLandingPricing();
+    scheduleInit();
   }
+  window.addEventListener('load', scheduleInit);
 })();

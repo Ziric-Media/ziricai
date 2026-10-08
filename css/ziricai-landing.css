@@ -4767,6 +4767,13 @@ body:not(.wizard-active) > .industry-hero .btn {
 }
 
 /* ===== Website Evolution Gate 1 — multi-page marketing ===== */
+body:has(#landingView.marketing-subpage) {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
 .marketing-subpage.landing-view {
     display: flex;
     flex-direction: column;
