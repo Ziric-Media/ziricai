@@ -6235,14 +6235,27 @@ body:has(#landingView.marketing-subpage) {
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 .home-modern > .landing-header .logo,
-.home-modern > .landing-header .nav-links a,
 .home-modern > .landing-header .mobile-menu-btn {
     color: rgba(255, 255, 255, 0.92);
 }
-.home-modern > .landing-header .nav-links a:hover { color: #fff; }
-.home-modern > .landing-header .nav-links-mega .nav-link,
-.home-modern > .landing-header .nav-links-mega .nav-dropdown-toggle {
+.home-modern > .landing-header .nav-links-mega > a.nav-link,
+.home-modern > .landing-header .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle {
     color: rgba(255, 255, 255, 0.88);
+}
+.home-modern > .landing-header .nav-links-mega > a.nav-link:hover,
+.home-modern > .landing-header .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle:hover {
+    color: #fff;
+}
+.home-modern > .landing-header .nav-dropdown-menu .nav-dropdown-item {
+    color: var(--text) !important;
+}
+.home-modern > .landing-header .nav-dropdown-menu .nav-dropdown-item:hover,
+.home-modern > .landing-header .nav-dropdown-menu .nav-dropdown-item.nav-active {
+    color: var(--primary) !important;
+}
+.home-modern > .landing-header .nav-dropdown-menu {
+    background: #fff;
+    border-color: var(--border);
 }
 .home-modern > .landing-header .nav-links-mega .nav-link:hover,
 .home-modern > .landing-header .nav-links-mega .nav-dropdown-toggle:hover {
@@ -6277,12 +6290,16 @@ body:has(#landingView.marketing-subpage) {
     align-items: start;
     gap: 40px;
 }
+.home-diff-under-copy {
+    justify-content: flex-start;
+    margin-top: 28px;
+    max-width: 100%;
+}
 .home-diff-horizontal {
     flex-direction: row;
     align-items: center;
     justify-content: center;
     gap: 12px;
-    margin-bottom: 20px;
     width: 100%;
 }
 .home-diff-horizontal .home-diff-card {
@@ -6414,6 +6431,16 @@ body:has(#landingView.marketing-subpage) {
     opacity: 0.5;
 }
 
+@media (max-width: 1023px) {
+    .home-modern > .landing-header .header-nav-panel.open .nav-links-mega > a.nav-link,
+    .home-modern > .landing-header .header-nav-panel.open .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle {
+        color: var(--text);
+    }
+    .home-modern > .landing-header .header-nav-panel.open .nav-cta-login {
+        color: var(--text) !important;
+        border-color: var(--border) !important;
+    }
+}
 @media (max-width: 900px) {
     .home-trust-bar-inner { grid-template-columns: 1fr 1fr; }
     .home-split { grid-template-columns: 1fr; }
