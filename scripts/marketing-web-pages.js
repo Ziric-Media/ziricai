@@ -10,6 +10,8 @@ import {
   marketingDetail,
   marketingPricingSection,
 } from './marketing-page-blocks.js';
+import { collectMarketingNavPaths, pathFromOutPath, normalizeNavPath } from './marketing-nav.js';
+import { buildMarketingStubPages } from './marketing-stub-pages.js';
 
 export function tourPhoneBlock({ title = 'Central Motors', idsPrefix = '' }) {
   const titleId = idsPrefix ? `${idsPrefix}PhoneTitle` : 'tourPhoneTitle';
@@ -63,17 +65,17 @@ export function tourPhoneBlock({ title = 'Central Motors', idsPrefix = '' }) {
             </div>`;
 }
 
-export const MARKETING_WEB_PAGES = [
+const MARKETING_CORE_PAGES = [
   {
-    outPath: 'platforms/index.html',
-    title: 'Platforms · ZiricAI',
-    description: 'Sarah on WhatsApp, webchat, and every channel your customers use — one AI workforce.',
+    outPath: 'platform/index.html',
+    title: 'Platform · ZiricAI',
+    description: 'Sarah on WhatsApp, webchat, email, and every channel your customers use — one AI workforce.',
     depth: 1,
-    activeNav: 'platforms',
+    activePath: '/platform/',
     includePricing: true,
     includeLanding: false,
     bodyHtml: `${marketingHero({
-      eyebrow: 'Platforms',
+      eyebrow: 'Platform',
       title: 'Your AI workforce on every channel',
       lead: 'One portal, one team of AI Employees — deployed where your customers already are.',
     })}
@@ -87,24 +89,11 @@ ${marketingDetail(`
             <h2>Explore platforms</h2>
         </div>
         <div class="platform-channel-grid marketing-channel-grid">
-            <a class="platform-channel-card" href="/platforms/whatsapp/">
-                <i class="fa-brands fa-whatsapp"></i>
-                <h4>WhatsApp</h4>
-                <p>Sales, support, and bookings on the world's #1 messaging app.</p>
-                <span class="platform-channel-link">Explore WhatsApp <i class="fa-solid fa-arrow-right"></i></span>
-            </a>
-            <a class="platform-channel-card" href="/platforms/webchat/">
-                <i class="fa-solid fa-comment-dots"></i>
-                <h4>Webchat</h4>
-                <p>Live Sarah on your website — same brain as WhatsApp.</p>
-                <span class="platform-channel-link">Explore webchat <i class="fa-solid fa-arrow-right"></i></span>
-            </a>
-            <a class="platform-channel-card platform-channel-card-muted" href="/#integrations">
-                <i class="fa-solid fa-plug"></i>
-                <h4>More channels</h4>
-                <p>Messenger, Instagram, email, SMS — connected in one place.</p>
-                <span class="platform-channel-link">All integrations <i class="fa-solid fa-arrow-right"></i></span>
-            </a>
+            <a class="platform-channel-card" href="/platform/whatsapp/"><i class="fa-brands fa-whatsapp"></i><h4>WhatsApp</h4><p>Sales, support, and bookings.</p><span class="platform-channel-link">Explore <i class="fa-solid fa-arrow-right"></i></span></a>
+            <a class="platform-channel-card" href="/platform/email/"><i class="fa-solid fa-envelope"></i><h4>Email</h4><p>Triage and reply from your inbox.</p><span class="platform-channel-link">Explore <i class="fa-solid fa-arrow-right"></i></span></a>
+            <a class="platform-channel-card" href="/platform/messenger/"><i class="fa-brands fa-facebook-messenger"></i><h4>Messenger</h4><p>Facebook Page messages.</p><span class="platform-channel-link">Explore <i class="fa-solid fa-arrow-right"></i></span></a>
+            <a class="platform-channel-card" href="/platform/instagram/"><i class="fa-brands fa-instagram"></i><h4>Instagram</h4><p>DMs and social enquiries.</p><span class="platform-channel-link">Explore <i class="fa-solid fa-arrow-right"></i></span></a>
+            <a class="platform-channel-card" href="/platform/webchat/"><i class="fa-solid fa-comment-dots"></i><h4>Webchat</h4><p>Sarah on your website.</p><span class="platform-channel-link">Explore <i class="fa-solid fa-arrow-right"></i></span></a>
         </div>`, { alt: true })}
 ${marketingPricingSection()}`,
   },
@@ -113,7 +102,7 @@ ${marketingPricingSection()}`,
     title: 'Solutions · ZiricAI',
     description: 'Industry packs and solutions — automotive, and more AI workforce templates.',
     depth: 1,
-    activeNav: 'solutions',
+    activePath: '/solutions/',
     includePricing: true,
     includeLanding: false,
     bodyHtml: `${marketingHero({
@@ -130,28 +119,21 @@ ${marketingDetail(`
             <span class="section-eyebrow">Packs</span>
             <h2>Start with a template</h2>
         </div>
-        <div class="platform-channel-grid marketing-channel-grid marketing-channel-grid-2">
-            <a class="platform-channel-card" href="/solutions/automotive/">
-                <i class="fa-solid fa-car"></i>
-                <h4>Automotive</h4>
-                <p>Stock, test drives, financing, and trade-ins for dealers.</p>
-                <span class="platform-channel-link">Car Dealer Pack <i class="fa-solid fa-arrow-right"></i></span>
-            </a>
-            <a class="platform-channel-card platform-channel-card-muted" href="/#industries">
-                <i class="fa-solid fa-building"></i>
-                <h4>All industries</h4>
-                <p>50+ industry templates on the homepage catalog.</p>
-                <span class="platform-channel-link">Browse industries <i class="fa-solid fa-arrow-right"></i></span>
-            </a>
+        <div class="platform-channel-grid marketing-channel-grid">
+            <a class="platform-channel-card" href="/solutions/automotive/"><i class="fa-solid fa-car"></i><h4>Automotive</h4><p>Dealers, stock, and test drives.</p><span class="platform-channel-link">Car Dealer Pack <i class="fa-solid fa-arrow-right"></i></span></a>
+            <a class="platform-channel-card" href="/solutions/construction/"><i class="fa-solid fa-hard-hat"></i><h4>Construction</h4><p>Site enquiries and quotes.</p><span class="platform-channel-link">Explore <i class="fa-solid fa-arrow-right"></i></span></a>
+            <a class="platform-channel-card" href="/solutions/healthcare/"><i class="fa-solid fa-heart-pulse"></i><h4>Healthcare</h4><p>Appointments and patient FAQs.</p><span class="platform-channel-link">Explore <i class="fa-solid fa-arrow-right"></i></span></a>
+            <a class="platform-channel-card" href="/solutions/education/"><i class="fa-solid fa-graduation-cap"></i><h4>Education</h4><p>Admissions and parent comms.</p><span class="platform-channel-link">Explore <i class="fa-solid fa-arrow-right"></i></span></a>
+            <a class="platform-channel-card platform-channel-card-muted" href="/ai-employees/industries/"><i class="fa-solid fa-building"></i><h4>All industries</h4><p>50+ templates on the marketplace.</p><span class="platform-channel-link">Browse <i class="fa-solid fa-arrow-right"></i></span></a>
         </div>`, { alt: true })}
 ${marketingPricingSection()}`,
   },
   {
-    outPath: 'faq/index.html',
+    outPath: 'resources/faq/index.html',
     title: 'FAQ · ZiricAI',
     description: 'Frequently asked questions about setup, channels, security, billing, and trials.',
-    depth: 1,
-    activeNav: 'faq',
+    depth: 2,
+    activePath: '/resources/faq/',
     includePricing: true,
     includeLanding: true,
     bodyHtml: `${marketingHero({
@@ -163,7 +145,7 @@ ${marketingIntro({
   title: 'Browse by topic',
   body: 'Filter common questions below. For anything specific to your business, open the Sarah chat — no signup required.',
 })}
-${renderFaqSection('../')}
+${renderFaqSection('../../')}
 ${marketingPricingSection()}`,
   },
   {
@@ -171,7 +153,7 @@ ${marketingPricingSection()}`,
     title: 'Pricing · ZiricAI',
     description: 'Simple, scalable pricing for your AI workforce — 14-day free trial, canonical plans from ZiricAI billing.',
     depth: 1,
-    activeNav: 'pricing',
+    activePath: '/pricing/',
     includePricing: true,
     includeLanding: false,
     bodyHtml: `${marketingHero({
@@ -192,11 +174,11 @@ ${marketingIntro({
 </section>`,
   },
   {
-    outPath: 'platforms/whatsapp/index.html',
+    outPath: 'platform/whatsapp/index.html',
     title: 'WhatsApp · ZiricAI Platforms',
     description: 'Sarah on WhatsApp — inventory, bookings, and sales conversations with CRM and automation behind every reply.',
     depth: 2,
-    activeNav: 'platforms',
+    activePath: '/platform/whatsapp/',
     includePricing: true,
     includeLanding: true,
     bodyHtml: `${marketingHero({
@@ -242,11 +224,11 @@ ${marketingDetail(`
 ${marketingPricingSection()}`,
   },
   {
-    outPath: 'platforms/webchat/index.html',
+    outPath: 'platform/webchat/index.html',
     title: 'Webchat · ZiricAI Platforms',
     description: 'Embed Sarah on your website — live chat with the same AI workforce, knowledge, and automations as WhatsApp.',
     depth: 2,
-    activeNav: 'platforms',
+    activePath: '/platform/webchat/',
     includePricing: true,
     includeLanding: false,
     bodyHtml: `${marketingHero({
@@ -288,7 +270,7 @@ ${marketingPricingSection()}`,
     title: 'Automotive · ZiricAI Solutions',
     description: 'AI for car dealers — stock enquiries, financing, test drives, and trade-ins on WhatsApp and webchat.',
     depth: 2,
-    activeNav: 'solutions',
+    activePath: '/solutions/automotive/',
     includePricing: true,
     includeLanding: false,
     bodyHtml: `${marketingHero({
@@ -296,7 +278,7 @@ ${marketingPricingSection()}`,
       title: 'AI for automotive dealers',
       lead: 'Close deals at midnight. Answer stock enquiries instantly. Book test drives while your sales team sleeps.',
       actions: `<button class="btn btn-glow btn-lg" type="button" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
-            <a href="/platforms/whatsapp/" class="btn btn-ghost btn-lg"><i class="fa-brands fa-whatsapp"></i> Sarah on WhatsApp</a>`,
+            <a href="/platform/whatsapp/" class="btn btn-ghost btn-lg"><i class="fa-brands fa-whatsapp"></i> Sarah on WhatsApp</a>`,
     })}
 ${marketingIntro({
   title: 'Dealer workflows out of the box',
@@ -316,4 +298,13 @@ ${marketingDetail(`
         <p class="marketing-detail-cta"><a href="/#case-studies" class="btn">See Central Motors case study</a></p>`, { alt: true })}
 ${marketingPricingSection()}`,
   },
+];
+
+const CUSTOM_PAGE_PATHS = new Set(
+  MARKETING_CORE_PAGES.map((p) => pathFromOutPath(p.outPath))
+);
+
+export const MARKETING_WEB_PAGES = [
+  ...MARKETING_CORE_PAGES,
+  ...buildMarketingStubPages(collectMarketingNavPaths(), CUSTOM_PAGE_PATHS),
 ];

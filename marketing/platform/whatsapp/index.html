@@ -25,20 +25,76 @@
 </head>
 <body>
 <div id="landingView" class="landing-view marketing-subpage">
-<header class="landing-header site-header-v2">
+<header class="landing-header site-header-v2 site-header-mega">
     <div class="container header-inner">
-        <a href="/" class="logo"><img src="../../assets/ZIRICAI LOGO.png?v=80363b3a8b68-b4cbaaf4" alt="ZiricAI" class="logo-img"></a>
+        <a href="/" class="logo" aria-label="ZiricAI Home"><img src="../../assets/ZIRICAI LOGO.png?v=80363b3a8b68-b4cbaaf4" alt="ZiricAI" class="logo-img"></a>
         <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
         <div class="header-nav-panel" id="headerNavPanel">
-            <nav class="nav-links" id="navLinks">
-                <a href="/platforms/" class="nav-active">Platforms</a>
-                <a href="/#ai-employees" class="">AI Employees</a>
-                <a href="/solutions/" class="">Solutions</a>
-                <a href="/pricing/" class="">Pricing</a>
-                <a href="/faq/" class="">FAQ</a>
+            <nav class="nav-links nav-links-mega" id="navLinks">
+                <a href="/" class="nav-link nav-home "><i class="fa-solid fa-house" aria-hidden="true"></i><span>Home</span></a>
+                <div class="nav-dropdown is-open nav-section-active" data-nav-dropdown>
+                <a href="/platform/" class="nav-dropdown-toggle nav-active nav-link" aria-haspopup="true" aria-expanded="true">
+                    <span>Platform</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/platform/whatsapp/" class="nav-dropdown-item nav-active" role="menuitem">WhatsApp</a>
+                    <a href="/platform/email/" class="nav-dropdown-item " role="menuitem">Email</a>
+                    <a href="/platform/messenger/" class="nav-dropdown-item " role="menuitem">Messenger</a>
+                    <a href="/platform/instagram/" class="nav-dropdown-item " role="menuitem">Instagram</a>
+                    <a href="/platform/webchat/" class="nav-dropdown-item " role="menuitem">Webchat</a>
+                </div>
+            </div>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/ai-employees/how-it-works/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>AI Employees</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/ai-employees/how-it-works/" class="nav-dropdown-item " role="menuitem">How AI Employees Work</a>
+                    <a href="/ai-employees/marketplace/" class="nav-dropdown-item " role="menuitem">AI Employee Marketplace</a>
+                    <a href="/ai-employees/industries/" class="nav-dropdown-item " role="menuitem">Industries</a>
+                </div>
+            </div>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/products/crm/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>Products</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/products/crm/" class="nav-dropdown-item " role="menuitem">CRM</a>
+                    <a href="/products/automation/" class="nav-dropdown-item " role="menuitem">Automation</a>
+                    <a href="/products/knowledge/" class="nav-dropdown-item " role="menuitem">Knowledge</a>
+                    <a href="/products/analytics/" class="nav-dropdown-item " role="menuitem">Analytics</a>
+                    <a href="/products/dashboards/" class="nav-dropdown-item " role="menuitem">Dashboards</a>
+                </div>
+            </div>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/solutions/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>Solutions</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/solutions/automotive/" class="nav-dropdown-item " role="menuitem">Automotive</a>
+                    <a href="/solutions/construction/" class="nav-dropdown-item " role="menuitem">Construction</a>
+                    <a href="/solutions/mining/" class="nav-dropdown-item " role="menuitem">Mining</a>
+                    <a href="/solutions/retail/" class="nav-dropdown-item " role="menuitem">Retail</a>
+                    <a href="/solutions/professional-services/" class="nav-dropdown-item " role="menuitem">Professional Services</a>
+                    <a href="/solutions/healthcare/" class="nav-dropdown-item " role="menuitem">Healthcare</a>
+                    <a href="/solutions/education/" class="nav-dropdown-item " role="menuitem">Education</a>
+                    <a href="/solutions/" class="nav-dropdown-item " role="menuitem">All industries</a>
+                </div>
+            </div>
+                <a href="/pricing/" class="nav-link ">Pricing</a>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/resources/guides/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>Resources</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/resources/guides/" class="nav-dropdown-item " role="menuitem">Guides</a>
+                    <a href="/resources/faq/" class="nav-dropdown-item " role="menuitem">FAQ</a>
+                    <a href="/resources/ai-resources/" class="nav-dropdown-item " role="menuitem">AI Resources</a>
+                </div>
+            </div>
+                <a href="/login.html" class="nav-link nav-login ">Login</a>
             </nav>
             <div class="nav-ctas">
-                <a href="/login.html" class="btn btn-sm">Log in</a>
                 <button type="button" class="btn btn-sm" onclick="launchWizard()">Start Free Trial</button>
             </div>
         </div>
@@ -297,11 +353,9 @@
     }
     syncWizardFromHash();
     window.addEventListener('hashchange', syncWizardFromHash);
-    document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
-        document.getElementById('headerNavPanel')?.classList.toggle('open');
-    });
     document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => document.getElementById('sarahBubble')?.click());
 </script>
+<script src="../../js/marketing-site-nav.js"></script>
 <script type="module" src="../../js/onboarding/main.js"></script>
 <script type="module">
 import { getSiteUrls, marketingLoginUrl } from '../../js/shared/siteUrls.js';

@@ -49,18 +49,48 @@
   status = 301
 
 [[redirects]]
+  from = "/platform"
+  to = "/platform/"
+  status = 301
+
+[[redirects]]
+  from = "/platform/whatsapp"
+  to = "/platform/whatsapp/"
+  status = 301
+
+[[redirects]]
+  from = "/platform/webchat"
+  to = "/platform/webchat/"
+  status = 301
+
+[[redirects]]
   from = "/platforms"
-  to = "/platforms/"
+  to = "/platform/"
+  status = 301
+
+[[redirects]]
+  from = "/platforms/"
+  to = "/platform/"
   status = 301
 
 [[redirects]]
   from = "/platforms/whatsapp"
-  to = "/platforms/whatsapp/"
+  to = "/platform/whatsapp/"
+  status = 301
+
+[[redirects]]
+  from = "/platforms/whatsapp/"
+  to = "/platform/whatsapp/"
   status = 301
 
 [[redirects]]
   from = "/platforms/webchat"
-  to = "/platforms/webchat/"
+  to = "/platform/webchat/"
+  status = 301
+
+[[redirects]]
+  from = "/platforms/webchat/"
+  to = "/platform/webchat/"
   status = 301
 
 [[redirects]]
@@ -75,10 +105,20 @@
 
 [[redirects]]
   from = "/faq"
-  to = "/faq/"
+  to = "/resources/faq/"
   status = 301
 
-# Home-only hash routes; physical paths (pricing/, platforms/*) are served as static HTML first.
+[[redirects]]
+  from = "/faq/"
+  to = "/resources/faq/"
+  status = 301
+
+[[redirects]]
+  from = "/resources/faq"
+  to = "/resources/faq/"
+  status = 301
+
+# Home-only hash routes; physical paths (pricing/, platform/*) are served as static HTML first.
 [[redirects]]
   from = "/*"
   to = "/index.html"

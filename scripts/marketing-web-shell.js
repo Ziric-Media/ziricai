@@ -3,6 +3,8 @@
  * Used by prepare-sites.js — not loaded in browser.
  */
 
+import { renderMarketingNavLinks } from './marketing-nav.js';
+
 export function marketingRootPrefix(depth = 0) {
   if (!depth) return './';
   return '../'.repeat(depth);
@@ -38,33 +40,20 @@ export function renderMarketingHead({ title, description, depth = 0 }) {
 <body>`;
 }
 
-/** Site-root paths — avoid SPA fallback URLs serving homepage at /platforms/ etc. */
-const NAV_ITEMS = [
-  { id: 'platforms', label: 'Platforms', href: '/platforms/' },
-  { id: 'ai-employees', label: 'AI Employees', href: '/#ai-employees' },
-  { id: 'solutions', label: 'Solutions', href: '/solutions/' },
-  { id: 'pricing', label: 'Pricing', href: '/pricing/' },
-];
-
-export function renderMarketingHeader({ depth = 0, active = '', homeHref = null }) {
+export function renderMarketingHeader({ depth = 0, activePath = '/', homeHref = null }) {
   const root = marketingRootPrefix(depth);
   const home = homeHref ?? '/';
-  const links = NAV_ITEMS.map(
-    (item) =>
-      `<a href="${item.href}" class="${active === item.id ? 'nav-active' : ''}">${item.label}</a>`
-  ).join('\n                ');
+  const links = renderMarketingNavLinks({ activePath });
 
-  return `<header class="landing-header site-header-v2">
+  return `<header class="landing-header site-header-v2 site-header-mega">
     <div class="container header-inner">
-        <a href="${home}" class="logo"><img src="${root}assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img"></a>
+        <a href="${home}" class="logo" aria-label="ZiricAI Home"><img src="${root}assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img"></a>
         <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
         <div class="header-nav-panel" id="headerNavPanel">
-            <nav class="nav-links" id="navLinks">
+            <nav class="nav-links nav-links-mega" id="navLinks">
                 ${links}
-                <a href="/faq/" class="${active === 'faq' ? 'nav-active' : ''}">FAQ</a>
             </nav>
             <div class="nav-ctas">
-                <a href="/login.html" class="btn btn-sm">Log in</a>
                 <button type="button" class="btn btn-sm" onclick="launchWizard()">Start Free Trial</button>
             </div>
         </div>
@@ -235,11 +224,9 @@ ${extraScript}
     }
     syncWizardFromHash();
     window.addEventListener('hashchange', syncWizardFromHash);
-    document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
-        document.getElementById('headerNavPanel')?.classList.toggle('open');
-    });
     document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => document.getElementById('sarahBubble')?.click());
 </script>
+<script src="${root}js/marketing-site-nav.js"></script>
 <script type="module" src="${root}js/onboarding/main.js"></script>`;
 }
 
@@ -247,7 +234,7 @@ export function wrapMarketingPage({
   title,
   description,
   depth = 0,
-  activeNav = '',
+  activePath = '/',
   bodyHtml,
   includePricing = false,
   includeLanding = false,
@@ -255,7 +242,7 @@ export function wrapMarketingPage({
 }) {
   return `${renderMarketingHead({ title, description, depth })}
 <div id="landingView" class="landing-view marketing-subpage">
-${renderMarketingHeader({ depth, active: activeNav })}
+${renderMarketingHeader({ depth, activePath })}
 <main class="marketing-page-main">
 ${bodyHtml}
 </main>

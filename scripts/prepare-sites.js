@@ -11,6 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { resolveWebFirebaseConfig } from '../js/firebase-config.js';
 import { wrapMarketingPage } from './marketing-web-shell.js';
 import { MARKETING_WEB_PAGES } from './marketing-web-pages.js';
+import { renderMarketingNavLinks } from './marketing-nav.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCES = path.join(ROOT, '_sources');
@@ -389,6 +390,7 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
   out = out.replace(/ziric-superadmin-console\.html/g, 'index.html');
 
   if (site === 'marketing') {
+    out = patchMarketingHomeNav(out);
     out = out.replace(/href="index\.html"/g, 'href="./"');
     out = out.replace(/href="index\.html#/g, 'href="./#');
     out = out.replace(/href="login\.html"/g, 'href="./login.html"');
@@ -478,13 +480,28 @@ document.querySelectorAll('[data-site-link]').forEach((el) => {
   return out;
 }
 
+function patchMarketingHomeNav(html) {
+  const navInner = renderMarketingNavLinks({ activePath: '/' });
+  const headerPatched = html.replace(
+    /<header class="landing-header site-header-v2">/,
+    '<header class="landing-header site-header-v2 site-header-mega">'
+  );
+  return headerPatched.replace(
+    /<nav class="nav-links" id="navLinks">[\s\S]*?<\/nav>/,
+    `<nav class="nav-links nav-links-mega" id="navLinks">\n                ${navInner}\n            </nav>`
+  ).replace(
+    /<div class="nav-ctas">\s*<a href="[^"]*login\.html" class="btn btn-sm">Log in<\/a>\s*/,
+    '<div class="nav-ctas">\n                '
+  );
+}
+
 function writeMarketingWebPages() {
   for (const page of MARKETING_WEB_PAGES) {
     const html = wrapMarketingPage({
       title: page.title,
       description: page.description,
       depth: page.depth,
-      activeNav: page.activeNav,
+      activePath: page.activePath,
       bodyHtml: page.bodyHtml,
       includePricing: page.includePricing,
       includeLanding: page.includeLanding,
@@ -544,7 +561,7 @@ function prepareMarketing() {
   copyDir(path.join(ROOT, 'js/onboarding'), path.join(dir, 'js/onboarding'));
   copyDir(path.join(ROOT, 'js/landing'), path.join(dir, 'js/landing'));
   copyDir(path.join(ROOT, 'js/shared'), path.join(dir, 'js/shared'));
-  for (const f of ['auth.js', 'firebase-config.js', 'firebase.js', 'users.js', 'ziricai-landing.js', 'unified-login.js']) {
+  for (const f of ['auth.js', 'firebase-config.js', 'firebase.js', 'users.js', 'ziricai-landing.js', 'unified-login.js', 'marketing-site-nav.js']) {
     if (fs.existsSync(path.join(ROOT, 'js', f))) {
       copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
     }
@@ -560,12 +577,25 @@ function prepareMarketing() {
   const prettyUrlRedirects = [
     '/industry-automotive.html  /solutions/automotive/  301',
     '/pricing  /pricing/  301',
-    '/platforms  /platforms/  301',
-    '/platforms/whatsapp  /platforms/whatsapp/  301',
-    '/platforms/webchat  /platforms/webchat/  301',
+    '/platform  /platform/  301',
+    '/platform/whatsapp  /platform/whatsapp/  301',
+    '/platform/webchat  /platform/webchat/  301',
+    '/platform/email  /platform/email/  301',
+    '/platform/messenger  /platform/messenger/  301',
+    '/platform/instagram  /platform/instagram/  301',
+    '/platforms  /platform/  301',
+    '/platforms/  /platform/  301',
+    '/platforms/whatsapp  /platform/whatsapp/  301',
+    '/platforms/whatsapp/  /platform/whatsapp/  301',
+    '/platforms/webchat  /platform/webchat/  301',
+    '/platforms/webchat/  /platform/webchat/  301',
     '/solutions  /solutions/  301',
     '/solutions/automotive  /solutions/automotive/  301',
-    '/faq  /faq/  301',
+    '/faq  /resources/faq/  301',
+    '/faq/  /resources/faq/  301',
+    '/resources/faq  /resources/faq/  301',
+    '/resources/guides  /resources/guides/  301',
+    '/resources/ai-resources  /resources/ai-resources/  301',
   ].join('\n');
   fs.writeFileSync(
     path.join(dir, '_redirects'),

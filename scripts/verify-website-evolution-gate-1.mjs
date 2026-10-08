@@ -12,13 +12,15 @@ const M = path.join(ROOT, 'marketing');
 
 const WAVE1_PAGES = [
   'index.html',
-  'platforms/index.html',
+  'platform/index.html',
   'pricing/index.html',
-  'faq/index.html',
-  'platforms/whatsapp/index.html',
-  'platforms/webchat/index.html',
+  'resources/faq/index.html',
+  'platform/whatsapp/index.html',
+  'platform/webchat/index.html',
   'solutions/index.html',
   'solutions/automotive/index.html',
+  'products/crm/index.html',
+  'ai-employees/how-it-works/index.html',
 ];
 
 const SHELL_MARKERS = [
@@ -116,7 +118,7 @@ if (redirects.includes('/industry-automotive.html  /solutions/automotive/  301')
 
 const toml = fs.readFileSync(path.join(M, 'netlify.toml'), 'utf8');
 const spaIdx = toml.indexOf('from = "/*"');
-const prettyIdx = toml.indexOf('/platforms/whatsapp');
+const prettyIdx = toml.indexOf('/platform/');
 if (prettyIdx >= 0 && spaIdx >= 0 && prettyIdx < spaIdx) {
   pass('netlify.toml: pretty URL redirects before SPA fallback');
 } else {
@@ -143,19 +145,19 @@ if (
   fail('pricing/: missing canonical pricing scripts or grid');
 }
 
-const waHtml = read('platforms/whatsapp/index.html');
+const waHtml = read('platform/whatsapp/index.html');
 if (TOUR_IDS.every((id) => waHtml.includes(`id="${id}"`) || waHtml.includes(`id='${id}'`))) {
-  pass('platforms/whatsapp/: tour DOM IDs preserved');
+  pass('platform/whatsapp/: tour DOM IDs preserved');
 } else {
-  fail('platforms/whatsapp/: missing tour IDs');
+  fail('platform/whatsapp/: missing tour IDs');
 }
-if (waHtml.includes('ziricai-landing.js')) pass('platforms/whatsapp/: loads ziricai-landing.js');
+if (waHtml.includes('ziricai-landing.js')) pass('platform/whatsapp/: loads ziricai-landing.js');
 
-const webHtml = read('platforms/webchat/index.html');
+const webHtml = read('platform/webchat/index.html');
 if (webHtml.includes('id="sarahBubble"') && webHtml.includes('id="sarahForm"')) {
-  pass('platforms/webchat/: Sarah widget DOM present');
+  pass('platform/webchat/: Sarah widget DOM present');
 } else {
-  fail('platforms/webchat/: Sarah widget incomplete');
+  fail('platform/webchat/: Sarah widget incomplete');
 }
 
 const autoHtml = read('solutions/automotive/index.html');
@@ -174,6 +176,8 @@ if (home.includes('id="hero"') && home.includes('Hire AI Employees in minutes'))
 }
 if (home.includes('id="platforms-story"')) pass('home: below-hero platforms-story section');
 else fail('home: missing platforms-story');
+if (home.includes('nav-home') && home.includes('nav-links-mega')) pass('home: mega-menu nav with Home');
+else fail('home: missing mega-menu nav');
 if (home.includes('id="product-tour"') && home.includes('id="tourPhoneChat"')) {
   pass('home: product tour / demo phone UI present');
 } else {

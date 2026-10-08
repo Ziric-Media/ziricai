@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp · ZiricAI Platforms</title>
-    <meta name="description" content="Sarah on WhatsApp — inventory, bookings, and sales conversations with CRM and automation behind every reply.">
+    <title>Professional Services · ZiricAI</title>
+    <meta name="description" content="Intake, scheduling, and client FAQs without adding headcount.">
     <link rel="icon" href="../../assets/favicon.png?v=80363b3a8b68-b4cbaaf4" type="image/png">
     <link rel="apple-touch-icon" href="../../assets/favicon.png?v=80363b3a8b68-b4cbaaf4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
@@ -25,20 +25,76 @@
 </head>
 <body>
 <div id="landingView" class="landing-view marketing-subpage">
-<header class="landing-header site-header-v2">
+<header class="landing-header site-header-v2 site-header-mega">
     <div class="container header-inner">
-        <a href="/" class="logo"><img src="../../assets/ZIRICAI LOGO.png?v=80363b3a8b68-b4cbaaf4" alt="ZiricAI" class="logo-img"></a>
+        <a href="/" class="logo" aria-label="ZiricAI Home"><img src="../../assets/ZIRICAI LOGO.png?v=80363b3a8b68-b4cbaaf4" alt="ZiricAI" class="logo-img"></a>
         <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
         <div class="header-nav-panel" id="headerNavPanel">
-            <nav class="nav-links" id="navLinks">
-                <a href="/platforms/" class="nav-active">Platforms</a>
-                <a href="/#ai-employees" class="">AI Employees</a>
-                <a href="/solutions/" class="">Solutions</a>
-                <a href="/pricing/" class="">Pricing</a>
-                <a href="/faq/" class="">FAQ</a>
+            <nav class="nav-links nav-links-mega" id="navLinks">
+                <a href="/" class="nav-link nav-home "><i class="fa-solid fa-house" aria-hidden="true"></i><span>Home</span></a>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/platform/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>Platform</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/platform/whatsapp/" class="nav-dropdown-item " role="menuitem">WhatsApp</a>
+                    <a href="/platform/email/" class="nav-dropdown-item " role="menuitem">Email</a>
+                    <a href="/platform/messenger/" class="nav-dropdown-item " role="menuitem">Messenger</a>
+                    <a href="/platform/instagram/" class="nav-dropdown-item " role="menuitem">Instagram</a>
+                    <a href="/platform/webchat/" class="nav-dropdown-item " role="menuitem">Webchat</a>
+                </div>
+            </div>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/ai-employees/how-it-works/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>AI Employees</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/ai-employees/how-it-works/" class="nav-dropdown-item " role="menuitem">How AI Employees Work</a>
+                    <a href="/ai-employees/marketplace/" class="nav-dropdown-item " role="menuitem">AI Employee Marketplace</a>
+                    <a href="/ai-employees/industries/" class="nav-dropdown-item " role="menuitem">Industries</a>
+                </div>
+            </div>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/products/crm/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>Products</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/products/crm/" class="nav-dropdown-item " role="menuitem">CRM</a>
+                    <a href="/products/automation/" class="nav-dropdown-item " role="menuitem">Automation</a>
+                    <a href="/products/knowledge/" class="nav-dropdown-item " role="menuitem">Knowledge</a>
+                    <a href="/products/analytics/" class="nav-dropdown-item " role="menuitem">Analytics</a>
+                    <a href="/products/dashboards/" class="nav-dropdown-item " role="menuitem">Dashboards</a>
+                </div>
+            </div>
+                <div class="nav-dropdown is-open nav-section-active" data-nav-dropdown>
+                <a href="/solutions/" class="nav-dropdown-toggle nav-active nav-link" aria-haspopup="true" aria-expanded="true">
+                    <span>Solutions</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/solutions/automotive/" class="nav-dropdown-item " role="menuitem">Automotive</a>
+                    <a href="/solutions/construction/" class="nav-dropdown-item " role="menuitem">Construction</a>
+                    <a href="/solutions/mining/" class="nav-dropdown-item " role="menuitem">Mining</a>
+                    <a href="/solutions/retail/" class="nav-dropdown-item " role="menuitem">Retail</a>
+                    <a href="/solutions/professional-services/" class="nav-dropdown-item nav-active" role="menuitem">Professional Services</a>
+                    <a href="/solutions/healthcare/" class="nav-dropdown-item " role="menuitem">Healthcare</a>
+                    <a href="/solutions/education/" class="nav-dropdown-item " role="menuitem">Education</a>
+                    <a href="/solutions/" class="nav-dropdown-item nav-active" role="menuitem">All industries</a>
+                </div>
+            </div>
+                <a href="/pricing/" class="nav-link ">Pricing</a>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/resources/guides/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>Resources</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/resources/guides/" class="nav-dropdown-item " role="menuitem">Guides</a>
+                    <a href="/resources/faq/" class="nav-dropdown-item " role="menuitem">FAQ</a>
+                    <a href="/resources/ai-resources/" class="nav-dropdown-item " role="menuitem">AI Resources</a>
+                </div>
+            </div>
+                <a href="/login.html" class="nav-link nav-login ">Login</a>
             </nav>
             <div class="nav-ctas">
-                <a href="/login.html" class="btn btn-sm">Log in</a>
                 <button type="button" class="btn btn-sm" onclick="launchWizard()">Start Free Trial</button>
             </div>
         </div>
@@ -47,95 +103,25 @@
 <main class="marketing-page-main">
 <section class="section marketing-page-hero marketing-page-block-hero">
     <div class="container">
-        <span class="section-eyebrow"><i class="fa-brands fa-whatsapp"></i> Platform</span>
-        <h1>WhatsApp — where your customers already are</h1>
-        <p class="intro-lead">One AI Employee on WhatsApp: instant replies, your knowledge base, CRM updates, and automations — without another inbox to babysit.</p>
-        <div class="hero-actions marketing-hero-actions"><button class="btn btn-glow" type="button" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Connect WhatsApp</button>
-            <a class="btn btn-ghost" href="/#product-tour"><i class="fa-solid fa-play"></i> Tour on home</a></div>
+        <span class="section-eyebrow">Solutions</span>
+        <h1>AI for professional services</h1>
+        <p class="intro-lead">Intake, scheduling, and client FAQs without adding headcount.</p>
+        
     </div>
 </section>
 <section class="section section-alt marketing-page-block-intro">
     <div class="container marketing-page-intro-inner">
-        <h2>Built for high-volume messaging</h2>
-        <p>Sarah reads your knowledge base, updates CRM records, and triggers automations on every WhatsApp thread — the same orchestration you get on webchat.</p>
+        <h2>Professional services pack</h2>
+        <p>Ideal for firms that live in email and WhatsApp.</p>
     </div>
 </section>
 <section class="section marketing-page-block-detail section-alt">
     <div class="container">
-
-        <div class="section-header marketing-detail-header">
-            <span class="section-eyebrow">Live demo</span>
-            <h2>Watch Sarah on WhatsApp</h2>
-            <p>A real customer journey in four steps — same tour as the homepage.</p>
+<div class="section-header marketing-detail-header">
+            <h2>More coming soon</h2>
+            <p>We are expanding this section with full product detail. Sarah already covers the basics on WhatsApp — explore pricing below or <a href="/">return home</a>.</p>
         </div>
-        <div class="tour-layout" id="product-tour">
-            <div class="tour-phone-wrap">
-                <div class="device-simulator device-iphone" aria-hidden="true">
-                    <div class="device-frame">
-                        <div class="device-btn device-btn-silent"></div>
-                        <div class="device-btn device-btn-vol-up"></div>
-                        <div class="device-btn device-btn-vol-down"></div>
-                        <div class="device-btn device-btn-power"></div>
-                        <div class="device-screen">
-                            <div class="device-status-bar">
-                                <span class="device-time">9:41</span>
-                                <div class="device-dynamic-island"><span class="device-island-cam"></span></div>
-                                <div class="device-status-icons">
-                                    <i class="fa-solid fa-signal"></i>
-                                    <i class="fa-solid fa-wifi"></i>
-                                    <span class="device-battery"><span class="device-battery-level"></span></span>
-                                </div>
-                            </div>
-                            <div class="tour-phone-app">
-                                <div class="tour-phone-header">
-                                    <span class="tour-phone-back"><i class="fa-solid fa-chevron-left"></i></span>
-                                    <div class="tour-phone-avatar">S</div>
-                                    <div class="tour-phone-contact">
-                                        <span class="tour-phone-title" id="tourPhoneTitle">Central Motors</span>
-                                        <span class="tour-phone-status"><span class="pulse-dot"></span> Sarah · online</span>
-                                    </div>
-                                    <div class="tour-phone-actions">
-                                        <i class="fa-brands fa-whatsapp"></i>
-                                        <i class="fa-solid fa-phone"></i>
-                                        <i class="fa-solid fa-ellipsis-vertical"></i>
-                                    </div>
-                                </div>
-                                <div class="tour-phone-chat" id="tourPhoneChat"></div>
-                                <div class="tour-phone-action" id="tourPhoneAction"></div>
-                                <div class="tour-phone-input">
-                                    <i class="fa-regular fa-face-smile"></i>
-                                    <span class="tour-phone-input-field">Message</span>
-                                    <i class="fa-solid fa-paperclip"></i>
-                                    <span class="tour-phone-send"><i class="fa-solid fa-microphone"></i></span>
-                                </div>
-                            </div>
-                            <div class="device-home-indicator"></div>
-                        </div>
-                    </div>
-                    <div class="device-shadow"></div>
-                </div>
-            </div>
-            <div class="tour-controls">
-                <div class="tour-step-indicator">
-                    <span class="tour-dot active" data-step="0"></span>
-                    <span class="tour-dot" data-step="1"></span>
-                    <span class="tour-dot" data-step="2"></span>
-                    <span class="tour-dot" data-step="3"></span>
-                </div>
-                <h3 id="tourStepTitle">Step 1 · Answer WhatsApp enquiry</h3>
-                <p id="tourStepDesc">A customer asks about stock at 9pm. Sarah replies instantly with accurate inventory from your knowledge base.</p>
-                <div class="tour-nav">
-                    <button class="btn btn-outline" id="tourPrevBtn" disabled type="button"><i class="fa-solid fa-arrow-left"></i> Back</button>
-                    <button class="btn" id="tourNextBtn" type="button">Next <i class="fa-solid fa-arrow-right"></i></button>
-                </div>
-                <button class="btn btn-glow tour-cta hidden" id="tourCtaBtn" type="button" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
-            </div>
-        </div>
-        <div class="platform-cap-grid marketing-cap-grid">
-            <div class="platform-cap-card"><i class="fa-solid fa-book"></i><h3>Knowledge-backed replies</h3><p>Stock, policies, and FAQs from your live knowledge base — not generic chatbot fluff.</p></div>
-            <div class="platform-cap-card"><i class="fa-solid fa-address-book"></i><h3>CRM on every message</h3><p>Leads and conversation history sync to your portal automatically.</p></div>
-            <div class="platform-cap-card"><i class="fa-solid fa-bolt"></i><h3>Automations</h3><p>Bookings, handoffs, and notifications fire when Sarah completes a step.</p></div>
-        </div>
+        <p class="marketing-detail-cta"><a href="/" class="btn btn-outline"><i class="fa-solid fa-house"></i> Back to Home</a></p>
     </div>
 </section>
 <section class="section section-alt marketing-page-pricing" id="page-pricing">
@@ -259,10 +245,6 @@
 <div class="toast-container" id="toastContainer"></div>
 <script src="../../js/shared/billingPlans.browser.js"></script>
 <script src="../../js/landing/pricing-landing.browser.js"></script>
-<script src="../../js/shared/platformKnowledge.browser.js"></script>
-<script src="../../js/shared/marketplacePacks.browser.js"></script>
-<script src="../../js/shared/aiEmployeesCatalog.browser.js"></script>
-<script src="../../js/shared/industryTemplates.browser.js"></script>
 <script src="../../js/ziricai-landing.js"></script>
 
 <script>
@@ -297,11 +279,9 @@
     }
     syncWizardFromHash();
     window.addEventListener('hashchange', syncWizardFromHash);
-    document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
-        document.getElementById('headerNavPanel')?.classList.toggle('open');
-    });
     document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => document.getElementById('sarahBubble')?.click());
 </script>
+<script src="../../js/marketing-site-nav.js"></script>
 <script type="module" src="../../js/onboarding/main.js"></script>
 <script type="module">
 import { getSiteUrls, marketingLoginUrl } from '../../js/shared/siteUrls.js';
