@@ -4,6 +4,8 @@
 [build]
   command = "cd .. && npm ci && node scripts/prepare-sites.js marketing"
   publish = "."
+  # Skip only when marketing/ AND root marketing sources are unchanged (prepare reads ziricai.html, css/, js/, scripts/).
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . && git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ../ziricai.html ../css ../js ../scripts"
 
 [build.environment]
   NETLIFY = "true"
