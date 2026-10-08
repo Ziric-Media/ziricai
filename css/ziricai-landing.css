@@ -6228,6 +6228,145 @@ body:has(#landingView.marketing-subpage) {
 
 .nav-cta-login { box-shadow: none !important; }
 
+/* Hero classic (image 1) + dark header on home */
+.home-modern > .landing-header {
+    background: rgba(15, 23, 42, 0.82);
+    backdrop-filter: blur(14px);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+.home-modern > .landing-header .logo,
+.home-modern > .landing-header .nav-links a,
+.home-modern > .landing-header .mobile-menu-btn {
+    color: rgba(255, 255, 255, 0.92);
+}
+.home-modern > .landing-header .nav-links a:hover { color: #fff; }
+.hero-section-classic .hero-visual { max-width: none; }
+.hero-section-classic .pipeline-panel { max-width: 100%; }
+
+/* Chatbot vs workforce — Sarah sim on right */
+.home-diff-split {
+    grid-template-columns: 1.05fr 0.95fr;
+    align-items: start;
+    gap: 40px;
+}
+.home-diff-vertical {
+    flex-direction: column;
+    margin-top: 28px;
+    max-width: 280px;
+}
+.home-diff-arrow-down {
+    color: var(--primary);
+    font-size: 1.1rem;
+    padding: 4px 0;
+}
+.home-diff-sarah-col {
+    display: flex;
+    align-items: stretch;
+    min-height: 420px;
+}
+.home-diff-sarah-sim {
+    flex: 1;
+    min-height: 400px;
+    max-height: none;
+    border-radius: 20px;
+    box-shadow: 0 24px 60px rgba(124, 58, 237, 0.15);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+.home-section-mc-full .mission-panel { margin-top: 8px; }
+.mission-status-row { padding: 0 !important; justify-content: flex-end; }
+#missionActivityFeed .activity-line {
+    opacity: 0.45;
+    transition: opacity 0.4s ease;
+}
+#missionActivityFeed .activity-line.is-active {
+    opacity: 1;
+}
+
+/* Curved monitor — workflow automation */
+.home-curved-monitor {
+    position: relative;
+    max-width: 380px;
+    margin-left: auto;
+}
+.home-curved-monitor-bezel {
+    height: 28px;
+    border-radius: 20px 20px 0 0;
+    background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: none;
+}
+.home-monitor-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+}
+.home-monitor-dot:first-child { background: #f87171; }
+.home-monitor-dot:nth-child(2) { background: #fbbf24; }
+.home-monitor-dot:nth-child(3) { background: #34d399; }
+.home-curved-monitor-screen {
+    background: linear-gradient(165deg, #0f172a 0%, #1e1b4b 55%, #0f172a 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0 0 24px 24px / 0 0 32px 32px;
+    padding: 16px 14px 20px;
+    box-shadow:
+        0 30px 60px rgba(15, 23, 42, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transform: perspective(800px) rotateX(2deg);
+}
+.home-monitor-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.home-curved-monitor-screen .home-workflow-board {
+    margin: 0 auto;
+    max-width: 100%;
+    background: transparent;
+    border: none;
+    padding: 0;
+    box-shadow: none;
+}
+.home-curved-monitor-screen .workflow-step {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+.home-curved-monitor-screen .workflow-step h4 { color: rgba(255, 255, 255, 0.9); font-size: 0.85rem; }
+.home-curved-monitor-screen .workflow-step-icon {
+    background: rgba(124, 58, 237, 0.25);
+    color: #c4b5fd;
+}
+.home-curved-monitor-stand {
+    width: 120px;
+    height: 10px;
+    margin: 0 auto;
+    background: linear-gradient(180deg, #475569, #334155);
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+.home-curved-monitor-stand::after {
+    content: '';
+    display: block;
+    width: 200px;
+    height: 6px;
+    margin: 8px auto 0;
+    background: #cbd5e1;
+    border-radius: 999px;
+    opacity: 0.5;
+}
+
 @media (max-width: 900px) {
     .home-trust-bar-inner { grid-template-columns: 1fr 1fr; }
     .home-split { grid-template-columns: 1fr; }
@@ -6235,6 +6374,8 @@ body:has(#landingView.marketing-subpage) {
     .home-sarah-checklist { grid-template-columns: 1fr; }
     .pipeline-panel-story { margin-inline: auto; }
     .hero-visual-stack { margin-inline: auto; max-width: 100%; }
-    .home-sarah-layout, .home-social-stage, .home-knowledge-split, .home-workflow-split, .home-connected-layout { grid-template-columns: 1fr; }
+    .home-sarah-layout, .home-social-stage, .home-knowledge-split, .home-workflow-split, .home-connected-layout, .home-diff-split { grid-template-columns: 1fr; }
+    .home-diff-sarah-col { min-height: 320px; }
+    .home-curved-monitor { margin: 24px auto 0; max-width: 100%; }
     .home-social-node { transform: rotate(calc(var(--i) * 60deg)) translate(100px) rotate(calc(var(--i) * -60deg)); }
 }

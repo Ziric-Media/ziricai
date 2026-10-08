@@ -1176,8 +1176,11 @@
     function initListTicker(listId, intervalMs = 2800) {
         const list = document.getElementById(listId);
         if (!list || prefersReducedMotion) return;
-        const items = [...list.querySelectorAll('li, span')].filter((el) => el.parentElement === list || list.classList.contains('home-viz-ticker'));
-        const nodes = list.classList.contains('home-viz-ticker') ? [...list.querySelectorAll('span')] : [...list.querySelectorAll('li')];
+        const nodes = list.classList.contains('home-viz-ticker')
+            ? [...list.querySelectorAll('span')]
+            : list.querySelector('.activity-line')
+              ? [...list.querySelectorAll('.activity-line')]
+              : [...list.querySelectorAll('li')];
         if (nodes.length < 2) return;
         let i = 0;
         nodes.forEach((n, idx) => n.classList.toggle('is-active', idx === 0));
@@ -1252,6 +1255,7 @@
         initHomeTestimonials();
         initListTicker('sarahActivityFeed');
         initListTicker('aiEmployeeWorkTicker');
+        initListTicker('missionActivityFeed');
         initHomePossible();
         initHomeSocialFeed();
         initWorkflowLiveStep();
@@ -1289,7 +1293,8 @@
         initHomeModern();
 
         document.getElementById('watchDemoBtn')?.addEventListener('click', () => {
-            document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('mission-control')?.scrollIntoView({ behavior: 'smooth' })
+                || document.getElementById('product-tour')?.scrollIntoView({ behavior: 'smooth' });
         });
         document.getElementById('talkToSarahBtn')?.addEventListener('click', () => {
             if (typeof openSarahChat === 'function') openSarahChat();
