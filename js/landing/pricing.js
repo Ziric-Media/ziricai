@@ -1,7 +1,6 @@
 /**
-
- * Landing page pricing — renders cards from ZiricBillingPlans (services/platform/billingPlans.js).
-
+ * Landing page pricing (ES module) — local dev with import map.
+ * Production marketing uses js/landing/pricing-landing.browser.js after billingPlans.browser.js.
  */
 
 import { getPublicPlans, formatPrice } from '../shared/billingPlans.js';
@@ -34,9 +33,13 @@ function renderPlanCard(plan, featured) {
 
     const ctaHtml = isCustom
 
-        ? '<button class="btn btn-outline" type="button" onclick="showToast(\'Contact sales for custom pricing\',\'info\')">Contact Sales</button>'
+        ? '<button class="btn btn-outline" type="button" onclick="showToast(\'Our team will reach out with custom pricing.\',\'info\')">Talk to Sales</button>'
 
         : '<button class="btn" type="button" onclick="launchWizard()">Start Free Trial</button>';
+
+    const headline = plan.headline || plan.tagline || '';
+
+    const description = plan.description || '';
 
 
 
@@ -46,13 +49,15 @@ function renderPlanCard(plan, featured) {
 
             <div class="pricing-plan">${plan.label}</div>
 
-            <p class="pricing-tagline">${plan.tagline || ''}</p>
+            ${headline ? `<p class="pricing-headline">${headline}</p>` : ''}
 
             <div class="pricing-price">${priceHtml}</div>
 
+            ${description ? `<p class="pricing-description">${description}</p>` : ''}
+
             <ul class="pricing-features">
 
-                ${(plan.features || []).slice(0, 5).map(renderFeature).join('')}
+                ${(plan.features || []).map(renderFeature).join('')}
 
             </ul>
 

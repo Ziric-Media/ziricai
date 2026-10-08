@@ -60,27 +60,42 @@ export const BILLING_PLANS = {
 
         label: "Starter",
 
+        headline: "Start with Sarah",
+
+        description: "For businesses ready to put AI to work on WhatsApp.",
+
         price: 999.99,
 
         currency: "ZAR",
 
         billingCycle: "monthly",
 
-        tagline: "For small teams getting started",
+        tagline: "Start with Sarah",
 
-        features: ["1 AI Employee", "1,500 conversations", "2 users", "2 GB storage"],
+        features: [
+            "Sarah AI Assistant",
+            "WhatsApp",
+            "3 business workspaces",
+            "1,000 AI conversations / month",
+            "CRM",
+            "Knowledge Base",
+            "Basic automation",
+            "Sarah + 1 AI Employee",
+        ],
 
         limits: {
 
-            aiEmployees: 1,
+            aiEmployees: 2,
 
-            conversations: 1500,
+            conversations: 1000,
 
             messages: 1000,
 
             tokens: 100000,
 
-            users: 2,
+            users: 3,
+
+            workspaces: 3,
 
             storageMb: 2048,
 
@@ -94,6 +109,8 @@ export const BILLING_PLANS = {
 
             knowledgeSizeMb: 200,
 
+            channels: ["whatsapp"],
+
         },
 
     },
@@ -104,21 +121,34 @@ export const BILLING_PLANS = {
 
         label: "Professional",
 
+        headline: "Connect your customers",
+
+        description: "For growing businesses communicating across multiple channels.",
+
         price: 2999,
 
         currency: "ZAR",
 
         billingCycle: "monthly",
 
-        tagline: "Grow with more AI capacity",
+        tagline: "Connect your customers",
 
         featured: true,
 
-        features: ["5 AI Employees", "5,000 conversations", "10 users", "5 GB storage"],
+        features: [
+            "Everything in Starter",
+            "WhatsApp, Messenger & Email",
+            "5 business workspaces",
+            "5,000 AI conversations / month",
+            "Advanced automation",
+            "Sarah + 3 AI Employees",
+            "Advanced analytics",
+            "CRM & Knowledge Base",
+        ],
 
         limits: {
 
-            aiEmployees: 5,
+            aiEmployees: 4,
 
             conversations: 5000,
 
@@ -126,7 +156,9 @@ export const BILLING_PLANS = {
 
             tokens: 250000,
 
-            users: 10,
+            users: 5,
+
+            workspaces: 5,
 
             storageMb: 5120,
 
@@ -140,6 +172,8 @@ export const BILLING_PLANS = {
 
             knowledgeSizeMb: 500,
 
+            channels: ["whatsapp", "messenger", "email"],
+
         },
 
     },
@@ -150,27 +184,42 @@ export const BILLING_PLANS = {
 
         label: "Business",
 
+        headline: "Run your business everywhere",
+
+        description: "For businesses ready to operate AI across every major customer channel.",
+
         price: 4999,
 
         currency: "ZAR",
 
         billingCycle: "monthly",
 
-        tagline: "Scale with workflows & knowledge",
+        tagline: "Run your business everywhere",
 
-        features: ["10 AI Employees", "Unlimited workflows", "50 users", "Unlimited knowledge"],
+        features: [
+            "Everything in Professional",
+            "WhatsApp, Messenger, Email, Instagram & Webchat",
+            "10 business workspaces",
+            "20,000 AI conversations / month",
+            "Sarah + 10 AI Employees",
+            "Advanced CRM",
+            "Advanced automation",
+            "Priority support",
+        ],
 
         limits: {
 
-            aiEmployees: 10,
+            aiEmployees: 11,
 
-            conversations: 5000,
+            conversations: 20000,
 
             messages: 5000,
 
             tokens: 500000,
 
-            users: 50,
+            users: 10,
+
+            workspaces: 10,
 
             storageMb: 10240,
 
@@ -184,6 +233,8 @@ export const BILLING_PLANS = {
 
             knowledgeSizeMb: null,
 
+            channels: ["whatsapp", "messenger", "email", "instagram", "webchat"],
+
         },
 
     },
@@ -194,6 +245,10 @@ export const BILLING_PLANS = {
 
         label: "Enterprise",
 
+        headline: "Build your AI workforce",
+
+        description: "For organisations that want ZiricAI across their entire operation.",
+
         price: null,
 
         currency: "ZAR",
@@ -202,9 +257,18 @@ export const BILLING_PLANS = {
 
         contactSales: true,
 
-        tagline: "Unlimited everything + SLA",
+        tagline: "Build your AI workforce",
 
-        features: ["Unlimited AI", "Unlimited users", "Dedicated support", "Custom SLA"],
+        features: [
+            "Everything in Business",
+            "All channels",
+            "Unlimited workspaces",
+            "Custom AI conversations",
+            "Unlimited / custom AI Employees",
+            "Mission Control",
+            "Custom integrations",
+            "Enterprise security & dedicated support",
+        ],
 
         limits: {
 
@@ -218,6 +282,8 @@ export const BILLING_PLANS = {
 
             users: null,
 
+            workspaces: null,
+
             storageMb: null,
 
             workflows: null,
@@ -229,6 +295,8 @@ export const BILLING_PLANS = {
             apiCalls: null,
 
             knowledgeSizeMb: null,
+
+            channels: null,
 
         },
 
@@ -362,15 +430,21 @@ function formatPlanPriceLine(plan) {
 
 export function getPricingSummaryText() {
 
-    const planLines = getPublicPlans().map((plan) => `${formatPlanPriceLine(plan)} (${plan.features[0]})`);
+    const planLines = getPublicPlans().map((plan) => {
+
+        const pitch = plan.headline || plan.tagline || plan.features[0];
+
+        return `${formatPlanPriceLine(plan)} — ${pitch}`;
+
+    });
 
     return (
 
-        `Plans: ${planLines.join(", ")}. ` +
+        `Plans: ${planLines.join("; ")}. ` +
 
-        "All plans include a 14-day free trial, WhatsApp + web channels, CRM, analytics, and Sarah as your operating assistant. " +
+        "Start with Sarah on WhatsApp, then add Messenger, email, Instagram, and webchat as you grow. " +
 
-        "Most businesses recover the cost from after-hours leads in the first week."
+        "Every plan includes CRM, knowledge, automation, and a 14-day free trial."
 
     );
 
@@ -382,11 +456,11 @@ export function getDefaultPlatformReply() {
 
     return (
 
-        "ZiricAI deploys AI Employees to handle customer enquiries 24/7 on WhatsApp, web, and social. " +
+        "ZiricAI starts with Sarah on WhatsApp — then you add channels and AI Employees as your business grows. " +
 
-        `Setup takes under 10 minutes, plans start at ${formatPrice(getMinimumPlanPrice())}/month, ` +
+        `Plans start at ${formatPrice(getMinimumPlanPrice())}/month with a 14-day free trial. ` +
 
-        "and you get a 14-day free trial. Ask about pricing, setup, industries, WhatsApp, CRM, automation, or the Knowledge Base — or say what you'd like to set up."
+        "Ask about channels, workspaces, conversations included, CRM, automation, or upgrading from Starter to Professional."
 
     );
 

@@ -5,8 +5,8 @@ export function marketingPricingSection() {
     <div class="container">
         <div class="section-header">
             <span class="section-eyebrow">Pricing</span>
-            <h2>Simple, scalable pricing</h2>
-            <p>Every plan includes setup, AI training, and access to future platform updates.</p>
+            <h2>Start with Sarah. Grow by channel.</h2>
+            <p>Add Messenger, email, Instagram, and webchat as your customers reach you in more places — then expand your AI workforce when you are ready.</p>
         </div>
         <div class="pricing-grid marketing-pricing-grid" aria-live="polite" aria-busy="true"></div>
         <p class="pricing-note">14-day free trial on all plans. No credit card required.</p>

@@ -180,8 +180,8 @@ ${marketingPricingSection()}`,
       lead: 'Every plan includes setup, AI training, and access to future platform updates.',
     })}
 ${marketingIntro({
-  title: 'Same plans as the homepage',
-  body: 'Plans stay in sync everywhere on the site — upgrade or add AI Employees from the Company Portal when you are ready.',
+  title: 'Channels first, workforce when you are ready',
+  body: 'Every tier includes Sarah, CRM, knowledge, and automation. Upgrade when you need more customer channels, workspaces, or AI Employees — not before.',
 })}
 <section class="section section-alt marketing-page-block-detail marketing-pricing-detail" id="pricing">
     <div class="container">

@@ -21,10 +21,17 @@
         : 'Free <small>/trial</small>';
 
     const ctaHtml = isCustom
-      ? '<button class="btn btn-outline" type="button" onclick="showToast(\'Contact sales for custom pricing\',\'info\')">Contact Sales</button>'
+      ? '<button class="btn btn-outline" type="button" onclick="showToast(\'Our team will reach out with custom pricing.\',\'info\')">Talk to Sales</button>'
       : '<button class="btn" type="button" onclick="launchWizard()">Start Free Trial</button>';
 
-    const tagline = plan.tagline ? '<p class="pricing-tagline">' + plan.tagline + '</p>' : '';
+    const headline = plan.headline
+      ? '<p class="pricing-headline">' + plan.headline + '</p>'
+      : plan.tagline
+        ? '<p class="pricing-headline">' + plan.tagline + '</p>'
+        : '';
+    const description = plan.description
+      ? '<p class="pricing-description">' + plan.description + '</p>'
+      : '';
 
     return (
       '<div class="pricing-card' +
@@ -33,12 +40,13 @@
       '<div class="pricing-plan">' +
       plan.label +
       '</div>' +
-      tagline +
+      headline +
       '<div class="pricing-price">' +
       priceHtml +
       '</div>' +
+      description +
       '<ul class="pricing-features">' +
-      (plan.features || []).slice(0, 5).map(renderFeature).join('') +
+      (plan.features || []).map(renderFeature).join('') +
       '</ul>' +
       ctaHtml +
       '</div>'

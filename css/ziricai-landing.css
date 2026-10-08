@@ -2389,8 +2389,9 @@ body {
 /* ===== Pricing ===== */
 .pricing-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 20px;
+    align-items: stretch;
 }
 .pricing-card {
     background: var(--bg-card);
@@ -2399,6 +2400,8 @@ body {
     padding: 32px 28px;
     transition: all 0.25s;
     position: relative;
+    display: flex;
+    flex-direction: column;
 }
 .pricing-card.featured {
     border-color: var(--primary);
@@ -2428,6 +2431,25 @@ body {
     font-weight: 700;
     font-size: 1.2rem;
     margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.pricing-headline {
+    font-size: clamp(1.15rem, 2vw, 1.35rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+.pricing-description {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0 0 16px;
+    min-height: 2.85em;
 }
 .pricing-price {
     font-size: 2.2rem;
@@ -2442,7 +2464,8 @@ body {
 }
 .pricing-features {
     list-style: none;
-    margin: 20px 0;
+    margin: 8px 0 20px;
+    flex: 1;
 }
 .pricing-features li {
     padding: 6px 0;
