@@ -121,9 +121,9 @@ export const BILLING_PLANS = {
 
         label: "Professional",
 
-        headline: "Connect your customers",
+        headline: "Build your customer-facing workforce",
 
-        description: "For growing businesses communicating across multiple channels.",
+        description: "For growing businesses that need AI across multiple customer channels.",
 
         price: 2999,
 
@@ -184,9 +184,9 @@ export const BILLING_PLANS = {
 
         label: "Business",
 
-        headline: "Run your business everywhere",
+        headline: "Run AI across your business",
 
-        description: "For businesses ready to operate AI across every major customer channel.",
+        description: "For businesses ready to deploy AI across multiple departments and channels.",
 
         price: 4999,
 

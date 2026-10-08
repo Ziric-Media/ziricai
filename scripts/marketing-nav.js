@@ -4,16 +4,19 @@
  */
 
 export const MARKETING_NAV = [
-  { id: 'home', label: 'Home', href: '/', home: true },
   {
     id: 'platform',
     label: 'Platform',
     href: '/platform/',
     children: [
+      { label: 'AI Business OS', href: '/platform/' },
+      { label: 'Knowledge Base', href: '/products/knowledge/' },
+      { label: 'CRM', href: '/products/crm/' },
+      { label: 'Automation', href: '/products/automation/' },
+      { label: 'Analytics', href: '/products/analytics/' },
+      { label: 'Mission Control', href: '/products/dashboards/' },
+      { label: 'Integrations', href: '/platform/' },
       { label: 'WhatsApp', href: '/platform/whatsapp/' },
-      { label: 'Email', href: '/platform/email/' },
-      { label: 'Messenger', href: '/platform/messenger/' },
-      { label: 'Instagram', href: '/platform/instagram/' },
       { label: 'Webchat', href: '/platform/webchat/' },
     ],
   },
@@ -22,21 +25,16 @@ export const MARKETING_NAV = [
     label: 'AI Employees',
     href: '/ai-employees/how-it-works/',
     children: [
-      { label: 'How AI Employees Work', href: '/ai-employees/how-it-works/' },
-      { label: 'AI Employee Marketplace', href: '/ai-employees/marketplace/' },
-      { label: 'Industries', href: '/ai-employees/industries/' },
-    ],
-  },
-  {
-    id: 'products',
-    label: 'Products',
-    href: '/products/crm/',
-    children: [
-      { label: 'CRM', href: '/products/crm/' },
-      { label: 'Automation', href: '/products/automation/' },
-      { label: 'Knowledge', href: '/products/knowledge/' },
-      { label: 'Analytics', href: '/products/analytics/' },
-      { label: 'Dashboards', href: '/products/dashboards/' },
+      { label: 'Browse AI Employees', href: '/ai-employees/marketplace/' },
+      { label: 'How It Works', href: '/ai-employees/how-it-works/' },
+      { label: 'Administration', href: '/ai-employees/marketplace/' },
+      { label: 'Sales', href: '/ai-employees/marketplace/' },
+      { label: 'Customer Support', href: '/ai-employees/marketplace/' },
+      { label: 'Human Resources', href: '/ai-employees/marketplace/' },
+      { label: 'Finance', href: '/ai-employees/marketplace/' },
+      { label: 'Legal', href: '/ai-employees/marketplace/' },
+      { label: 'Healthcare', href: '/ai-employees/marketplace/' },
+      { label: 'Education', href: '/ai-employees/marketplace/' },
     ],
   },
   {
@@ -44,14 +42,27 @@ export const MARKETING_NAV = [
     label: 'Solutions',
     href: '/solutions/',
     children: [
+      { label: 'Customer Service', href: '/solutions/' },
+      { label: 'Sales', href: '/solutions/' },
+      { label: 'Operations', href: '/solutions/' },
+      { label: 'Enterprise', href: '/solutions/' },
+      { label: 'Small Business', href: '/solutions/' },
+      { label: 'Growing Businesses', href: '/solutions/' },
+    ],
+  },
+  {
+    id: 'industries',
+    label: 'Industries',
+    href: '/solutions/',
+    children: [
       { label: 'Automotive', href: '/solutions/automotive/' },
-      { label: 'Construction', href: '/solutions/construction/' },
       { label: 'Mining', href: '/solutions/mining/' },
-      { label: 'Retail', href: '/solutions/retail/' },
-      { label: 'Professional Services', href: '/solutions/professional-services/' },
       { label: 'Healthcare', href: '/solutions/healthcare/' },
       { label: 'Education', href: '/solutions/education/' },
-      { label: 'All industries', href: '/solutions/' },
+      { label: 'Legal', href: '/solutions/professional-services/' },
+      { label: 'Retail', href: '/solutions/retail/' },
+      { label: 'Hospitality', href: '/solutions/' },
+      { label: 'View all industries', href: '/solutions/' },
     ],
   },
   { id: 'pricing', label: 'Pricing', href: '/pricing/' },
@@ -62,7 +73,8 @@ export const MARKETING_NAV = [
     children: [
       { label: 'Guides', href: '/resources/guides/' },
       { label: 'FAQ', href: '/resources/faq/' },
-      { label: 'AI Resources', href: '/resources/ai-resources/' },
+      { label: 'Documentation', href: '/resources/ai-resources/' },
+      { label: 'Security', href: '/privacy/' },
     ],
   },
   { id: 'login', label: 'Login', href: '/login.html' },
@@ -105,13 +117,6 @@ export function renderMarketingNavLinks({ activePath = '/' } = {}) {
   const parts = [];
 
   for (const item of MARKETING_NAV) {
-    if (item.home) {
-      parts.push(
-        `<a href="/" class="nav-link nav-home ${linkClass(path, '/')}"><i class="fa-solid fa-house" aria-hidden="true"></i><span>Home</span></a>`
-      );
-      continue;
-    }
-
     if (item.id === 'login') {
       parts.push(`<a href="/login.html" class="nav-link nav-login ${linkClass(path, '/login.html')}">${item.label}</a>`);
       continue;

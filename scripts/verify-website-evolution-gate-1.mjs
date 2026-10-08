@@ -169,14 +169,17 @@ if (['Car Dealer Pack', 'Stock enquiries', 'Test drive booking'].every((p) => au
 }
 
 const home = read('index.html');
-if (home.includes('id="hero"') && home.includes('Hire AI Employees in minutes')) {
-  pass('home: hero section unchanged (marker + headline)');
+if (home.includes('id="hero"') && home.includes('Put Them to Work')) {
+  pass('home: hero + primary headline present');
 } else {
-  fail('home: hero may have been altered');
+  fail('home: hero headline missing');
 }
-if (home.includes('id="platforms-story"')) pass('home: below-hero platforms-story section');
-else fail('home: missing platforms-story');
-if (home.includes('nav-home') && home.includes('nav-links-mega')) pass('home: mega-menu nav with Home');
+if (home.includes('id="trust-stats"') && home.includes('id="differentiator"')) {
+  pass('home: trust bar + differentiator sections');
+} else {
+  fail('home: missing trust/differentiator sections');
+}
+if (home.includes('nav-links-mega') && home.includes('nav-dropdown')) pass('home: mega-menu nav (logo = home)');
 else fail('home: missing mega-menu nav');
 if (home.includes('id="product-tour"') && home.includes('id="tourPhoneChat"')) {
   pass('home: product tour / demo phone UI present');

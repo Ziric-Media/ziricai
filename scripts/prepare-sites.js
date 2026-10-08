@@ -490,8 +490,13 @@ function patchMarketingHomeNav(html) {
     /<nav class="nav-links" id="navLinks">[\s\S]*?<\/nav>/,
     `<nav class="nav-links nav-links-mega" id="navLinks">\n                ${navInner}\n            </nav>`
   ).replace(
-    /<div class="nav-ctas">\s*<a href="[^"]*login\.html" class="btn btn-sm">Log in<\/a>\s*/,
-    '<div class="nav-ctas">\n                '
+    /<div class="nav-ctas">[\s\S]*?<\/div>\s*<\/div>\s*<\/header>/,
+    `<div class="nav-ctas">
+                <a href="/login.html" class="btn btn-sm btn-outline nav-cta-login">Login</a>
+                <button type="button" class="btn btn-sm" onclick="launchWizard()">Start Free</button>
+            </div>
+        </div>
+    </header>`
   );
 }
 

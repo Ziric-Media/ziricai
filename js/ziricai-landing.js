@@ -684,52 +684,40 @@
     // ===== PRODUCT TOUR =====
     const tourSteps = [
         {
-            title: 'Step 1 · Answer WhatsApp enquiry',
-            desc: 'A customer asks about stock at 9pm. Sarah replies instantly with accurate inventory from your knowledge base.',
+            title: 'Step 1 · Customer asks a question',
+            desc: 'A customer sends a WhatsApp message after business hours.',
             action: '',
             messages: [
-                { role: 'customer', text: 'Hi, do you have a 2024 Toyota Hilux in stock?' },
-                { role: 'ai', text: 'Good evening! Yes — we have 3 Hilux models available:\n\n• 2.4 GD-6 Raider — R589,900\n• 2.8 GD-6 Legend — R724,500\n• 2.8 GD-6 GR-S — R798,900\n\nWould you like specs on any of these, or financing options?' },
-                { role: 'customer', text: 'Tell me more about the Legend — what\'s included?' },
-                { role: 'ai', text: 'The 2.8 GD-6 Legend includes leather seats, LED headlights, 12.3" touchscreen, reverse camera, and Toyota Safety Sense. It\'s our best-selling double cab.\n\nWould you like a brochure or to compare it with the Raider?' },
+                { role: 'customer', text: 'Hi — are you open? I need help with a Hilux Legend test drive.' },
+                { role: 'ai', text: 'Good evening! Yes — I\'m Sarah from Central Motors. We\'re closed on the floor, but I can help you right now. Would you like available Legend stock or to book a test drive?' },
             ],
         },
         {
-            title: 'Step 2 · Book appointment',
-            desc: 'Sarah checks your calendar and confirms a test drive — no back-and-forth, no missed bookings.',
-            action: '✓ Appointment synced to calendar',
+            title: 'Step 2 · Sarah understands',
+            desc: 'Sarah uses your business knowledge to provide an accurate answer.',
+            action: '',
             messages: [
-                { role: 'customer', text: 'Can I book a test drive this Saturday?' },
-                { role: 'ai', text: 'Absolutely! I have these slots available this Saturday:\n\n• 10:00 AM\n• 12:30 PM\n• 2:00 PM\n\nWhich works best for you?' },
-                { role: 'customer', text: '10 AM please. It\'ll just be me.' },
-                { role: 'ai', text: 'Done — test drive booked for Saturday 10:00 AM for the Hilux Legend. Confirmation sent to your WhatsApp with our dealership address and parking info.\n\nSee you then! 🚗' },
-                { role: 'customer', text: 'Perfect, thanks!' },
-                { role: 'ai', text: 'You\'re welcome, Thabo! I\'ve also saved your details so we can prepare the vehicle before you arrive. Reply anytime if you need to reschedule.' },
+                { role: 'customer', text: 'What\'s included on the Legend and do you have white?' },
+                { role: 'ai', text: 'The 2.8 GD-6 Legend includes leather seats, LED headlights, touchscreen, reverse camera, and Toyota Safety Sense — from R724,500.\n\nWe have Glacier White and Silver Metallic available. Both are on our price list and knowledge base for accurate quoting.' },
             ],
         },
         {
-            title: 'Step 3 · Capture lead',
-            desc: 'Every conversation becomes a CRM lead with contact details, intent, and deal value — automatically.',
-            action: '✓ Lead created · R589,900 · Hot',
+            title: 'Step 3 · Sarah takes action',
+            desc: 'She captures the customer\'s information and creates or updates the relevant CRM record.',
+            action: '✓ CRM record created · Intent: test drive',
             messages: [
-                { role: 'system', text: '📋 Lead captured in CRM' },
-                { role: 'system', text: 'Name: Thabo M. · Intent: Hilux Legend purchase · Value: R724,500 · Status: Hot' },
-                { role: 'ai', text: 'I\'ve saved your details, Thabo. Our sales team will follow up with a personalised financing quote within the hour.' },
-                { role: 'customer', text: 'Great. Can you also check if you have the Legend in white?' },
-                { role: 'ai', text: 'Yes — we have the Legend in Glacier White and Silver Metallic on the floor. Both are available for your Saturday test drive. I\'ve noted your colour preference on your profile.' },
+                { role: 'customer', text: 'Book Saturday 10am for a white Legend please.' },
+                { role: 'ai', text: 'Done — I\'ve saved your details and created a CRM lead for a Hilux Legend test drive (Glacier White).' },
+                { role: 'system', text: '📋 Lead captured · Test drive · Saturday 10:00' },
             ],
         },
         {
-            title: 'Step 4 · Generate quotation',
-            desc: 'Sarah pulls pricing from your knowledge base and sends a professional quote — before the customer asks twice.',
-            action: '✓ Quote #CM-2847 sent via WhatsApp',
+            title: 'Step 4 · The workflow continues',
+            desc: 'Sarah books an appointment, sends information, and notifies your team.',
+            action: '✓ Appointment booked · Team notified',
             messages: [
-                { role: 'customer', text: 'Can you send me a quote for the Legend with financing?' },
-                { role: 'ai', text: 'Here\'s your personalised quote:\n\n2024 Hilux 2.8 GD-6 Legend — R724,500\nColour: Glacier White\nDeposit: R72,450 (10%)\n36-month finance: R18,200/mo\n48-month finance: R14,850/mo\n\nQuote valid 7 days. Reply ACCEPT to proceed.' },
-                { role: 'customer', text: 'What if I put down 20% instead?' },
-                { role: 'ai', text: 'With a 20% deposit (R144,900), your monthly payment over 36 months drops to R16,100/mo — saving you R2,100/month.\n\nI\'ve updated quote #CM-2847 and sent the revised PDF to your WhatsApp.' },
-                { role: 'system', text: '📄 Quote #CM-2847 updated & sent' },
-                { role: 'ai', text: 'Your test drive is still confirmed for Saturday 10 AM. Our finance manager can walk you through both options in person. Anything else I can help with?' },
+                { role: 'ai', text: 'Test drive confirmed for Saturday 10:00 AM. Confirmation and directions sent to your WhatsApp. Our sales team has been notified to prepare the vehicle.' },
+                { role: 'system', text: '🔔 Sales team notified · Calendar updated' },
             ],
         },
     ];
@@ -1223,8 +1211,9 @@
         initMarketplace();
         initHomeModern();
 
-        document.getElementById('watchDemoBtn')?.addEventListener('click', () => openDemo('sales'));
-        document.getElementById('watchDemoBtn2')?.addEventListener('click', () => openDemo('sales'));
+        document.getElementById('watchDemoBtn')?.addEventListener('click', () => {
+            document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+        });
         document.getElementById('talkToSarahBtn')?.addEventListener('click', () => {
             if (typeof openSarahChat === 'function') openSarahChat();
             else openDemo('sarah');
