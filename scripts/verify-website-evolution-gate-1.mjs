@@ -12,9 +12,12 @@ const M = path.join(ROOT, 'marketing');
 
 const WAVE1_PAGES = [
   'index.html',
+  'platforms/index.html',
   'pricing/index.html',
+  'faq/index.html',
   'platforms/whatsapp/index.html',
   'platforms/webchat/index.html',
+  'solutions/index.html',
   'solutions/automotive/index.html',
 ];
 

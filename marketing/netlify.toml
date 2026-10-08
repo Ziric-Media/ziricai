@@ -49,6 +49,11 @@
   status = 301
 
 [[redirects]]
+  from = "/platforms"
+  to = "/platforms/"
+  status = 301
+
+[[redirects]]
   from = "/platforms/whatsapp"
   to = "/platforms/whatsapp/"
   status = 301
@@ -59,8 +64,18 @@
   status = 301
 
 [[redirects]]
+  from = "/solutions"
+  to = "/solutions/"
+  status = 301
+
+[[redirects]]
   from = "/solutions/automotive"
   to = "/solutions/automotive/"
+  status = 301
+
+[[redirects]]
+  from = "/faq"
+  to = "/faq/"
   status = 301
 
 # Home-only hash routes; physical paths (pricing/, platforms/*) are served as static HTML first.

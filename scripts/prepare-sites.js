@@ -437,9 +437,12 @@ function prepareMarketing() {
   const prettyUrlRedirects = [
     '/industry-automotive.html  /solutions/automotive/  301',
     '/pricing  /pricing/  301',
+    '/platforms  /platforms/  301',
     '/platforms/whatsapp  /platforms/whatsapp/  301',
     '/platforms/webchat  /platforms/webchat/  301',
+    '/solutions  /solutions/  301',
     '/solutions/automotive  /solutions/automotive/  301',
+    '/faq  /faq/  301',
   ].join('\n');
   fs.writeFileSync(
     path.join(dir, '_redirects'),

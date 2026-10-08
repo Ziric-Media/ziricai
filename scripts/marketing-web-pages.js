@@ -2,6 +2,8 @@
  * Marketing subpage body fragments (Gate 1 Wave 1).
  */
 
+import { renderFaqSection } from './marketing-faq-section.js';
+
 export function tourPhoneBlock({ title = 'Central Motors', idsPrefix = '' }) {
   const titleId = idsPrefix ? `${idsPrefix}PhoneTitle` : 'tourPhoneTitle';
   const chatId = idsPrefix ? `${idsPrefix}PhoneChat` : 'tourPhoneChat';
@@ -56,6 +58,85 @@ export function tourPhoneBlock({ title = 'Central Motors', idsPrefix = '' }) {
 
 export const MARKETING_WEB_PAGES = [
   {
+    outPath: 'platforms/index.html',
+    title: 'Platforms · ZiricAI',
+    description: 'Sarah on WhatsApp, webchat, and every channel your customers use — one AI workforce.',
+    depth: 1,
+    activeNav: 'platforms',
+    includePricing: false,
+    includeLanding: false,
+    bodyHtml: `<section class="section marketing-page-hero">
+    <div class="container">
+        <span class="section-eyebrow">Platforms</span>
+        <h1>Your AI workforce on every channel</h1>
+        <p class="intro-lead">One portal, one team of AI Employees — deployed where your customers already are.</p>
+        <div class="platform-channel-grid">
+            <a class="platform-channel-card" href="/platforms/whatsapp/">
+                <i class="fa-brands fa-whatsapp"></i>
+                <h4>WhatsApp</h4>
+                <p>Sales, support, and bookings on the world's #1 messaging app.</p>
+                <span class="platform-channel-link">Explore WhatsApp <i class="fa-solid fa-arrow-right"></i></span>
+            </a>
+            <a class="platform-channel-card" href="/platforms/webchat/">
+                <i class="fa-solid fa-comment-dots"></i>
+                <h4>Webchat</h4>
+                <p>Live Sarah on your website — same brain as WhatsApp.</p>
+                <span class="platform-channel-link">Explore webchat <i class="fa-solid fa-arrow-right"></i></span>
+            </a>
+            <a class="platform-channel-card platform-channel-card-muted" href="/#integrations">
+                <i class="fa-solid fa-plug"></i>
+                <h4>More channels</h4>
+                <p>Messenger, Instagram, email, SMS — connected in one place.</p>
+                <span class="platform-channel-link">All integrations <i class="fa-solid fa-arrow-right"></i></span>
+            </a>
+        </div>
+    </div>
+</section>`,
+  },
+  {
+    outPath: 'solutions/index.html',
+    title: 'Solutions · ZiricAI',
+    description: 'Industry packs and solutions — automotive, and more AI workforce templates.',
+    depth: 1,
+    activeNav: 'solutions',
+    includePricing: false,
+    includeLanding: false,
+    bodyHtml: `<section class="section marketing-page-hero">
+    <div class="container">
+        <span class="section-eyebrow">Solutions</span>
+        <h1>Built for your industry</h1>
+        <p class="intro-lead">Pre-configured AI Employees, workflows, and knowledge templates — go live in minutes.</p>
+        <div class="platform-channel-grid">
+            <a class="platform-channel-card" href="/solutions/automotive/">
+                <i class="fa-solid fa-car"></i>
+                <h4>Automotive</h4>
+                <p>Stock, test drives, financing, and trade-ins for dealers.</p>
+                <span class="platform-channel-link">Car Dealer Pack <i class="fa-solid fa-arrow-right"></i></span>
+            </a>
+            <a class="platform-channel-card platform-channel-card-muted" href="/#industries">
+                <i class="fa-solid fa-building"></i>
+                <h4>All industries</h4>
+                <p>50+ industry templates on the homepage catalog.</p>
+                <span class="platform-channel-link">Browse industries <i class="fa-solid fa-arrow-right"></i></span>
+            </a>
+        </div>
+    </div>
+</section>`,
+  },
+  {
+    outPath: 'faq/index.html',
+    title: 'FAQ · ZiricAI',
+    description: 'Frequently asked questions about setup, channels, security, billing, and trials.',
+    depth: 1,
+    activeNav: 'faq',
+    includePricing: false,
+    includeLanding: true,
+    extraScript: `<script>
+document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => document.getElementById('sarahBubble')?.click());
+</script>`,
+    bodyHtml: renderFaqSection('../'),
+  },
+  {
     outPath: 'pricing/index.html',
     title: 'Pricing · ZiricAI',
     description: 'Simple, scalable pricing for your AI workforce — 14-day free trial, canonical plans from ZiricAI billing.',
@@ -72,7 +153,7 @@ export const MARKETING_WEB_PAGES = [
         </div>
         <div class="pricing-grid" aria-live="polite" aria-busy="true"></div>
         <p class="pricing-note">14-day free trial on all plans. No credit card required.</p>
-        <p class="marketing-page-back"><a href="../"><i class="fa-solid fa-arrow-left"></i> Back to home</a></p>
+        <p class="marketing-page-back"><a href="/"><i class="fa-solid fa-arrow-left"></i> Back to home</a></p>
     </div>
 </section>`,
   },
