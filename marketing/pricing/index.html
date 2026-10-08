@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing · ZiricAI</title>
+    <meta name="description" content="Simple, scalable pricing for your AI workforce — 14-day free trial, canonical plans from ZiricAI billing.">
+    <link rel="icon" href="../assets/favicon.png?v=e22a98216683-b4cbaaf4" type="image/png">
+    <link rel="apple-touch-icon" href="../assets/favicon.png?v=e22a98216683-b4cbaaf4">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="../css/onboarding.css">
+    <link rel="stylesheet" href="../css/ziricai-landing.css">
+    <link rel="stylesheet" href="../css/admin-dashboard.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js",
+        "firebase/storage": "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js"
+      }
+    }
+    </script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"","assetVersion":"e22a98216683-b4cbaaf4","sites":{"marketing":"https://marketing.ziricai.com","publicWeb":"https://ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"landingSarahCompanyId":"ziricai","firebase":{"apiKey":"AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"482382497730","appId":"1:482382497730:web:6bc2f8668a1598fa13f85b","measurementId":"G-92ZVT0731S","databaseId":"default"}};</script>
+</head>
+<body>
+<div id="landingView" class="landing-view marketing-subpage">
+<header class="landing-header site-header-v2">
+    <div class="container header-inner">
+        <a href="../" class="logo"><img src="../assets/ZIRICAI LOGO.png?v=e22a98216683-b4cbaaf4" alt="ZiricAI" class="logo-img"></a>
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+        <div class="header-nav-panel" id="headerNavPanel">
+            <nav class="nav-links" id="navLinks">
+                <a href="../platforms/whatsapp/" class="">Platforms</a>
+                <a href="../#ai-employees" class="">AI Employees</a>
+                <a href="../solutions/automotive/" class="">Solutions</a>
+                <a href="../pricing/" class="nav-active">Pricing</a>
+                <a href="../#faq">FAQ</a>
+            </nav>
+            <div class="nav-ctas">
+                <a href="../login.html" class="btn btn-sm">Log in</a>
+                <button type="button" class="btn btn-sm" onclick="launchWizard()">Start Free Trial</button>
+            </div>
+        </div>
+    </div>
+</header>
+<main class="marketing-page-main">
+<section class="section marketing-page-hero" id="pricing">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-eyebrow">Pricing</span>
+            <h1>Simple, scalable pricing</h1>
+            <p>Every plan includes setup, AI training, and access to future platform updates. Same plans as on the homepage — always in sync.</p>
+        </div>
+        <div class="pricing-grid" aria-live="polite" aria-busy="true"></div>
+        <p class="pricing-note">14-day free trial on all plans. No credit card required.</p>
+        <p class="marketing-page-back"><a href="../"><i class="fa-solid fa-arrow-left"></i> Back to home</a></p>
+    </div>
+</section>
+</main>
+<footer class="site-footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <a href="../" class="logo"><img src="../assets/ZIRICAI LOGO.png?v=e22a98216683-b4cbaaf4" alt="ZiricAI" class="logo-img"></a>
+                <p>Your AI workforce, working everywhere your customers are. Sarah on every channel — CRM, knowledge, and automation behind the conversations.</p>
+            </div>
+            <div class="footer-col">
+                <h5>Platforms</h5>
+                <a href="../platforms/whatsapp/">WhatsApp</a>
+                <a href="../platforms/webchat/">Webchat</a>
+                <a href="../#integrations">All channels</a>
+            </div>
+            <div class="footer-col">
+                <h5>Product</h5>
+                <a href="../#ai-employees">AI Employees</a>
+                <a href="../#automation">Automation</a>
+                <a href="../#knowledge">Knowledge</a>
+                <a href="../pricing/">Pricing</a>
+            </div>
+            <div class="footer-col">
+                <h5>Solutions</h5>
+                <a href="../solutions/automotive/">Automotive</a>
+                <a href="../#industries">Industries</a>
+                <a href="mailto:hello@ziric.ai">Contact</a>
+            </div>
+            <div class="footer-col">
+                <h5>Platform</h5>
+                <a href="#" data-site-link="app">Company Portal</a>
+                <a href="#" data-site-link="admin">Mission Control</a>
+                <a href="../login.html">Sign in</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>&copy; 2026 ZiricAI — built by Ziric Media</span>
+            <div class="footer-bottom-links">
+                <a href="../privacy.html">Privacy Policy</a>
+                <a href="../login.html">Sign in</a>
+            </div>
+        </div>
+    </div>
+</footer>
+</div>
+
+<div id="wizardView" class="wizard-view hidden onboarding-body">
+    <div class="onboarding-bg"></div>
+    <header class="onboarding-header">
+        <a href="../" class="onboarding-brand" id="wizardBackHome">
+            <img src="../assets/ZIRICAI LOGO.png?v=e22a98216683-b4cbaaf4" alt="ZiricAI" class="logo-img">
+        </a>
+        <div class="onboarding-header-meta">
+            <span class="trial-pill"><i class="fa-solid fa-gift"></i> 14-day free trial</span>
+            <a href="../login.html" class="link-muted">Sign in</a>
+        </div>
+    </header>
+    <main class="onboarding-main">
+        <aside class="onboarding-progress-panel">
+            <h2>Launch in minutes</h2>
+            <p class="progress-sub">Set up your AI workforce — no credit card required.</p>
+            <ol class="step-list" id="stepList"></ol>
+            <div class="progress-bar-wrap">
+                <div class="progress-bar"><div class="progress-fill" id="overallProgress"></div></div>
+                <span id="progressLabel">Step 1 of 7</span>
+            </div>
+        </aside>
+        <section class="onboarding-card" id="wizardCard">
+            <div id="stepContent"></div>
+            <div class="wizard-actions" id="wizardActions"></div>
+            <p class="wizard-status" id="wizardStatus"></p>
+        </section>
+    </main>
+    <footer class="onboarding-footer">
+        <span>&copy; ZiricAI &middot; POPIA-ready &middot; <a href="#" data-site-link="admin">Mission Control</a></span>
+    </footer>
+</div>
+
+<div class="sarah-widget" id="sarahWidget">
+    <div class="sarah-panel" id="sarahPanel" aria-hidden="true">
+        <div class="sarah-panel-header">
+            <div class="sarah-panel-avatar"><img src="../assets/sarah-avatar.svg?v=e22a98216683-b4cbaaf4" alt="" width="40" height="40"></div>
+            <div>
+                <strong>Sarah</strong>
+                <span>ZiricAI assistant · Online</span>
+            </div>
+            <button class="sarah-panel-close" id="sarahPanelClose" aria-label="Close chat">&times;</button>
+        </div>
+        <div class="sarah-panel-messages" id="sarahMessages">
+            <div class="sarah-msg ai">Hi 👋 I'm Sarah. Ask me about platforms, AI Employees, pricing, or how to get started.</div>
+        </div>
+        <div class="sarah-panel-suggestions" id="sarahSuggestions">
+            <button type="button" data-q="How much does ZiricAI cost?">Pricing</button>
+            <button type="button" data-q="Does Sarah work on WhatsApp?">WhatsApp</button>
+            <button type="button" data-q="What is an AI Employee?">AI Employees</button>
+        </div>
+        <form class="sarah-panel-input" id="sarahForm">
+            <input type="text" id="sarahInput" placeholder="Ask Sarah anything…" autocomplete="off" maxlength="500">
+            <button type="submit" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
+        </form>
+    </div>
+    <button class="sarah-bubble" id="sarahBubble" aria-label="Chat with Sarah">
+        <span class="sarah-bubble-avatar"><img src="../assets/sarah-avatar.svg?v=e22a98216683-b4cbaaf4" alt="" width="44" height="44"></span>
+        <span class="sarah-bubble-text">Chat with Sarah</span>
+        <span class="sarah-bubble-icon"><i class="fa-solid fa-comment-dots"></i></span>
+    </button>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script src="../js/shared/billingPlans.browser.js"></script>
+<script src="../js/landing/pricing-landing.browser.js"></script>
+<script src="../js/ziricai-landing.js"></script>
+
+<script>
+    function launchWizard() {
+        const landing = document.getElementById('landingView');
+        const wizard = document.getElementById('wizardView');
+        if (!landing || !wizard) {
+            window.location.href = "../#start";
+            return;
+        }
+        landing.classList.add('hidden');
+        wizard.classList.remove('hidden');
+        document.body.classList.add('wizard-active');
+        history.replaceState(null, '', '#start');
+        window.scrollTo(0, 0);
+        window.dispatchEvent(new CustomEvent('ziric:wizard-open'));
+        window.initOnboarding?.();
+    }
+    window.launchWizard = launchWizard;
+    document.getElementById('wizardBackHome')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.location.href = "../";
+    });
+    if (location.hash === '#start' || location.hash === '#wizard') launchWizard();
+    window.addEventListener('hashchange', () => {
+        if (location.hash === '#start' || location.hash === '#wizard') launchWizard();
+    });
+    document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
+        document.getElementById('headerNavPanel')?.classList.toggle('open');
+    });
+</script>
+<script type="module" src="../js/onboarding/main.js"></script>
+<script type="module">
+import { getSiteUrls, marketingLoginUrl } from '../js/shared/siteUrls.js';
+document.querySelectorAll('[data-site-link]').forEach((el) => {
+  const key = el.getAttribute('data-site-link');
+  if (key === 'login') {
+    el.href = marketingLoginUrl();
+    return;
+  }
+  const urls = getSiteUrls();
+  if (urls[key]) el.href = urls[key];
+});
+</script>
+</body>
+</html>

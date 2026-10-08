@@ -9,6 +9,8 @@ import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { resolveWebFirebaseConfig } from '../js/firebase-config.js';
+import { wrapMarketingPage } from './marketing-web-shell.js';
+import { MARKETING_WEB_PAGES } from './marketing-web-pages.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCES = path.join(ROOT, '_sources');
@@ -185,6 +187,16 @@ function writeText(relPath, content) {
   fs.writeFileSync(dest, content, 'utf8');
 }
 
+/** Relative prefix from a published HTML file to site js/ (e.g. marketing/pricing/index.html → ../). */
+function publishJsPrefix(publishPath) {
+  const norm = String(publishPath).replace(/\\/g, '/');
+  const m = norm.match(/^(marketing|app|admin)\/(.+)$/);
+  if (!m) return './';
+  const segments = m[2].split('/');
+  if (segments.length <= 1) return './';
+  return '../'.repeat(segments.length - 1);
+}
+
 const SHARED_BROWSER_TARGETS = [
   'js/shared',
   'marketing/js/shared',
@@ -242,7 +254,8 @@ const FIREBASE_IMPORTMAP_CDN_BLOCK = `<script type="importmap">
     }
     </script>`;
 
-function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node' } = {}) {
+function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node', publishPath } = {}) {
+  const jsPrefix = publishPath ? publishJsPrefix(publishPath) : './';
   let out = normalizePlatformFavicon(html);
   if (importmapMode === 'cdn') {
     out = out.replace(/<script type="importmap">[\s\S]*?<\/script>/, FIREBASE_IMPORTMAP_CDN_BLOCK);
@@ -326,7 +339,7 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
 
   if (out.includes('data-site-link') && !out.includes('getSiteUrls')) {
     out = out.replace('</body>', `<script type="module">
-import { getSiteUrls, marketingLoginUrl } from './js/shared/siteUrls.js';
+import { getSiteUrls, marketingLoginUrl } from '${jsPrefix}js/shared/siteUrls.js';
 document.querySelectorAll('[data-site-link]').forEach((el) => {
   const key = el.getAttribute('data-site-link');
   if (key === 'login') {
@@ -342,6 +355,23 @@ document.querySelectorAll('[data-site-link]').forEach((el) => {
   return out;
 }
 
+function writeMarketingWebPages() {
+  for (const page of MARKETING_WEB_PAGES) {
+    const html = wrapMarketingPage({
+      title: page.title,
+      description: page.description,
+      depth: page.depth,
+      activeNav: page.activeNav,
+      bodyHtml: page.bodyHtml,
+      includePricing: page.includePricing,
+      includeLanding: page.includeLanding,
+      extraScript: page.extraScript || '',
+    });
+    const publishPath = `marketing/${page.outPath}`;
+    writeText(publishPath, patchHtml(html, { site: 'marketing', importmapMode: 'cdn', publishPath }));
+  }
+}
+
 function prepareMarketing() {
   const dir = path.join(ROOT, 'marketing');
   rmDir(path.join(dir, 'css'));
@@ -349,14 +379,22 @@ function prepareMarketing() {
   rmDir(path.join(dir, 'assets'));
 
   // Static publish dirs never include node_modules — always use gstatic CDN importmap.
-  writeText('marketing/index.html', patchHtml(readText('ziricai.html'), { site: 'marketing', importmapMode: 'cdn' }));
+  writeText(
+    'marketing/index.html',
+    patchHtml(readText('ziricai.html'), { site: 'marketing', importmapMode: 'cdn', publishPath: 'marketing/index.html' })
+  );
+  writeMarketingWebPages();
   if (fs.existsSync(path.join(ROOT, 'login.html'))) {
-    writeText('marketing/login.html', patchHtml(readText('login.html'), { site: 'marketing', importmapMode: 'cdn' }));
+    writeText(
+      'marketing/login.html',
+      patchHtml(readText('login.html'), { site: 'marketing', importmapMode: 'cdn', publishPath: 'marketing/login.html' })
+    );
   }
 
   for (const name of fs.readdirSync(ROOT)) {
     if (name.startsWith('industry-') && name.endsWith('.html')) {
-      writeText(`marketing/${name}`, patchHtml(readText(name), { site: 'marketing', importmapMode: 'cdn' }));
+      const publishPath = `marketing/${name}`;
+      writeText(publishPath, patchHtml(readText(name), { site: 'marketing', importmapMode: 'cdn', publishPath }));
     }
   }
 
@@ -365,7 +403,8 @@ function prepareMarketing() {
       const srcPath = path.join(dir, name);
       if (!fs.existsSync(srcPath)) continue;
       const raw = fs.readFileSync(srcPath, 'utf8');
-      writeText(`marketing/${name}`, patchHtml(raw, { site: 'marketing', importmapMode: 'cdn' }));
+      const publishPath = `marketing/${name}`;
+      writeText(publishPath, patchHtml(raw, { site: 'marketing', importmapMode: 'cdn', publishPath }));
     }
   }
 
@@ -385,9 +424,16 @@ function prepareMarketing() {
   copyPlatformBrandAssets(dir, ['favicon-portal.svg']);
 
   const apiTarget = process.env.PRODUCTION_API_URL || PRODUCTION_API_URL;
+  const prettyUrlRedirects = [
+    '/industry-automotive.html  /solutions/automotive/  301',
+    '/pricing  /pricing/  301',
+    '/platforms/whatsapp  /platforms/whatsapp/  301',
+    '/platforms/webchat  /platforms/webchat/  301',
+    '/solutions/automotive  /solutions/automotive/  301',
+  ].join('\n');
   fs.writeFileSync(
     path.join(dir, '_redirects'),
-    `# Generated by prepare-sites.js — API proxy when netlify.toml is not picked up on deploy\n/api/*  ${apiTarget}/api/:splat  200!\n/login  /login.html  301\n`,
+    `# Generated by prepare-sites.js — API proxy when netlify.toml is not picked up on deploy\n/api/*  ${apiTarget}/api/:splat  200!\n/login  /login.html  301\n${prettyUrlRedirects}\n`,
     'utf8'
   );
 }

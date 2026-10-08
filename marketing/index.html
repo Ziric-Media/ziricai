@@ -2,9 +2,10 @@
 <html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZiricAI · AI Business OS</title>
-    <link rel="icon" type="image/svg+xml" href="assets/favicon-portal.svg">
+    <link rel="icon" href="assets/favicon.png?v=e22a98216683-b4cbaaf4" type="image/png">
+    <link rel="apple-touch-icon" href="assets/favicon.png?v=e22a98216683-b4cbaaf4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="css/onboarding.css">
@@ -12,43 +13,37 @@
     <script type="importmap">
     {
       "imports": {
-        "firebase/app": "./node_modules/firebase/app/dist/esm/index.esm.js",
-        "firebase/auth": "./node_modules/firebase/auth/dist/esm/index.esm.js",
-        "firebase/firestore": "./node_modules/firebase/firestore/dist/esm/index.esm.js",
-        "firebase/storage": "./node_modules/firebase/storage/dist/esm/index.esm.js",
-        "@firebase/app": "./node_modules/@firebase/app/dist/esm/index.esm.js",
-        "@firebase/auth": "./node_modules/@firebase/auth/dist/esm/index.js",
-        "@firebase/firestore": "./node_modules/@firebase/firestore/dist/index.esm.js",
-        "@firebase/storage": "./node_modules/@firebase/storage/dist/index.esm.js",
-        "@firebase/util": "./node_modules/@firebase/util/dist/index.esm.js",
-        "@firebase/logger": "./node_modules/@firebase/logger/dist/esm/index.esm.js",
-        "@firebase/component": "./node_modules/@firebase/component/dist/esm/index.esm.js",
-        "@firebase/webchannel-wrapper/bloom-blob": "./node_modules/@firebase/webchannel-wrapper/dist/bloom-blob/esm/bloom_blob_es2018.js",
-        "@firebase/webchannel-wrapper/webchannel-blob": "./node_modules/@firebase/webchannel-wrapper/dist/webchannel-blob/esm/webchannel_blob_es2018.js",
-        "idb": "./node_modules/idb/build/index.js",
-        "re2js": "./node_modules/re2js/build/index.esm.js"
+        "firebase/app": "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js",
+        "firebase/storage": "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js"
       }
     }
     </script>
-<script>window.__ZIRICAI_CONFIG__={"apiBase":"https://ziricai-production.up.railway.app","sites":{"marketing":"https://marketing.ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"firebase":{"apiKey":"","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"","appId":"","measurementId":""}};</script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"","assetVersion":"e22a98216683-b4cbaaf4","sites":{"marketing":"https://marketing.ziricai.com","publicWeb":"https://ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","api":"https://ziricai-production.up.railway.app"},"landingSarahCompanyId":"ziricai","firebase":{"apiKey":"AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"482382497730","appId":"1:482382497730:web:6bc2f8668a1598fa13f85b","measurementId":"G-92ZVT0731S","databaseId":"default"}};</script>
 </head>
 <body>
 
 <div id="landingView" class="landing-view">
 
 <!-- ===== HEADER ===== -->
-<header class="landing-header">
+<header class="landing-header site-header-v2">
     <div class="container header-inner">
-        <a href="#" class="logo"><img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img"></a>
+        <a href="./" class="logo"><img src="assets/ZIRICAI LOGO.png?v=e22a98216683-b4cbaaf4" alt="ZiricAI" class="logo-img"></a>
         <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
-        <nav class="nav-links" id="navLinks">
-            <a href="#hire-ai-employees">Hire AI Employees</a>
-            <a href="#ai-employees-catalog">Catalog</a>
-            <a href="#industries">Industries</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#faq">FAQ</a>
-            <button class="btn btn-sm" onclick="launchWizard()">Start Free Trial</button>
-        </nav>
+        <div class="header-nav-panel" id="headerNavPanel">
+            <nav class="nav-links" id="navLinks">
+                <a href="platforms/whatsapp/">Platforms</a>
+                <a href="#ai-employees">AI Employees</a>
+                <a href="solutions/automotive/">Solutions</a>
+                <a href="pricing/">Pricing</a>
+                <a href="#faq">FAQ</a>
+            </nav>
+            <div class="nav-ctas">
+                <a href="./login.html" class="btn btn-sm">Log in</a>
+                <button type="button" class="btn btn-sm" onclick="launchWizard()">Start Free Trial</button>
+            </div>
+        </div>
     </div>
 </header>
 
@@ -70,7 +65,7 @@
             <p class="hero-sub">ZiricAI is an AI Business Operating System that allows organizations to deploy, manage, and coordinate AI Employees across every department of their business — without writing a single line of code.</p>
             <div class="hero-actions">
                 <button class="btn btn-glow btn-lg" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
-                <button class="btn btn-ghost btn-lg" id="watchDemoBtn"><i class="fa-solid fa-play"></i> Watch AI Live</button>
+                <button class="btn btn-ghost btn-lg" id="watchDemoBtn"><i class="fa-solid fa-play"></i> See a Demo</button>
             </div>
             <p class="hero-trust-line"><i class="fa-solid fa-shield-check"></i> No credit card required · Setup in under 10 minutes · POPIA-ready</p>
         </div>
@@ -143,6 +138,49 @@
                 </div>
             </div>
         </div>
+    </div>
+</section>
+
+<!-- ===== PLATFORMS + WORKFORCE (below hero — hero unchanged) ===== -->
+<section class="section section-alt" id="platforms-story">
+    <div class="container">
+        <div class="section-header platforms-story-header">
+            <span class="section-eyebrow">Platforms + AI Employees</span>
+            <h2>Your AI workforce, working everywhere your customers are.</h2>
+            <p class="intro-lead">Sarah is one AI Employee on every channel — with CRM, knowledge, and automation behind the conversations.</p>
+        </div>
+        <div class="platforms-meet-sarah">
+            <div class="platforms-meet-sarah-copy">
+                <h3>Meet Sarah</h3>
+                <p>Your lead AI Employee handles enquiries, books appointments, and escalates to your team when it matters. Same brain on WhatsApp, webchat, and the channels you add next.</p>
+                <a href="#ai-employees" class="btn btn-outline btn-sm">See the workforce</a>
+            </div>
+            <div class="platforms-meet-sarah-visual" aria-hidden="true">
+                <img src="assets/sarah-avatar.svg?v=e22a98216683-b4cbaaf4" alt="" width="88" height="88">
+                <span class="platforms-meet-badge"><span class="pulse-dot"></span> Online on all platforms</span>
+            </div>
+        </div>
+        <div class="platform-channel-grid">
+            <a class="platform-channel-card" href="platforms/whatsapp/">
+                <i class="fa-brands fa-whatsapp"></i>
+                <h4>WhatsApp</h4>
+                <p>Stock, sales, and support where customers already message you.</p>
+                <span class="platform-channel-link">Explore WhatsApp <i class="fa-solid fa-arrow-right"></i></span>
+            </a>
+            <a class="platform-channel-card" href="platforms/webchat/">
+                <i class="fa-solid fa-comment-dots"></i>
+                <h4>Webchat</h4>
+                <p>Live Sarah widget on your site — try the bubble on this page.</p>
+                <span class="platform-channel-link">Explore webchat <i class="fa-solid fa-arrow-right"></i></span>
+            </a>
+            <a class="platform-channel-card platform-channel-card-muted" href="#integrations">
+                <i class="fa-solid fa-plug"></i>
+                <h4>More channels</h4>
+                <p>Messenger, Instagram, email, SMS — one portal, one workforce.</p>
+                <span class="platform-channel-link">All integrations <i class="fa-solid fa-arrow-right"></i></span>
+            </a>
+        </div>
+        <p class="platforms-story-cta"><a href="pricing/">View pricing</a> · <a href="solutions/automotive/">Automotive solution</a></p>
     </div>
 </section>
 
@@ -376,7 +414,7 @@
         </div>
         <div class="sarah-hero-card">
             <div class="sarah-avatar-wrap">
-                <div class="sarah-avatar"><img src="assets/sarah-avatar.svg" alt="Sarah" width="120" height="120"></div>
+                <div class="sarah-avatar"><img src="assets/sarah-avatar.svg?v=e22a98216683-b4cbaaf4" alt="Sarah" width="120" height="120"></div>
                 <span class="sarah-status"><span class="pulse-dot"></span> Online now</span>
             </div>
             <div class="sarah-info">
@@ -654,56 +692,7 @@
             <h2>Simple, scalable pricing</h2>
             <p>Every plan includes setup, AI training, and access to future platform updates.</p>
         </div>
-        <div class="pricing-grid">
-            <div class="pricing-card">
-                <div class="pricing-plan">Starter</div>
-                <div class="pricing-price">R999 <small>/month</small></div>
-                <ul class="pricing-features">
-                    <li><i class="fa-solid fa-check"></i> 1 AI Employee</li>
-                    <li><i class="fa-solid fa-check"></i> WhatsApp + Website Chat</li>
-                    <li><i class="fa-solid fa-check"></i> 2,000 conversations/mo</li>
-                    <li><i class="fa-solid fa-check"></i> Basic Knowledge Base</li>
-                    <li><i class="fa-solid fa-check"></i> Email Support</li>
-                </ul>
-                <button class="btn" onclick="launchWizard()">Start Free Trial</button>
-            </div>
-            <div class="pricing-card featured">
-                <div class="pricing-plan">Professional</div>
-                <div class="pricing-price">R2,999 <small>/month</small></div>
-                <ul class="pricing-features">
-                    <li><i class="fa-solid fa-check"></i> Up to 5 AI Employees</li>
-                    <li><i class="fa-solid fa-check"></i> Social Media + CRM</li>
-                    <li><i class="fa-solid fa-check"></i> Analytics Dashboard</li>
-                    <li><i class="fa-solid fa-check"></i> Team accounts</li>
-                    <li><i class="fa-solid fa-check"></i> Workflow automation</li>
-                </ul>
-                <button class="btn" onclick="launchWizard()">Start Free Trial</button>
-            </div>
-            <div class="pricing-card">
-                <div class="pricing-plan">Business</div>
-                <div class="pricing-price">R7,999 <small>/month</small></div>
-                <ul class="pricing-features">
-                    <li><i class="fa-solid fa-check"></i> Unlimited AI Employees</li>
-                    <li><i class="fa-solid fa-check"></i> Unlimited Knowledge</li>
-                    <li><i class="fa-solid fa-check"></i> API Access</li>
-                    <li><i class="fa-solid fa-check"></i> Multiple departments</li>
-                    <li><i class="fa-solid fa-check"></i> Priority Support</li>
-                </ul>
-                <button class="btn" onclick="launchWizard()">Start Free Trial</button>
-            </div>
-            <div class="pricing-card">
-                <div class="pricing-plan">Enterprise</div>
-                <div class="pricing-price">Custom</div>
-                <ul class="pricing-features">
-                    <li><i class="fa-solid fa-check"></i> Custom AI development</li>
-                    <li><i class="fa-solid fa-check"></i> On-premise deployment</li>
-                    <li><i class="fa-solid fa-check"></i> Dedicated infrastructure</li>
-                    <li><i class="fa-solid fa-check"></i> SLA + Staff training</li>
-                    <li><i class="fa-solid fa-check"></i> Custom workflows</li>
-                </ul>
-                <button class="btn btn-outline" onclick="showToast('Contact sales for enterprise pricing','info')">Contact Sales</button>
-            </div>
-        </div>
+        <div class="pricing-grid" id="landingPricingGrid" aria-live="polite" aria-busy="true"></div>
         <p class="pricing-note">14-day free trial on all plans. No credit card required.</p>
     </div>
 </section>
@@ -724,7 +713,7 @@
                     <button type="button" class="faq-cat-btn" data-faq-cat="billing"><i class="fa-solid fa-credit-card"></i> Billing &amp; trial</button>
                 </nav>
                 <div class="faq-sarah-prompt">
-                    <div class="faq-sarah-avatar"><img src="assets/sarah-avatar.svg" alt="" width="44" height="44"></div>
+                    <div class="faq-sarah-avatar"><img src="assets/sarah-avatar.svg?v=e22a98216683-b4cbaaf4" alt="" width="44" height="44"></div>
                     <div>
                         <strong>Still unsure?</strong>
                         <p>Ask Sarah — she knows pricing, setup, and every industry pack.</p>
@@ -770,7 +759,7 @@
     <p>Join businesses across Africa building their digital workforce with ZiricAI — the world's first digital AI employment agency.</p>
     <div class="hero-actions">
         <button class="btn btn-glow btn-lg" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
-        <button class="btn btn-ghost btn-lg" id="watchDemoBtn2"><i class="fa-solid fa-play"></i> Watch AI Live</button>
+        <button class="btn btn-ghost btn-lg" id="watchDemoBtn2"><i class="fa-solid fa-play"></i> See a Demo</button>
     </div>
 </section>
 
@@ -779,48 +768,41 @@
     <div class="container">
         <div class="footer-grid">
             <div class="footer-brand">
-                <a href="#" class="logo"><img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img"></a>
-                <p>The AI Business Operating System. Hire, train, manage, and grow your digital workforce of intelligent AI Employees.</p>
+                <a href="./" class="logo"><img src="assets/ZIRICAI LOGO.png?v=e22a98216683-b4cbaaf4" alt="ZiricAI" class="logo-img"></a>
+                <p>Your AI workforce, working everywhere your customers are. Sarah on every channel — CRM, knowledge, and automation behind the conversations.</p>
+            </div>
+            <div class="footer-col">
+                <h5>Platforms</h5>
+                <a href="platforms/whatsapp/">WhatsApp</a>
+                <a href="platforms/webchat/">Webchat</a>
+                <a href="#integrations">All channels</a>
             </div>
             <div class="footer-col">
                 <h5>Product</h5>
                 <a href="#ai-employees">AI Employees</a>
-                <a href="#hire-ai-employees">Hire AI Employees</a>
-                <a href="#industries">Industries</a>
                 <a href="#automation">Automation</a>
-                <a href="#knowledge">CRM & Knowledge</a>
-                <a href="#pricing">Pricing</a>
+                <a href="#knowledge">Knowledge</a>
+                <a href="pricing/">Pricing</a>
             </div>
             <div class="footer-col">
-                <h5>Company</h5>
-                <a href="#industries">About</a>
-                <a href="#" onclick="showToast('Careers page coming soon','info');return false;">Careers</a>
-                <a href="#" onclick="showToast('Partners program coming soon','info');return false;">Partners</a>
-                <a href="#" onclick="showToast('Contact: hello@ziric.ai','info');return false;">Contact</a>
+                <h5>Solutions</h5>
+                <a href="solutions/automotive/">Automotive</a>
+                <a href="#industries">Industries</a>
+                <a href="mailto:hello@ziric.ai">Contact</a>
             </div>
             <div class="footer-col">
-                <h5>Resources</h5>
-                <a href="#" onclick="showToast('Documentation coming soon','info');return false;">Documentation</a>
-                <a href="#" onclick="showToast('API docs coming soon','info');return false;">API</a>
-                <a href="#faq">Help Center</a>
-                <a href="#" onclick="showToast('Blog coming soon','info');return false;">Blog</a>
-            </div>
-            <div class="footer-col">
-                <h5>Developers</h5>
-                <a href="#" onclick="showToast('API docs coming soon','info');return false;">API Reference</a>
-                <a href="#" onclick="showToast('Webhooks docs coming soon','info');return false;">Webhooks</a>
-                <a href="#" onclick="showToast('SDK coming soon','info');return false;">SDK</a>
-                <a href="./">Platform Admin</a>
-                <a href="./">Company Portal</a>
+                <h5>Platform</h5>
+                <a href="#" data-site-link="app">Company Portal</a>
+                <a href="#" data-site-link="admin">Mission Control</a>
             </div>
         </div>
         <div class="footer-bottom">
             <span>&copy; 2026 ZiricAI — built by Ziric Media</span>
             <div class="footer-bottom-links">
                 <a href="/privacy">Privacy Policy</a>
-                <a href="#">Terms</a>
-                <a href="./">Super Admin</a>
-                <a href="./">Portal</a>
+                <a href="./login.html">Sign in</a>
+                <a href="#" data-site-link="app">Portal</a>
+                <a href="#" data-site-link="admin">Mission Control</a>
             </div>
         </div>
     </div>
@@ -828,16 +810,16 @@
 
 </div><!-- /landingView -->
 
-<!-- ===== WATCH AI LIVE — DEMO MODAL ===== -->
+<!-- ===== DEMO MODAL (scripted WhatsApp sample) ===== -->
 <div class="demo-overlay" id="demoOverlay">
-    <div class="demo-modal demo-modal-split" role="dialog" aria-label="AI Live Demo">
+    <div class="demo-modal demo-modal-split" role="dialog" aria-label="Sample WhatsApp demo">
         <div class="demo-modal-header">
-            <h3 id="demoModalTitle"><i class="fa-brands fa-whatsapp"></i> Watch AI Live</h3>
+            <h3 id="demoModalTitle"><i class="fa-brands fa-whatsapp"></i> See a Demo</h3>
             <button class="demo-close" id="demoClose" aria-label="Close">&times;</button>
         </div>
         <div class="demo-modal-body">
             <div class="demo-controls">
-                <p class="demo-controls-label">Live scenario</p>
+                <p class="demo-controls-label">Demo scenario</p>
                 <div class="demo-scenario-tabs" id="demoScenarioTabs">
                     <button type="button" class="demo-scenario-tab active" data-scenario="sales"><i class="fa-solid fa-car"></i> Sales enquiry</button>
                     <button type="button" class="demo-scenario-tab" data-scenario="sarah"><i class="fa-solid fa-calendar-check"></i> Appointment booking</button>
@@ -846,7 +828,7 @@
                 <div class="demo-live-feed" id="demoLiveFeed">
                     <div class="demo-feed-line"><span class="dot"></span> Waiting for customer message…</div>
                 </div>
-                <p class="demo-modal-note"><i class="fa-solid fa-circle-info"></i> Messages appear on the phone in real time — just like your customers see them.</p>
+                <p class="demo-modal-note"><i class="fa-solid fa-circle-info"></i> Scripted sample conversation for illustration — not a live AI session.</p>
             </div>
             <div class="demo-phone-wrap">
                 <div class="device-simulator device-iphone device-iphone-compact">
@@ -905,11 +887,11 @@
 
     <header class="onboarding-header">
         <a href="#" class="onboarding-brand" id="wizardBackHome">
-            <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img">
+            <img src="assets/ZIRICAI LOGO.png?v=e22a98216683-b4cbaaf4" alt="ZiricAI" class="logo-img">
         </a>
         <div class="onboarding-header-meta">
             <span class="trial-pill"><i class="fa-solid fa-gift"></i> 14-day free trial</span>
-            <a href="./" class="link-muted">Sign in</a>
+            <a href="./login.html" class="link-muted">Sign in</a>
         </div>
     </header>
 
@@ -932,7 +914,7 @@
     </main>
 
     <footer class="onboarding-footer">
-        <span>&copy; ZiricAI &middot; POPIA-ready &middot; <a href="./">Platform Admin</a></span>
+        <span>&copy; ZiricAI &middot; POPIA-ready &middot; <a href="#" data-site-link="admin">Mission Control</a></span>
     </footer>
 </div>
 
@@ -940,15 +922,15 @@
 <div class="sarah-widget" id="sarahWidget">
     <div class="sarah-panel" id="sarahPanel" aria-hidden="true">
         <div class="sarah-panel-header">
-            <div class="sarah-panel-avatar"><img src="assets/sarah-avatar.svg" alt="" width="40" height="40"></div>
+            <div class="sarah-panel-avatar"><img src="assets/sarah-avatar.svg?v=e22a98216683-b4cbaaf4" alt="" width="40" height="40"></div>
             <div>
                 <strong>Sarah</strong>
-                <span>Reception AI · Online</span>
+                <span>ZiricAI assistant · Online</span>
             </div>
             <button class="sarah-panel-close" id="sarahPanelClose" aria-label="Close chat">&times;</button>
         </div>
         <div class="sarah-panel-messages" id="sarahMessages">
-            <div class="sarah-msg ai">Hi 👋 I'm Sarah. Ask me anything about ZiricAI — pricing, setup, industries, WhatsApp integration. No signup required!</div>
+            <div class="sarah-msg ai">Hi 👋 I'm Sarah, ZiricAI's AI assistant. Ask me about the platform, pricing, industries, or how to get started — no signup required.</div>
         </div>
         <div class="sarah-panel-suggestions" id="sarahSuggestions">
             <button type="button" data-q="How much does ZiricAI cost?">Pricing</button>
@@ -962,7 +944,7 @@
         </form>
     </div>
     <button class="sarah-bubble" id="sarahBubble" aria-label="Chat with Sarah">
-        <span class="sarah-bubble-avatar"><img src="assets/sarah-avatar.svg" alt="" width="44" height="44"></span>
+        <span class="sarah-bubble-avatar"><img src="assets/sarah-avatar.svg?v=e22a98216683-b4cbaaf4" alt="" width="44" height="44"></span>
         <span class="sarah-bubble-text">Hi 👋 I'm Sarah. Ask me anything about ZiricAI. No signup required.</span>
         <span class="sarah-bubble-icon"><i class="fa-solid fa-comment-dots"></i></span>
     </button>
@@ -972,12 +954,12 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="js/shared/billingPlans.browser.js"></script>
+<script src="js/landing/pricing-landing.browser.js"></script>
 <script src="js/shared/platformKnowledge.browser.js"></script>
 <script src="js/shared/marketplacePacks.browser.js"></script>
 <script src="js/shared/aiEmployeesCatalog.browser.js"></script>
 <script src="js/shared/industryTemplates.browser.js"></script>
 <script src="js/ziricai-landing.js"></script>
-<script type="module" src="js/landing/pricing.js"></script>
 <script>
     function launchWizard() {
         const landing = document.getElementById('landingView');
@@ -1052,7 +1034,7 @@
 
     // ===== MOBILE MENU =====
     document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
-        document.getElementById('navLinks')?.classList.toggle('open');
+        document.getElementById('headerNavPanel')?.classList.toggle('open');
     });
 
     document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => {
@@ -1060,11 +1042,23 @@
         else showToast('Sarah chat loading — try again in a moment', 'info');
     });
 
-    // FAQ accordion, Watch AI Live demo, Sarah chat — js/ziricai-landing.js
+    // FAQ accordion, demo modal, Sarah chat — js/ziricai-landing.js
 
     // ===== AGENT CARD CLICK — handled by ziricai-landing.js hire/catalog sections =====
 
     console.log('ZiricAI landing — Digital AI Employment Agency ready.');
+</script>
+<script type="module">
+import { getSiteUrls, marketingLoginUrl } from './js/shared/siteUrls.js';
+document.querySelectorAll('[data-site-link]').forEach((el) => {
+  const key = el.getAttribute('data-site-link');
+  if (key === 'login') {
+    el.href = marketingLoginUrl();
+    return;
+  }
+  const urls = getSiteUrls();
+  if (urls[key]) el.href = urls[key];
+});
 </script>
 </body>
 </html>
