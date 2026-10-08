@@ -1,13 +1,13 @@
-/** FAQ section HTML for /faq/ (asset paths use depth prefix e.g. ../). */
+/** FAQ detail block for /faq/ (asset paths use depth prefix e.g. ../). */
 export function renderFaqSection(assetRoot = '../') {
   const a = assetRoot;
-  return `<section class="section section-alt marketing-page-hero" id="faq">
+  return `<section class="section marketing-page-block-detail" id="faq">
     <div class="container">
         <div class="split-panel-layout faq-layout">
             <aside class="split-panel-left faq-sidebar">
-                <span class="section-eyebrow">FAQ</span>
-                <h1 class="faq-sidebar-title">Got questions? We've got answers.</h1>
-                <p class="faq-sidebar-intro">Everything you need to know about setup, channels, security, and pricing — or ask Sarah anytime.</p>
+                <span class="section-eyebrow">Browse</span>
+                <h2 class="faq-sidebar-title">Categories</h2>
+                <p class="faq-sidebar-intro">Filter questions by topic — or ask Sarah anytime.</p>
                 <nav class="faq-categories" id="faqCategories" aria-label="FAQ categories">
                     <button type="button" class="faq-cat-btn active" data-faq-cat="all"><i class="fa-solid fa-grid-2"></i> All questions</button>
                     <button type="button" class="faq-cat-btn" data-faq-cat="getting-started"><i class="fa-solid fa-rocket"></i> Getting started</button>
@@ -53,7 +53,6 @@ export function renderFaqSection(assetRoot = '../') {
                 </div>
             </div>
         </div>
-        <p class="marketing-page-back"><a href="/"><i class="fa-solid fa-arrow-left"></i> Back to home</a> · <a href="/pricing/">Pricing</a></p>
     </div>
 </section>`;
 }

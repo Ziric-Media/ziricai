@@ -225,13 +225,21 @@ ${extraScript}
         e.preventDefault();
         window.location.href = '/';
     });
-    if (location.hash === '#start' || location.hash === '#wizard') launchWizard();
-    window.addEventListener('hashchange', () => {
-        if (location.hash === '#start' || location.hash === '#wizard') launchWizard();
-    });
+    function syncWizardFromHash() {
+        if (location.hash === '#start' || location.hash === '#wizard') {
+            launchWizard();
+            return;
+        }
+        document.body.classList.remove('wizard-active');
+        document.getElementById('landingView')?.classList.remove('hidden');
+        document.getElementById('wizardView')?.classList.add('hidden');
+    }
+    syncWizardFromHash();
+    window.addEventListener('hashchange', syncWizardFromHash);
     document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
         document.getElementById('headerNavPanel')?.classList.toggle('open');
     });
+    document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => document.getElementById('sarahBubble')?.click());
 </script>
 <script type="module" src="${root}js/onboarding/main.js"></script>`;
 }

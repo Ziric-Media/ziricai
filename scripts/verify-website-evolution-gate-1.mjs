@@ -136,7 +136,7 @@ const pricingHtml = read('pricing/index.html');
 if (
   pricingHtml.includes('billingPlans.browser.js') &&
   pricingHtml.includes('pricing-landing.browser.js') &&
-  pricingHtml.includes('class="pricing-grid"')
+  /\bpricing-grid\b/.test(pricingHtml)
 ) {
   pass('pricing/: canonical billingPlans + pricing-landing + .pricing-grid');
 } else {

@@ -1,8 +1,15 @@
 /**
  * Marketing subpage body fragments (Gate 1 Wave 1).
+ * Structure: hero → intro → detail → pricing (pricing page: hero → intro → detail grid only).
  */
 
 import { renderFaqSection } from './marketing-faq-section.js';
+import {
+  marketingHero,
+  marketingIntro,
+  marketingDetail,
+  marketingPricingSection,
+} from './marketing-page-blocks.js';
 
 export function tourPhoneBlock({ title = 'Central Motors', idsPrefix = '' }) {
   const titleId = idsPrefix ? `${idsPrefix}PhoneTitle` : 'tourPhoneTitle';
@@ -63,14 +70,23 @@ export const MARKETING_WEB_PAGES = [
     description: 'Sarah on WhatsApp, webchat, and every channel your customers use — one AI workforce.',
     depth: 1,
     activeNav: 'platforms',
-    includePricing: false,
+    includePricing: true,
     includeLanding: false,
-    bodyHtml: `<section class="section marketing-page-hero">
-    <div class="container">
-        <span class="section-eyebrow">Platforms</span>
-        <h1>Your AI workforce on every channel</h1>
-        <p class="intro-lead">One portal, one team of AI Employees — deployed where your customers already are.</p>
-        <div class="platform-channel-grid">
+    bodyHtml: `${marketingHero({
+      eyebrow: 'Platforms',
+      title: 'Your AI workforce on every channel',
+      lead: 'One portal, one team of AI Employees — deployed where your customers already are.',
+    })}
+${marketingIntro({
+  title: 'Choose your first channel',
+  body: 'Start with WhatsApp or webchat, then add Messenger, Instagram, email, and SMS from the same Company Portal — no duplicate setup.',
+})}
+${marketingDetail(`
+        <div class="section-header marketing-detail-header">
+            <span class="section-eyebrow">Channels</span>
+            <h2>Explore platforms</h2>
+        </div>
+        <div class="platform-channel-grid marketing-channel-grid">
             <a class="platform-channel-card" href="/platforms/whatsapp/">
                 <i class="fa-brands fa-whatsapp"></i>
                 <h4>WhatsApp</h4>
@@ -89,9 +105,8 @@ export const MARKETING_WEB_PAGES = [
                 <p>Messenger, Instagram, email, SMS — connected in one place.</p>
                 <span class="platform-channel-link">All integrations <i class="fa-solid fa-arrow-right"></i></span>
             </a>
-        </div>
-    </div>
-</section>`,
+        </div>`, { alt: true })}
+${marketingPricingSection()}`,
   },
   {
     outPath: 'solutions/index.html',
@@ -99,14 +114,23 @@ export const MARKETING_WEB_PAGES = [
     description: 'Industry packs and solutions — automotive, and more AI workforce templates.',
     depth: 1,
     activeNav: 'solutions',
-    includePricing: false,
+    includePricing: true,
     includeLanding: false,
-    bodyHtml: `<section class="section marketing-page-hero">
-    <div class="container">
-        <span class="section-eyebrow">Solutions</span>
-        <h1>Built for your industry</h1>
-        <p class="intro-lead">Pre-configured AI Employees, workflows, and knowledge templates — go live in minutes.</p>
-        <div class="platform-channel-grid">
+    bodyHtml: `${marketingHero({
+      eyebrow: 'Solutions',
+      title: 'Built for your industry',
+      lead: 'Pre-configured AI Employees, workflows, and knowledge templates — go live in minutes.',
+    })}
+${marketingIntro({
+  title: 'Industry packs, not generic chatbots',
+  body: 'Each pack ships with Sarah tuned for your vertical — inventory, booking flows, and compliance-aware replies out of the box.',
+})}
+${marketingDetail(`
+        <div class="section-header marketing-detail-header">
+            <span class="section-eyebrow">Packs</span>
+            <h2>Start with a template</h2>
+        </div>
+        <div class="platform-channel-grid marketing-channel-grid marketing-channel-grid-2">
             <a class="platform-channel-card" href="/solutions/automotive/">
                 <i class="fa-solid fa-car"></i>
                 <h4>Automotive</h4>
@@ -119,9 +143,8 @@ export const MARKETING_WEB_PAGES = [
                 <p>50+ industry templates on the homepage catalog.</p>
                 <span class="platform-channel-link">Browse industries <i class="fa-solid fa-arrow-right"></i></span>
             </a>
-        </div>
-    </div>
-</section>`,
+        </div>`, { alt: true })}
+${marketingPricingSection()}`,
   },
   {
     outPath: 'faq/index.html',
@@ -129,12 +152,19 @@ export const MARKETING_WEB_PAGES = [
     description: 'Frequently asked questions about setup, channels, security, billing, and trials.',
     depth: 1,
     activeNav: 'faq',
-    includePricing: false,
+    includePricing: true,
     includeLanding: true,
-    extraScript: `<script>
-document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => document.getElementById('sarahBubble')?.click());
-</script>`,
-    bodyHtml: renderFaqSection('../'),
+    bodyHtml: `${marketingHero({
+      eyebrow: 'FAQ',
+      title: "Got questions? We've got answers.",
+      lead: 'Everything you need to know about setup, channels, security, and pricing — or ask Sarah anytime.',
+    })}
+${marketingIntro({
+  title: 'Browse by topic',
+  body: 'Filter common questions below. For anything specific to your business, open the Sarah chat — no signup required.',
+})}
+${renderFaqSection('../')}
+${marketingPricingSection()}`,
   },
   {
     outPath: 'pricing/index.html',
@@ -144,14 +174,18 @@ document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => docum
     activeNav: 'pricing',
     includePricing: true,
     includeLanding: false,
-    bodyHtml: `<section class="section marketing-page-hero" id="pricing">
+    bodyHtml: `${marketingHero({
+      eyebrow: 'Pricing',
+      title: 'Simple, scalable pricing',
+      lead: 'Every plan includes setup, AI training, and access to future platform updates.',
+    })}
+${marketingIntro({
+  title: 'Same plans as the homepage',
+  body: 'Plans stay in sync everywhere on the site — upgrade or add AI Employees from the Company Portal when you are ready.',
+})}
+<section class="section section-alt marketing-page-block-detail marketing-pricing-detail" id="pricing">
     <div class="container">
-        <div class="section-header">
-            <span class="section-eyebrow">Pricing</span>
-            <h1>Simple, scalable pricing</h1>
-            <p>Every plan includes setup, AI training, and access to future platform updates. Same plans as on the homepage — always in sync.</p>
-        </div>
-        <div class="pricing-grid" aria-live="polite" aria-busy="true"></div>
+        <div class="pricing-grid marketing-pricing-grid" aria-live="polite" aria-busy="true"></div>
         <p class="pricing-note">14-day free trial on all plans. No credit card required.</p>
         <p class="marketing-page-back"><a href="/"><i class="fa-solid fa-arrow-left"></i> Back to home</a></p>
     </div>
@@ -163,27 +197,26 @@ document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => docum
     description: 'Sarah on WhatsApp — inventory, bookings, and sales conversations with CRM and automation behind every reply.',
     depth: 2,
     activeNav: 'platforms',
-    includePricing: false,
+    includePricing: true,
     includeLanding: true,
-    bodyHtml: `<section class="section marketing-page-hero platform-page-hero">
-    <div class="container">
-        <span class="section-eyebrow"><i class="fa-brands fa-whatsapp"></i> Platform</span>
-        <h1>WhatsApp — where your customers already are</h1>
-        <p class="intro-lead">One AI Employee on WhatsApp: instant replies, your knowledge base, CRM updates, and automations — without another inbox to babysit.</p>
-        <div class="hero-actions">
-            <button class="btn btn-glow" type="button" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Connect WhatsApp</button>
-            <a class="btn btn-ghost" href="../../#product-tour"><i class="fa-solid fa-play"></i> Tour on home</a>
-        </div>
-    </div>
-</section>
-<section class="section section-alt" id="product-tour">
-    <div class="container">
-        <div class="section-header">
-            <span class="section-eyebrow">Live Demo</span>
+    bodyHtml: `${marketingHero({
+      eyebrow: '<i class="fa-brands fa-whatsapp"></i> Platform',
+      title: 'WhatsApp — where your customers already are',
+      lead: 'One AI Employee on WhatsApp: instant replies, your knowledge base, CRM updates, and automations — without another inbox to babysit.',
+      actions: `<button class="btn btn-glow" type="button" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Connect WhatsApp</button>
+            <a class="btn btn-ghost" href="/#product-tour"><i class="fa-solid fa-play"></i> Tour on home</a>`,
+    })}
+${marketingIntro({
+  title: 'Built for high-volume messaging',
+  body: 'Sarah reads your knowledge base, updates CRM records, and triggers automations on every WhatsApp thread — the same orchestration you get on webchat.',
+})}
+${marketingDetail(`
+        <div class="section-header marketing-detail-header">
+            <span class="section-eyebrow">Live demo</span>
             <h2>Watch Sarah on WhatsApp</h2>
-            <p>Same product tour as the homepage — a real customer journey in four steps.</p>
+            <p>A real customer journey in four steps — same tour as the homepage.</p>
         </div>
-        <div class="tour-layout">
+        <div class="tour-layout" id="product-tour">
             ${tourPhoneBlock({ title: 'Central Motors' })}
             <div class="tour-controls">
                 <div class="tour-step-indicator">
@@ -201,15 +234,12 @@ document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => docum
                 <button class="btn btn-glow tour-cta hidden" id="tourCtaBtn" type="button" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
             </div>
         </div>
-    </div>
-</section>
-<section class="section">
-    <div class="container platform-cap-grid">
-        <div class="platform-cap-card"><i class="fa-solid fa-book"></i><h3>Knowledge-backed replies</h3><p>Stock, policies, and FAQs from your live knowledge base — not generic chatbot fluff.</p></div>
-        <div class="platform-cap-card"><i class="fa-solid fa-address-book"></i><h3>CRM on every message</h3><p>Leads and conversation history sync to your portal automatically.</p></div>
-        <div class="platform-cap-card"><i class="fa-solid fa-bolt"></i><h3>Automations</h3><p>Bookings, handoffs, and notifications fire when Sarah completes a step.</p></div>
-    </div>
-</section>`,
+        <div class="platform-cap-grid marketing-cap-grid">
+            <div class="platform-cap-card"><i class="fa-solid fa-book"></i><h3>Knowledge-backed replies</h3><p>Stock, policies, and FAQs from your live knowledge base — not generic chatbot fluff.</p></div>
+            <div class="platform-cap-card"><i class="fa-solid fa-address-book"></i><h3>CRM on every message</h3><p>Leads and conversation history sync to your portal automatically.</p></div>
+            <div class="platform-cap-card"><i class="fa-solid fa-bolt"></i><h3>Automations</h3><p>Bookings, handoffs, and notifications fire when Sarah completes a step.</p></div>
+        </div>`, { alt: true })}
+${marketingPricingSection()}`,
   },
   {
     outPath: 'platforms/webchat/index.html',
@@ -217,42 +247,41 @@ document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => docum
     description: 'Embed Sarah on your website — live chat with the same AI workforce, knowledge, and automations as WhatsApp.',
     depth: 2,
     activeNav: 'platforms',
-    includePricing: false,
+    includePricing: true,
     includeLanding: false,
-    bodyHtml: `<section class="section marketing-page-hero platform-page-hero">
-    <div class="container">
-        <span class="section-eyebrow"><i class="fa-solid fa-comment-dots"></i> Platform</span>
-        <h1>Webchat — Sarah on your site</h1>
-        <p class="intro-lead">The same Sarah you see in the corner of every marketing page — trained on your business, connected to your portal, ready for visitors 24/7.</p>
-        <div class="hero-actions">
-            <button class="btn btn-glow" type="button" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Add webchat</button>
-            <button class="btn btn-ghost" type="button" onclick="document.getElementById('sarahBubble')?.click()"><i class="fa-solid fa-comment-dots"></i> Try Sarah now</button>
-        </div>
-    </div>
-</section>
-<section class="section section-alt">
-    <div class="container webchat-explainer">
-        <div class="webchat-explainer-copy">
-            <h2>One workforce, every channel</h2>
-            <p>Webchat is not a separate bot — it is Sarah, your lead AI Employee, with the same catalog, pricing knowledge, and escalation paths as WhatsApp.</p>
-            <ul class="webchat-checklist">
-                <li><i class="fa-solid fa-check"></i> Widget matches your brand</li>
-                <li><i class="fa-solid fa-check"></i> Suggested prompts for common questions</li>
-                <li><i class="fa-solid fa-check"></i> Hand off to humans in the Company Portal</li>
-                <li><i class="fa-solid fa-check"></i> POPIA-ready consent and logging</li>
-            </ul>
-            <p class="webchat-hint"><i class="fa-solid fa-hand-pointer"></i> Use the <strong>Chat with Sarah</strong> bubble on this page to experience webchat firsthand.</p>
-        </div>
-        <div class="webchat-widget-preview" aria-hidden="true">
-            <div class="webchat-preview-card">
-                <div class="webchat-preview-header"><img src="../../assets/sarah-avatar.svg" alt="" width="36" height="36"><span>Sarah · Online</span></div>
-                <div class="webchat-preview-msg ai">Hi 👋 Ask me about platforms, pricing, or getting started.</div>
-                <div class="webchat-preview-msg user">Do you support WhatsApp too?</div>
-                <div class="webchat-preview-msg ai">Yes — Sarah runs on WhatsApp, webchat, and more from one portal.</div>
+    bodyHtml: `${marketingHero({
+      eyebrow: '<i class="fa-solid fa-comment-dots"></i> Platform',
+      title: 'Webchat — Sarah on your site',
+      lead: 'The same Sarah you see in the corner of every marketing page — trained on your business, connected to your portal, ready for visitors 24/7.',
+      actions: `<button class="btn btn-glow" type="button" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Add webchat</button>
+            <button class="btn btn-ghost" type="button" onclick="document.getElementById('sarahBubble')?.click()"><i class="fa-solid fa-comment-dots"></i> Try Sarah now</button>`,
+    })}
+${marketingIntro({
+  title: 'One workforce, every channel',
+  body: 'Webchat is not a separate bot — it is Sarah with the same catalog, pricing knowledge, and escalation paths as WhatsApp.',
+})}
+${marketingDetail(`
+        <div class="webchat-explainer">
+            <div class="webchat-explainer-copy">
+                <h2>What you get</h2>
+                <ul class="webchat-checklist">
+                    <li><i class="fa-solid fa-check"></i> Widget matches your brand</li>
+                    <li><i class="fa-solid fa-check"></i> Suggested prompts for common questions</li>
+                    <li><i class="fa-solid fa-check"></i> Hand off to humans in the Company Portal</li>
+                    <li><i class="fa-solid fa-check"></i> POPIA-ready consent and logging</li>
+                </ul>
+                <p class="webchat-hint"><i class="fa-solid fa-hand-pointer"></i> Use the <strong>Chat with Sarah</strong> bubble on this page to experience webchat firsthand.</p>
             </div>
-        </div>
-    </div>
-</section>`,
+            <div class="webchat-widget-preview" aria-hidden="true">
+                <div class="webchat-preview-card">
+                    <div class="webchat-preview-header"><img src="../../assets/sarah-avatar.svg" alt="" width="36" height="36"><span>Sarah · Online</span></div>
+                    <div class="webchat-preview-msg ai">Hi 👋 Ask me about platforms, pricing, or getting started.</div>
+                    <div class="webchat-preview-msg user">Do you support WhatsApp too?</div>
+                    <div class="webchat-preview-msg ai">Yes — Sarah runs on WhatsApp, webchat, and more from one portal.</div>
+                </div>
+            </div>
+        </div>`, { alt: true })}
+${marketingPricingSection()}`,
   },
   {
     outPath: 'solutions/automotive/index.html',
@@ -260,24 +289,23 @@ document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => docum
     description: 'AI for car dealers — stock enquiries, financing, test drives, and trade-ins on WhatsApp and webchat.',
     depth: 2,
     activeNav: 'solutions',
-    includePricing: false,
+    includePricing: true,
     includeLanding: false,
-    bodyHtml: `<section class="industry-hero marketing-industry-hero">
-    <div class="container">
-        <span class="hero-badge"><span class="pulse-dot"></span> Car Dealer Pack</span>
-        <h1>AI for automotive dealers</h1>
-        <p>Close deals at midnight. Answer stock enquiries instantly. Book test drives while your sales team sleeps.</p>
-        <div class="industry-hero-actions">
-            <button class="btn btn-glow btn-lg" type="button" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
-            <a href="../../platforms/whatsapp/" class="btn btn-ghost btn-lg"><i class="fa-brands fa-whatsapp"></i> Sarah on WhatsApp</a>
-        </div>
-    </div>
-</section>
-<section class="industry-features">
-    <div class="container">
-        <div class="section-header">
+    bodyHtml: `${marketingHero({
+      eyebrow: 'Car Dealer Pack',
+      title: 'AI for automotive dealers',
+      lead: 'Close deals at midnight. Answer stock enquiries instantly. Book test drives while your sales team sleeps.',
+      actions: `<button class="btn btn-glow btn-lg" type="button" onclick="launchWizard()"><i class="fa-solid fa-rocket"></i> Start Free Trial</button>
+            <a href="/platforms/whatsapp/" class="btn btn-ghost btn-lg"><i class="fa-brands fa-whatsapp"></i> Sarah on WhatsApp</a>`,
+    })}
+${marketingIntro({
+  title: 'Dealer workflows out of the box',
+  body: 'Inventory queries, financing quotes, test drive booking, and trade-in valuations — automated and logged to your portal.',
+})}
+${marketingDetail(`
+        <div class="section-header marketing-detail-header">
             <h2>Built for car dealers</h2>
-            <p>Inventory queries, financing quotes, test drive booking, and trade-in valuations — automated.</p>
+            <p>Pre-trained flows your front desk and BDC teams can trust from day one.</p>
         </div>
         <div class="industry-features-grid">
             <div class="agent-card"><div class="agent-avatar">🚗</div><h4>Stock enquiries</h4><p>Instant answers from your live inventory</p></div>
@@ -285,8 +313,7 @@ document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => docum
             <div class="agent-card"><div class="agent-avatar">📅</div><h4>Test drive booking</h4><p>Calendar sync, confirmations, reminders</p></div>
             <div class="agent-card"><div class="agent-avatar">🔄</div><h4>Trade-in valuations</h4><p>Capture details and route to appraisers</p></div>
         </div>
-        <p style="text-align:center;margin-top:32px;"><a href="../../#case-studies" class="btn">See Central Motors case study</a></p>
-    </div>
-</section>`,
+        <p class="marketing-detail-cta"><a href="/#case-studies" class="btn">See Central Motors case study</a></p>`, { alt: true })}
+${marketingPricingSection()}`,
   },
 ];

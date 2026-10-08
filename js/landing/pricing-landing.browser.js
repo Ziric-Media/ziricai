@@ -46,7 +46,9 @@
   }
 
   function initLandingPricing() {
-    const grid = document.querySelector('#pricing .pricing-grid');
+    const grid = document.querySelector(
+      '#pricing .pricing-grid, #page-pricing .marketing-pricing-grid, .marketing-page-pricing .pricing-grid'
+    );
     const bp = window.ZiricBillingPlans;
     if (!grid || !bp?.getPublicPlans) return;
 
