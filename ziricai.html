@@ -76,10 +76,10 @@
             </div>
             <p class="hero-trust-line"><i class="fa-solid fa-shield-check"></i> No coding required · Deploy in minutes · Available 24/7</p>
         </div>
-        <div class="hero-visual home-reveal home-reveal-delay-1">
+        <div class="hero-visual hero-visual-stack home-reveal home-reveal-delay-1">
             <div class="pipeline-panel pipeline-panel-story">
                 <div class="pipeline-title"><i class="fa-solid fa-route"></i> From conversation to completed work</div>
-                <div class="pipeline-flow pipeline-flow-vertical pipeline-flow-animated">
+                <div class="pipeline-flow pipeline-flow-vertical pipeline-flow-animated pipeline-flow-hero">
                     <div class="pipeline-node"><div class="pipeline-icon"><i class="fa-solid fa-user"></i></div><span class="pipeline-label">Customer</span></div>
                     <div class="pipeline-arrow pipeline-arrow-down"><i class="fa-solid fa-chevron-down"></i></div>
                     <div class="pipeline-node"><div class="pipeline-icon whatsapp"><i class="fa-brands fa-whatsapp"></i></div><span class="pipeline-label">WhatsApp</span></div>
@@ -97,6 +97,14 @@
                     <div class="pipeline-arrow pipeline-arrow-down"><i class="fa-solid fa-chevron-down"></i></div>
                     <div class="pipeline-node pipeline-node-done"><div class="pipeline-icon done"><i class="fa-solid fa-circle-check"></i></div><span class="pipeline-label">Completed Work</span></div>
                 </div>
+            </div>
+            <div class="home-bento-sim home-hero-sim" id="homeMiniChat" aria-label="Sarah live chat simulation">
+                <div class="home-mini-chat-header">
+                    <span class="home-mini-chat-avatar"><img src="assets/sarah-avatar.svg" alt="" width="28" height="28"></span>
+                    <div><strong>Sarah</strong><span><span class="pulse-dot"></span> Live simulation</span></div>
+                </div>
+                <div class="home-mini-chat-body" id="homeMiniChatBody"></div>
+                <div class="home-mini-chat-typing hidden" id="homeMiniChatTyping"><span></span><span></span><span></span></div>
             </div>
         </div>
     </div>
@@ -133,29 +141,32 @@
 </section>
 
 <!-- ===== 4. WHAT IS AN AI EMPLOYEE ===== -->
-<section class="section section-alt" id="ai-employee-concept">
+<section class="section section-alt home-section-ai-employee" id="ai-employee-concept">
+    <div class="home-section-mesh home-mesh-violet" aria-hidden="true"></div>
     <div class="container">
         <div class="section-header home-reveal">
             <span class="section-eyebrow">Meet the AI Employee</span>
             <h2>What if you could hire a digital employee for almost any role?</h2>
-            <p>An AI Employee is a digital worker designed to perform a specific business role. Unlike a basic chatbot, an AI Employee is connected to your organization's knowledge, instructions, workflows, and business systems.</p>
+            <p>An AI Employee is a digital worker designed to perform a specific business role — connected to your knowledge, workflows, and business systems.</p>
         </div>
-        <p class="home-center-lead home-reveal">It can communicate with customers, perform tasks, follow processes, and work continuously — while handing complex or sensitive situations to your human team.</p>
-        <div class="home-three-cards">
-            <article class="home-three-card home-reveal home-reveal-delay-1">
+        <div class="home-three-cards home-three-cards-glass">
+            <article class="home-three-card home-card-shimmer home-reveal home-reveal-delay-1">
                 <div class="home-pillar-icon"><i class="fa-solid fa-brain"></i></div>
                 <h3>Knows Your Business</h3>
-                <p>Train your AI Employees on documents, policies, products, services, FAQs, websites, and internal knowledge.</p>
+                <p>Train on documents, policies, products, FAQs, websites, and internal knowledge.</p>
+                <div class="home-card-mini-viz" aria-hidden="true"><span class="home-viz-chip"><i class="fa-solid fa-file-pdf"></i> PDF</span><span class="home-viz-chip"><i class="fa-solid fa-globe"></i> Web</span><span class="home-viz-chip"><i class="fa-solid fa-list"></i> FAQ</span></div>
             </article>
-            <article class="home-three-card home-reveal home-reveal-delay-2">
+            <article class="home-three-card home-card-shimmer home-reveal home-reveal-delay-2">
                 <div class="home-pillar-icon"><i class="fa-solid fa-gears"></i></div>
                 <h3>Does Real Work</h3>
-                <p>Capture leads, book appointments, update CRM records, trigger workflows, send notifications, and more.</p>
+                <p>Leads, appointments, CRM updates, workflows, notifications — not just chat.</p>
+                <div class="home-card-mini-viz home-viz-ticker" id="aiEmployeeWorkTicker" aria-hidden="true"><span class="is-active">Lead captured</span><span>Appointment booked</span><span>CRM updated</span><span>Workflow triggered</span></div>
             </article>
-            <article class="home-three-card home-reveal home-reveal-delay-3">
+            <article class="home-three-card home-card-shimmer home-reveal home-reveal-delay-3">
                 <div class="home-pillar-icon"><i class="fa-solid fa-share-nodes"></i></div>
                 <h3>Works Everywhere</h3>
-                <p>Deploy the same AI Employee across WhatsApp, your website, email, social channels, and internal platforms.</p>
+                <p>One employee, every channel — same brain, same instructions.</p>
+                <div class="home-card-mini-viz home-channel-dots" aria-hidden="true"><i class="fa-brands fa-whatsapp"></i><i class="fa-solid fa-envelope"></i><i class="fa-brands fa-instagram"></i><i class="fa-brands fa-facebook-messenger"></i><i class="fa-solid fa-globe"></i></div>
             </article>
         </div>
     </div>
@@ -186,9 +197,10 @@
             <h2>Your first AI Employee.</h2>
             <p>Sarah is ZiricAI's lead AI Employee — designed to communicate with customers, understand your business, perform tasks, and help your team get more done. She uses the same business knowledge and instructions on every connected channel.</p>
         </div>
-        <div class="sarah-hero-card home-reveal home-reveal-delay-1 home-sarah-glow">
+        <div class="home-sarah-layout home-reveal home-reveal-delay-1">
+        <div class="sarah-hero-card home-sarah-glow">
             <div class="sarah-avatar-wrap">
-                <div class="sarah-avatar"><img src="assets/sarah-avatar.svg" alt="Sarah" width="120" height="120"></div>
+                <div class="sarah-avatar sarah-avatar-pulse"><img src="assets/sarah-avatar.svg" alt="Sarah" width="120" height="120"></div>
                 <span class="sarah-status"><span class="pulse-dot"></span> Online now</span>
             </div>
             <div class="sarah-info">
@@ -210,11 +222,26 @@
                 </div>
             </div>
         </div>
+        <div class="home-sarah-sim-panel" aria-hidden="true">
+            <div class="home-sarah-sim-header"><i class="fa-solid fa-satellite-dish"></i> Sarah · live activity</div>
+            <ul class="home-sarah-activity" id="sarahActivityFeed">
+                <li class="is-active"><span class="dot"></span> Answered WhatsApp enquiry — 1.2s</li>
+                <li><span class="dot"></span> Qualified lead · Central Motors</li>
+                <li><span class="dot"></span> Booked test drive · Sat 10:00</li>
+                <li><span class="dot"></span> CRM record updated</li>
+                <li><span class="dot"></span> Team notified on dashboard</li>
+            </ul>
+            <div class="home-sarah-metrics">
+                <div><strong data-counter="8412" data-format="number">0</strong><span>Tasks this month</span></div>
+                <div><strong data-counter="98.7" data-format="percent">0</strong><span>Accuracy</span></div>
+            </div>
+        </div>
+        </div>
     </div>
 </section>
 
 <!-- ===== 7. OMNICHANNEL ===== -->
-<section class="section home-section-channels" id="omnichannel">
+<section class="section home-section-channels home-section-social" id="omnichannel">
     <div class="home-section-mesh" aria-hidden="true"></div>
     <div class="container">
         <div class="section-header home-reveal">
@@ -222,57 +249,82 @@
             <h2>Your AI workforce goes where your customers are.</h2>
             <p>Customers shouldn't have to learn how your business works. Deploy AI Employees across your digital channels and manage everything from one platform.</p>
         </div>
-        <div class="platform-channel-grid home-reveal">
-            <a class="platform-channel-card home-bento-tile" href="/platform/whatsapp/"><i class="fa-brands fa-whatsapp"></i><h4>WhatsApp</h4><p>Answer enquiries, support customers, qualify leads, and follow up automatically.</p></a>
-            <a class="platform-channel-card home-bento-tile" href="/platform/webchat/"><i class="fa-solid fa-globe"></i><h4>Website</h4><p>An AI assistant that answers questions and takes action for every visitor.</p></a>
-            <a class="platform-channel-card home-bento-tile" href="/platform/email/"><i class="fa-solid fa-envelope"></i><h4>Email</h4><p>Handle enquiries, follow-ups, requests, and routine communications.</p></a>
-            <a class="platform-channel-card home-bento-tile" href="/platform/instagram/"><i class="fa-brands fa-instagram"></i><h4>Social media</h4><p>Engage customers on the channels where your business already has an audience.</p></a>
-            <a class="platform-channel-card home-bento-tile" href="/platform/"><i class="fa-solid fa-building"></i><h4>Internal platforms</h4><p>Help employees with internal questions, processes, and tasks.</p></a>
+        <div class="home-social-stage home-reveal">
+            <div class="home-social-orbit" aria-hidden="true">
+                <div class="home-social-center"><img src="assets/sarah-avatar.svg" alt="" width="56" height="56"><span>Sarah</span></div>
+                <a href="/platform/whatsapp/" class="home-social-node home-sn-wa" style="--i:0"><i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span></a>
+                <a href="/platform/webchat/" class="home-social-node home-sn-web" style="--i:1"><i class="fa-solid fa-globe"></i><span>Webchat</span></a>
+                <a href="/platform/email/" class="home-social-node home-sn-mail" style="--i:2"><i class="fa-solid fa-envelope"></i><span>Gmail</span></a>
+                <a href="/platform/messenger/" class="home-social-node home-sn-msg" style="--i:3"><i class="fa-brands fa-facebook-messenger"></i><span>Messenger</span></a>
+                <a href="/platform/instagram/" class="home-social-node home-sn-ig" style="--i:4"><i class="fa-brands fa-instagram"></i><span>Instagram</span></a>
+                <a href="/platform/" class="home-social-node home-sn-ms" style="--i:5"><i class="fa-brands fa-microsoft"></i><span>Teams</span></a>
+            </div>
+            <div class="home-social-feed" id="homeSocialFeed">
+                <div class="home-social-post home-sp-wa"><i class="fa-brands fa-whatsapp"></i><p><strong>New message</strong> — Sarah replied in under 2 seconds</p></div>
+                <div class="home-social-post home-sp-ig"><i class="fa-brands fa-instagram"></i><p><strong>DM handled</strong> — product question + link sent</p></div>
+                <div class="home-social-post home-sp-mail"><i class="fa-solid fa-envelope"></i><p><strong>Email triaged</strong> — routed to Sales AI</p></div>
+            </div>
         </div>
         <p class="home-center-lead home-reveal"><strong>One workforce. Multiple channels. One source of business knowledge.</strong></p>
     </div>
 </section>
 
 <!-- ===== 8. KNOWLEDGE ===== -->
-<section class="section section-alt" id="knowledge">
-    <div class="container">
-        <div class="section-header home-reveal">
+<section class="section section-alt home-section-knowledge" id="knowledge">
+    <div class="container home-knowledge-split home-reveal">
+        <div class="home-knowledge-copy">
             <span class="section-eyebrow">Your business knowledge</span>
             <h2>Teach your AI Employees how your business works.</h2>
-            <p>Your AI Employees should know your business — not just the internet. Upload documents, policies, price lists, FAQs, and procedures — or connect your website and other sources.</p>
+            <p>Your AI Employees should know <em>your</em> business — not just the internet. Upload price lists, policies, and SOPs, or connect your website in minutes.</p>
+            <ul class="home-knowledge-bullets">
+                <li><i class="fa-solid fa-check"></i> Every answer grounded in approved company content</li>
+                <li><i class="fa-solid fa-check"></i> Shared brain across Sarah and your whole workforce</li>
+                <li><i class="fa-solid fa-check"></i> Tenant-isolated — your data stays yours</li>
+            </ul>
+            <a href="/products/knowledge/" class="btn btn-outline">Explore Knowledge Base</a>
         </div>
-        <div class="home-four-cards home-reveal">
-            <div class="home-four-card"><i class="fa-solid fa-file-pdf"></i><h4>Upload documents</h4><p>PDFs, spreadsheets, policies, price lists, SOPs, and more.</p></div>
-            <div class="home-four-card"><i class="fa-solid fa-globe"></i><h4>Connect your website</h4><p>Import website content, FAQs, and public business information.</p></div>
-            <div class="home-four-card"><i class="fa-solid fa-folder-tree"></i><h4>Organize knowledge</h4><p>Keep information structured and accessible to the right AI Employees.</p></div>
-            <div class="home-four-card"><i class="fa-solid fa-shield-halved"></i><h4>Keep employees consistent</h4><p>One shared source of approved business information.</p></div>
+        <div class="knowledge-mock home-knowledge-mock home-knowledge-viz">
+            <div class="home-knowledge-scan" aria-hidden="true"></div>
+            <div class="knowledge-mock-header"><i class="fa-solid fa-book"></i> Knowledge Library — Your business</div>
+            <div class="knowledge-doc home-kb-doc"><i class="fa-solid fa-file-pdf"></i> Price List 2026.pdf <span class="badge badge-training">Training…</span></div>
+            <div class="knowledge-doc"><i class="fa-solid fa-file-word"></i> Policies &amp; SOPs.docx <span class="badge">Trained</span></div>
+            <div class="knowledge-doc"><i class="fa-solid fa-file-lines"></i> Customer FAQs <span class="badge">Trained</span></div>
+            <div class="knowledge-doc"><i class="fa-solid fa-globe"></i> yourwebsite.co.za <span class="badge">Indexed</span></div>
+            <div class="home-kb-sync-bar"><span id="homeKbProgress" style="width:72%"></span></div>
+            <p class="home-kb-caption"><i class="fa-solid fa-brain"></i> Embedding knowledge for Sarah + Sales AI…</p>
         </div>
-        <p class="home-section-cta home-reveal"><a href="/products/knowledge/" class="btn btn-outline">Explore Knowledge Base</a></p>
     </div>
 </section>
 
 <!-- ===== 9. WORKFLOW ===== -->
 <section class="section" id="automation">
     <div class="container">
-        <div class="section-header home-reveal">
-            <span class="section-eyebrow">Workflow automation</span>
-            <h2>Don't stop at the conversation. Complete the work.</h2>
-            <p>A customer conversation can be the beginning of a business process — not the end. ZiricAI connects AI conversations to the actions your business needs to take.</p>
+        <div class="home-workflow-split home-reveal">
+            <div class="home-workflow-copy">
+                <span class="section-eyebrow">Workflow automation</span>
+                <h2>Don't stop at the conversation. Complete the work.</h2>
+                <p>When Sarah understands intent, ZiricAI triggers the next steps automatically — CRM updates, calendar bookings, confirmations, and team alerts.</p>
+                <ul class="home-knowledge-bullets">
+                    <li><i class="fa-solid fa-bolt"></i> Visual workflows — no code required</li>
+                    <li><i class="fa-solid fa-link"></i> Connect WhatsApp events to Paystack, email, and your portal</li>
+                    <li><i class="fa-solid fa-user-check"></i> Human approval steps when you need them</li>
+                </ul>
+                <p class="home-lead-accent"><strong>Turn conversations into completed business processes.</strong></p>
+            </div>
+            <div class="workflow-visual workflow-visual-animated workflow-visual-stack home-workflow-board">
+                <div class="workflow-step is-live"><div class="workflow-step-icon"><i class="fa-solid fa-comment-dots"></i></div><h4>Customer asks</h4></div>
+                <div class="workflow-connector workflow-connector-down"><i class="fa-solid fa-arrow-down"></i></div>
+                <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-brain"></i></div><h4>AI understands</h4></div>
+                <div class="workflow-connector workflow-connector-down"><i class="fa-solid fa-arrow-down"></i></div>
+                <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-address-book"></i></div><h4>Creates / updates CRM</h4></div>
+                <div class="workflow-connector workflow-connector-down"><i class="fa-solid fa-arrow-down"></i></div>
+                <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-calendar-check"></i></div><h4>Books appointment</h4></div>
+                <div class="workflow-connector workflow-connector-down"><i class="fa-solid fa-arrow-down"></i></div>
+                <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-paper-plane"></i></div><h4>Sends confirmation</h4></div>
+                <div class="workflow-connector workflow-connector-down"><i class="fa-solid fa-arrow-down"></i></div>
+                <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-bell"></i></div><h4>Notifies your team</h4></div>
+            </div>
         </div>
-        <div class="workflow-visual workflow-visual-animated workflow-visual-stack home-reveal">
-            <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-comment-dots"></i></div><h4>Customer asks</h4></div>
-            <div class="workflow-connector workflow-connector-down"><i class="fa-solid fa-arrow-down"></i></div>
-            <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-brain"></i></div><h4>AI understands</h4></div>
-            <div class="workflow-connector workflow-connector-down"><i class="fa-solid fa-arrow-down"></i></div>
-            <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-address-book"></i></div><h4>Creates / updates CRM</h4></div>
-            <div class="workflow-connector workflow-connector-down"><i class="fa-solid fa-arrow-down"></i></div>
-            <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-calendar-check"></i></div><h4>Books appointment</h4></div>
-            <div class="workflow-connector workflow-connector-down"><i class="fa-solid fa-arrow-down"></i></div>
-            <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-paper-plane"></i></div><h4>Sends confirmation</h4></div>
-            <div class="workflow-connector workflow-connector-down"><i class="fa-solid fa-arrow-down"></i></div>
-            <div class="workflow-step"><div class="workflow-step-icon"><i class="fa-solid fa-bell"></i></div><h4>Notifies your team</h4></div>
-        </div>
-        <p class="home-center-lead home-reveal"><strong>Turn conversations into completed business processes.</strong></p>
     </div>
 </section>
 
@@ -284,13 +336,13 @@
             <h2>Hire an AI Employee for the job you need done.</h2>
             <p>Start with a ready-to-deploy AI Employee or build one around your organization's requirements — role, knowledge, channels, workflows, integrations, and permissions.</p>
         </div>
-        <div class="home-workforce-grid home-reveal">
-            <article class="home-workforce-card"><span class="home-workforce-dept">Administration</span><h4>AI Receptionist</h4><p>Enquiries, visitors, routine requests, and routing to the right person or service.</p></article>
-            <article class="home-workforce-card"><span class="home-workforce-dept">Sales</span><h4>Sales Consultant</h4><p>Qualifies leads, answers product questions, follows up, and moves opportunities forward.</p></article>
-            <article class="home-workforce-card"><span class="home-workforce-dept">Customer Support</span><h4>Support Employee</h4><p>Answers questions, handles routine support, tracks issues, and escalates when needed.</p></article>
-            <article class="home-workforce-card"><span class="home-workforce-dept">Human Resources</span><h4>HR Assistant</h4><p>Employee FAQs, onboarding, policies, leave questions, and routine HR requests.</p></article>
-            <article class="home-workforce-card"><span class="home-workforce-dept">Finance</span><h4>Finance Assistant</h4><p>Routine finance enquiries, payment reminders, invoice questions, and account requests.</p></article>
-            <article class="home-workforce-card"><span class="home-workforce-dept">Legal</span><h4>Legal Assistant</h4><p>Initial enquiries, information collection, consultations, and documentation guidance.</p></article>
+        <div class="marketplace-grid home-marketplace-preview home-reveal" id="homeMarketplacePreview">
+            <article class="marketplace-card"><div class="marketplace-icon">🛎️</div><span class="marketplace-category">Administration</span><h4>AI Receptionist</h4><p>Enquiries, visitors, routine requests, and routing to the right person or service.</p><span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> Ready to hire</span></article>
+            <article class="marketplace-card"><div class="marketplace-icon">🚗</div><span class="marketplace-category">Sales</span><h4>Sales Consultant</h4><p>Qualifies leads, answers product questions, follows up, and moves opportunities forward.</p><span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> Ready to hire</span></article>
+            <article class="marketplace-card"><div class="marketplace-icon">💬</div><span class="marketplace-category">Customer Support</span><h4>Support Employee</h4><p>Answers questions, handles routine support, tracks issues, and escalates when needed.</p><span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> Ready to hire</span></article>
+            <article class="marketplace-card"><div class="marketplace-icon">👥</div><span class="marketplace-category">Human Resources</span><h4>HR Assistant</h4><p>Employee FAQs, onboarding, policies, leave questions, and routine HR requests.</p><span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> Ready to hire</span></article>
+            <article class="marketplace-card"><div class="marketplace-icon">💰</div><span class="marketplace-category">Finance</span><h4>Finance Assistant</h4><p>Routine finance enquiries, payment reminders, invoice questions, and account requests.</p><span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> Ready to hire</span></article>
+            <article class="marketplace-card"><div class="marketplace-icon">⚖️</div><span class="marketplace-category">Legal</span><h4>Legal Assistant</h4><p>Initial enquiries, information collection, consultations, and documentation guidance.</p><span class="marketplace-tag"><i class="fa-solid fa-bolt"></i> Ready to hire</span></article>
         </div>
         <p class="home-disclaimer home-reveal"><i class="fa-solid fa-circle-info"></i> Legal and healthcare AI Employees do not replace licensed professionals. Configure permissions and escalation rules for your organization.</p>
         <p class="home-section-cta home-reveal"><a href="/ai-employees/marketplace/" class="btn">Explore all AI Employees <i class="fa-solid fa-arrow-right"></i></a></p>
@@ -320,8 +372,26 @@
             <h2>AI Employees that don't work in isolation.</h2>
             <p>ZiricAI brings conversations, customer information, knowledge, automation, and business activity together so your AI Employees work as part of your operation.</p>
         </div>
-        <div class="home-systems-chain home-reveal" aria-hidden="true">
-            <span>AI Employee</span><i class="fa-solid fa-arrows-left-right"></i><span>CRM</span><i class="fa-solid fa-arrows-left-right"></i><span>Knowledge</span><i class="fa-solid fa-arrows-left-right"></i><span>Calendar</span><i class="fa-solid fa-arrows-left-right"></i><span>Payments</span><i class="fa-solid fa-arrows-left-right"></i><span>Automation</span><i class="fa-solid fa-arrows-left-right"></i><span>Channels</span>
+        <div class="home-connected-layout home-reveal">
+            <div class="home-connected-diagram" aria-hidden="true">
+                <div class="home-hub-node"><i class="fa-solid fa-robot"></i> AI Employee</div>
+                <div class="home-hub-spokes">
+                    <span><i class="fa-solid fa-address-book"></i> CRM</span>
+                    <span><i class="fa-solid fa-book"></i> Knowledge</span>
+                    <span><i class="fa-solid fa-calendar"></i> Calendar</span>
+                    <span><i class="fa-brands fa-stripe"></i> Payments</span>
+                    <span><i class="fa-solid fa-bolt"></i> Automation</span>
+                    <span><i class="fa-brands fa-whatsapp"></i> Channels</span>
+                </div>
+            </div>
+            <div class="home-connected-detail">
+                <p>When a customer messages you, data flows in real time — no copy-paste between tools.</p>
+                <ul class="home-knowledge-bullets">
+                    <li><i class="fa-solid fa-check"></i> Single customer record across WhatsApp, web, and email</li>
+                    <li><i class="fa-solid fa-check"></i> Knowledge updates instantly available to every AI Employee</li>
+                    <li><i class="fa-solid fa-check"></i> Automations fire from conversation events, not manual exports</li>
+                </ul>
+            </div>
         </div>
     </div>
 </section>
@@ -354,11 +424,11 @@
             <span class="section-eyebrow">Why ZiricAI</span>
             <h2>AI that works like part of your business.</h2>
         </div>
-        <div class="home-why-grid home-reveal">
-            <article><h3>Hire</h3><p>Add specialized AI Employees without months of recruitment.</p></article>
-            <article><h3>Train</h3><p>Give them the knowledge and instructions they need for their role.</p></article>
-            <article><h3>Deploy</h3><p>Put them on the channels and systems where work happens.</p></article>
-            <article><h3>Manage</h3><p>Control your AI workforce from one unified platform.</p></article>
+        <div class="home-why-grid home-why-modern home-reveal">
+            <article class="home-why-card"><div class="home-why-icon"><i class="fa-solid fa-user-plus"></i></div><h3>Hire</h3><p>Add specialized AI Employees without months of recruitment.</p></article>
+            <article class="home-why-card"><div class="home-why-icon"><i class="fa-solid fa-graduation-cap"></i></div><h3>Train</h3><p>Give them the knowledge and instructions they need for their role.</p></article>
+            <article class="home-why-card"><div class="home-why-icon"><i class="fa-solid fa-rocket"></i></div><h3>Deploy</h3><p>Put them on the channels and systems where work happens.</p></article>
+            <article class="home-why-card"><div class="home-why-icon"><i class="fa-solid fa-satellite-dish"></i></div><h3>Manage</h3><p>Control your AI workforce from one unified platform.</p></article>
         </div>
     </div>
 </section>
@@ -428,10 +498,39 @@
 
 <!-- ===== 16. SEE WHAT'S POSSIBLE ===== -->
 <section class="section home-section-possible" id="social-proof">
+    <div class="home-possible-bg" aria-hidden="true"></div>
     <div class="container home-reveal">
         <span class="section-eyebrow">See what's possible</span>
         <h2>Built for businesses ready to work differently.</h2>
-        <p class="intro-lead">From customer service and sales to administration and operations, ZiricAI gives businesses the tools to build a digital workforce around the work that matters most. Real case studies coming soon.</p>
+        <p class="intro-lead">Watch how one platform connects customer conversations to real outcomes — before your first case study goes live.</p>
+        <div class="home-possible-stage" id="homePossibleStage">
+            <div class="home-possible-slide is-active" data-slide="0">
+                <div class="home-possible-icon"><i class="fa-brands fa-whatsapp"></i></div>
+                <h3>After-hours sales</h3>
+                <p>Sarah answers stock questions, sends quotes, and books test drives while your showroom is closed.</p>
+            </div>
+            <div class="home-possible-slide" data-slide="1">
+                <div class="home-possible-icon"><i class="fa-solid fa-calendar-check"></i></div>
+                <h3>Appointments on autopilot</h3>
+                <p>Reception AI syncs calendars, sends reminders, and reduces no-shows across WhatsApp and web.</p>
+            </div>
+            <div class="home-possible-slide" data-slide="2">
+                <div class="home-possible-icon"><i class="fa-solid fa-headset"></i></div>
+                <h3>Support without the queue</h3>
+                <p>Support Employees resolve routine tickets instantly and escalate sensitive cases to your team.</p>
+            </div>
+            <div class="home-possible-slide" data-slide="3">
+                <div class="home-possible-icon"><i class="fa-solid fa-chart-line"></i></div>
+                <h3>Operations you can see</h3>
+                <p>Mission Control shows live workload, accuracy, and revenue impact across your workforce.</p>
+            </div>
+        </div>
+        <div class="home-possible-dots" id="homePossibleDots">
+            <button type="button" class="is-active" data-slide="0" aria-label="Slide 1"></button>
+            <button type="button" data-slide="1" aria-label="Slide 2"></button>
+            <button type="button" data-slide="2" aria-label="Slide 3"></button>
+            <button type="button" data-slide="3" aria-label="Slide 4"></button>
+        </div>
     </div>
 </section>
 
@@ -449,13 +548,25 @@
 </section>
 
 <!-- ===== 18. FAQ ===== -->
-<section class="section" id="faq">
+<section class="section section-alt home-section-faq" id="faq">
     <div class="container">
-        <div class="section-header home-reveal">
-            <span class="section-eyebrow">FAQ</span>
-            <h2>Everything you need to know about ZiricAI.</h2>
-        </div>
-        <div class="faq-list faq-list-home home-reveal" id="faqList">
+        <div class="split-panel-layout faq-layout home-faq-layout home-reveal">
+            <aside class="split-panel-left faq-sidebar">
+                <span class="section-eyebrow">FAQ</span>
+                <h2 class="faq-sidebar-title">Everything you need to know about ZiricAI.</h2>
+                <p class="faq-sidebar-intro">Quick answers on AI Employees, channels, security, and getting started — or chat with Sarah anytime.</p>
+                <div class="home-faq-highlights">
+                    <div><i class="fa-solid fa-clock"></i> Live in minutes</div>
+                    <div><i class="fa-solid fa-shield-halved"></i> POPIA-ready design</div>
+                    <div><i class="fa-solid fa-gift"></i> 14-day free trial</div>
+                </div>
+                <div class="faq-sarah-prompt">
+                    <div class="faq-sarah-avatar"><img src="assets/sarah-avatar.svg" alt="" width="44" height="44"></div>
+                    <div><strong>Ask Sarah</strong><p>Pricing, setup, industries, and plans.</p><button type="button" class="btn btn-outline btn-sm" id="faqAskSarahBtn"><i class="fa-solid fa-comment-dots"></i> Chat with Sarah</button></div>
+                </div>
+            </aside>
+            <div class="split-panel-right faq-content">
+        <div class="faq-list faq-list-home" id="faqList">
             <div class="faq-item" data-faq-cat="getting-started"><button class="faq-question" type="button">What is ZiricAI? <i class="fa-solid fa-chevron-down"></i></button><div class="faq-answer"><p>ZiricAI is an AI Business Operating System that allows organizations to hire, train, deploy, and manage AI Employees across their business.</p></div></div>
             <div class="faq-item" data-faq-cat="getting-started"><button class="faq-question" type="button">What is an AI Employee? <i class="fa-solid fa-chevron-down"></i></button><div class="faq-answer"><p>An AI Employee is a digital worker designed for a specific business role. It can communicate, access approved business knowledge, perform configured tasks, follow workflows, and escalate matters to human employees.</p></div></div>
             <div class="faq-item" data-faq-cat="product"><button class="faq-question" type="button">Is ZiricAI just a chatbot? <i class="fa-solid fa-chevron-down"></i></button><div class="faq-answer"><p>No. Chat is one way an AI Employee communicates. ZiricAI connects AI Employees to business knowledge, CRM, automation, communication channels, and other systems so they can perform work, not simply answer questions.</p></div></div>
@@ -466,9 +577,7 @@
             <div class="faq-item" data-faq-cat="product"><button class="faq-question" type="button">Can I have more than one AI Employee? <i class="fa-solid fa-chevron-down"></i></button><div class="faq-answer"><p>Yes. Businesses can build a workforce of specialized AI Employees for different roles and departments.</p></div></div>
             <div class="faq-item" data-faq-cat="security"><button class="faq-question" type="button">Is my business information secure? <i class="fa-solid fa-chevron-down"></i></button><div class="faq-answer"><p>ZiricAI is designed with tenant separation, access controls, and security measures to keep each organization's information isolated. See our <a href="/privacy/">privacy</a> and security documentation for details.</p></div></div>
         </div>
-        <div class="faq-sarah-prompt home-reveal">
-            <div class="faq-sarah-avatar"><img src="assets/sarah-avatar.svg" alt="" width="44" height="44"></div>
-            <div><strong>Still have questions?</strong><p>Ask Sarah or browse the <a href="/resources/faq/">full FAQ</a>.</p><button type="button" class="btn btn-outline btn-sm" id="faqAskSarahBtn"><i class="fa-solid fa-comment-dots"></i> Chat with Sarah</button></div>
+            </div>
         </div>
     </div>
 </section>
@@ -488,18 +597,18 @@
 <!-- ===== 20. FOOTER ===== -->
 <footer class="site-footer home-footer">
     <div class="container">
-        <div class="footer-grid footer-grid-v2">
-            <div class="footer-brand">
-                <a href="/" class="logo"><img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img"></a>
-                <p><strong>The AI Business Operating System for the modern business.</strong></p>
-                <p>Hire AI Employees. Train them on your business. Connect them to your systems. Put them to work.</p>
-            </div>
+        <div class="footer-top-brand footer-brand">
+            <a href="/" class="logo"><img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img"></a>
+            <p><strong>The AI Business Operating System for the modern business.</strong></p>
+            <p>Hire AI Employees. Train them on your business. Connect them to your systems. Put them to work.</p>
+        </div>
+        <div class="footer-grid footer-grid-v2 footer-grid-inline">
             <div class="footer-col"><h5>Platform</h5><a href="/ai-employees/how-it-works/">AI Employees</a><a href="/products/knowledge/">Knowledge Base</a><a href="/products/crm/">CRM</a><a href="/products/automation/">Automation</a><a href="/products/analytics/">Analytics</a><a href="/products/dashboards/">Mission Control</a><a href="/platform/">Integrations</a></div>
-            <div class="footer-col"><h5>AI Employees</h5><a href="/ai-employees/marketplace/">Administration</a><a href="/ai-employees/marketplace/">Sales</a><a href="/ai-employees/marketplace/">Marketing</a><a href="/ai-employees/marketplace/">Customer Support</a><a href="/ai-employees/marketplace/">Human Resources</a><a href="/ai-employees/marketplace/">Finance</a><a href="/ai-employees/marketplace/">Legal</a><a href="/ai-employees/marketplace/">Healthcare</a><a href="/ai-employees/marketplace/">Education</a></div>
-            <div class="footer-col"><h5>Solutions</h5><a href="/solutions/">Small Business</a><a href="/solutions/">Growing Businesses</a><a href="/solutions/">Enterprise</a><a href="/solutions/">Customer Service</a><a href="/solutions/">Sales</a><a href="/solutions/">Operations</a><a href="/solutions/">Internal Teams</a></div>
-            <div class="footer-col"><h5>Industries</h5><a href="/solutions/automotive/">Automotive</a><a href="/solutions/mining/">Mining</a><a href="/solutions/healthcare/">Healthcare</a><a href="/solutions/education/">Education</a><a href="/solutions/professional-services/">Legal</a><a href="/solutions/retail/">Retail</a><a href="/solutions/">Hospitality</a><a href="/solutions/professional-services/">Professional Services</a><a href="/solutions/">View all industries</a></div>
-            <div class="footer-col"><h5>Company</h5><a href="/resources/guides/">About ZiricAI</a><a href="mailto:hello@ziric.ai">Contact</a><a href="mailto:hello@ziric.ai">Careers</a><a href="mailto:hello@ziric.ai">Partners</a></div>
-            <div class="footer-col"><h5>Resources</h5><a href="/resources/guides/">Guides</a><a href="/resources/ai-resources/">Documentation</a><a href="/resources/faq/">FAQ</a><a href="/privacy/">Security</a><a href="/privacy/">Privacy</a></div>
+            <div class="footer-col"><h5>AI Employees</h5><a href="/ai-employees/marketplace/">Administration</a><a href="/ai-employees/marketplace/">Sales</a><a href="/ai-employees/marketplace/">Customer Support</a><a href="/ai-employees/marketplace/">HR</a><a href="/ai-employees/marketplace/">Finance</a><a href="/ai-employees/marketplace/">Legal</a></div>
+            <div class="footer-col"><h5>Solutions</h5><a href="/solutions/">Customer Service</a><a href="/solutions/">Sales</a><a href="/solutions/">Operations</a><a href="/solutions/">Enterprise</a></div>
+            <div class="footer-col"><h5>Industries</h5><a href="/solutions/automotive/">Automotive</a><a href="/solutions/healthcare/">Healthcare</a><a href="/solutions/education/">Education</a><a href="/solutions/">View all</a></div>
+            <div class="footer-col"><h5>Company</h5><a href="/resources/guides/">About</a><a href="mailto:hello@ziric.ai">Contact</a><a href="mailto:hello@ziric.ai">Partners</a></div>
+            <div class="footer-col"><h5>Resources</h5><a href="/resources/guides/">Guides</a><a href="/resources/faq/">FAQ</a><a href="/resources/ai-resources/">Docs</a><a href="/privacy/">Privacy</a></div>
         </div>
         <div class="footer-bottom">
             <span>&copy; 2026 ZiricAI — Built by Ziric Media</span>

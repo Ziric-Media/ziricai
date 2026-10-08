@@ -1173,12 +1173,89 @@
         }, 5500);
     }
 
+    function initListTicker(listId, intervalMs = 2800) {
+        const list = document.getElementById(listId);
+        if (!list || prefersReducedMotion) return;
+        const items = [...list.querySelectorAll('li, span')].filter((el) => el.parentElement === list || list.classList.contains('home-viz-ticker'));
+        const nodes = list.classList.contains('home-viz-ticker') ? [...list.querySelectorAll('span')] : [...list.querySelectorAll('li')];
+        if (nodes.length < 2) return;
+        let i = 0;
+        nodes.forEach((n, idx) => n.classList.toggle('is-active', idx === 0));
+        setInterval(() => {
+            nodes[i].classList.remove('is-active');
+            i = (i + 1) % nodes.length;
+            nodes[i].classList.add('is-active');
+        }, intervalMs);
+    }
+
+    function initHomePossible() {
+        const stage = document.getElementById('homePossibleStage');
+        const dots = document.getElementById('homePossibleDots');
+        if (!stage || prefersReducedMotion) return;
+        const slides = [...stage.querySelectorAll('.home-possible-slide')];
+        const dotBtns = dots ? [...dots.querySelectorAll('button')] : [];
+        let index = 0;
+
+        function show(idx) {
+            index = idx;
+            slides.forEach((s, i) => s.classList.toggle('is-active', i === idx));
+            dotBtns.forEach((d, i) => d.classList.toggle('is-active', i === idx));
+        }
+
+        dotBtns.forEach((btn) => {
+            btn.addEventListener('click', () => show(parseInt(btn.dataset.slide, 10) || 0));
+        });
+
+        setInterval(() => show((index + 1) % slides.length), 5000);
+    }
+
+    function initHomeSocialFeed() {
+        const feed = document.getElementById('homeSocialFeed');
+        if (!feed || prefersReducedMotion) return;
+        const posts = [...feed.querySelectorAll('.home-social-post')];
+        if (posts.length < 2) return;
+        let i = 0;
+        posts.forEach((p, idx) => p.classList.toggle('is-active', idx === 0));
+        setInterval(() => {
+            posts[i].classList.remove('is-active');
+            i = (i + 1) % posts.length;
+            posts[i].classList.add('is-active');
+        }, 3500);
+    }
+
+    function initWorkflowLiveStep() {
+        const board = document.querySelector('.home-workflow-board');
+        if (!board || prefersReducedMotion) return;
+        const steps = [...board.querySelectorAll('.workflow-step')];
+        let i = 0;
+        setInterval(() => {
+            steps.forEach((s) => s.classList.remove('is-live'));
+            steps[i].classList.add('is-live');
+            i = (i + 1) % steps.length;
+        }, 2200);
+    }
+
+    function initKbProgressAnim() {
+        const bar = document.getElementById('homeKbProgress');
+        if (!bar || prefersReducedMotion) return;
+        setInterval(() => {
+            const w = 55 + Math.random() * 40;
+            bar.style.width = `${w}%`;
+        }, 3200);
+    }
+
     function initHomeModern() {
         if (!document.getElementById('landingView')?.classList.contains('home-modern')) return;
         initHomeReveal();
         initHomeMiniChat();
         initMissionActivityTicker();
         initHomeTestimonials();
+        initListTicker('sarahActivityFeed');
+        initListTicker('aiEmployeeWorkTicker');
+        initHomePossible();
+        initHomeSocialFeed();
+        initWorkflowLiveStep();
+        initKbProgressAnim();
 
         document.getElementById('homeChannelsDemoBtn')?.addEventListener('click', () => {
             document.getElementById('product-tour')?.scrollIntoView({ behavior: 'smooth' });

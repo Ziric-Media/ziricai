@@ -4,6 +4,7 @@
  */
 
 export const MARKETING_NAV = [
+  { id: 'home', label: 'Home', href: '/', home: true },
   {
     id: 'platform',
     label: 'Platform',
@@ -77,7 +78,6 @@ export const MARKETING_NAV = [
       { label: 'Security', href: '/privacy/' },
     ],
   },
-  { id: 'login', label: 'Login', href: '/login.html' },
 ];
 
 /** Normalize for active-state checks (trailing slash, no hash). */
@@ -117,8 +117,10 @@ export function renderMarketingNavLinks({ activePath = '/' } = {}) {
   const parts = [];
 
   for (const item of MARKETING_NAV) {
-    if (item.id === 'login') {
-      parts.push(`<a href="/login.html" class="nav-link nav-login ${linkClass(path, '/login.html')}">${item.label}</a>`);
+    if (item.home) {
+      parts.push(
+        `<a href="/" class="nav-link nav-home ${linkClass(path, '/')}"><i class="fa-solid fa-house" aria-hidden="true"></i><span>Home</span></a>`
+      );
       continue;
     }
 

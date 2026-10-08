@@ -179,7 +179,7 @@ if (home.includes('id="trust-stats"') && home.includes('id="differentiator"')) {
 } else {
   fail('home: missing trust/differentiator sections');
 }
-if (home.includes('nav-links-mega') && home.includes('nav-dropdown')) pass('home: mega-menu nav (logo = home)');
+if (home.includes('nav-links-mega') && home.includes('nav-home')) pass('home: mega-menu nav with Home');
 else fail('home: missing mega-menu nav');
 if (home.includes('id="product-tour"') && home.includes('id="tourPhoneChat"')) {
   pass('home: product tour / demo phone UI present');
