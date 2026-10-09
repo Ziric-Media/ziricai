@@ -11,9 +11,10 @@ import { renderEmptyState } from '../core/widgets/emptyState.js';
 import {
   getPermissions,
   PERMISSION_LABELS,
-  PORTAL_ROLES,
+  STAFF_PORTAL_ROLES,
   roleLabel,
   can,
+  invitableRoles,
 } from '../permissions.js';
 import { fetchPortalTeam, inviteTeamMember } from '../api.js';
 
@@ -74,13 +75,13 @@ export async function renderTeam(container) {
       <div class="card-body permissions-matrix-wrap">
         <table class="org-table permissions-matrix">
           <thead>
-            <tr><th>Permission</th>${PORTAL_ROLES.map((r) => `<th>${escapeHtml(roleLabel(r))}</th>`).join('')}</tr>
+            <tr><th>Permission</th>${STAFF_PORTAL_ROLES.map((r) => `<th>${escapeHtml(roleLabel(r))}</th>`).join('')}</tr>
           </thead>
           <tbody>
             ${Object.entries(PERMISSION_LABELS).map(([key, label]) => `
               <tr>
                 <td>${escapeHtml(label)}</td>
-                ${PORTAL_ROLES.map((r) => {
+                ${STAFF_PORTAL_ROLES.map((r) => {
                   const p = getPermissions(r);
                   return `<td class="perm-cell ${p[key] ? 'yes' : 'no'}">${p[key] ? '✓' : '—'}</td>`;
                 }).join('')}
@@ -101,7 +102,7 @@ export async function renderTeam(container) {
           <div class="form-group"><label>Email</label><input type="email" id="inviteEmail" placeholder="colleague@company.com" /></div>
           <div class="form-group"><label>Role</label>
             <select id="inviteRole">
-              ${PORTAL_ROLES.filter((r) => r !== 'owner').map((r) => `<option value="${r}">${escapeHtml(roleLabel(r))}</option>`).join('')}
+              ${invitableRoles().map((r) => `<option value="${r}">${escapeHtml(roleLabel(r))}</option>`).join('')}
             </select>
           </div>
           <p class="form-hint">${isDemo ? 'Demo mode — invite is simulated locally.' : 'Invite is recorded on the server; email delivery pending.'}</p>

@@ -1,4 +1,10 @@
-import { observeAuthState, loginUser, isSuperAdminRole, resolveAuthProfile } from '../auth.js';
+import {
+  observeAuthState,
+  loginUser,
+  isSuperAdminRole,
+  resolveAuthProfile,
+  fetchServerSessionProfile,
+} from '../auth.js';
 import { setState } from './state.js';
 import { showToast } from './ui.js';
 import { createLoginBusy } from '../shared/loginBusy.js';
@@ -34,7 +40,10 @@ export function initAuthGuard({ onReady, onDenied }) {
       return;
     }
 
-    const profile = await resolveAuthProfile(user, { allowDemo: false });
+    let profile = await fetchServerSessionProfile(user);
+    if (!profile) {
+      profile = await resolveAuthProfile(user, { allowDemo: false });
+    }
 
     if (!profile) {
       showAccessDenied(

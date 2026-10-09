@@ -119,10 +119,22 @@ export async function fetchServerSessionProfile(user) {
     if (!res.ok) return null;
     const data = await res.json();
     const profile = data?.profile;
-    if (!profile?.companyId) return null;
+    if (!profile) return null;
+    const role = profile.role || data.role || null;
+    const companyId = profile.companyId || profile.company || data.companyId || null;
+    if (isSuperAdminRole(role)) {
+      return {
+        ...profile,
+        role,
+        companyId,
+        isDemo: false,
+      };
+    }
+    if (!companyId) return null;
     return {
       ...profile,
-      companyId: profile.companyId || profile.company || null,
+      role,
+      companyId,
       isDemo: false,
     };
   } catch (err) {

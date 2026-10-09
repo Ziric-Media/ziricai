@@ -92,6 +92,42 @@ export async function renderSupport(container) {
       { label: 'Ask Sarah', icon: 'fa-sparkles', action: 'sarah', color: 'green' },
     ])}
 
+    <div class="panel-card bos-panel bos-support-compose-card" style="margin-bottom:1rem">
+      <div class="panel-header"><h3><i class="fa-solid fa-plus"></i> New support case</h3></div>
+      <form id="bosSupportForm" class="bos-support-form">
+        <div class="bos-support-form-meta">
+          <div class="bos-support-field bos-support-field--subject">
+            <label class="bos-support-label" for="bosSupportSubject">Subject <span class="required">*</span></label>
+            <input id="bosSupportSubject" class="bos-support-input" name="subject" required maxlength="200" placeholder="Brief summary" />
+          </div>
+          <div class="bos-support-field">
+            <label class="bos-support-label" for="bosSupportCategory">Category</label>
+            <select id="bosSupportCategory" class="bos-support-input" name="category">
+              ${CATEGORIES.map((c) => `<option value="${c.value}">${escapeHtml(c.label)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="bos-support-field">
+            <label class="bos-support-label" for="bosSupportPriority">Priority</label>
+            <select id="bosSupportPriority" class="bos-support-input" name="priority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+        <div class="bos-support-compose">
+          <label class="bos-support-label" for="bosSupportDescription">Description</label>
+          <textarea id="bosSupportDescription" class="bos-support-textarea" name="description" rows="5" placeholder="What do you need help with?"></textarea>
+          <div class="bos-support-compose-actions">
+            <p class="bos-support-compose-hint">Our team will follow up in your company inbox.</p>
+            <button type="submit" class="btn btn-primary bos-support-submit">
+              <i class="fa-solid fa-paper-plane"></i> Submit case
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
     <div class="panel-card bos-panel" style="margin-bottom:1rem">
       <div class="panel-header"><h3><i class="fa-solid fa-ticket"></i> Your support cases</h3></div>
       ${
@@ -102,29 +138,8 @@ export async function renderSupport(container) {
               <thead><tr><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th><th>Updated</th></tr></thead>
               <tbody>${cases.map((c) => renderCaseRow(c, canPatch)).join('')}</tbody>
             </table></div>`
-            : emptyState('No support cases yet. Submit a request below and our team will follow up.')
+            : emptyState('No support cases yet. Submit a request above and our team will follow up.')
       }
-    </div>
-
-    <div class="panel-card bos-panel" style="margin-bottom:1rem">
-      <div class="panel-header"><h3><i class="fa-solid fa-plus"></i> New support case</h3></div>
-      <form id="bosSupportForm" class="bos-support-form">
-        <label class="form-label">Subject <span class="required">*</span></label>
-        <input class="form-input" name="subject" required maxlength="200" placeholder="Brief summary" />
-        <label class="form-label">Category</label>
-        <select class="form-input" name="category">
-          ${CATEGORIES.map((c) => `<option value="${c.value}">${escapeHtml(c.label)}</option>`).join('')}
-        </select>
-        <label class="form-label">Priority</label>
-        <select class="form-input" name="priority">
-          <option value="low">Low</option>
-          <option value="medium" selected>Medium</option>
-          <option value="high">High</option>
-        </select>
-        <label class="form-label">Description</label>
-        <textarea class="form-input" name="description" rows="4" placeholder="What do you need help with?"></textarea>
-        <button type="submit" class="btn btn-primary">Submit case</button>
-      </form>
     </div>
 
     <div class="bos-support-grid">

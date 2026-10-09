@@ -153,7 +153,17 @@ async function ensureAuthForProfileWrite(uid) {
   return { ok: true };
 }
 
-const UPDATABLE_PROFILE_FIELDS = ['fullName', 'name', 'email', 'role', 'company', 'companyId', 'status', 'mfaEnabled'];
+const UPDATABLE_PROFILE_FIELDS = [
+  'fullName',
+  'name',
+  'email',
+  'role',
+  'company',
+  'companyId',
+  'status',
+  'mfaEnabled',
+  'photoURL',
+];
 
 
 
@@ -258,6 +268,7 @@ function normalizeProfile(uid, data) {
     companyId,
     status: data.status ?? '',
     mfaEnabled: Boolean(data.mfaEnabled),
+    photoURL: data.photoURL ?? '',
     createdAt: data.createdAt ?? null,
     lastLogin: data.lastLogin ?? null,
   };
@@ -432,6 +443,16 @@ async function fetchUserProfileViaRest(uid) {
 
 async function readUserProfileSnapshot(profileRef) {
   let lastError = null;
+
+  try {
+    await ensureFirestoreReady();
+    const cachedSnap = await getDoc(profileRef);
+    if (cachedSnap.exists()) {
+      return cachedSnap;
+    }
+  } catch (error) {
+    lastError = error;
+  }
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {

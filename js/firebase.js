@@ -55,7 +55,7 @@ export async function ensureFirestoreReady() {
   await auth.authStateReady();
   const user = auth.currentUser;
   if (user) {
-    await user.getIdToken(true);
+    await user.getIdToken(false);
   }
   await ensureNetworkOnline();
 }

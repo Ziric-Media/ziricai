@@ -7,7 +7,7 @@ export const DEMO_COMPANY_ID = 'demo-central-motors';
 export const DEMO_BRANDING = {
   logoUrl: 'https://ui-avatars.com/api/?name=Central+Motors&background=1e40af&color=fff&size=128&bold=true',
   primaryColor: '#1e40af',
-  faviconUrl: 'assets/favicon-portal.svg',
+  faviconUrl: 'assets/favicon.png',
   emailSignature: 'Best regards,\nThe Central Motors Team\n+27 11 555 0100 | centralmotors.co.za',
   aiAvatarUrl: '',
   whatsappGreeting: 'Hi! Welcome to Central Motors. How can we help you find your next vehicle today?',

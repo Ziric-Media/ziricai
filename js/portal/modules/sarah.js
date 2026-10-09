@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../admin/ui.js';
+import { sarahPageAvatarMarkup } from '../../shared/sarahAvatar.js';
 import { mountSarahChat, SARAH_CAPABILITIES, SUGGESTIONS, initPortalSarah } from '../sarah/sarah-ui.js';
 
 export async function renderSarah(container) {
@@ -7,7 +8,7 @@ export async function renderSarah(container) {
     <div class="portal-sarah-page">
       <aside class="portal-sarah-page-aside" aria-label="Sarah assistant info">
         <div class="portal-sarah-page-brand">
-          <div class="portal-sarah-page-avatar" aria-hidden="true"><i class="fa-solid fa-sparkles"></i></div>
+          ${sarahPageAvatarMarkup()}
           <div>
             <h2 class="portal-sarah-page-title">Sarah</h2>
             <p class="portal-sarah-page-subtitle">AI Operating Assistant</p>
@@ -42,7 +43,7 @@ export async function renderSarah(container) {
 
   const chatRoot = container.querySelector('#portalSarahPageChat');
   if (chatRoot) {
-    mountSarahChat(chatRoot, { mode: 'page' });
+    await mountSarahChat(chatRoot, { mode: 'page' });
     chatRoot.querySelector('#portalSarahInput')?.focus();
   }
 }

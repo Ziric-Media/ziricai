@@ -18,6 +18,7 @@ import { applyTheme, toggleTheme, showToast } from '../admin/ui.js';
 import { registerApiErrorToast } from '../shared/apiRequest.js';
 import { initRouter, navigateTo } from './router.js';
 import { initAuthGuard, bindLoginForm, bindLogout } from './auth-guard.js';
+import { consumeAuthHandoffFromUrl } from '../shared/authHandoff.js';
 import { renderNotificationDrawer } from './modules/notifications.js';
 import { initPortalSarah } from './sarah/sarah-ui.js';
 import { initAppShell, applySidebarVisibility } from './core/appShell.js';
@@ -31,6 +32,7 @@ export async function bootstrap() {
   }
 
   try {
+    await consumeAuthHandoffFromUrl();
     applyTheme(state.theme);
     registerApiErrorToast(showToast);
     bindLoginForm();

@@ -368,7 +368,30 @@ export async function sarahChat(payload) {
   return request('/api/sarah/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      surface: 'portal',
+      ...payload,
+    }),
+  });
+}
+
+export async function fetchSarahActiveSession(companyId) {
+  const qs = new URLSearchParams({ surface: 'portal' });
+  if (companyId) qs.set('companyId', companyId);
+  return request(`/api/sarah/sessions/active?${qs}`);
+}
+
+export async function fetchSarahSession(sessionId, companyId) {
+  const qs = new URLSearchParams({ surface: 'portal' });
+  if (companyId) qs.set('companyId', companyId);
+  return request(`/api/sarah/sessions/${encodeURIComponent(sessionId)}?${qs}`);
+}
+
+export async function createSarahSession(companyId) {
+  return request('/api/sarah/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ surface: 'portal', companyId }),
   });
 }
 

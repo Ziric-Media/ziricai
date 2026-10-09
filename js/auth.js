@@ -104,14 +104,91 @@ export async function isLaxTenantMode() {
  * @param {import('firebase/auth').User} user
  * @param {{ demoFallback?: (user: import('firebase/auth').User) => object|null, allowDemo?: boolean }} [options]
  */
+/**
+ * Load profile from Railway after sign-in when Firestore users/{uid} is missing (owner bootstrap).
+ * @param {import('firebase/auth').User} user
+ */
+export async function fetchServerSessionProfile(user) {
+  if (!user?.getIdToken) return null;
+  try {
+    const token = await user.getIdToken();
+    const base = getApiBase();
+    const res = await fetch(`${base}/api/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const profile = data?.profile;
+    if (!profile) return null;
+    const role = profile.role || data.role || null;
+    const companyId = profile.companyId || profile.company || data.companyId || null;
+    if (isSuperAdminRole(role)) {
+      return {
+        ...profile,
+        role,
+        companyId,
+        isDemo: false,
+      };
+    }
+    if (!companyId) return null;
+    return {
+      ...profile,
+      role,
+      companyId,
+      isDemo: false,
+    };
+  } catch (err) {
+    console.warn('[auth] fetchServerSessionProfile failed:', err?.message || err);
+    return null;
+  }
+}
+
+const DEMO_TENANT_ID = 'demo-central-motors';
+
+function isProductionZiricHost() {
+  if (typeof location === 'undefined') return false;
+  const host = location.hostname;
+  return /(^|\.)ziricai\.com$/i.test(host);
+}
+
+function isMissionControlHost() {
+  if (typeof location === 'undefined') return false;
+  return /^admin\.ziricai\.com$/i.test(location.hostname);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function signInWithRetry(email, password) {
+  try {
+    return await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    if (error?.code !== 'auth/network-request-failed') throw error;
+    await delay(900);
+    return signInWithEmailAndPassword(auth, email, password);
+  }
+}
+
 export async function resolveAuthProfile(user, options = {}) {
   if (!user?.uid) return null;
 
   const result = await getUserProfile(user.uid);
   if (result.profile) {
+    const companyId = result.profile.companyId || result.profile.company || null;
+    if (
+      isProductionZiricHost() &&
+      (companyId === DEMO_TENANT_ID || result.profile.isDemo)
+    ) {
+      const serverProfile = await fetchServerSessionProfile(user);
+      if (serverProfile) {
+        updateLastLogin(user.uid).catch(() => {});
+        return serverProfile;
+      }
+    }
     const profile = {
       ...result.profile,
-      companyId: result.profile.companyId || result.profile.company || null,
+      companyId,
       isDemo: false,
     };
     updateLastLogin(user.uid).catch(() => {});
@@ -121,6 +198,12 @@ export async function resolveAuthProfile(user, options = {}) {
   const allowDemo = options.allowDemo !== false && (await isLaxTenantMode());
   if (allowDemo && typeof options.demoFallback === 'function') {
     return options.demoFallback(user);
+  }
+
+  const serverProfile = await fetchServerSessionProfile(user);
+  if (serverProfile) {
+    updateLastLogin(user.uid).catch(() => {});
+    return serverProfile;
   }
 
   if (result.error && !allowDemo) {
@@ -212,11 +295,23 @@ export async function registerUserWithProfile({
  */
 export async function loginUser(email, password) {
   try {
-    const credential = await signInWithEmailAndPassword(auth, email, password);
-    const profile = await resolveAuthProfile(credential.user, { allowDemo: false });
+    const credential = await signInWithRetry(email, password);
+    let profile = null;
+    if (isMissionControlHost()) {
+      profile = await fetchServerSessionProfile(credential.user);
+    }
+    if (!profile) {
+      profile = await resolveAuthProfile(credential.user, { allowDemo: false });
+    }
     return { user: credential.user, profile: profile || undefined };
   } catch (error) {
-    return { error: getAuthErrorMessage(error) };
+    const message = getAuthErrorMessage(error);
+    if (error?.code === 'auth/network-request-failed') {
+      return {
+        error: `${message} If you are online, wait a few seconds and try again, or use another network. Check that identitytoolkit.googleapis.com is not blocked.`,
+      };
+    }
+    return { error: message };
   }
 }
 

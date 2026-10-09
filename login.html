@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in · ZiricAI</title>
+    <link rel="icon" href="assets/favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="assets/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/admin-dashboard.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "./node_modules/firebase/app/dist/esm/index.esm.js",
+        "firebase/auth": "./node_modules/firebase/auth/dist/esm/index.esm.js",
+        "firebase/firestore": "./node_modules/firebase/firestore/dist/esm/index.esm.js",
+        "firebase/storage": "./node_modules/firebase/storage/dist/esm/index.esm.js",
+        "@firebase/app": "./node_modules/@firebase/app/dist/esm/index.esm.js",
+        "@firebase/auth": "./node_modules/@firebase/auth/dist/esm/index.js",
+        "@firebase/firestore": "./node_modules/@firebase/firestore/dist/index.esm.js",
+        "@firebase/storage": "./node_modules/@firebase/storage/dist/index.esm.js",
+        "@firebase/util": "./node_modules/@firebase/util/dist/index.esm.js",
+        "@firebase/logger": "./node_modules/@firebase/logger/dist/esm/index.esm.js",
+        "@firebase/component": "./node_modules/@firebase/component/dist/esm/index.esm.js",
+        "@firebase/webchannel-wrapper/bloom-blob": "./node_modules/@firebase/webchannel-wrapper/dist/bloom-blob/esm/bloom_blob_es2018.js",
+        "@firebase/webchannel-wrapper/webchannel-blob": "./node_modules/@firebase/webchannel-wrapper/dist/webchannel-blob/esm/webchannel_blob_es2018.js",
+        "idb": "./node_modules/idb/build/index.js",
+        "re2js": "./node_modules/re2js/build/index.esm.js"
+      }
+    }
+    </script>
+</head>
+<body class="portal-body">
+    <div class="auth-screen open" id="loginScreen">
+        <div class="auth-card portal-auth-card">
+            <div class="auth-brand">
+                <a href="#" id="backToHome" class="auth-brand-link">
+                    <img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="auth-logo-img" width="200" height="48">
+                </a>
+                <p class="auth-brand-tagline">ZiricAI Platform</p>
+            </div>
+            <h1 class="auth-title">Sign in</h1>
+            <p class="auth-lead">One login for your company portal and Mission Control. We send you to the right place based on your account.</p>
+            <form id="loginForm" class="auth-login-form">
+                <input type="email" id="loginEmail" class="auth-login-input" autocomplete="username" placeholder="Work email" required />
+                <input type="password" id="loginPassword" class="auth-login-input" autocomplete="current-password" placeholder="Password" required />
+                <button class="btn btn-primary auth-login-submit" type="submit">Continue</button>
+            </form>
+            <p id="loginStatus" class="auth-login-status"></p>
+            <p class="auth-login-footer">
+                New here? <a href="index.html#start">Start free trial</a>
+            </p>
+        </div>
+    </div>
+    <script type="module" src="js/unified-login.js"></script>
+</body>
+</html>
