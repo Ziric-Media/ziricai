@@ -10,13 +10,16 @@ export const MARKETING_NAV = [
     label: 'Platform',
     href: '/platform/',
     children: [
+      { type: 'group', label: 'Core Platform' },
       { label: 'AI Business OS', href: '/platform/' },
       { label: 'Knowledge Base', href: '/products/knowledge/' },
       { label: 'CRM', href: '/products/crm/' },
       { label: 'Automation', href: '/products/automation/' },
       { label: 'Analytics', href: '/products/analytics/' },
       { label: 'Mission Control', href: '/products/dashboards/' },
-      { label: 'Integrations', href: '/platform/' },
+      { type: 'group', label: 'Connect' },
+      { label: 'Integrations', href: '/platform/integrations/' },
+      { type: 'group', label: 'Channels' },
       { label: 'WhatsApp', href: '/platform/whatsapp/' },
       { label: 'Webchat', href: '/platform/webchat/' },
     ],
@@ -101,7 +104,7 @@ function isActive(path, href) {
 
 function sectionActive(path, item) {
   if (isActive(path, item.href)) return true;
-  return (item.children || []).some((c) => isActive(path, c.href));
+  return (item.children || []).some((c) => c.href && isActive(path, c.href));
 }
 
 function linkClass(path, href, extra = '') {
@@ -127,10 +130,12 @@ export function renderMarketingNavLinks({ activePath = '/' } = {}) {
     if (item.children?.length) {
       const open = sectionActive(path, item);
       const menu = item.children
-        .map(
-          (c) =>
-            `<a href="${c.href}" class="nav-dropdown-item ${linkClass(path, c.href)}" role="menuitem">${c.label}</a>`
-        )
+        .map((c) => {
+          if (c.type === 'group') {
+            return `<div class="nav-dropdown-group" role="presentation"><span class="nav-dropdown-group-label">${c.label}</span></div>`;
+          }
+          return `<a href="${c.href}" class="nav-dropdown-item ${linkClass(path, c.href)}" role="menuitem">${c.label}</a>`;
+        })
         .join('\n                    ');
       parts.push(`<div class="nav-dropdown${open ? ' is-open' : ''}${open ? ' nav-section-active' : ''}" data-nav-dropdown>
                 <a href="${item.href}" class="nav-dropdown-toggle ${linkClass(path, item.href, 'nav-link')}" aria-haspopup="true" aria-expanded="${open ? 'true' : 'false'}">
@@ -155,7 +160,7 @@ export function collectMarketingNavPaths() {
   for (const item of MARKETING_NAV) {
     if (item.href && !item.href.endsWith('.html')) set.add(normalizeNavPath(item.href));
     for (const c of item.children || []) {
-      set.add(normalizeNavPath(c.href));
+      if (c.href) set.add(normalizeNavPath(c.href));
     }
   }
   return [...set].sort();

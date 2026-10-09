@@ -585,6 +585,7 @@ function prepareMarketing() {
     '/platform  /platform/  301',
     '/platform/whatsapp  /platform/whatsapp/  301',
     '/platform/webchat  /platform/webchat/  301',
+    '/platform/integrations  /platform/integrations/  301',
     '/platform/email  /platform/email/  301',
     '/platform/messenger  /platform/messenger/  301',
     '/platform/instagram  /platform/instagram/  301',
