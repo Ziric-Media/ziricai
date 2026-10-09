@@ -57,6 +57,29 @@ const HERO_VISUALS = {
         <div class="phm-web-input">Ask anything…</div>
       </div>
     </div>`,
+  'workforce-browse': `<div class="phm-wf-roster">
+      <div class="phm-wf-person"><img src="__SARAH_AVATAR__" alt="" width="36" height="36"><div><strong>Sarah</strong><span>AI Receptionist</span></div><em>Hire</em></div>
+      <div class="phm-wf-person phm-wf-muted"><span class="phm-wf-av">A</span><div><strong>Alex</strong><span>Sales Consultant</span></div><em>Hire</em></div>
+      <div class="phm-wf-person phm-wf-muted"><span class="phm-wf-av">M</span><div><strong>Maya</strong><span>Customer Support</span></div><em>Hire</em></div>
+    </div>`,
+  'workforce-how': `<div class="phm-wf-steps">
+      <span>Choose</span><i class="fa-solid fa-chevron-right"></i><span>Hire</span><i class="fa-solid fa-chevron-right"></i><span>Train</span><i class="fa-solid fa-chevron-right"></i><span>Deploy</span>
+    </div>`,
+  'workforce-dept': `<div class="phm-wf-dept">
+      <div class="phm-wf-dept-icon"><i class="fa-solid fa-users-gear"></i></div>
+      <p><strong>8 departments</strong> · <strong>30+ roles</strong> · Pre-trained</p>
+    </div>`,
+  solutions: `<div class="phm-solution-pills">
+      <span>Customer Service</span><span>Sales</span><span>Operations</span><span>Enterprise</span>
+    </div>`,
+  industries: `<div class="phm-ind-grid">
+      <span><i class="fa-solid fa-car"></i> Auto</span><span><i class="fa-solid fa-heart-pulse"></i> Health</span><span><i class="fa-solid fa-gavel"></i> Legal</span><span><i class="fa-solid fa-store"></i> Retail</span>
+    </div>`,
+  resources: `<div class="phm-docs">
+      <div class="phm-doc"><i class="fa-solid fa-book"></i><span>Guides</span><em>12</em></div>
+      <div class="phm-doc"><i class="fa-solid fa-shield-halved"></i><span>Security</span><em>Trust</em></div>
+      <div class="phm-doc phm-doc-active"><i class="fa-solid fa-circle-question"></i><span>FAQ</span><em>Live</em></div>
+    </div>`,
 };
 
 export function productHero({ eyebrow, title, lead, actions = '', theme = 'os', assetPrefix = '' }) {

@@ -27,18 +27,18 @@ export const MARKETING_NAV = [
   {
     id: 'ai-employees',
     label: 'AI Employees',
-    href: '/ai-employees/how-it-works/',
+    href: '/ai-employees/marketplace/',
     children: [
       { label: 'Browse AI Employees', href: '/ai-employees/marketplace/' },
       { label: 'How It Works', href: '/ai-employees/how-it-works/' },
-      { label: 'Administration', href: '/ai-employees/marketplace/' },
-      { label: 'Sales', href: '/ai-employees/marketplace/' },
-      { label: 'Customer Support', href: '/ai-employees/marketplace/' },
-      { label: 'Human Resources', href: '/ai-employees/marketplace/' },
-      { label: 'Finance', href: '/ai-employees/marketplace/' },
-      { label: 'Legal', href: '/ai-employees/marketplace/' },
-      { label: 'Healthcare', href: '/ai-employees/marketplace/' },
-      { label: 'Education', href: '/ai-employees/marketplace/' },
+      { label: 'Administration', href: '/ai-employees/administration/' },
+      { label: 'Sales', href: '/ai-employees/sales/' },
+      { label: 'Customer Support', href: '/ai-employees/customer-support/' },
+      { label: 'Human Resources', href: '/ai-employees/human-resources/' },
+      { label: 'Finance', href: '/ai-employees/finance/' },
+      { label: 'Legal', href: '/ai-employees/legal/' },
+      { label: 'Healthcare', href: '/ai-employees/healthcare/' },
+      { label: 'Education', href: '/ai-employees/education/' },
     ],
   },
   {
@@ -46,27 +46,27 @@ export const MARKETING_NAV = [
     label: 'Solutions',
     href: '/solutions/',
     children: [
-      { label: 'Customer Service', href: '/solutions/' },
-      { label: 'Sales', href: '/solutions/' },
-      { label: 'Operations', href: '/solutions/' },
-      { label: 'Enterprise', href: '/solutions/' },
-      { label: 'Small Business', href: '/solutions/' },
-      { label: 'Growing Businesses', href: '/solutions/' },
+      { label: 'Customer Service', href: '/solutions/customer-service/' },
+      { label: 'Sales', href: '/solutions/sales/' },
+      { label: 'Operations', href: '/solutions/operations/' },
+      { label: 'Enterprise', href: '/solutions/enterprise/' },
+      { label: 'Small Business', href: '/solutions/small-business/' },
+      { label: 'Growing Business', href: '/solutions/growing-business/' },
     ],
   },
   {
     id: 'industries',
     label: 'Industries',
-    href: '/solutions/',
+    href: '/industries/',
     children: [
-      { label: 'Automotive', href: '/solutions/automotive/' },
-      { label: 'Mining', href: '/solutions/mining/' },
-      { label: 'Healthcare', href: '/solutions/healthcare/' },
-      { label: 'Education', href: '/solutions/education/' },
-      { label: 'Legal', href: '/solutions/professional-services/' },
-      { label: 'Retail', href: '/solutions/retail/' },
-      { label: 'Hospitality', href: '/solutions/' },
-      { label: 'View all industries', href: '/solutions/' },
+      { label: 'Automotive', href: '/industries/automotive/' },
+      { label: 'Mining', href: '/industries/mining/' },
+      { label: 'Healthcare', href: '/industries/healthcare/' },
+      { label: 'Education', href: '/industries/education/' },
+      { label: 'Legal', href: '/industries/legal/' },
+      { label: 'Retail', href: '/industries/retail/' },
+      { label: 'Hospitality', href: '/industries/hospitality/' },
+      { label: 'View All Industries', href: '/industries/all/' },
     ],
   },
   { id: 'pricing', label: 'Pricing', href: '/pricing/' },
@@ -77,8 +77,8 @@ export const MARKETING_NAV = [
     children: [
       { label: 'Guides', href: '/resources/guides/' },
       { label: 'FAQ', href: '/resources/faq/' },
-      { label: 'Documentation', href: '/resources/ai-resources/' },
-      { label: 'Security', href: '/privacy/' },
+      { label: 'Documentation', href: '/resources/documentation/' },
+      { label: 'Security', href: '/resources/security/' },
     ],
   },
 ];
@@ -139,7 +139,7 @@ export function renderMarketingNavLinks({ activePath = '/' } = {}) {
         .join('\n                    ');
       parts.push(`<div class="nav-dropdown${open ? ' is-open' : ''}${open ? ' nav-section-active' : ''}" data-nav-dropdown>
                 <a href="${item.href}" class="nav-dropdown-toggle ${linkClass(path, item.href, 'nav-link')}" aria-haspopup="true" aria-expanded="${open ? 'true' : 'false'}">
-                    <span>${item.label}</span><i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                    ${item.label} <i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
                 </a>
                 <div class="nav-dropdown-menu" role="menu">
                     ${menu}

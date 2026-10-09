@@ -54,6 +54,7 @@ export function renderMarketingHeader({ depth = 0, activePath = '/', homeHref = 
                 ${links}
             </nav>
             <div class="nav-ctas">
+                <a href="${root}login.html" class="btn btn-sm btn-outline nav-cta-login">Login</a>
                 <button type="button" class="btn btn-sm" onclick="launchWizard()">Start Free Trial</button>
             </div>
         </div>
