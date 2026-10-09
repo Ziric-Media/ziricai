@@ -3,12 +3,6 @@
  */
 
 import {
-  marketingHero,
-  marketingIntro,
-  marketingDetail,
-  marketingPricingSection,
-} from './marketing-page-blocks.js';
-import {
   platformStack,
   platformCardGrid,
   platformFlow,
@@ -18,6 +12,11 @@ import {
   mktFinalCta,
   btnPrimary,
   btnOutlineLink,
+  productHero,
+  platformIntro,
+  platformDetail,
+  platformSectionHeader,
+  marketingPricingSection,
 } from './marketing-platform-blocks.js';
 import { tourPhoneBlock } from './marketing-tour-phone.js';
 
@@ -64,26 +63,29 @@ export const PLATFORM_PRODUCT_PAGES = [
       'ZiricAI is the AI Business Operating System — AI Employees, knowledge, CRM, automation, analytics, and integrations in one platform.',
     depth: 1,
     activePath: '/platform/',
-    bodyHtml: `${marketingHero({
+    bodyHtml: `${productHero({
       eyebrow: 'THE FOUNDATION OF YOUR AI WORKFORCE',
       title: 'One operating system for your entire AI workforce.',
       lead: 'ZiricAI brings AI Employees, business knowledge, customer relationships, automation, communications, analytics and integrations together in one intelligent business operating system.',
       actions: `${btnPrimary('Build Your AI Workforce')} ${btnOutlineLink('/ai-employees/how-it-works/', 'Explore AI Employees')}`,
+      theme: 'os',
+      assetPrefix: '../',
     })}
-${marketingIntro({
+${platformIntro({
+  icon: 'fa-microchip',
   title: 'AI is no longer just a tool',
   body: `<p>Your business doesn't need another AI tool. It needs an AI operating system.</p>
         <p>Businesses already use software for communication, sales, customer management, finance, operations and administration.</p>
         <p>ZiricAI connects AI to those workflows, giving your business a central platform for deploying and managing a digital workforce.</p>
         <p>Instead of adding another isolated chatbot, you can build an AI workforce that operates as part of your organization.</p>`,
 })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header">
             <span class="section-eyebrow">The ZiricAI stack</span>
             <h2>How the platform fits together</h2>
         </div>
         ${STACK}`, { alt: true })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header">
             <span class="section-eyebrow">Platform</span>
             <h2>One platform. Every part of the AI workforce.</h2>
@@ -103,19 +105,22 @@ ${marketingPricingSection()}`,
     description: 'Give your AI Employees the business knowledge they need — documents, website, FAQs, and role-specific training.',
     depth: 2,
     activePath: '/products/knowledge/',
-    bodyHtml: `${marketingHero({
+    bodyHtml: `${productHero({
       eyebrow: 'BUSINESS KNOWLEDGE',
       title: 'Give your AI Employees the knowledge they need to do their jobs.',
       lead: "Turn your company's documents, policies, products, processes and website information into a knowledge layer your AI workforce can use.",
       actions: `${btnPrimary('Upload Knowledge')} ${btnOutlineLink('/ai-employees/how-it-works/', 'See How It Works')}`,
+      theme: 'knowledge',
+      assetPrefix: '../../',
     })}
-${marketingIntro({
+${platformIntro({
+  icon: 'fa-book-open',
   title: 'Your AI should know your business.',
   body: `<p>General-purpose AI knows a lot about the world. Your AI Employees need to know <strong>your</strong> world.</p>
         <p>Your products. Your services. Your prices. Your policies. Your procedures. Your customers. Your way of working.</p>
         <p>ZiricAI Knowledge Base gives your AI Employees access to the business information you choose to provide.</p>`,
 })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><span class="section-eyebrow">How it works</span><h2>From upload to deployed knowledge</h2></div>
         ${platformNumberedSteps([
           {
@@ -131,7 +136,7 @@ ${marketingDetail(`
           { num: '3', title: 'Organize', body: 'Keep business information structured and accessible.' },
           { num: '4', title: 'Deploy', body: 'Make relevant knowledge available to the AI Employees that need it.' },
         ])}`, { alt: true })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><h2>One source of truth for your AI workforce.</h2></div>
         ${platformBulletGrid([
           '<strong>Shared knowledge</strong> — Give multiple AI Employees access to approved information.',
@@ -151,18 +156,21 @@ ${marketingPricingSection()}`,
     description: 'ZiricAI CRM — turn every conversation into a customer relationship with leads, pipeline, and AI-assisted updates.',
     depth: 2,
     activePath: '/products/crm/',
-    bodyHtml: `${marketingHero({
+    bodyHtml: `${productHero({
       eyebrow: 'CUSTOMER RELATIONSHIP MANAGEMENT',
       title: 'Turn every conversation into a customer relationship.',
       lead: 'ZiricAI CRM gives your AI Employees the customer context they need to capture leads, manage relationships and keep your team informed.',
       actions: btnPrimary('Explore CRM'),
+      theme: 'crm',
+      assetPrefix: '../../',
     })}
-${marketingIntro({
+${platformIntro({
+  icon: 'fa-address-book',
   title: "Your AI Employees shouldn't forget your customers.",
   body: `<p>A customer may talk to your business today, return next week, speak to another employee and continue the same relationship.</p>
         <p>CRM gives your AI workforce the context needed to understand those interactions and keep customer information connected.</p>`,
 })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><span class="section-eyebrow">Core features</span><h2>CRM built for conversations</h2></div>
         ${platformCardGrid([
           { icon: 'fa-user-plus', title: 'Lead Management', body: 'Capture and organize new opportunities.' },
@@ -172,7 +180,7 @@ ${marketingDetail(`
           { icon: 'fa-filter', title: 'Pipeline', body: 'Track prospects from enquiry to customer.' },
           { icon: 'fa-robot', title: 'AI-Assisted CRM', body: 'Let AI Employees capture and update information during conversations.' },
         ])}`, { alt: true })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><h2>The conversation becomes the CRM.</h2></div>
         ${platformFlow([
           { label: 'Customer', text: 'Sends WhatsApp message' },
@@ -191,18 +199,21 @@ ${marketingPricingSection()}`,
     description: 'Workflow automation — from customer message to completed work with CRM, calendar, booking, and team notifications.',
     depth: 2,
     activePath: '/products/automation/',
-    bodyHtml: `${marketingHero({
+    bodyHtml: `${productHero({
       eyebrow: 'WORKFLOW AUTOMATION',
       title: 'From conversation to completed work. Automatically.',
       lead: 'Connect AI Employees to the workflows your business runs every day — without manually moving information between systems.',
       actions: btnPrimary('Build a Workflow'),
+      theme: 'automation',
+      assetPrefix: '../../',
     })}
-${marketingIntro({
+${platformIntro({
+  icon: 'fa-bolt',
   title: 'AI should do more than answer.',
   body: `<p>A customer enquiry often triggers a chain of work — capture the lead, update the CRM, check availability, book the appointment, send confirmation and notify the team.</p>
         <p>ZiricAI can connect these steps into automated workflows.</p>`,
 })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><span class="section-eyebrow">Example</span><h2>One conversation. An entire workflow.</h2></div>
         ${platformFlow([
           { label: 'Customer message', text: '"Can I book an appointment tomorrow?"' },
@@ -213,7 +224,7 @@ ${marketingDetail(`
           { label: 'Customer', text: 'Confirmation sent.' },
           { label: 'Team', text: 'Relevant staff notified.' },
         ])}`, { alt: true })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><h2>Automation capabilities</h2></div>
         ${platformBulletGrid([
           'Lead creation',
@@ -237,18 +248,21 @@ ${marketingPricingSection()}`,
     description: 'AI business analytics — visibility into conversations, leads, workflows, and workforce performance.',
     depth: 2,
     activePath: '/products/analytics/',
-    bodyHtml: `${marketingHero({
+    bodyHtml: `${productHero({
       eyebrow: 'AI BUSINESS ANALYTICS',
       title: 'Know what your AI workforce is doing.',
       lead: 'Turn AI activity and business interactions into insights you can use to make better decisions.',
       actions: btnPrimary('Explore Analytics'),
+      theme: 'analytics',
+      assetPrefix: '../../',
     })}
-${marketingIntro({
+${platformIntro({
+  icon: 'fa-chart-line',
   title: 'Visibility across your digital workforce.',
   body: `<p>When AI starts handling conversations and business processes at scale, you need more than activity logs.</p>
         <p>You need to understand what is happening, what is working and where your team needs to intervene.</p>`,
 })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><h2>Dashboard areas</h2></div>
         ${platformCardGrid([
           { icon: 'fa-robot', title: 'AI Activity', body: 'See how your AI Employees are being used.' },
@@ -258,9 +272,10 @@ ${marketingDetail(`
           { icon: 'fa-gauge-high', title: 'Response Performance', body: 'See how quickly customers receive assistance.' },
           { icon: 'fa-arrow-up-right-from-square', title: 'Escalations', body: 'Identify where human intervention is required.' },
         ])}`, { alt: true })}
-${marketingIntro({
+${platformIntro({
+  icon: 'fa-gauge-high',
   title: 'Measure the work. Improve the workforce.',
-  body: "Analytics isn't just about counting conversations. It's about understanding how AI is contributing to the business.",
+  body: `<p>Analytics isn't just about counting conversations. It's about understanding how AI is contributing to the business.</p>`,
 })}
 ${mktFinalCta({ title: 'Explore AI Analytics', primaryHtml: btnPrimary('Explore Analytics') })}
 ${marketingPricingSection()}`,
@@ -272,18 +287,21 @@ ${marketingPricingSection()}`,
     description: 'Mission Control — manage AI Employees, conversations, knowledge, integrations, and automation from one command center.',
     depth: 2,
     activePath: '/products/dashboards/',
-    bodyHtml: `${marketingHero({
+    bodyHtml: `${productHero({
       eyebrow: 'AI WORKFORCE MANAGEMENT',
       title: 'Your entire AI workforce. One command center.',
       lead: 'Mission Control gives business leaders a central place to manage AI Employees, monitor operations, oversee integrations and understand what their digital workforce is doing.',
       actions: btnPrimary('Open Mission Control'),
+      theme: 'mission-control',
+      assetPrefix: '../../',
     })}
-${marketingIntro({
+${platformIntro({
+  icon: 'fa-satellite-dish',
   title: 'As your AI workforce grows, control becomes essential.',
   body: `<p>One AI Employee is simple. Ten AI Employees across different departments is an operation.</p>
         <p>Mission Control gives you the visibility and controls to manage that operation.</p>`,
 })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><h2>What you can manage</h2></div>
         <div class="platform-manage-grid">
             <div class="platform-manage-card"><h4><i class="fa-solid fa-robot"></i> AI Employees</h4><ul><li>Who is deployed</li><li>What role they perform</li><li>Their status</li><li>Their configuration</li></ul></div>
@@ -303,17 +321,20 @@ ${marketingPricingSection()}`,
     description: 'Connect ZiricAI to WhatsApp, CRM, calendars, payments, APIs, and the systems your business already uses.',
     depth: 2,
     activePath: '/platform/integrations/',
-    bodyHtml: `${marketingHero({
+    bodyHtml: `${productHero({
       eyebrow: 'CONNECTED BUSINESS',
       title: 'Connect ZiricAI to the systems your business already uses.',
       lead: "Your AI workforce shouldn't require you to rebuild your technology stack. Connect the tools, channels and systems your business already relies on.",
       actions: btnPrimary('Explore Integrations'),
+      theme: 'integrations',
+      assetPrefix: '../../',
     })}
-${marketingIntro({
+${platformIntro({
+  icon: 'fa-plug',
   title: "Your AI Employees don't work alone.",
   body: '<p>They need access to the systems where business actually happens.</p><p>ZiricAI connects your AI workforce to the tools and services that support your operation.</p>',
 })}
-${marketingDetail(`
+${platformDetail(`
         ${platformCategoryGrid([
           { title: 'Communication', items: ['WhatsApp', 'Email', 'Webchat', 'Social channels'] },
           { title: 'Customer Management', items: ['CRM', 'Customer databases', 'Lead systems'] },
@@ -321,7 +342,7 @@ ${marketingDetail(`
           { title: 'Payments', items: ['Payment platforms', 'Billing systems'] },
           { title: 'Developer & Business Systems', items: ['APIs', 'Webhooks', 'Custom integrations'] },
         ])}`, { alt: true })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><h2>Connect once. Let your workforce use it.</h2></div>
         ${platformFlow([
           { label: 'CRM', text: 'Customer data' },
@@ -341,18 +362,21 @@ ${marketingPricingSection()}`,
     depth: 2,
     activePath: '/platform/whatsapp/',
     includeLanding: true,
-    bodyHtml: `${marketingHero({
+    bodyHtml: `${productHero({
       eyebrow: 'AI ON WHATSAPP',
       title: 'Put your AI Employees where your customers already are.',
       lead: 'Let customers talk to your business through WhatsApp while your AI Employees handle enquiries, sales, support, bookings and other workflows.',
       actions: `${btnPrimary('Connect WhatsApp')} ${btnOutlineLink('/#product-tour', 'See Sarah in Action')}`,
+      theme: 'whatsapp',
+      assetPrefix: '../../',
     })}
-${marketingIntro({
+${platformIntro({
+  icon: 'fa-comment-dots',
   title: 'Turn WhatsApp into a digital employee.',
   body: `<p>Your customers already use WhatsApp to ask questions, request prices, book appointments and communicate with your business.</p>
         <p>Instead of making your team answer every routine message manually, let your AI Employees handle the conversation.</p>`,
 })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><h2>What AI Employees can do</h2></div>
         ${platformCardGrid([
           { icon: 'fa-comment', title: 'Answer', body: 'Respond using your business knowledge.' },
@@ -362,7 +386,7 @@ ${marketingDetail(`
           { icon: 'fa-database', title: 'Capture', body: 'Collect information and create CRM records.' },
           { icon: 'fa-user-group', title: 'Escalate', body: 'Bring your human team in when needed.' },
         ])}`, { alt: true })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><span class="section-eyebrow">Example</span><h2>From stock question to test drive</h2></div>
         <div class="platform-dialog-example">
             <p><strong>Customer:</strong> "Hi, do you have the 2025 Hilux Legend in stock?"</p>
@@ -399,18 +423,21 @@ ${marketingPricingSection()}`,
     description: 'AI website assistant — answer questions, capture leads, and guide visitors with Sarah on your site.',
     depth: 2,
     activePath: '/platform/webchat/',
-    bodyHtml: `${marketingHero({
+    bodyHtml: `${productHero({
       eyebrow: 'AI WEBSITE ASSISTANT',
       title: 'Turn every website visitor into a conversation.',
       lead: 'Give your website an AI Employee that can answer questions, guide visitors, capture leads and help customers take the next step.',
       actions: `${btnPrimary('Add Webchat')} <button class="btn btn-ghost" type="button" onclick="document.getElementById('sarahBubble')?.click()"><i class="fa-solid fa-comment-dots"></i> Try Sarah</button>`,
+      theme: 'webchat',
+      assetPrefix: '../../',
     })}
-${marketingIntro({
+${platformIntro({
+  icon: 'fa-window-maximize',
   title: "Your website shouldn't just display information. It should work for your business.",
   body: `<p>Visitors arrive with questions — pricing, hours, booking, location, which service is right for them.</p>
         <p>Instead of making visitors search through pages, your AI Employee can help them immediately.</p>`,
 })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><h2>What Webchat can do</h2></div>
         ${platformCardGrid([
           { icon: 'fa-circle-question', title: 'Answer questions', body: 'Using your business knowledge.' },
@@ -420,7 +447,7 @@ ${marketingDetail(`
           { icon: 'fa-filter', title: 'Qualify prospects', body: 'Understand what the visitor needs.' },
           { icon: 'fa-arrow-up-right-from-square', title: 'Escalate', body: 'Connect customers to your team when required.' },
         ])}`, { alt: true })}
-${marketingDetail(`
+${platformDetail(`
         <div class="section-header marketing-detail-header"><h2>Your AI Employee is already on your website.</h2></div>
         <p>Use the <strong>Chat with Sarah</strong> bubble on any marketing page to experience webchat firsthand.</p>
         <div class="webchat-widget-preview">
