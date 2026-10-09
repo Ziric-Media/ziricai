@@ -464,14 +464,15 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
 
   if (out.includes('data-site-link') && !out.includes('getSiteUrls')) {
     out = out.replace('</body>', `<script type="module">
-import { getSiteUrls, marketingLoginUrl } from '${jsPrefix}js/shared/siteUrls.js';
+import { getSiteUrls } from '${jsPrefix}js/shared/siteUrls.js';
 document.querySelectorAll('[data-site-link]').forEach((el) => {
   const key = el.getAttribute('data-site-link');
+  const urls = getSiteUrls();
   if (key === 'login') {
-    el.href = marketingLoginUrl();
+    const base = (urls.marketing || '').replace(/\\/$/, '');
+    el.href = base ? \`\${base}/login.html\` : '/login.html';
     return;
   }
-  const urls = getSiteUrls();
   if (urls[key]) el.href = urls[key];
 });
 </script>\n</body>`);

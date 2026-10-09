@@ -14,7 +14,7 @@ import {
   fetchAuthHandoffToken,
   targetNeedsAuthHandoff,
 } from './shared/authHandoff.js';
-import { landingHomeUrl } from './shared/siteUrls.js';
+import { marketingUrl } from './shared/siteUrls.js';
 
 async function redirectAfterLogin(user, profile) {
   const resolved = profile || (await resolveAuthProfile(user, { allowDemo: false }));
@@ -93,5 +93,5 @@ if (location.protocol !== 'file:') {
 
 document.getElementById('backToHome')?.addEventListener('click', (e) => {
   e.preventDefault();
-  window.location.href = landingHomeUrl();
+  window.location.href = marketingUrl();
 });

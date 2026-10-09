@@ -2,7 +2,13 @@
  * Sign out from app/admin and return to the public marketing site.
  */
 import { logoutUser } from '../auth.js';
-import { landingHomeUrl, marketingLoginUrl } from './siteUrls.js';
+import { getSiteUrls, marketingUrl } from './siteUrls.js';
+
+/** Works with legacy siteUrls.js (pre–publicWeb exports). */
+function publicLoginUrl() {
+  const base = getSiteUrls().marketing.replace(/\/$/, '');
+  return `${base}/login.html`;
+}
 
 const LOGOUT_FLAG = 'ziricai:logout-redirect';
 
@@ -18,14 +24,14 @@ export function handleSignedOutVisitor() {
   try {
     if (sessionStorage.getItem(LOGOUT_FLAG)) {
       sessionStorage.removeItem(LOGOUT_FLAG);
-      window.location.replace(landingHomeUrl());
+      window.location.replace(marketingUrl());
       return true;
     }
   } catch {
     /* sessionStorage blocked */
   }
 
-  window.location.replace(marketingLoginUrl());
+  window.location.replace(publicLoginUrl());
   return true;
 }
 
@@ -36,5 +42,5 @@ export async function logoutAndReturnToLanding() {
     /* ignore */
   }
   await logoutUser();
-  window.location.assign(landingHomeUrl());
+  window.location.assign(marketingUrl());
 }

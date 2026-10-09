@@ -1,4 +1,5 @@
 # Super admin console — admin.ziricai.com
+# Deploy note: 2026-10-09 — siteUrls legacy import compat (logout + login links)
 # Netlify dashboard: Base directory = admin
 
 [build]
