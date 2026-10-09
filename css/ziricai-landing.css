@@ -6611,6 +6611,42 @@ body:has(#landingView.marketing-subpage) {
         0 24px 60px rgba(15, 23, 42, 0.12),
         0 0 0 1px rgba(255, 255, 255, 0.6) inset;
     backdrop-filter: blur(12px);
+    color: var(--text);
+}
+/* Dark hero — mock UI panel must use dark text (hero section sets color: #fff) */
+.marketing-subpage .platform-hero-visual {
+    color: #0f172a;
+}
+.marketing-subpage .platform-hero-visual > *:not(.platform-hero-visual-glow) {
+    color: #0f172a;
+}
+.marketing-subpage .platform-hero-visual strong {
+    color: #0f172a;
+    font-weight: 700;
+}
+.marketing-subpage .platform-hero-visual .phm-wf-person span,
+.marketing-subpage .platform-hero-visual .phm-doc,
+.marketing-subpage .platform-hero-visual .phm-chart-meta,
+.marketing-subpage .platform-hero-visual .phm-crm-row,
+.marketing-subpage .platform-hero-visual .phm-wf-dept p {
+    color: var(--text-secondary);
+}
+.marketing-subpage .platform-hero-visual .phm-wa-bubble.them {
+    color: #0f172a;
+    background: #fff;
+}
+.marketing-subpage .platform-hero-visual .phm-wa-bubble.us {
+    color: #0f172a;
+}
+.marketing-subpage .platform-hero-visual .phm-web-msg,
+.marketing-subpage .platform-hero-visual .phm-web-input {
+    color: var(--text-secondary);
+}
+.marketing-subpage .platform-hero-visual .phm-web-top {
+    color: #fff;
+}
+.marketing-subpage .platform-hero-visual .phm-wf-steps > i {
+    color: #94a3b8;
 }
 
 /* Hero mock UI components */
@@ -7233,9 +7269,19 @@ body:has(#landingView.marketing-subpage) {
     color: var(--primary);
     font-weight: 700;
 }
-.phm-wf-person div { display: flex; flex-direction: column; gap: 2px; }
-.phm-wf-person strong { font-size: 0.88rem; }
-.phm-wf-person span { color: var(--text-muted); font-size: 0.75rem; }
+.phm-wf-person div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.phm-wf-person strong {
+    font-size: 0.88rem;
+    color: #0f172a;
+    display: block;
+    line-height: 1.3;
+}
+.phm-wf-person span {
+    color: #64748b;
+    font-size: 0.75rem;
+    display: block;
+    line-height: 1.35;
+}
 .phm-wf-person em { font-style: normal; font-weight: 700; color: var(--primary); font-size: 0.72rem; }
 .phm-wf-steps {
     display: flex;
@@ -7272,56 +7318,128 @@ body:has(#landingView.marketing-subpage) {
 }
 .phm-ind-grid span i { margin-right: 6px; }
 
+.marketing-subpage .wf-dept-grid,
 .wf-dept-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 20px;
-    margin-top: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 22px;
+    margin-top: 32px;
+    width: 100%;
 }
+.marketing-subpage .wf-dept-card,
 .wf-dept-card {
-    display: block;
-    padding: 24px;
-    border-radius: 18px;
-    border: 1px solid rgba(124, 58, 237, 0.12);
-    background: linear-gradient(160deg, #fff, rgba(248, 250, 252, 0.95));
-    text-decoration: none;
-    color: inherit;
-    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+    padding: 26px 24px 22px;
+    border-radius: 20px;
+    border: 1px solid rgba(124, 58, 237, 0.14);
+    background: linear-gradient(165deg, #ffffff 0%, #f8fafc 100%);
+    text-decoration: none !important;
+    color: #0f172a !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+    min-height: 100%;
 }
+.marketing-subpage .wf-dept-card:hover,
 .wf-dept-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 20px 44px rgba(15, 23, 42, 0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 22px 48px rgba(124, 58, 237, 0.12);
+    border-color: rgba(124, 58, 237, 0.28);
 }
-.wf-dept-emoji { font-size: 1.75rem; display: block; margin-bottom: 8px; }
-.wf-dept-card h3 { margin: 0 0 12px; font-size: 1.1rem; }
-.wf-dept-card ul { margin: 0 0 14px; padding-left: 18px; font-size: 0.88rem; color: var(--text-secondary); }
-.wf-dept-link { font-size: 0.85rem; font-weight: 600; color: var(--primary); }
+.wf-dept-emoji { font-size: 2rem; display: block; margin-bottom: 10px; line-height: 1; }
+.marketing-subpage .wf-dept-card h3,
+.wf-dept-card h3 {
+    margin: 0 0 14px;
+    font-size: 1.15rem;
+    color: #0f172a !important;
+    text-decoration: none !important;
+}
+.marketing-subpage .wf-dept-card ul,
+.wf-dept-card ul {
+    list-style: none;
+    margin: 0 0 18px;
+    padding: 0;
+    flex: 1;
+}
+.marketing-subpage .wf-dept-card li,
+.wf-dept-card li {
+    position: relative;
+    padding: 6px 0 6px 22px;
+    font-size: 0.88rem;
+    color: #475569 !important;
+    line-height: 1.45;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+.marketing-subpage .wf-dept-card li:last-child,
+.wf-dept-card li:last-child { border-bottom: none; }
+.marketing-subpage .wf-dept-card li::before,
+.wf-dept-card li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 12px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(124, 58, 237, 0.35);
+}
+.wf-dept-link {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary) !important;
+    margin-top: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
 
+.marketing-subpage .wf-jd-grid,
 .wf-jd-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 16px;
-    margin-top: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 18px;
+    margin-top: 32px;
+    width: 100%;
 }
+.marketing-subpage .wf-jd-card,
 .wf-jd-card {
-    padding: 20px;
-    border-radius: 14px;
-    border: 1px solid var(--border);
-    background: var(--bg-card);
+    padding: 22px 20px;
+    border-radius: 16px;
+    border: 1px solid rgba(124, 58, 237, 0.1);
+    background: #fff;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.marketing-subpage .wf-jd-card:hover,
+.wf-jd-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
 }
 .wf-jd-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    background: rgba(124, 58, 237, 0.1);
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.14), rgba(124, 58, 237, 0.05));
     color: var(--primary);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
+    font-size: 1.05rem;
 }
-.wf-jd-card h4 { margin: 0 0 6px; font-size: 0.95rem; }
-.wf-jd-card p { margin: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; }
+.marketing-subpage .wf-jd-card h4,
+.wf-jd-card h4 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    color: #0f172a;
+}
+.marketing-subpage .wf-jd-card p,
+.wf-jd-card p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #475569;
+    line-height: 1.55;
+}
 
 .wf-meet-grid {
     display: grid;
@@ -7588,4 +7706,81 @@ body:has(#landingView.marketing-subpage) {
 
 @media (max-width: 720px) {
     .wf-enterprise-cols { grid-template-columns: 1fr; }
+}
+
+/* Workforce pages — section rhythm and content legibility */
+.marketing-subpage .marketing-page-block-detail {
+    color: var(--text);
+}
+.marketing-subpage .marketing-page-block-detail .platform-detail-shell {
+    width: 100%;
+}
+.marketing-subpage .marketing-page-block-detail.section-alt {
+    background: linear-gradient(180deg, #f1f5f9 0%, #f8fafc 50%, #fff 100%);
+}
+.marketing-subpage .marketing-page-block-detail:not(.section-alt) {
+    background: #fff;
+}
+.marketing-subpage .platform-section-header .section-eyebrow {
+    color: var(--primary);
+}
+.marketing-subpage .platform-section-header h2 {
+    color: #0f172a;
+}
+.marketing-subpage .platform-section-sub {
+    color: #475569;
+}
+
+.marketing-subpage .wf-solution-grid,
+.marketing-subpage .wf-industry-grid,
+.marketing-subpage .wf-emp-card-grid,
+.marketing-subpage .wf-meet-grid,
+.marketing-subpage .wf-guide-grid,
+.marketing-subpage .wf-other-employees {
+    width: 100%;
+}
+
+.marketing-subpage .wf-meet-section {
+    background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 100%);
+}
+.marketing-subpage .wf-employee-card {
+    color: #0f172a;
+}
+.marketing-subpage .wf-employee-card h3,
+.marketing-subpage .wf-other-card h4,
+.marketing-subpage .wf-featured-employee h3 {
+    color: #0f172a;
+}
+
+.marketing-subpage .wf-solution-card,
+.marketing-subpage .wf-industry-card {
+    color: #0f172a !important;
+    text-decoration: none !important;
+}
+.marketing-subpage .wf-solution-card h3,
+.marketing-subpage .wf-industry-card h3 {
+    color: #0f172a !important;
+}
+
+.marketing-subpage .platform-dialog-example,
+.marketing-subpage .platform-dialog-example p,
+.marketing-subpage .wf-feature-example p {
+    color: #334155;
+}
+.marketing-subpage .platform-big-statement {
+    color: #334155;
+}
+.marketing-subpage .platform-big-statement strong {
+    color: #0f172a;
+}
+
+@media (max-width: 640px) {
+    .marketing-subpage .wf-dept-grid,
+    .wf-dept-grid {
+        grid-template-columns: 1fr;
+    }
+    .marketing-subpage .wf-jd-grid,
+    .wf-jd-grid {
+        grid-template-columns: 1fr;
+    }
 }
