@@ -5116,7 +5116,8 @@ body:has(#landingView.marketing-subpage) {
 
 /* ===== Home modern redesign ===== */
 .home-modern { position: relative; }
-.home-modern > .landing-header { position: sticky; z-index: 120; }
+.home-modern > .landing-header,
+.marketing-subpage > .landing-header { position: sticky; z-index: 120; }
 .home-modern .hero-section,
 .home-modern .section,
 .home-modern .final-cta,
@@ -6274,7 +6275,8 @@ body:has(#landingView.marketing-subpage) {
 .nav-dropdown-group + a.nav-dropdown-item {
     margin-top: 0;
 }
-.home-modern > .landing-header .nav-dropdown-menu .nav-dropdown-group-label {
+.home-modern > .landing-header .nav-dropdown-menu .nav-dropdown-group-label,
+.marketing-subpage > .landing-header .nav-dropdown-menu .nav-dropdown-group-label {
     color: #64748b !important;
 }
 
@@ -6953,58 +6955,80 @@ body:has(#landingView.marketing-subpage) {
     .platform-intro-icon { margin: 0 auto; }
 }
 
-/* Pitch-black header on home + readable Login */
-.home-modern > .landing-header {
+/* Pitch-black header on home + marketing subpages */
+.home-modern > .landing-header,
+.marketing-subpage > .landing-header {
     background: #000;
     backdrop-filter: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 .home-modern > .landing-header .logo,
-.home-modern > .landing-header .mobile-menu-btn {
+.home-modern > .landing-header .mobile-menu-btn,
+.marketing-subpage > .landing-header .logo,
+.marketing-subpage > .landing-header .mobile-menu-btn {
     color: rgba(255, 255, 255, 0.92);
 }
 .home-modern > .landing-header .nav-links-mega > a.nav-link,
-.home-modern > .landing-header .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle {
+.home-modern > .landing-header .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle,
+.marketing-subpage > .landing-header .nav-links-mega > a.nav-link,
+.marketing-subpage > .landing-header .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle {
     color: rgba(255, 255, 255, 0.88);
 }
 .home-modern > .landing-header .nav-links-mega > a.nav-link:hover,
-.home-modern > .landing-header .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle:hover {
+.home-modern > .landing-header .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle:hover,
+.marketing-subpage > .landing-header .nav-links-mega > a.nav-link:hover,
+.marketing-subpage > .landing-header .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle:hover {
     color: #fff;
 }
-.home-modern > .landing-header .nav-dropdown-menu .nav-dropdown-item {
+.home-modern > .landing-header .nav-dropdown-menu .nav-dropdown-item,
+.marketing-subpage > .landing-header .nav-dropdown-menu .nav-dropdown-item {
     color: var(--text) !important;
 }
 .home-modern > .landing-header .nav-dropdown-menu .nav-dropdown-item:hover,
-.home-modern > .landing-header .nav-dropdown-menu .nav-dropdown-item.nav-active {
+.home-modern > .landing-header .nav-dropdown-menu .nav-dropdown-item.nav-active,
+.marketing-subpage > .landing-header .nav-dropdown-menu .nav-dropdown-item:hover,
+.marketing-subpage > .landing-header .nav-dropdown-menu .nav-dropdown-item.nav-active {
     color: var(--primary) !important;
 }
-.home-modern > .landing-header .nav-dropdown-menu {
+.home-modern > .landing-header .nav-dropdown-menu,
+.marketing-subpage > .landing-header .nav-dropdown-menu {
     background: #fff;
     border-color: var(--border);
 }
 .home-modern > .landing-header .nav-links-mega .nav-link:hover,
-.home-modern > .landing-header .nav-links-mega .nav-dropdown-toggle:hover {
+.home-modern > .landing-header .nav-links-mega .nav-dropdown-toggle:hover,
+.marketing-subpage > .landing-header .nav-links-mega .nav-link:hover,
+.marketing-subpage > .landing-header .nav-links-mega .nav-dropdown-toggle:hover {
     color: #fff;
     background: rgba(255, 255, 255, 0.06);
 }
 .home-modern > .landing-header .nav-links-mega .nav-home,
 .home-modern > .landing-header .nav-links-mega a.nav-active,
-.home-modern > .landing-header .nav-links-mega .nav-dropdown-toggle.nav-active {
+.home-modern > .landing-header .nav-links-mega .nav-dropdown-toggle.nav-active,
+.marketing-subpage > .landing-header .nav-links-mega .nav-home,
+.marketing-subpage > .landing-header .nav-links-mega a.nav-active,
+.marketing-subpage > .landing-header .nav-links-mega .nav-dropdown-toggle.nav-active {
     color: #c4b5fd;
 }
-.home-modern > .landing-header .nav-cta-login {
+.home-modern > .landing-header .nav-cta-login,
+.marketing-subpage > .landing-header .nav-cta-login {
     color: #fff !important;
     border-color: rgba(255, 255, 255, 0.55) !important;
     background: transparent !important;
     box-shadow: none !important;
 }
-.home-modern > .landing-header .nav-cta-login:hover {
+.home-modern > .landing-header .nav-cta-login:hover,
+.marketing-subpage > .landing-header .nav-cta-login:hover {
     color: #fff !important;
     background: rgba(255, 255, 255, 0.12) !important;
     border-color: #fff !important;
 }
-.home-modern > .landing-header .nav-chevron {
+.home-modern > .landing-header .nav-chevron,
+.marketing-subpage > .landing-header .nav-chevron {
     color: rgba(255, 255, 255, 0.55);
+}
+.marketing-subpage > .landing-header .nav-ctas .btn:not(.btn-outline) {
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.45);
 }
 .hero-section-classic .hero-visual { max-width: none; }
 .hero-section-classic .pipeline-panel { max-width: 100%; }
@@ -7158,10 +7182,13 @@ body:has(#landingView.marketing-subpage) {
 
 @media (max-width: 1023px) {
     .home-modern > .landing-header .header-nav-panel.open .nav-links-mega > a.nav-link,
-    .home-modern > .landing-header .header-nav-panel.open .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle {
+    .home-modern > .landing-header .header-nav-panel.open .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle,
+    .marketing-subpage > .landing-header .header-nav-panel.open .nav-links-mega > a.nav-link,
+    .marketing-subpage > .landing-header .header-nav-panel.open .nav-links-mega > .nav-dropdown > .nav-dropdown-toggle {
         color: var(--text);
     }
-    .home-modern > .landing-header .header-nav-panel.open .nav-cta-login {
+    .home-modern > .landing-header .header-nav-panel.open .nav-cta-login,
+    .marketing-subpage > .landing-header .header-nav-panel.open .nav-cta-login {
         color: var(--text) !important;
         border-color: var(--border) !important;
     }
