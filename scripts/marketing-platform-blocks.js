@@ -165,15 +165,32 @@ export function platformBulletGrid(items) {
     .join('')}</ul>`;
 }
 
+const PROCESS_STEP_ICONS = {
+  Upload: 'fa-cloud-arrow-up',
+  Connect: 'fa-link',
+  Organize: 'fa-folder-tree',
+  Deploy: 'fa-rocket',
+};
+
 export function platformNumberedSteps(steps) {
-  return `<ol class="platform-numbered-steps">${steps
-    .map(
-      (s) => `<li>
-            <span class="platform-step-num">${s.num}</span>
-            <div><h4>${s.title}</h4>${s.body ? `<p>${s.body}</p>` : ''}${s.list ? `<ul>${s.list.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}</div>
-        </li>`
-    )
-    .join('')}</ol>`;
+  return `<div class="platform-process-grid">${steps
+    .map((s) => {
+      const icon = s.icon || PROCESS_STEP_ICONS[s.title] || 'fa-circle-check';
+      const bodyHtml = s.list
+        ? `<ul class="platform-process-tags">${s.list.map((x) => `<li>${x}</li>`).join('')}</ul>`
+        : s.body
+          ? `<p class="platform-process-desc">${s.body}</p>`
+          : '';
+      return `<article class="platform-process-card">
+            <div class="platform-process-card-top">
+                <span class="platform-process-num">${s.num}</span>
+                <div class="platform-process-icon"><i class="fa-solid ${icon}"></i></div>
+            </div>
+            <h4>${s.title}</h4>
+            ${bodyHtml}
+        </article>`;
+    })
+    .join('\n        ')}</div>`;
 }
 
 export function platformCategoryGrid(categories) {

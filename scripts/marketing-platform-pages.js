@@ -121,7 +121,7 @@ ${platformIntro({
         <p>ZiricAI Knowledge Base gives your AI Employees access to the business information you choose to provide.</p>`,
 })}
 ${platformDetail(`
-        <div class="section-header marketing-detail-header"><span class="section-eyebrow">How it works</span><h2>From upload to deployed knowledge</h2></div>
+        ${platformSectionHeader({ eyebrow: 'How it works', title: 'From upload to deployed knowledge' })}
         ${platformNumberedSteps([
           {
             num: '1',
