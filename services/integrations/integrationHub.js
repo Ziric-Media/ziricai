@@ -47,7 +47,19 @@ export function mergeTenantIntegrationsIntoChannels(channels, integrations = [])
 
     return channels.map((ch) => {
         const rec = byChannel.get(ch.channel);
-        if (!rec) return ch;
+        if (!rec) {
+            // WhatsApp (and other tenant-scoped channels) must not show "Connected" from global env alone.
+            if (ch.channel === CHANNELS.WHATSAPP) {
+                return {
+                    ...ch,
+                    configured: false,
+                    integrationStatus: null,
+                    displayPhoneNumber: null,
+                    phoneNumberId: null,
+                };
+            }
+            return ch;
+        }
         const status = String(rec.status || "").toLowerCase();
         const tenantConnected = ACTIVE_INTEGRATION_STATUSES.has(status);
         return {

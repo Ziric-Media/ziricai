@@ -151,12 +151,27 @@ export async function runMetaEmbeddedSignupConnect({ config, companyId, complete
 
   const signupData = await finishPromise;
   if (!authCode) {
-    await new Promise((r) => setTimeout(r, 400));
+    for (let i = 0; i < 30 && !authCode; i += 1) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+  const phoneNumberId =
+    signupData?.phone_number_id ||
+    signupData?.phoneNumberId ||
+    signupData?.data?.phone_number_id ||
+    signupData?.data?.phoneNumberId ||
+    null;
+  if (!phoneNumberId) {
+    throw new Error(
+      'Meta did not return a phone number ID. Finish all Meta steps, then try Connect WhatsApp once more.'
+    );
   }
   setStatus('Saving your connection…');
 
   const completeRes = await completeSignup(companyId, {
     ...signupData,
+    phone_number_id: phoneNumberId,
+    waba_id: signupData?.waba_id || signupData?.wabaId || signupData?.data?.waba_id || null,
     code: authCode,
   });
   if (completeRes?.error) {
