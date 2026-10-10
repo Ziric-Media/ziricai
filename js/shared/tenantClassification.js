@@ -7,12 +7,20 @@
 
 export const TENANT_CLASS = {
   PRODUCTION_CUSTOMER: 'PRODUCTION CUSTOMER',
+  CLIENT_ZERO: 'CLIENT ZERO',
   PILOT: 'PILOT',
   ACCEPTANCE: 'ACCEPTANCE',
   DEMO_SHOWCASE: 'DEMO/SHOWCASE',
   TEST: 'TEST',
   UNKNOWN: 'UNKNOWN',
 };
+
+import { CLIENT_ZERO_COMPANY_IDS, isClientZeroCompanyId } from './clientZero.js';
+
+/** ZiricAI platform tenant (Client Zero) — real company, not test/unknown harness. */
+const KNOWN_CLIENT_ZERO = new Set(
+  CLIENT_ZERO_COMPANY_IDS.map((id) => String(id).trim().toLowerCase())
+);
 
 const KNOWN_PILOT = new Set(['central-motors-rtb']);
 const KNOWN_DEMO = new Set(['demo-central-motors', 'demo-econo-funerals']);
@@ -54,8 +62,11 @@ function normalizeStoredClass(raw) {
   if (token === 'test') return TENANT_CLASS.TEST;
   if (token === 'acceptance') return TENANT_CLASS.ACCEPTANCE;
   if (token === 'pilot') return TENANT_CLASS.PILOT;
+  if (token === 'client_zero' || token === 'clientzero') return TENANT_CLASS.CLIENT_ZERO;
+  if (token === 'company_zero' || token === 'companyzero') return TENANT_CLASS.CLIENT_ZERO;
   if (token === 'unknown') return TENANT_CLASS.UNKNOWN;
   const upper = String(raw).toUpperCase();
+  if (upper === 'COMPANY ZERO') return TENANT_CLASS.CLIENT_ZERO;
   if (Object.values(TENANT_CLASS).includes(upper)) return upper;
   return null;
 }
@@ -89,6 +100,30 @@ export function classifyTenant(company) {
   const storedRaw =
     settings.tenantClass || settings.general?.tenantClass || settings.censusClass || null;
   const stored = normalizeStoredClass(storedRaw);
+
+  /** Operator-known Client Zero ids must not display as UNKNOWN because of stale stored metadata. */
+  if (isClientZeroCompanyId(companyId)) {
+    if (stored && stored !== TENANT_CLASS.UNKNOWN) {
+      evidence.push(`settings.tenantClass=${storedRaw}`);
+      return {
+        classification: stored,
+        classificationSource: 'stored_metadata',
+        classificationConfidence: 'HIGH',
+        evidence,
+      };
+    }
+    evidence.push(`known client zero id (${companyId})`);
+    if (stored === TENANT_CLASS.UNKNOWN) {
+      evidence.push('ignored stale settings.tenantClass=UNKNOWN for Client Zero');
+    }
+    return {
+      classification: TENANT_CLASS.CLIENT_ZERO,
+      classificationSource: 'operator_policy',
+      classificationConfidence: 'HIGH',
+      evidence,
+    };
+  }
+
   if (stored) {
     evidence.push(`settings.tenantClass=${storedRaw}`);
     return {
@@ -115,6 +150,24 @@ export function classifyTenant(company) {
     return {
       classification: TENANT_CLASS.PRODUCTION_CUSTOMER,
       classificationSource: 'operator_registry',
+      classificationConfidence: 'HIGH',
+      evidence,
+    };
+  }
+
+  if (
+    KNOWN_CLIENT_ZERO.has(id) ||
+    settings.isClientZero === true ||
+    settings.isCompanyZero === true ||
+    settings.companyZero === true
+  ) {
+    if (KNOWN_CLIENT_ZERO.has(id)) evidence.push(`known client zero id (${companyId})`);
+    if (settings.isClientZero === true) evidence.push('settings.isClientZero === true');
+    if (settings.isCompanyZero === true) evidence.push('settings.isCompanyZero === true');
+    if (settings.companyZero === true) evidence.push('settings.companyZero === true');
+    return {
+      classification: TENANT_CLASS.CLIENT_ZERO,
+      classificationSource: 'operator_policy',
       classificationConfidence: 'HIGH',
       evidence,
     };
@@ -198,6 +251,7 @@ export function summarizeByClassification(companies) {
   const summary = {
     total: companies.length,
     [TENANT_CLASS.PRODUCTION_CUSTOMER]: 0,
+    [TENANT_CLASS.CLIENT_ZERO]: 0,
     [TENANT_CLASS.PILOT]: 0,
     [TENANT_CLASS.ACCEPTANCE]: 0,
     [TENANT_CLASS.DEMO_SHOWCASE]: 0,
@@ -216,6 +270,7 @@ export function tenantClassFilterOptions() {
   return [
     { value: '', label: 'All' },
     { value: TENANT_CLASS.PRODUCTION_CUSTOMER, label: 'Production' },
+    { value: TENANT_CLASS.CLIENT_ZERO, label: 'Client Zero' },
     { value: TENANT_CLASS.PILOT, label: 'Pilot' },
     { value: TENANT_CLASS.ACCEPTANCE, label: 'Acceptance' },
     { value: TENANT_CLASS.DEMO_SHOWCASE, label: 'Demo' },
@@ -223,3 +278,6 @@ export function tenantClassFilterOptions() {
     { value: TENANT_CLASS.UNKNOWN, label: 'Unknown' },
   ];
 }
+
+/** @deprecated use TENANT_CLASS.CLIENT_ZERO */
+TENANT_CLASS.COMPANY_ZERO = TENANT_CLASS.CLIENT_ZERO;

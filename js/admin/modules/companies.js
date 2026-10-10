@@ -454,10 +454,12 @@ function buildFormSlideOver() {
           <div class="form-group"><label for="companyTenantClass">Tenant classification</label>
             <select id="companyTenantClass">
               <option value="PRODUCTION CUSTOMER" selected>Production customer</option>
+              <option value="CLIENT ZERO">Client Zero</option>
               <option value="PILOT">Pilot</option>
               <option value="ACCEPTANCE">Acceptance</option>
               <option value="DEMO/SHOWCASE">Demo / Showcase</option>
               <option value="TEST">Test</option>
+              <option value="UNKNOWN">Unknown (manual review)</option>
             </select>
           </div>
         </div>
@@ -1359,44 +1361,75 @@ function parseTemperatureInput(raw, fallback = 0.7) {
   return Math.min(2, Math.max(0, n));
 }
 
+function resolveTenantClassSelectValue(record) {
+  const raw = record?.settings?.tenantClass || record?.settings?.general?.tenantClass || null;
+  if (raw) return String(raw);
+  if (record?.id && isClientZeroCompanyId(record.id)) return TENANT_CLASS.CLIENT_ZERO;
+  return TENANT_CLASS.PRODUCTION_CUSTOMER;
+}
+
+function setTenantClassSelect(container, record) {
+  const select = container.querySelector('#companyTenantClass');
+  if (!select) return;
+  const desired = resolveTenantClassSelectValue(record);
+  const hasOption = Array.from(select.options).some((o) => o.value === desired);
+  select.value = hasOption ? desired : TENANT_CLASS.PRODUCTION_CUSTOMER;
+}
+
 async function openCompanyForm(container, company, openForm) {
-  let record = company;
-  if (company?.id) {
-    const fresh = await fetchPlatformCompany(company.id);
-    if (!fresh.error && fresh.data?.company) {
-      record = fresh.data.company;
-      setState({ companies: mergeSavedCompanyIntoItems(state.companies, record) });
-    }
+  const formPanel = container.querySelector('#companyFormPanel');
+  if (!formPanel) {
+    showToast('Company form is not available — refresh the page.', 'error');
+    return;
   }
-  const isEdit = Boolean(record);
-  container.querySelector('#companyFormTitle').textContent = isEdit ? 'Edit Company' : 'Add Company';
-  container.querySelector('#companyEditId').value = record?.id || '';
-  container.querySelector('#companyName').value = record?.name || '';
-  container.querySelector('#companyIndustry').value = record?.industry || '';
-  container.querySelector('#companyWebsite').value = record?.website || '';
-  container.querySelector('#companyEmail').value = record?.email || '';
-  container.querySelector('#companyPhone').value = record?.phone || '';
-  container.querySelector('#companyLogoUrl').value = record?.logoUrl || '';
-  container.querySelector('#companyOwner').value = record?.owner || '';
-  container.querySelector('#companyOwnerEmail').value = record?.ownerEmail || '';
-  container.querySelector('#companyOwnerPhone').value = record?.ownerPhone || '';
-  container.querySelector('#companyTenantClass').value =
-    record?.settings?.tenantClass || 'PRODUCTION CUSTOMER';
-  container.querySelector('#companyPlan').value = record?.plan || 'business';
-  container.querySelector('#companyStatus').value = record?.status || 'active';
-  const planAmount = container.querySelector('#companyPlanAmount');
-  planAmount.value = record?.billing?.planAmount ?? PLAN_AMOUNTS[record?.plan || 'business'] ?? '';
-  planAmount.dataset.userEdited = record ? '1' : '';
-  container.querySelector('#companyBillingStatus').value = record?.billing?.status || 'pending';
-  container.querySelector('#companyAgent').value = record?.agentId || '';
-  container.querySelector('#companyAiModel').value = record?.aiModel || 'gpt-4o-mini';
-  container.querySelector('#companyAiTemperature').value = record?.aiTemperature ?? 0.7;
-  container.querySelector('#companyOpenAiKey').value = record?.openAiApiKey || '';
-  container.querySelector('#companyKnowledgeBase').value = record?.knowledgeBaseId || '';
-  container.querySelector('#companyKnowledgeMaxDocs').value = record?.knowledgeMaxDocs ?? 500;
-  container.querySelector('#companyKnowledgeAutoSync').checked = record?.knowledgeAutoSync !== false;
+
   openForm();
-  loadWhatsAppIntegrationCard(container, isEdit ? record.id : null);
+
+  let record = company;
+  try {
+    if (company?.id) {
+      const fresh = await fetchPlatformCompany(company.id);
+      if (!fresh.error && fresh.data?.company) {
+        record = fresh.data.company;
+        setState({ companies: mergeSavedCompanyIntoItems(state.companies, record) });
+      } else if (fresh.error) {
+        showToast(fresh.error, 'warning');
+      }
+    }
+
+    const isEdit = Boolean(record);
+    container.querySelector('#companyFormTitle').textContent = isEdit ? 'Edit Company' : 'Add Company';
+    container.querySelector('#companyEditId').value = record?.id || '';
+    container.querySelector('#companyName').value = record?.name || '';
+    container.querySelector('#companyIndustry').value = record?.industry || '';
+    container.querySelector('#companyWebsite').value = record?.website || '';
+    container.querySelector('#companyEmail').value = record?.email || '';
+    container.querySelector('#companyPhone').value = record?.phone || '';
+    container.querySelector('#companyLogoUrl').value = record?.logoUrl || '';
+    container.querySelector('#companyOwner').value = record?.owner || '';
+    container.querySelector('#companyOwnerEmail').value = record?.ownerEmail || '';
+    container.querySelector('#companyOwnerPhone').value = record?.ownerPhone || '';
+    setTenantClassSelect(container, record);
+    container.querySelector('#companyPlan').value = record?.plan || 'business';
+    container.querySelector('#companyStatus').value = record?.status || 'active';
+    const planAmount = container.querySelector('#companyPlanAmount');
+    planAmount.value = record?.billing?.planAmount ?? PLAN_AMOUNTS[record?.plan || 'business'] ?? '';
+    planAmount.dataset.userEdited = record ? '1' : '';
+    container.querySelector('#companyBillingStatus').value = record?.billing?.status || 'pending';
+    container.querySelector('#companyAgent').value = record?.agentId || '';
+    container.querySelector('#companyAiModel').value = record?.aiModel || 'gpt-4o-mini';
+    container.querySelector('#companyAiTemperature').value = record?.aiTemperature ?? 0.7;
+    container.querySelector('#companyOpenAiKey').value = record?.openAiApiKey || '';
+    container.querySelector('#companyKnowledgeBase').value = record?.knowledgeBaseId || '';
+    container.querySelector('#companyKnowledgeMaxDocs').value = record?.knowledgeMaxDocs ?? 500;
+    container.querySelector('#companyKnowledgeAutoSync').checked = record?.knowledgeAutoSync !== false;
+    await loadWhatsAppIntegrationCard(container, isEdit ? record.id : null);
+  } catch (err) {
+    console.error('[companies] openCompanyForm failed:', err);
+    showToast(err?.message || 'Could not open company editor', 'error');
+    formPanel.classList.remove('open');
+    document.getElementById('overlay')?.classList.remove('open');
+  }
 }
 
 async function saveCompany(container, closeForm) {

@@ -15,10 +15,12 @@ export const TENANT_CLASS = {
   UNKNOWN: 'UNKNOWN',
 };
 
-import { CLIENT_ZERO_COMPANY_IDS } from './clientZero.js';
+import { CLIENT_ZERO_COMPANY_IDS, isClientZeroCompanyId } from './clientZero.js';
 
 /** ZiricAI platform tenant (Client Zero) — real company, not test/unknown harness. */
-const KNOWN_CLIENT_ZERO = new Set(CLIENT_ZERO_COMPANY_IDS);
+const KNOWN_CLIENT_ZERO = new Set(
+  CLIENT_ZERO_COMPANY_IDS.map((id) => String(id).trim().toLowerCase())
+);
 
 const KNOWN_PILOT = new Set(['central-motors-rtb']);
 const KNOWN_DEMO = new Set(['demo-central-motors', 'demo-econo-funerals']);
@@ -98,6 +100,30 @@ export function classifyTenant(company) {
   const storedRaw =
     settings.tenantClass || settings.general?.tenantClass || settings.censusClass || null;
   const stored = normalizeStoredClass(storedRaw);
+
+  /** Operator-known Client Zero ids must not display as UNKNOWN because of stale stored metadata. */
+  if (isClientZeroCompanyId(companyId)) {
+    if (stored && stored !== TENANT_CLASS.UNKNOWN) {
+      evidence.push(`settings.tenantClass=${storedRaw}`);
+      return {
+        classification: stored,
+        classificationSource: 'stored_metadata',
+        classificationConfidence: 'HIGH',
+        evidence,
+      };
+    }
+    evidence.push(`known client zero id (${companyId})`);
+    if (stored === TENANT_CLASS.UNKNOWN) {
+      evidence.push('ignored stale settings.tenantClass=UNKNOWN for Client Zero');
+    }
+    return {
+      classification: TENANT_CLASS.CLIENT_ZERO,
+      classificationSource: 'operator_policy',
+      classificationConfidence: 'HIGH',
+      evidence,
+    };
+  }
+
   if (stored) {
     evidence.push(`settings.tenantClass=${storedRaw}`);
     return {
@@ -130,12 +156,12 @@ export function classifyTenant(company) {
   }
 
   if (
-    KNOWN_CLIENT_ZERO.has(companyId) ||
+    KNOWN_CLIENT_ZERO.has(id) ||
     settings.isClientZero === true ||
     settings.isCompanyZero === true ||
     settings.companyZero === true
   ) {
-    if (KNOWN_CLIENT_ZERO.has(companyId)) evidence.push(`known client zero id (${companyId})`);
+    if (KNOWN_CLIENT_ZERO.has(id)) evidence.push(`known client zero id (${companyId})`);
     if (settings.isClientZero === true) evidence.push('settings.isClientZero === true');
     if (settings.isCompanyZero === true) evidence.push('settings.isCompanyZero === true');
     if (settings.companyZero === true) evidence.push('settings.companyZero === true');
