@@ -6,11 +6,49 @@ import { auth, ensureAuthReadyForApi } from '../firebase.js';
 
 /** Resolve API origin: injected config, same-origin Netlify proxy, or production default. */
 const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
+const PRODUCTION_API_HOST = 'ziricai-production.up.railway.app';
+
+function isNetlifyDeployPreviewHost(host) {
+  return /\.netlify\.app$/i.test(host);
+}
+
+function isProductionRailwayUrl(url) {
+  return typeof url === 'string' && url.includes(PRODUCTION_API_HOST);
+}
+
+function normalizeApiOrigin(url) {
+  return String(url).replace(/\/$/, '');
+}
+
+/**
+ * Netlify Deploy Previews use app/netlify.toml /api/* → production Railway unless
+ * the build sets API_BASE_URL to staging. Fail closed instead of silent prod fallback.
+ */
+function resolveApiBaseForNetlifyPreview(cfg) {
+  const explicit = cfg?.apiBase;
+  if (typeof explicit === 'string' && explicit.length > 0 && !isProductionRailwayUrl(explicit)) {
+    return normalizeApiOrigin(explicit);
+  }
+  const sitesApi = cfg?.sites?.api;
+  if (typeof sitesApi === 'string' && sitesApi.length > 0 && !isProductionRailwayUrl(sitesApi)) {
+    return normalizeApiOrigin(sitesApi);
+  }
+  throw new Error(
+    '[ZiricAI staging] Deploy Preview requires a non-empty staging API_BASE_URL at build time. ' +
+      'Refusing same-origin /api proxy and production Railway fallback.'
+  );
+}
 
 export function resolveApiBase() {
   if (typeof window === 'undefined') return PRODUCTION_API_URL;
 
   const cfg = window.__ZIRICAI_CONFIG__;
+  const host = location.hostname;
+
+  if (isNetlifyDeployPreviewHost(host)) {
+    return resolveApiBaseForNetlifyPreview(cfg);
+  }
+
   if (cfg?.apiBase !== undefined && cfg.apiBase !== null) {
     return cfg.apiBase;
   }
@@ -18,7 +56,6 @@ export function resolveApiBase() {
     return cfg.sites.api;
   }
 
-  const host = location.hostname;
   if (host === 'localhost' || host === '127.0.0.1') {
     return '';
   }

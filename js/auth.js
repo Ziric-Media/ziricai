@@ -17,6 +17,7 @@ import {
   createUserProfile,
   createTenantMembership,
 } from './users.js';
+import { getApiBase } from './shared/apiRequest.js';
 
 /** Maps Firebase Auth error codes to readable messages for the UI. */
 const AUTH_ERROR_MESSAGES = {
@@ -42,20 +43,6 @@ const AUTH_ERROR_MESSAGES = {
 };
 
 let cachedEnforcement = null;
-
-/** API base for auth helpers — prefers same-origin /api proxy on Netlify static sites. */
-const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
-
-function getApiBase() {
-  if (typeof window === 'undefined') return PRODUCTION_API_URL;
-  const cfg = window.__ZIRICAI_CONFIG__;
-  if (cfg?.apiBase !== undefined && cfg.apiBase !== null) return cfg.apiBase;
-  if (cfg?.sites?.api) return cfg.sites.api;
-  const host = location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1') return '';
-  if (/\.ziricai\.com$/i.test(host) && host !== 'api.ziricai.com') return '';
-  return PRODUCTION_API_URL;
-}
 
 /**
  * Converts a Firebase Auth error into a user-friendly message.
@@ -195,8 +182,7 @@ export async function resolveAuthProfile(user, options = {}) {
     return profile;
   }
 
-  const allowDemo = options.allowDemo !== false && (await isLaxTenantMode());
-  if (allowDemo && typeof options.demoFallback === 'function') {
+  if (options.allowDemo === true && typeof options.demoFallback === 'function') {
     return options.demoFallback(user);
   }
 
