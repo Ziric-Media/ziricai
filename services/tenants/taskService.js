@@ -10,6 +10,7 @@ import {
     enforceTaskListVisibility,
     assertCanViewTask,
     validateTaskCreateBody,
+    sanitizeTaskCreateBody,
     assertCanUpdateTask,
     sanitizeTaskUpdatePatch,
 } from "../auth/taskPermissionPolicy.js";
@@ -59,13 +60,19 @@ export async function getTaskForAccess(companyId, taskId, access = {}) {
 }
 
 export async function createTaskForAccess(companyId, access, data = {}) {
-    validateTaskCreateBody(access.role, access.uid, data);
-    const assigneeUid = data.assigneeUid ?? data.assigneeId ?? null;
-    return createTask(companyId, {
-        ...data,
-        assigneeUid,
-        createdByUid: access.uid || null,
-    });
+    const sanitized = sanitizeTaskCreateBody(data);
+    validateTaskCreateBody(access.role, access.uid, sanitized);
+    const payload = {
+        title: sanitized.title ?? "",
+        description: sanitized.description,
+        priority: sanitized.priority ?? "medium",
+        dueAt: sanitized.dueAt,
+        notes: sanitized.notes,
+        assigneeUid: sanitized.assigneeUid ?? null,
+        status: "open",
+        createdByUid: access.uid ?? null,
+    };
+    return createTask(companyId, payload);
 }
 
 export async function updateTaskForAccess(companyId, taskId, access, patch = {}) {

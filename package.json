@@ -112,6 +112,7 @@
         "verify:tenant-provisioning-1": "node scripts/verify-tenant-provisioning-1.mjs",
         "verify:business-portal-sec05-open-reg": "node scripts/verify-business-portal-sec05-open-remediation-regression.mjs",
         "verify:business-portal-sec04-rev-open1-slice-a": "node scripts/verify-business-portal-sec04-rev-open1-slice-a.js",
+        "verify:business-portal-task-create-boundary": "node scripts/verify-business-portal-task-create-boundary.mjs",
         "verify:mc-session-open2-firestore": "node scripts/verify-mc-session-open2-firestore-emulator.mjs"
     },
     "dependencies": {

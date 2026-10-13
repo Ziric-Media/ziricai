@@ -26,6 +26,24 @@ export const TASK_PATCH_PROTECTED_KEYS = new Set([
     "complete",
 ]);
 
+/** Client POST keys allowed through createTaskForAccess (OPEN-CREATE). */
+export const TASK_CLIENT_CREATABLE_KEYS = new Set([
+    "title",
+    "description",
+    "priority",
+    "dueAt",
+    "assigneeUid",
+    "assigneeId",
+    "notes",
+]);
+
+/** Must never be supplied on task create bodies. */
+export const TASK_CREATE_PROTECTED_KEYS = new Set([
+    ...TASK_PATCH_PROTECTED_KEYS,
+    "status",
+    "completedAt",
+]);
+
 export const TASK_PERMISSION_KEYS = [
     "canViewTasks",
     "canCreateTasks",
@@ -98,13 +116,45 @@ export function assertCanCreateTask(role) {
 }
 
 /**
+ * Allowlist + normalize client task CREATE before role checks and persistence.
+ * @param {object} body
+ * @returns {object} sanitized creatable fields (assigneeId → assigneeUid)
+ */
+export function sanitizeTaskCreateBody(body = {}) {
+    if (body == null || typeof body !== "object" || Array.isArray(body)) {
+        throw httpError("Task create body must be an object", 400, "TASK_CREATE_INVALID");
+    }
+    for (const key of Object.keys(body)) {
+        if (TASK_CREATE_PROTECTED_KEYS.has(key)) {
+            throw httpError(`Protected task field cannot be set on create: ${key}`, 403, "TASK_CREATE_FORBIDDEN");
+        }
+        if (!TASK_CLIENT_CREATABLE_KEYS.has(key)) {
+            throw httpError(`Unknown task create field: ${key}`, 400, "TASK_CREATE_UNKNOWN_FIELD");
+        }
+    }
+    const out = {};
+    for (const key of TASK_CLIENT_CREATABLE_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(body, key)) {
+            out[key] = body[key];
+        }
+    }
+    if (out.assigneeId !== undefined && out.assigneeUid === undefined) {
+        out.assigneeUid = out.assigneeId;
+        delete out.assigneeId;
+    } else if (out.assigneeId !== undefined) {
+        delete out.assigneeId;
+    }
+    return out;
+}
+
+/**
  * @param {string|null|undefined} role
  * @param {string|null|undefined} uid
- * @param {object} body
+ * @param {object} body — sanitized creatable fields from sanitizeTaskCreateBody
  */
 export function validateTaskCreateBody(role, uid, body = {}) {
     assertCanCreateTask(role);
-    const assigneeUid = body.assigneeUid || body.assigneeId || null;
+    const assigneeUid = body.assigneeUid || null;
     if (assigneeUid && assigneeUid !== uid && !hasPermission(role, "canAssignTasks")) {
         throw httpError("Permission denied: canAssignTasks required to assign others", 403, "PERMISSION_DENIED");
     }
