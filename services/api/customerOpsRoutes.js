@@ -3,6 +3,7 @@
  * CRM, Conversations, Appointments, Notifications, Reports.
  */
 import { requireTenantScope, requireAuthenticatedTenantMember } from "../core/tenantContext.js";
+import { checkPermission } from "../auth/permissionsService.js";
 import {
     listTenantCustomers,
     listContacts,
@@ -41,12 +42,81 @@ import {
     markNotificationRead,
     markAllNotificationsRead,
 } from "../tenants/notificationService.js";
-import { listTasks, createTask } from "../tenants/taskService.js";
+import {
+    listTasksForAccess,
+    createTaskForAccess,
+    getTaskForAccess,
+    updateTaskForAccess,
+} from "../tenants/taskService.js";
 import { listWorkflows, upsertWorkflow } from "../automation/workflowRegistry.js";
 import { listAutomationRuns } from "../automation/automationEngine.js";
 import { generateReport } from "../reporting/reportService.js";
 import { publish, EventTypes } from "../events/index.js";
 import { mountSupportCaseRoutes } from "./supportCaseRoutes.js";
+
+
+function tenantTaskAccess(req) {
+    return { role: req.tenant?.role, uid: req.tenant?.uid ?? null };
+}
+
+function taskError(res, err, logLabel) {
+    console.error(`[${logLabel}] error:`, err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+        error: err.message || "Task request failed",
+        code: err.code || "TASK_ERROR",
+    });
+}
+
+/**
+ * @param {import('express').Express} app
+ * @param {{ listPath: string, itemPath: string, logPrefix: string }} paths
+ */
+function mountTenantTaskRoutes(app, paths) {
+    const { listPath, itemPath, logPrefix } = paths;
+
+    app.get(listPath, requireAuthenticatedTenantMember(), checkPermission("canViewTasks"), async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const items = await listTasksForAccess(companyId, tenantTaskAccess(req));
+            res.json({ items, companyId: req.params.companyId });
+        } catch (err) {
+            taskError(res, err, `${logPrefix}/tasks GET`);
+        }
+    });
+
+    app.post(listPath, requireAuthenticatedTenantMember(), checkPermission("canCreateTasks"), async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const task = await createTaskForAccess(companyId, tenantTaskAccess(req), req.body || {});
+            res.status(201).json({ task });
+        } catch (err) {
+            taskError(res, err, `${logPrefix}/tasks POST`);
+        }
+    });
+
+    app.get(itemPath, requireAuthenticatedTenantMember(), checkPermission("canViewTasks"), async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const task = await getTaskForAccess(companyId, req.params.taskId, tenantTaskAccess(req));
+            if (!task) return res.status(404).json({ error: "Task not found", code: "TASK_NOT_FOUND" });
+            res.json({ task });
+        } catch (err) {
+            taskError(res, err, `${logPrefix}/tasks/:id GET`);
+        }
+    });
+
+    app.patch(itemPath, requireAuthenticatedTenantMember(), async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const task = await updateTaskForAccess(companyId, req.params.taskId, tenantTaskAccess(req), req.body || {});
+            if (!task) return res.status(404).json({ error: "Task not found", code: "TASK_NOT_FOUND" });
+            res.json({ task });
+        } catch (err) {
+            taskError(res, err, `${logPrefix}/tasks/:id PATCH`);
+        }
+    });
+}
 
 const PIPELINE_STAGES = ["new", "contacted", "qualified", "proposal", "won", "lost"];
 
@@ -54,6 +124,18 @@ const PIPELINE_STAGES = ["new", "contacted", "qualified", "proposal", "won", "lo
  * @param {import('express').Express} app
  */
 export function mountCustomerOpsRoutes(app) {
+    mountTenantTaskRoutes(app, {
+        listPath: "/api/portal/tasks/:companyId",
+        itemPath: "/api/portal/tasks/:companyId/:taskId",
+        logPrefix: "portal/tasks",
+    });
+    mountTenantTaskRoutes(app, {
+        listPath: "/api/companies/:companyId/crm/tasks",
+        itemPath: "/api/companies/:companyId/crm/tasks/:taskId",
+        logPrefix: "crm/tasks",
+    });
+
+
     /* ── CRM ── */
     app.get("/api/companies/:companyId/crm/customers", requireTenantScope(), async (req, res) => {
         try {
@@ -133,24 +215,6 @@ export function mountCustomerOpsRoutes(app) {
             });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to load pipeline" });
-        }
-    });
-
-    app.get("/api/companies/:companyId/crm/tasks", requireTenantScope(), async (req, res) => {
-        try {
-            const items = await listTasks(req.params.companyId);
-            res.json({ items, companyId: req.params.companyId });
-        } catch (err) {
-            res.status(500).json({ error: err.message || "Failed to list tasks" });
-        }
-    });
-
-    app.post("/api/companies/:companyId/crm/tasks", requireTenantScope(), async (req, res) => {
-        try {
-            const task = await createTask(req.params.companyId, req.body || {});
-            res.status(201).json({ task });
-        } catch (err) {
-            res.status(400).json({ error: err.message || "Failed to create task" });
         }
     });
 

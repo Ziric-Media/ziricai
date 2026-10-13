@@ -43,6 +43,13 @@ function buildCertFromEnv() {
 function initializeAdminApp() {
     if (admin.apps.length > 0) return admin.app();
 
+    /** Local Firestore emulator — no service account required (FIRESTORE_EMULATOR_HOST must be set before first getAdminFirestore()). */
+    if (process.env.FIRESTORE_EMULATOR_HOST) {
+        const projectId =
+            process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || getFirebaseProjectId() || "ziricai-local-emulator";
+        return admin.initializeApp({ projectId });
+    }
+
     const jsonCreds = parseServiceAccountJson();
     const envCreds = buildCertFromEnv();
 
@@ -74,6 +81,7 @@ function initializeAdminApp() {
 
 /** True when Railway/server has credentials to use Admin SDK. */
 export function hasAdminCredentials() {
+    if (process.env.FIRESTORE_EMULATOR_HOST) return true;
     if (parseServiceAccountJson()) return true;
     if (buildCertFromEnv()?.clientEmail && buildCertFromEnv()?.privateKey) return true;
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) return true;

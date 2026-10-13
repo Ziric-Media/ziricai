@@ -693,7 +693,7 @@ app.get("/api/companies/:companyId", requireTenantScope(), async (req, res) => {
     }
 });
 
-app.patch("/api/companies/:companyId", requireTenantScope(), checkPermission("canManageStaff"), async (req, res) => {
+app.patch("/api/companies/:companyId", requireAuthenticatedTenantMember(), checkPermission("canManageStaff"), async (req, res) => {
     try {
         const company = await updateCompany(req.params.companyId, req.body || {});
         res.json({ success: true, company });
@@ -748,7 +748,7 @@ app.post(
 );
 
 /** Departments — org structure under tenant */
-app.get("/api/companies/:companyId/departments", requireTenantScope(), async (req, res) => {
+app.get("/api/companies/:companyId/departments", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const items = await listDepartments(req.params.companyId);
         res.json({ items });
@@ -757,7 +757,7 @@ app.get("/api/companies/:companyId/departments", requireTenantScope(), async (re
     }
 });
 
-app.post("/api/companies/:companyId/departments", requireTenantScope(), checkPermission("canManageStaff"), async (req, res) => {
+app.post("/api/companies/:companyId/departments", requireAuthenticatedTenantMember(), checkPermission("canManageStaff"), async (req, res) => {
     try {
         const dept = await createDepartment(req.params.companyId, req.body || {});
         res.status(201).json({ success: true, department: dept });
@@ -766,7 +766,7 @@ app.post("/api/companies/:companyId/departments", requireTenantScope(), checkPer
     }
 });
 
-app.patch("/api/companies/:companyId/departments/:deptId", requireTenantScope(), checkPermission("canManageStaff"), async (req, res) => {
+app.patch("/api/companies/:companyId/departments/:deptId", requireAuthenticatedTenantMember(), checkPermission("canManageStaff"), async (req, res) => {
     try {
         const department = await updateDepartment(req.params.companyId, req.params.deptId, req.body || {});
         res.json({ success: true, department });
@@ -775,7 +775,7 @@ app.patch("/api/companies/:companyId/departments/:deptId", requireTenantScope(),
     }
 });
 
-app.delete("/api/companies/:companyId/departments/:deptId", requireTenantScope(), checkPermission("canManageStaff"), async (req, res) => {
+app.delete("/api/companies/:companyId/departments/:deptId", requireAuthenticatedTenantMember(), checkPermission("canManageStaff"), async (req, res) => {
     try {
         await deleteDepartment(req.params.companyId, req.params.deptId);
         res.json({ success: true });
@@ -785,7 +785,7 @@ app.delete("/api/companies/:companyId/departments/:deptId", requireTenantScope()
 });
 
 /** Team — tenant membership */
-app.get("/api/companies/:companyId/team", requireTenantScope(), async (req, res) => {
+app.get("/api/companies/:companyId/team", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const items = await listTeamMembers(req.params.companyId);
         res.json({ items, count: items.length });
@@ -794,7 +794,7 @@ app.get("/api/companies/:companyId/team", requireTenantScope(), async (req, res)
     }
 });
 
-app.post("/api/companies/:companyId/team/invite", requireTenantScope(), checkPermission("canManageStaff"), async (req, res) => {
+app.post("/api/companies/:companyId/team/invite", requireAuthenticatedTenantMember(), checkPermission("canManageStaff"), async (req, res) => {
     try {
         const invite = await inviteTeamMember(req.params.companyId, {
             email: req.body?.email,
@@ -808,7 +808,7 @@ app.post("/api/companies/:companyId/team/invite", requireTenantScope(), checkPer
     }
 });
 
-app.patch("/api/companies/:companyId/team/:uid", requireTenantScope(), checkPermission("canManageStaff"), async (req, res) => {
+app.patch("/api/companies/:companyId/team/:uid", requireAuthenticatedTenantMember(), checkPermission("canManageStaff"), async (req, res) => {
     try {
         const member = await updateTeamMemberRole(req.params.companyId, req.params.uid, req.body?.role, req.body || {});
         res.json({ success: true, member });
@@ -818,7 +818,7 @@ app.patch("/api/companies/:companyId/team/:uid", requireTenantScope(), checkPerm
 });
 
 /** Workspace snapshot for portal bootstrap */
-app.get("/api/portal/workspace/:companyId", requireTenantScope(), async (req, res) => {
+app.get("/api/portal/workspace/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const snapshot = await getWorkspaceSnapshot(req.params.companyId);
         if (!snapshot) return res.status(404).json({ error: "Workspace not found" });
@@ -830,7 +830,7 @@ app.get("/api/portal/workspace/:companyId", requireTenantScope(), async (req, re
 });
 
 /** Company Admin Portal — tenant-scoped demo API */
-app.get("/api/portal/company/:companyId", requireTenantScope(), async (req, res) => {
+app.get("/api/portal/company/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const data = await getPortalCompanyAsync(req.params.companyId);
         res.json(data);
@@ -840,7 +840,7 @@ app.get("/api/portal/company/:companyId", requireTenantScope(), async (req, res)
     }
 });
 
-app.patch("/api/portal/company/:companyId", requireTenantScope(), checkPermission("canManageStaff"), async (req, res) => {
+app.patch("/api/portal/company/:companyId", requireAuthenticatedTenantMember(), checkPermission("canManageStaff"), async (req, res) => {
     try {
         const companyId = req.params.companyId;
         const { branding, settings } = req.body || {};
@@ -861,7 +861,7 @@ app.patch("/api/portal/company/:companyId", requireTenantScope(), checkPermissio
     }
 });
 
-app.get("/api/portal/team/:companyId", requireTenantScope(), async (req, res) => {
+app.get("/api/portal/team/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const data = await getPortalTeamAsync(req.params.companyId);
         res.json(data);
@@ -871,7 +871,7 @@ app.get("/api/portal/team/:companyId", requireTenantScope(), async (req, res) =>
     }
 });
 
-app.get("/api/portal/notifications/:companyId", requireTenantScope(), async (req, res) => {
+app.get("/api/portal/notifications/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const companyId = req.params.companyId;
         const items = await getPortalNotificationsAsync(companyId);
@@ -887,7 +887,7 @@ app.get("/api/portal/notifications/:companyId", requireTenantScope(), async (req
     }
 });
 
-app.get("/api/portal/activity/:companyId", requireTenantScope(), async (req, res) => {
+app.get("/api/portal/activity/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const companyId = req.params.companyId;
         const items = await getPortalActivityAsync(companyId);
@@ -899,7 +899,7 @@ app.get("/api/portal/activity/:companyId", requireTenantScope(), async (req, res
     }
 });
 
-app.get("/api/portal/usage/:companyId", requireTenantScope(), async (req, res) => {
+app.get("/api/portal/usage/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const data = await getPortalUsage(req.params.companyId);
         res.json(data);
@@ -1453,7 +1453,7 @@ app.get("/api/operations/command-center", requirePlatformAccess(), async (req, r
     }
 });
 
-app.get("/api/portal/dashboard/:companyId", requireTenantScope(), async (req, res) => {
+app.get("/api/portal/dashboard/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const data = await getPortalDashboard(req.params.companyId);
         res.json(data);
@@ -1464,7 +1464,7 @@ app.get("/api/portal/dashboard/:companyId", requireTenantScope(), async (req, re
 });
 
 /** Portal BOS — unified hub snapshot (metrics, conversations, activity) */
-app.get("/api/portal/hub/:companyId", requireTenantScope(), async (req, res) => {
+app.get("/api/portal/hub/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const data = await getPortalHub(req.params.companyId);
         res.json(data);
@@ -1474,7 +1474,7 @@ app.get("/api/portal/hub/:companyId", requireTenantScope(), async (req, res) => 
     }
 });
 
-app.get("/api/portal/analytics/:companyId", requireTenantScope(), async (req, res) => {
+app.get("/api/portal/analytics/:companyId", requireAuthenticatedTenantMember(), async (req, res) => {
     try {
         const snapshot = await getDashboardSnapshot(req.params.companyId, {
             days: parseInt(req.query.days || "14", 10),

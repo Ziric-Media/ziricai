@@ -7,8 +7,11 @@ import {
     normalizeRole,
     userBelongsToCompany,
     getTenantMembership,
+    getUserProfile,
     assertMfaIfRequired,
+    tryEnsureCompanyOwnerPortalAccess,
 } from "../auth/authService.js";
+import { resolveEffectivePortalRole } from "../auth/permissionsService.js";
 import { hasPlatformApiKeyAccess } from "../auth/platformAuth.js";
 import { auditLog } from "../audit/auditLog.js";
 import { tryPilotShowcaseTenantAccess } from "../storage/centralMotorsPilot.js";
@@ -17,6 +20,20 @@ const ENFORCEMENT = (process.env.TENANT_SCOPE_ENFORCEMENT || "lax").toLowerCase(
 
 export function isStrictTenantEnforcement() {
     return ENFORCEMENT === "strict";
+}
+
+/**
+ * Link company owner profile/membership when MC provision skipped users/{uid}.
+ * @param {object} ctx
+ * @returns {Promise<boolean>}
+ */
+async function recoverOwnerPortalAccess(ctx) {
+    if (!ctx?.uid || !ctx?.companyId) return false;
+    const linked = await tryEnsureCompanyOwnerPortalAccess(ctx, ctx.companyId);
+    if (!linked) return false;
+    ctx.profile = await getUserProfile(ctx.uid);
+    if (ctx.profile?.role) ctx.role = ctx.profile.role;
+    return true;
 }
 
 /**
@@ -43,10 +60,19 @@ export async function resolveTenantContext(req) {
     const auth = await resolveAuthFromRequest(req);
     const companyId = extractCompanyId(req);
 
+    let role = auth.role;
+    if (auth.uid && companyId && !auth.isSuperAdmin) {
+        const membership = await getTenantMembership(auth.uid, companyId);
+        if (membership?.role) {
+            role = membership.role;
+        }
+    }
+    role = resolveEffectivePortalRole(role);
+
     return {
         companyId,
         uid: auth.uid,
-        role: auth.role,
+        role,
         email: auth.email,
         isSuperAdmin: auth.isSuperAdmin,
         profile: auth.profile,
@@ -69,11 +95,27 @@ export async function assertTenantAccess(ctx) {
             throw Object.assign(new Error("Authentication required"), { status: 401, code: "UNAUTHORIZED" });
         }
 
+        if (await tryPilotShowcaseTenantAccess(ctx, ctx.companyId)) {
+            return;
+        }
+
         if (!ctx.profile) {
+            await recoverOwnerPortalAccess(ctx);
+        }
+
+        if (!ctx.profile) {
+            const membershipOnly = await getTenantMembership(ctx.uid, ctx.companyId);
+            if (membershipOnly) {
+                return;
+            }
             throw Object.assign(new Error("User profile not found — complete onboarding or contact support"), {
                 status: 403,
                 code: "PROFILE_REQUIRED",
             });
+        }
+
+        if (!userBelongsToCompany(ctx.profile, ctx.companyId)) {
+            await recoverOwnerPortalAccess(ctx);
         }
 
         if (!userBelongsToCompany(ctx.profile, ctx.companyId)) {
@@ -90,7 +132,11 @@ export async function assertTenantAccess(ctx) {
             );
         }
 
-        const membership = await getTenantMembership(ctx.uid, ctx.companyId);
+        let membership = await getTenantMembership(ctx.uid, ctx.companyId);
+        if (!membership) {
+            await recoverOwnerPortalAccess(ctx);
+            membership = await getTenantMembership(ctx.uid, ctx.companyId);
+        }
         if (!membership) {
             throw Object.assign(
                 new Error(`Not a member of company "${ctx.companyId}" — membership doc missing`),
@@ -130,6 +176,10 @@ export async function assertAuthenticatedTenantMemberAccess(ctx, deps = {}) {
     }
 
     if (!ctx.profile) {
+        await recoverOwnerPortalAccess(ctx);
+    }
+
+    if (!ctx.profile) {
         const membershipOnly = await resolveMembership(ctx.uid, ctx.companyId);
         if (!membershipOnly) {
             throw Object.assign(new Error("User profile not found — complete onboarding or contact support"), {
@@ -138,6 +188,10 @@ export async function assertAuthenticatedTenantMemberAccess(ctx, deps = {}) {
             });
         }
         return { via: "tenant" };
+    }
+
+    if (!userBelongsToCompany(ctx.profile, ctx.companyId)) {
+        await recoverOwnerPortalAccess(ctx);
     }
 
     if (!userBelongsToCompany(ctx.profile, ctx.companyId)) {
@@ -150,7 +204,11 @@ export async function assertAuthenticatedTenantMemberAccess(ctx, deps = {}) {
         throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
     }
 
-    const membership = await resolveMembership(ctx.uid, ctx.companyId);
+    let membership = await resolveMembership(ctx.uid, ctx.companyId);
+    if (!membership) {
+        await recoverOwnerPortalAccess(ctx);
+        membership = await resolveMembership(ctx.uid, ctx.companyId);
+    }
     if (!membership) {
         throw Object.assign(new Error("Access denied"), { status: 403, code: "TENANT_FORBIDDEN" });
     }

@@ -131,9 +131,15 @@ export async function getOrCreateMcSarahSession({
             session = await readSessionFromFirestore(sessionId);
             if (session) writeSessionToMemory(session);
         }
-        if (session && assertMcSessionAccess(session, { operatorUid: uid, scopeKey })) {
-            session.updatedAt = Date.now();
-            return session;
+        if (session) {
+            if (assertMcSessionAccess(session, { operatorUid: uid, scopeKey })) {
+                session.updatedAt = Date.now();
+                return session;
+            }
+            throw Object.assign(new Error("Session access denied"), {
+                status: 403,
+                code: "SARAH_SESSION_FORBIDDEN",
+            });
         }
     }
 
