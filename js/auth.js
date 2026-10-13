@@ -182,7 +182,8 @@ export async function resolveAuthProfile(user, options = {}) {
     return profile;
   }
 
-  if (options.allowDemo === true && typeof options.demoFallback === 'function') {
+  const allowDemo = options.allowDemo !== false && (await isLaxTenantMode());
+  if (allowDemo && typeof options.demoFallback === 'function') {
     return options.demoFallback(user);
   }
 
