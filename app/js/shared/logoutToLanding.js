@@ -17,9 +17,16 @@ export function isLocalAuthDevHost() {
   return /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 }
 
+/** Netlify Deploy Preview / branch deploy — keep auth on this origin (staging Firebase in __ZIRICAI_CONFIG__). */
+export function isNetlifyDeployPreviewHost() {
+  if (typeof location === 'undefined') return false;
+  return /\.netlify\.app$/i.test(location.hostname);
+}
+
 /** Production: send signed-out / never-signed-in visitors to marketing login or home after logout. */
 export function handleSignedOutVisitor() {
   if (isLocalAuthDevHost()) return false;
+  if (isNetlifyDeployPreviewHost()) return false;
 
   try {
     if (sessionStorage.getItem(LOGOUT_FLAG)) {
