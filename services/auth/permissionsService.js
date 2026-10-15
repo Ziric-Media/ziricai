@@ -15,6 +15,7 @@ const ROLE_ALIASES = {
 export const PORTAL_ROLES = [
     "owner",
     "manager",
+    "hr",
     "sales",
     "support",
     "reception",
@@ -36,6 +37,12 @@ const PERMISSION_MATRIX = {
     canManageIntegrations: ["owner", "manager"],
     canUploadKnowledge: ["owner"],
     canRunAutomations: ["owner", "manager", "marketing"],
+    canViewTasks: ["owner", "manager", "finance", "hr", "sales", "support", "reception", "marketing", "viewer"],
+    canCreateTasks: ["owner", "manager"],
+    canAssignTasks: ["owner", "manager"],
+    canUpdateOwnTasks: ["owner", "manager", "finance", "hr", "sales", "support", "reception", "marketing", "viewer"],
+    canUpdateAnyTask: ["owner", "manager"],
+    canCompleteTasks: ["owner", "manager", "finance", "hr", "sales", "support", "reception", "marketing", "viewer"],
 };
 
 /** Sensitive API routes map to permission keys. */
@@ -49,19 +56,31 @@ export const ROUTE_PERMISSIONS = {
     "POST /api/marketplace/update": "canManageStaff",
 };
 
-export function normalizeRole(role) {
+/**
+ * Least-privilege effective role for authorization (SEC-04).
+ * Unknown / missing roles must not grant owner/manager capabilities.
+ */
+export function resolveEffectivePortalRole(role) {
+    if (isSuperAdminRole(role)) return "superadmin";
     const raw = authNormalizeRole(role);
-    if (!raw) return "owner";
-    return ROLE_ALIASES[raw] || raw;
+    if (!raw) return "viewer";
+    const normalized = ROLE_ALIASES[raw] || raw;
+    if (PORTAL_ROLES.includes(normalized)) return normalized;
+    return "viewer";
+}
+
+export function normalizeRole(role) {
+    return resolveEffectivePortalRole(role);
 }
 
 export function assertInvitablePortalRole(role) {
-    const r = normalizeRole(role);
+    const raw = authNormalizeRole(role);
+    const normalized = raw ? ROLE_ALIASES[raw] || raw : "";
     const allowed = PORTAL_ROLES.filter((x) => x !== "owner" && x !== "superadmin");
-    if (!allowed.includes(r)) {
+    if (!normalized || !allowed.includes(normalized)) {
         throw new Error(`Invalid team role "${role}". Allowed: ${allowed.join(", ")}`);
     }
-    return r;
+    return normalized;
 }
 
 /**
@@ -77,17 +96,12 @@ export function hasPermission(role, permission) {
 
 /**
  * Express middleware factory — requires authenticated tenant context + permission.
- * Skipped in lax mode when user is not authenticated (demo/dev compatibility).
+ * Fail closed: lax tenant scope does not bypass permission checks (SEC-02).
  * @param {keyof typeof PERMISSION_MATRIX} permission
  */
 export function checkPermission(permission) {
     return (req, res, next) => {
-        const enforcement = (process.env.TENANT_SCOPE_ENFORCEMENT || "lax").toLowerCase();
         const ctx = req.tenant;
-
-        if (enforcement === "lax" && !ctx?.uid) {
-            return next();
-        }
 
         if (!ctx?.uid && !ctx?.isSuperAdmin) {
             return res.status(401).json({ error: "Authentication required", code: "UNAUTHORIZED" });

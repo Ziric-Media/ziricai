@@ -24,3 +24,14 @@ export function resolveQueueBackendName() {
     if (process.env.REDIS_URL) return "redis";
     return "memory";
 }
+
+/** Max time a job may stay in `processing` before lease recovery (ms). */
+export function queueProcessingLeaseMs() {
+    const n = parseInt(process.env.QUEUE_PROCESSING_LEASE_MS || "120000", 10);
+    const raw = Number.isFinite(n) && n > 0 ? n : 120000;
+    const testMode =
+        process.env.OPS_QUEUE_RELIABILITY_TEST === "1" || process.env.NODE_ENV === "test";
+    const floor = testMode ? 50 : 30_000;
+    const ceiling = 86_400_000;
+    return Math.min(ceiling, Math.max(floor, raw));
+}

@@ -14,6 +14,7 @@ export const NAV_SECTIONS = [
       { id: 'conversations', label: 'Inbox', icon: 'fa-inbox', live: true },
       { id: 'customers', label: 'CRM', icon: 'fa-users' },
       { id: 'appointments', label: 'Appointments', icon: 'fa-calendar-check' },
+      { id: 'operations', label: 'Operations', icon: 'fa-list-check' },
       { id: 'agents', label: 'AI Employees', icon: 'fa-robot' },
       { id: 'knowledge', label: 'Knowledge Base', icon: 'fa-book' },
       { id: 'automation', label: 'Automation', icon: 'fa-diagram-project' },

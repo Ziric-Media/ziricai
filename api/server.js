@@ -63,6 +63,14 @@ setImmediate(() => {
     import("./app.js")
         .then(async ({ setupApp, runBackgroundInit, createHealthHandler }) => {
             logStartup("Loading application modules");
+            const { getStorageAdapter, getStorageFallbackReason } = await import(
+                "../services/storage/storageAdapter.js"
+            );
+            const adapter = await getStorageAdapter();
+            logStartup("Storage backend resolved", {
+                backend: adapter.name,
+                fallback: getStorageFallbackReason() || undefined,
+            });
             await setupApp(app);
             fullHealthHandler = createHealthHandler();
             appReady = true;

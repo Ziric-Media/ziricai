@@ -3,12 +3,19 @@
  * Enqueue API stable for future BullMQ/SQS swap.
  */
 import { createQueueBackend } from "./backends/index.js";
-import { queueConcurrency, queuePollIntervalMs, resolveQueueBackendName } from "./queueConfig.js";
+import {
+    queueConcurrency,
+    queuePollIntervalMs,
+    queueProcessingLeaseMs,
+    resolveQueueBackendName,
+} from "./queueConfig.js";
 import { JOB_STATES } from "./jobStates.js";
 
 const JOB_TYPES = {
     PROCESS_INBOUND_MESSAGE: "PROCESS_INBOUND_MESSAGE",
     PROCESS_EVENT: "PROCESS_EVENT",
+    /** Operations Centre — AI-assigned task execution (tenant-scoped). */
+    EXECUTE_AI_TASK: "EXECUTE_AI_TASK",
 };
 
 /** @type {Map<string, Function>} */
@@ -46,14 +53,24 @@ async function runJob(job) {
 
     logJob("Processing", job);
 
+    const fence = { claimToken: job.claimToken || null };
+
     try {
         await handler(job);
-        const completed = await backend.completeJob(job.id, {
-            outboundSent: job.outboundSent,
-            outboundMetaMessageId: job.outboundMetaMessageId,
-            outboundPlanSent: job.outboundPlanSent,
-            outboundMetaMessageIds: job.outboundMetaMessageIds,
-        });
+        const completed = await backend.completeJob(
+            job.id,
+            {
+                outboundSent: job.outboundSent,
+                outboundMetaMessageId: job.outboundMetaMessageId,
+                outboundPlanSent: job.outboundPlanSent,
+                outboundMetaMessageIds: job.outboundMetaMessageIds,
+            },
+            fence
+        );
+        if (!completed) {
+            console.warn("[queue] Ignored stale completion for job", job.id, job.type);
+            return;
+        }
         if (completed) logJob("Completed", completed);
 
         if (job.type === JOB_TYPES.PROCESS_INBOUND_MESSAGE && job.externalMessageId) {
@@ -67,9 +84,24 @@ async function runJob(job) {
         }
     } catch (err) {
         const message = err?.message || String(err);
-        const updated = await backend.scheduleRetry(job.id, message);
+        const updated = await backend.scheduleRetry(job.id, message, fence);
+        if (!updated) {
+            console.warn("[queue] Ignored stale retry/fail for job", job.id, job.type);
+            return;
+        }
         if (updated?.status === JOB_STATES.FAILED) {
             logJob("Failed permanently", updated, { error: message });
+            if (job.type === JOB_TYPES.EXECUTE_AI_TASK) {
+                const { syncTaskExecutionWithFailedJob } = await import("../operations/aiTaskJobSync.js");
+                await syncTaskExecutionWithFailedJob(job, message).catch((syncErr) => {
+                    console.error("[queue] AI task failure sync error:", syncErr.message);
+                });
+            }
+        } else if (updated?.status === JOB_STATES.RETRYING && job.type === JOB_TYPES.EXECUTE_AI_TASK) {
+            const { syncTaskExecutionRetrying } = await import("../operations/aiTaskQueueSync.js");
+            await syncTaskExecutionRetrying(updated, updated.nextRunAt).catch((syncErr) => {
+                console.error("[queue] AI task retry sync error:", syncErr.message);
+            });
             if (job.type === JOB_TYPES.PROCESS_INBOUND_MESSAGE && job.externalMessageId) {
                 const { releaseInboundClaim } = await import("../conversationService.js");
                 await releaseInboundClaim(job.externalMessageId);
@@ -88,8 +120,27 @@ function schedulePoll() {
     if (pollTimer.unref) pollTimer.unref();
 }
 
+async function syncRecoveredAiTasks(recoveredJobs, reason) {
+    if (!recoveredJobs?.length) return;
+    const { syncTaskExecutionStaleRecovery } = await import("../operations/aiTaskQueueSync.js");
+    for (const row of recoveredJobs) {
+        if (row.type !== JOB_TYPES.EXECUTE_AI_TASK) continue;
+        await syncTaskExecutionStaleRecovery(row, reason).catch((err) => {
+            console.error("[queue] AI stale recovery sync error:", err.message);
+        });
+    }
+}
+
 async function tick() {
     if (!backend || activeJobs >= queueConcurrency()) return;
+
+    if (typeof backend.recoverStaleLeases === "function") {
+        const { recovered = [] } = await backend.recoverStaleLeases(queueProcessingLeaseMs());
+        if (recovered.length) {
+            logJob("Stale lease recovered", recovered[0], { count: recovered.length });
+            await syncRecoveredAiTasks(recovered, "Worker lease expired (stale processing recovered).");
+        }
+    }
 
     while (activeJobs < queueConcurrency()) {
         const job = await backend.claimNext();

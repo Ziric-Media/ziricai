@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { JOB_STATES } from "../jobStates.js";
-import { queueMaxAttempts, queueBaseDelayMs } from "../queueConfig.js";
+import { queueMaxAttempts, queueBaseDelayMs, queueProcessingLeaseMs } from "../queueConfig.js";
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS ziricai_jobs (
@@ -56,6 +56,9 @@ function rowToJob(row) {
         externalMessageId: row.external_message_id,
         outboundSent: row.outbound_sent,
         outboundMetaMessageId: row.outbound_meta_message_id,
+        lockedBy: row.locked_by,
+        lockedAt: row.locked_at ? new Date(row.locked_at).getTime() : null,
+        claimToken: row.claim_token || null,
     };
 }
 
@@ -74,6 +77,7 @@ export function createPostgresBackend(connectionString) {
             max: Math.max(2, parseInt(process.env.QUEUE_PG_POOL_SIZE || "4", 10)),
         });
         await pool.query(SCHEMA_SQL);
+        await pool.query(`ALTER TABLE ziricai_jobs ADD COLUMN IF NOT EXISTS claim_token TEXT`);
         console.log("[queue] Postgres backend initialized");
     }
 
@@ -122,12 +126,14 @@ export function createPostgresBackend(connectionString) {
     }
 
     async function claimNext() {
+        const claimToken = randomUUID();
         const result = await pool.query(
             `UPDATE ziricai_jobs
              SET status = $1,
                  started_at = NOW(),
                  locked_by = $2,
                  locked_at = NOW(),
+                 claim_token = $5,
                  attempt = attempt + 1
              WHERE id = (
                  SELECT id FROM ziricai_jobs
@@ -138,13 +144,24 @@ export function createPostgresBackend(connectionString) {
                  LIMIT 1
              )
              RETURNING *`,
-            [JOB_STATES.PROCESSING, workerId, JOB_STATES.QUEUED, JOB_STATES.RETRYING]
+            [JOB_STATES.PROCESSING, workerId, JOB_STATES.QUEUED, JOB_STATES.RETRYING, claimToken]
         );
         if (!result.rows[0]) return null;
         return rowToJob(result.rows[0]);
     }
 
-    async function completeJob(id, patch = {}) {
+    async function completeJob(id, patch = {}, opts = {}) {
+        const params = [
+            JOB_STATES.COMPLETED,
+            id,
+            patch.outboundSent ?? null,
+            patch.outboundMetaMessageId ?? null,
+        ];
+        let where = `id = $2 AND status = '${JOB_STATES.PROCESSING}'`;
+        if (opts.claimToken) {
+            where += ` AND claim_token = $5`;
+            params.push(opts.claimToken);
+        }
         const result = await pool.query(
             `UPDATE ziricai_jobs
              SET status = $1,
@@ -152,28 +169,33 @@ export function createPostgresBackend(connectionString) {
                  outbound_sent = COALESCE($3, outbound_sent),
                  outbound_meta_message_id = COALESCE($4, outbound_meta_message_id),
                  locked_by = NULL,
-                 locked_at = NULL
-             WHERE id = $2
+                 locked_at = NULL,
+                 claim_token = NULL
+             WHERE ${where}
              RETURNING *`,
-            [
-                JOB_STATES.COMPLETED,
-                id,
-                patch.outboundSent ?? null,
-                patch.outboundMetaMessageId ?? null,
-            ]
+            params
         );
         return result.rows[0] ? rowToJob(result.rows[0]) : null;
     }
 
-    async function scheduleRetry(id, errorMessage) {
+    async function scheduleRetry(id, errorMessage, opts = {}) {
         const current = await pool.query(`SELECT * FROM ziricai_jobs WHERE id = $1`, [id]);
         const row = current.rows[0];
         if (!row) return null;
+        if (
+            !opts.forceStaleRecovery &&
+            opts.claimToken &&
+            row.claim_token &&
+            row.claim_token !== opts.claimToken
+        ) {
+            return null;
+        }
 
         if (row.attempt >= row.max_attempts) {
             const failed = await pool.query(
                 `UPDATE ziricai_jobs
-                 SET status = $1, completed_at = NOW(), last_error = $2, locked_by = NULL, locked_at = NULL
+                 SET status = $1, completed_at = NOW(), last_error = $2,
+                     locked_by = NULL, locked_at = NULL, claim_token = NULL
                  WHERE id = $3 RETURNING *`,
                 [JOB_STATES.FAILED, errorMessage, id]
             );
@@ -184,11 +206,32 @@ export function createPostgresBackend(connectionString) {
         const nextRun = new Date(Date.now() + delayMs);
         const retrying = await pool.query(
             `UPDATE ziricai_jobs
-             SET status = $1, last_error = $2, next_run_at = $3, locked_by = NULL, locked_at = NULL
+             SET status = $1, last_error = $2, next_run_at = $3,
+                 locked_by = NULL, locked_at = NULL, claim_token = NULL
              WHERE id = $4 RETURNING *`,
             [JOB_STATES.RETRYING, errorMessage, nextRun, id]
         );
         return rowToJob(retrying.rows[0]);
+    }
+
+    async function recoverStaleLeases(leaseMs = queueProcessingLeaseMs()) {
+        const stale = await pool.query(
+            `SELECT id FROM ziricai_jobs
+             WHERE status = $1
+               AND locked_at IS NOT NULL
+               AND locked_at < NOW() - ($2::double precision / 1000.0) * INTERVAL '1 second'
+             FOR UPDATE SKIP LOCKED
+             LIMIT 20`,
+            [JOB_STATES.PROCESSING, leaseMs]
+        );
+        const recovered = [];
+        for (const row of stale.rows) {
+            const updated = await scheduleRetry(row.id, "Worker lease expired (stale processing recovered)", {
+                forceStaleRecovery: true,
+            });
+            if (updated) recovered.push(updated);
+        }
+        return { recovered };
     }
 
     async function markOutboundSent(id, metaMessageId, extra = {}) {
@@ -239,6 +282,32 @@ export function createPostgresBackend(connectionString) {
         return result.rows.map(rowToJob);
     }
 
+    async function requeueFailedForCompany(companyId, { limit = 5 } = {}) {
+        const failed = await pool.query(
+            `SELECT id FROM ziricai_jobs
+             WHERE company_id = $1 AND status = $2
+             ORDER BY completed_at DESC NULLS LAST
+             LIMIT $3`,
+            [companyId, JOB_STATES.FAILED, limit]
+        );
+        const ids = failed.rows.map((r) => r.id);
+        if (!ids.length) {
+            return { requeued: [], previousState: { failedCount: 0, failedJobIds: [] } };
+        }
+        await pool.query(
+            `UPDATE ziricai_jobs
+             SET status = $1, next_run_at = NOW(), last_error = NULL,
+                 attempt = GREATEST(0, attempt - 1), completed_at = NULL
+             WHERE id = ANY($2::uuid[])`,
+            [JOB_STATES.QUEUED, ids]
+        );
+        const refreshed = await pool.query(`SELECT * FROM ziricai_jobs WHERE id = ANY($1::uuid[])`, [ids]);
+        return {
+            requeued: refreshed.rows.map(rowToJob),
+            previousState: { failedCount: ids.length, failedJobIds: ids },
+        };
+    }
+
     async function shutdown() {
         if (pool) await pool.end();
     }
@@ -254,6 +323,8 @@ export function createPostgresBackend(connectionString) {
         findActiveByExternalMessageId,
         getStats,
         listJobs,
+        requeueFailedForCompany,
+        recoverStaleLeases,
         async restoreJobs() {
             throw new Error("restoreJobs is memory-backend test helper only");
         },

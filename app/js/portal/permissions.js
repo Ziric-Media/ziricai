@@ -15,6 +15,7 @@ const ROLE_ALIASES = {
 export const PORTAL_ROLES = [
   'owner',
   'manager',
+  'hr',
   'sales',
   'support',
   'reception',
@@ -44,6 +45,7 @@ const ROLE_LABELS = {
   marketing: 'Marketing',
 
   finance: 'Finance',
+  hr: 'HR',
   viewer: 'Viewer (read-only)',
 
 };
@@ -74,6 +76,15 @@ const PERMISSION_MATRIX = {
 
   /** Portal knowledge write — owners only. */
   canUploadKnowledge: ['owner'],
+
+  canRunAutomations: ['owner', 'manager', 'marketing'],
+
+  canViewTasks: ['owner', 'manager', 'finance', 'hr', 'sales', 'support', 'reception', 'marketing', 'viewer'],
+  canCreateTasks: ['owner', 'manager'],
+  canAssignTasks: ['owner', 'manager'],
+  canUpdateOwnTasks: ['owner', 'manager', 'finance', 'hr', 'sales', 'support', 'reception', 'marketing', 'viewer'],
+  canUpdateAnyTask: ['owner', 'manager'],
+  canCompleteTasks: ['owner', 'manager', 'finance', 'hr', 'sales', 'support', 'reception', 'marketing', 'viewer'],
 
 };
 
@@ -117,6 +128,9 @@ export const MODULE_PERMISSIONS = {
 
   support: null,
 
+  /** Operations Centre (Phase 1) — task workspace. */
+  operations: 'canViewTasks',
+
 };
 
 
@@ -148,12 +162,21 @@ export function getPermissions(role) {
 
 /** @param {string | undefined | null} role */
 
-export function normalizeRole(role) {
-  const raw = String(role || 'owner')
+/** Least-privilege effective role for UI gating (must match server SEC-04). */
+export function resolveEffectivePortalRole(role) {
+  const raw = String(role || '')
     .toLowerCase()
     .trim()
     .replace(/[\s_-]+/g, '');
-  return ROLE_ALIASES[raw] || raw;
+  if (!raw) return 'viewer';
+  if (raw === 'superadmin') return 'superadmin';
+  const normalized = ROLE_ALIASES[raw] || raw;
+  if (PORTAL_ROLES.includes(normalized)) return normalized;
+  return 'viewer';
+}
+
+export function normalizeRole(role) {
+  return resolveEffectivePortalRole(role);
 }
 
 
@@ -254,6 +277,13 @@ export const PERMISSION_LABELS = {
   canViewBilling: 'Can View Billing',
 
   canExportData: 'Can Export Data',
+
+  canViewTasks: 'Can View Tasks',
+  canCreateTasks: 'Can Create Tasks',
+  canAssignTasks: 'Can Assign Tasks',
+  canUpdateOwnTasks: 'Can Update Own Tasks',
+  canUpdateAnyTask: 'Can Update Any Task',
+  canCompleteTasks: 'Can Complete Tasks',
 
 };
 

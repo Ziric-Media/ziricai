@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { JOB_STATES, isTerminalJobState } from "../jobStates.js";
-import { queueMaxAttempts, queueBaseDelayMs } from "../queueConfig.js";
+import { queueMaxAttempts, queueBaseDelayMs, queueProcessingLeaseMs } from "../queueConfig.js";
 
 /**
  * In-process queue backend — dev/test fallback; jobs lost on restart.
@@ -10,6 +10,7 @@ export function createMemoryBackend() {
     const jobs = new Map();
     /** @type {string[]} */
     const ready = [];
+    const workerId = `mem-worker-${randomUUID().slice(0, 8)}`;
 
     function normalizeJob(record) {
         return {
@@ -33,7 +34,16 @@ export function createMemoryBackend() {
             outboundMetaMessageId: record.outboundMetaMessageId,
             outboundPlanSent: record.outboundPlanSent,
             outboundMetaMessageIds: record.outboundMetaMessageIds,
+            lockedBy: record.lockedBy || null,
+            lockedAt: record.lockedAt || null,
+            claimToken: record.claimToken || null,
         };
+    }
+
+    function claimMatches(record, opts = {}) {
+        if (opts.forceStaleRecovery) return true;
+        if (!opts.claimToken) return true;
+        return record.claimToken === opts.claimToken;
     }
 
     function findActiveByExternalMessageId(externalMessageId) {
@@ -81,6 +91,9 @@ export function createMemoryBackend() {
             outboundMetaMessageId: null,
             outboundPlanSent: false,
             outboundMetaMessageIds: null,
+            lockedBy: null,
+            lockedAt: null,
+            claimToken: null,
         };
         jobs.set(id, record);
         ready.push(id);
@@ -107,14 +120,18 @@ export function createMemoryBackend() {
             record.status = JOB_STATES.PROCESSING;
             record.startedAt = now;
             record.attempt += 1;
+            record.lockedBy = workerId;
+            record.lockedAt = now;
+            record.claimToken = randomUUID();
             return normalizeJob(record);
         }
         return null;
     }
 
-    function completeJob(id, patch = {}) {
+    function completeJob(id, patch = {}, opts = {}) {
         const record = jobs.get(id);
         if (!record) return null;
+        if (!claimMatches(record, opts)) return null;
         record.status = JOB_STATES.COMPLETED;
         record.completedAt = Date.now();
         if (patch.outboundSent !== undefined) record.outboundSent = patch.outboundSent;
@@ -125,13 +142,20 @@ export function createMemoryBackend() {
         if (patch.outboundMetaMessageIds !== undefined) {
             record.outboundMetaMessageIds = patch.outboundMetaMessageIds;
         }
+        record.lockedBy = null;
+        record.lockedAt = null;
+        record.claimToken = null;
         return normalizeJob(record);
     }
 
-    function scheduleRetry(id, errorMessage) {
+    function scheduleRetry(id, errorMessage, opts = {}) {
         const record = jobs.get(id);
         if (!record) return null;
+        if (!claimMatches(record, opts)) return null;
         record.lastError = errorMessage;
+        record.lockedBy = null;
+        record.lockedAt = null;
+        record.claimToken = null;
         if (record.attempt >= record.maxAttempts) {
             record.status = JOB_STATES.FAILED;
             record.completedAt = Date.now();
@@ -142,6 +166,20 @@ export function createMemoryBackend() {
         record.nextRunAt = Date.now() + delay;
         ready.push(id);
         return normalizeJob(record);
+    }
+
+    function recoverStaleLeases(leaseMs = queueProcessingLeaseMs()) {
+        const now = Date.now();
+        const recovered = [];
+        for (const record of jobs.values()) {
+            if (record.status !== JOB_STATES.PROCESSING) continue;
+            if (!record.lockedAt || now - record.lockedAt <= leaseMs) continue;
+            const updated = scheduleRetry(record.id, "Worker lease expired (stale processing recovered)", {
+                forceStaleRecovery: true,
+            });
+            if (updated) recovered.push(updated);
+        }
+        return { recovered };
     }
 
     function markOutboundSent(id, metaMessageId, extra = {}) {
@@ -187,6 +225,40 @@ export function createMemoryBackend() {
         }
     }
 
+    /** @internal test / verifier helper */
+    function markJobFailed(id, errorMessage = "failed") {
+        const record = jobs.get(id);
+        if (!record) return null;
+        record.status = JOB_STATES.FAILED;
+        record.lastError = errorMessage;
+        record.completedAt = Date.now();
+        record.attempt = record.maxAttempts;
+        return normalizeJob(record);
+    }
+
+    function requeueFailedForCompany(companyId, { limit = 5 } = {}) {
+        const failed = [];
+        for (const record of jobs.values()) {
+            if (record.companyId !== companyId) continue;
+            if (record.status !== JOB_STATES.FAILED) continue;
+            failed.push(record);
+        }
+        const requeued = [];
+        for (const record of failed.slice(0, limit)) {
+            record.status = JOB_STATES.QUEUED;
+            record.nextRunAt = Date.now();
+            record.lastError = null;
+            record.attempt = Math.max(0, record.attempt - 1);
+            record.completedAt = null;
+            ready.push(record.id);
+            requeued.push(normalizeJob(record));
+        }
+        return {
+            requeued,
+            previousState: { failedCount: failed.length, failedJobIds: failed.map((r) => r.id) },
+        };
+    }
+
     return {
         name: "memory",
         async init() {},
@@ -199,6 +271,9 @@ export function createMemoryBackend() {
         getStats,
         listJobs,
         restoreJobs,
+        requeueFailedForCompany,
+        markJobFailed,
+        recoverStaleLeases,
         async shutdown() {},
     };
 }

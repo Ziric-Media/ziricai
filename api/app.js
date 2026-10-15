@@ -2535,6 +2535,8 @@ export async function runBackgroundInit() {
         }
 
         startMessageWorker();
+        const { startAiTaskWorker } = await import("../services/queue/workers/aiTaskWorker.js");
+        startAiTaskWorker();
         await initQueue();
         console.error("[startup] Storage backend:", adapter.name);
 

@@ -244,6 +244,29 @@ export async function inviteTeamMember(companyId, { email, role, departmentId } 
   });
 }
 
+export async function fetchPortalTasks(companyId) {
+  return request(`/api/portal/tasks/${encodeURIComponent(companyId)}`);
+}
+
+export async function createPortalTask(companyId, body) {
+  return request(`/api/portal/tasks/${encodeURIComponent(companyId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+}
+
+export async function updatePortalTask(companyId, taskId, patch) {
+  return request(
+    `/api/portal/tasks/${encodeURIComponent(companyId)}/${encodeURIComponent(taskId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch || {}),
+    }
+  );
+}
+
 export async function updateTeamMemberRole(companyId, uid, role) {
   return request(`/api/companies/${encodeURIComponent(companyId)}/team/${encodeURIComponent(uid)}`, {
     method: 'PATCH',

@@ -1,5 +1,5 @@
 import { memoryAdapter } from "./memoryAdapter.js";
-import { hasAdminCredentials, getAdminInitError } from "../database/firestoreAdmin.js";
+import { hasAdminCredentials, getAdminInitError, getAdminFirestore } from "../database/firestoreAdmin.js";
 
 let adapter = null;
 let initPromise = null;
@@ -15,7 +15,10 @@ let fallbackReason = null;
 export function getConfiguredStorageBackend() {
     const raw = (process.env.STORAGE_BACKEND || "").trim().toLowerCase();
     if (raw) return raw;
-    if (process.env.NODE_ENV === "production") return "memory";
+    if (process.env.NODE_ENV === "production") {
+        if (hasAdminCredentials()) return "firestore";
+        return "memory";
+    }
     return "auto";
 }
 
@@ -33,12 +36,36 @@ function isRailwayRuntime() {
 
 async function probeFirestore(firestoreAdapter) {
     const pingMs = Number(process.env.FIRESTORE_PING_TIMEOUT_MS) || 8000;
-    await Promise.race([
-        firestoreAdapter.ping(),
-        new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`Firestore ping timed out after ${pingMs}ms`)), pingMs)
-        ),
-    ]);
+    const maxAttemptsRaw = parseInt(process.env.FIRESTORE_PROBE_ATTEMPTS || "2", 10);
+    const maxAttempts = Number.isFinite(maxAttemptsRaw) && maxAttemptsRaw >= 1 ? Math.min(maxAttemptsRaw, 3) : 2;
+
+    if (hasAdminCredentials()) {
+        getAdminFirestore();
+    }
+
+    let lastErr;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await Promise.race([
+                firestoreAdapter.ping(),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(`Firestore ping timed out after ${pingMs}ms`)), pingMs)
+                ),
+            ]);
+            return;
+        } catch (err) {
+            lastErr = err;
+            const retryable = /timed out/i.test(err?.message || "");
+            if (!retryable || attempt >= maxAttempts) {
+                throw err;
+            }
+            console.error(
+                `[storage] Firestore probe attempt ${attempt}/${maxAttempts} failed (${err.message}); retrying…`
+            );
+            await new Promise((resolve) => setTimeout(resolve, 400));
+        }
+    }
+    throw lastErr;
 }
 
 async function resolveAdapter() {
@@ -82,8 +109,19 @@ async function resolveAdapter() {
     }
 
     if (isRailwayRuntime()) {
+        if (hasAdminCredentials()) {
+            try {
+                await probeFirestore(firestoreAdapter);
+                console.error("[storage] Railway auto-selected Firestore adapter (Admin credentials present)");
+                return firestoreAdapter;
+            } catch (err) {
+                fallbackReason = `Railway Firestore probe failed: ${err.message}`;
+                console.error(`[storage] ${fallbackReason} — falling back to memory`);
+                return memoryAdapter;
+            }
+        }
         fallbackReason =
-            "Railway runtime with STORAGE_BACKEND=auto — set STORAGE_BACKEND=firestore after provisioning Firestore + Admin credentials";
+            "Railway runtime — set STORAGE_BACKEND=firestore and Firebase Admin credentials for durable tenant data";
         console.error(`[storage] ${fallbackReason}. Using memory adapter.`);
         return memoryAdapter;
     }
