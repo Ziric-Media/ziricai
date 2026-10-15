@@ -8,6 +8,17 @@ function isLocalHost() {
   return /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 }
 
+/** Netlify branch / deploy preview — keep navigation and login on this origin. */
+function isNetlifyDeployPreviewHost() {
+  if (typeof location === 'undefined') return false;
+  return /\.netlify\.app$/i.test(location.hostname);
+}
+
+function netlifyPreviewOrigin() {
+  if (!isNetlifyDeployPreviewHost()) return null;
+  return location.origin.replace(/\/$/, '');
+}
+
 const LOCAL = isLocalHost();
 
 const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
@@ -31,7 +42,14 @@ const DEFAULT_SITES = LOCAL
 /** @returns {{ marketing: string, app: string, admin: string, api: string }} */
 export function getSiteUrls() {
   const overrides = typeof window !== 'undefined' ? window.__ZIRICAI_CONFIG__?.sites : {};
-  return { ...DEFAULT_SITES, ...overrides };
+  const sites = { ...DEFAULT_SITES, ...overrides };
+  const preview = netlifyPreviewOrigin();
+  if (preview) {
+    sites.app = preview;
+    sites.publicWeb = preview;
+    sites.marketing = preview;
+  }
+  return sites;
 }
 
 /** Portal deep link for a company workspace. */
@@ -64,7 +82,9 @@ export function marketingUrl(hash = '') {
   return landingHomeUrl(hash);
 }
 
-/** Unified sign-in on the public marketing site. */
+/** Unified sign-in on the public marketing site (portal index on Netlify preview). */
 export function marketingLoginUrl() {
+  const preview = netlifyPreviewOrigin();
+  if (preview) return `${preview}/`;
   return `${publicWebBase()}/login.html`;
 }

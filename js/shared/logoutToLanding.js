@@ -2,12 +2,11 @@
  * Sign out from app/admin and return to the public marketing site.
  */
 import { logoutUser } from '../auth.js';
-import { getSiteUrls, marketingUrl } from './siteUrls.js';
+import { getSiteUrls, marketingUrl, marketingLoginUrl } from './siteUrls.js';
 
 /** Works with legacy siteUrls.js (pre–publicWeb exports). */
 function publicLoginUrl() {
-  const base = getSiteUrls().marketing.replace(/\/$/, '');
-  return `${base}/login.html`;
+  return marketingLoginUrl();
 }
 
 const LOGOUT_FLAG = 'ziricai:logout-redirect';
