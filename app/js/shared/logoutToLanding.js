@@ -2,7 +2,7 @@
  * Sign out from app/admin and return to the public marketing site.
  */
 import { logoutUser } from '../auth.js';
-import { getSiteUrls, marketingUrl, marketingLoginUrl } from './siteUrls.js';
+import { marketingUrl, marketingLoginUrl, useInlinePortalAuth } from './siteUrls.js';
 
 /** Works with legacy siteUrls.js (pre–publicWeb exports). */
 function publicLoginUrl() {
@@ -16,7 +16,7 @@ export function isLocalAuthDevHost() {
   return /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 }
 
-/** Netlify Deploy Preview / branch deploy — keep auth on this origin (staging Firebase in __ZIRICAI_CONFIG__). */
+/** @deprecated Prefer useInlinePortalAuth from siteUrls.js */
 export function isNetlifyDeployPreviewHost() {
   if (typeof location === 'undefined') return false;
   return /\.netlify\.app$/i.test(location.hostname);
@@ -24,8 +24,7 @@ export function isNetlifyDeployPreviewHost() {
 
 /** Production: send signed-out / never-signed-in visitors to marketing login or home after logout. */
 export function handleSignedOutVisitor() {
-  if (isLocalAuthDevHost()) return false;
-  if (isNetlifyDeployPreviewHost()) return false;
+  if (useInlinePortalAuth()) return false;
 
   try {
     if (sessionStorage.getItem(LOGOUT_FLAG)) {

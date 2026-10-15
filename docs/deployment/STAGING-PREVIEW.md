@@ -4,6 +4,48 @@ Planning doc for **ziricai-app** Netlify Deploy Previews + **Railway staging API
 
 Production (`app.ziricai.com`, `ziricai-production.up.railway.app`, Firebase `ziricai`) must not receive preview traffic or writes.
 
+**Do not** point `app.ziricai.com` at staging Firebase — use a **separate hostname** with the same Netlify **app** site layout (recommended: **`staging-app.ziricai.com`**).
+
+## Staging app hostname (recommended vs `*.netlify.app`)
+
+Same product surface as production **`app.ziricai.com`**, isolated stack:
+
+| Layer | Production | Staging test app |
+|--------|------------|------------------|
+| Portal URL | `https://app.ziricai.com` | `https://staging-app.ziricai.com` (or branch `*.netlify.app`) |
+| Firebase | `ziricai` | `ziricai-staging` |
+| API | `ziricai-production.up.railway.app` | `https://ziricai-production-d6b4.up.railway.app` |
+
+### Netlify (`ziricai-app`)
+
+1. **Git branch:** `staging/business-portal-open-create` (same as Gate A staging release).
+2. **Domain:** Netlify → **Domain management** → add **`staging-app.ziricai.com`** as a **branch subdomain** (or domain alias) for that branch.
+3. **DNS:** CNAME **`staging-app`** → Netlify target shown in the UI (often `ziricai-app.netlify.app`).
+4. **Build env** (branch **`staging/business-portal-open-create`** or Deploy Preview — set both if unsure):
+
+| Variable | Example |
+|----------|---------|
+| `FIREBASE_*` | Staging web app (see below) |
+| `API_BASE_URL` | `https://ziricai-production-d6b4.up.railway.app` |
+| `APP_BASE_URL` | `https://staging-app.ziricai.com` |
+| `PUBLIC_WEB_URL` | `https://staging-app.ziricai.com` |
+| `USE_CDN_FIREBASE` | `true` |
+| `NODE_VERSION` | `20` |
+
+5. **Redeploy** the branch after env + domain changes.
+
+### Firebase (`ziricai-staging`)
+
+Add **`staging-app.ziricai.com`** under **Authentication → Authorized domains** (keep preview hostname if you still use it).
+
+### Railway (staging API)
+
+Set **`APP_BASE_URL`** = `https://staging-app.ziricai.com` (no trailing path) and redeploy so CORS accepts the portal origin.
+
+### Login behavior
+
+When the built page has **`firebase.projectId` = `ziricai-staging`**, the portal keeps **inline sign-in on the same origin**. It does **not** send you to **`ziricai.com/login.html`** (production Firebase). Sign in only on the staging app URL or preview URL — never production marketing login for staging users.
+
 ## Git scope (staging branch)
 
 - Branch: `staging/business-portal-open-create`

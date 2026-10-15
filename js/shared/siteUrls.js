@@ -19,6 +19,22 @@ function netlifyPreviewOrigin() {
   return location.origin.replace(/\/$/, '');
 }
 
+/** Built with staging Firebase — never send auth to ziricai.com/login.html (production Identity Toolkit). */
+export function isStagingFirebasePortal() {
+  if (typeof window === 'undefined') return false;
+  return window.__ZIRICAI_CONFIG__?.firebase?.projectId === 'ziricai-staging';
+}
+
+/** Use Company Portal inline login (same origin), not marketing unified login. */
+export function useInlinePortalAuth() {
+  return isLocalHost() || isNetlifyDeployPreviewHost() || isStagingFirebasePortal();
+}
+
+function stagingPortalOrigin() {
+  if (typeof location === 'undefined' || !isStagingFirebasePortal()) return null;
+  return location.origin.replace(/\/$/, '');
+}
+
 const LOCAL = isLocalHost();
 
 const PRODUCTION_API_URL = 'https://ziricai-production.up.railway.app';
@@ -43,11 +59,14 @@ const DEFAULT_SITES = LOCAL
 export function getSiteUrls() {
   const overrides = typeof window !== 'undefined' ? window.__ZIRICAI_CONFIG__?.sites : {};
   const sites = { ...DEFAULT_SITES, ...overrides };
-  const preview = netlifyPreviewOrigin();
+  const preview = netlifyPreviewOrigin() || stagingPortalOrigin();
   if (preview) {
-    sites.app = preview;
-    sites.publicWeb = preview;
-    sites.marketing = preview;
+    const configuredApp = String(sites.app || '').replace(/\/$/, '');
+    if (!configuredApp || configuredApp.includes('app.ziricai.com')) {
+      sites.app = preview;
+      sites.publicWeb = preview;
+      sites.marketing = preview;
+    }
   }
   return sites;
 }
@@ -84,7 +103,11 @@ export function marketingUrl(hash = '') {
 
 /** Unified sign-in on the public marketing site (portal index on Netlify preview). */
 export function marketingLoginUrl() {
-  const preview = netlifyPreviewOrigin();
+  const preview = netlifyPreviewOrigin() || stagingPortalOrigin();
   if (preview) return `${preview}/`;
+  if (isStagingFirebasePortal()) {
+    const app = String(getSiteUrls().app || '').replace(/\/$/, '');
+    if (app && !app.includes('app.ziricai.com')) return `${app}/`;
+  }
   return `${publicWebBase()}/login.html`;
 }
