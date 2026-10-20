@@ -22,6 +22,12 @@ export const TENANT_COLLECTIONS = {
     CUSTOMERS: "customers",
     APPOINTMENTS: "appointments",
     TASKS: "tasks",
+    /** Company Portal Finance v1 — tenant business ledger (not subscription billing). */
+    FINANCE_TRANSACTIONS: "financeTransactions",
+    FINANCE_INVOICES: "financeInvoices",
+    FINANCE_CATEGORIES: "financeCategories",
+    /** Server-only dedupe ledger for retry-safe financial writes (doc id = hash(scope,key)). */
+    FINANCE_IDEMPOTENCY_KEYS: "financeIdempotencyKeys",
     AUTOMATIONS: "automations",
     ANALYTICS: "analytics",
     EVENTS: "events",
@@ -48,6 +54,8 @@ export const TENANT_COLLECTIONS = {
     SUPPORT_REMEDIATION_AUDITS: "supportRemediationAudits",
     /** Portal Sarah conversation sessions (tenant + user scoped). */
     SARAH_SESSIONS: "sarahSessions",
+    /** Sarah BOS — commercial cycle (quote → verified pay → mobilise) per tenant. */
+    BOS_COMMERCIAL_CYCLES: "bosCommercialCycles",
 };
 
 /** Subcollections under companies/{companyId}/analytics (flat names for TenantRepository) */

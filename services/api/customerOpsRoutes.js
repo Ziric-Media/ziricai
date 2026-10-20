@@ -53,6 +53,8 @@ import { listAutomationRuns } from "../automation/automationEngine.js";
 import { generateReport } from "../reporting/reportService.js";
 import { publish, EventTypes } from "../events/index.js";
 import { mountSupportCaseRoutes } from "./supportCaseRoutes.js";
+import { mountFinanceRoutes } from "./financeRoutes.js";
+import { mountBosRoutes } from "./bosRoutes.js";
 
 function tenantTaskAccess(req) {
     return { role: req.tenant?.role, uid: req.tenant?.uid ?? null };
@@ -123,6 +125,8 @@ const PIPELINE_STAGES = ["new", "contacted", "qualified", "proposal", "won", "lo
  * @param {import('express').Express} app
  */
 export function mountCustomerOpsRoutes(app) {
+    mountBosRoutes(app);
+    mountFinanceRoutes(app);
     mountTenantTaskRoutes(app, {
         listPath: "/api/portal/tasks/:companyId",
         itemPath: "/api/portal/tasks/:companyId/:taskId",

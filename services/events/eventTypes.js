@@ -22,6 +22,10 @@ export const EventTypes = {
     COMPANY_CREATED: "CompanyCreated",
     COMPANY_PROVISIONED: "CompanyProvisioned",
     SUBSCRIPTION_STARTED: "SubscriptionStarted",
+    /** Sarah BOS — work released after verified payment (commercial cycle). */
+    WORK_AUTHORISED: "WorkAuthorised",
+    /** Sarah BOS — delivery tasks created for a commercial cycle. */
+    COMMERCIAL_CYCLE_MOBILISED: "CommercialCycleMobilised",
 };
 
 /** All event type values as array */

@@ -244,12 +244,33 @@ export async function inviteTeamMember(companyId, { email, role, departmentId } 
   });
 }
 
+/* ── Sarah BOS commercial cycle (Central Motors pilot) ── */
+
+export async function fetchBosCommercialCycles(companyId) {
+  return request(`/api/portal/bos/cycles/${encodeURIComponent(companyId)}`);
+}
+
+export async function postBosCommercialCycleAction(companyId, cycleId, action, body = {}) {
+  return request(
+    `/api/portal/bos/cycles/${encodeURIComponent(companyId)}/${encodeURIComponent(cycleId)}/actions/${encodeURIComponent(action)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    }
+  );
+}
+
+const portalTasksBase = (companyId) =>
+  `/api/companies/${encodeURIComponent(companyId)}/crm/tasks`;
+
+/** Operations Centre tasks — CRM paths (live on production API; portal alias when deployed). */
 export async function fetchPortalTasks(companyId) {
-  return request(`/api/portal/tasks/${encodeURIComponent(companyId)}`);
+  return request(portalTasksBase(companyId));
 }
 
 export async function createPortalTask(companyId, body) {
-  return request(`/api/portal/tasks/${encodeURIComponent(companyId)}`, {
+  return request(portalTasksBase(companyId), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body || {}),
@@ -257,14 +278,11 @@ export async function createPortalTask(companyId, body) {
 }
 
 export async function updatePortalTask(companyId, taskId, patch) {
-  return request(
-    `/api/portal/tasks/${encodeURIComponent(companyId)}/${encodeURIComponent(taskId)}`,
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch || {}),
-    }
-  );
+  return request(`${portalTasksBase(companyId)}/${encodeURIComponent(taskId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch || {}),
+  });
 }
 
 /* ── Workspace Finance (not subscription billing) ── */
