@@ -3,6 +3,8 @@
  */
 import { registerAnalyticsEventHandler } from "./analyticsEventHandler.js";
 import { registerAutomationEventHandler } from "./automationEventHandler.js";
+import { registerPortalNotificationHandler } from "./portalNotificationHandler.js";
+import { registerBosAutopilotHandler } from "./bosAutopilotHandler.js";
 import { dispatchEvent, markEventBusInitialized } from "./eventBus.js";
 import { registerJobHandler, JOB_TYPES } from "../queue/jobQueue.js";
 import { flushAnalytics } from "../analytics/analyticsEngine.js";
@@ -15,6 +17,8 @@ export function initEventSystem() {
 
     registerAnalyticsEventHandler();
     registerAutomationEventHandler();
+    registerPortalNotificationHandler();
+    registerBosAutopilotHandler();
 
     registerJobHandler(JOB_TYPES.PROCESS_EVENT, async (job) => {
         if (job.event) await dispatchEvent(job.event);

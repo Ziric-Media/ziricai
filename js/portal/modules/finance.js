@@ -62,6 +62,7 @@ import {
   renderFinanceSarahPageShell,
   syncFinanceSarahAfterPaint,
 } from '../financeSarahPanel.js';
+import { consumePendingSarahNav } from '../portalWorkforceNav.js';
 
 /** Live customer payments blocked until Firestore atomicity is verified. */
 const PAYMENTS_UI_DISABLED = true;
@@ -432,7 +433,7 @@ function paint(container) {
   container.innerHTML = `
     <div class="fin-module ${onSarah ? 'fin-module--sarah' : ''}">
       ${pageHeader(
-        'Finance',
+        'Sarah Finance',
         onSarah
           ? 'Sarah — Finance assistant'
           : 'Workspace ledger — income, expenses, and invoices (not subscription billing).'
@@ -445,13 +446,11 @@ function paint(container) {
         <div class="fin-top-meta">${permHints()}</div>
       </div>`
       }
-      <div class="fin-layout ${onSarah ? 'fin-layout--sarah' : ''}">
-        ${renderFinanceWorkspaceNav(fin)}
-        <div class="fin-workspace-main">
-          ${onSarah ? '' : renderFinanceSubNav(fin)}
-          <div class="fin-panel card fin-panel-card ${onSarah ? 'fin-panel-card--sarah' : ''}">
-            ${onSarah ? renderBody() : fin.loading ? '<div class="fin-loading"><span class="fin-loading-dot"></span><span class="fin-loading-dot"></span><span class="fin-loading-dot"></span><p>Loading finance data…</p></div>' : renderBody()}
-          </div>
+      ${renderFinanceWorkspaceNav(fin)}
+      <div class="fin-workspace-stack ${onSarah ? 'fin-workspace-stack--sarah' : ''}">
+        ${onSarah ? '' : renderFinanceSubNav(fin)}
+        <div class="fin-panel card fin-panel-card fin-panel-card--full ${onSarah ? 'fin-panel-card--sarah' : ''}">
+          ${onSarah ? renderBody() : fin.loading ? '<div class="fin-loading"><span class="fin-loading-dot"></span><span class="fin-loading-dot"></span><span class="fin-loading-dot"></span><p>Loading finance data…</p></div>' : renderBody()}
         </div>
       </div>
       ${renderInvoiceUiOverlays(fin, {
@@ -597,6 +596,8 @@ export async function renderFinance(container) {
     container.innerHTML = errorState('You do not have permission to view Finance.');
     return;
   }
+  const pendingWorkspace = consumePendingSarahNav('finance');
+  if (pendingWorkspace) fin.workspace = pendingWorkspace;
   container.classList.add('fin-module-page');
   initFinanceSarah(container, () => fin);
   fin.loading = true;
@@ -607,6 +608,6 @@ export async function renderFinance(container) {
   } catch (err) {
     fin.loading = false;
     fin.error = err?.message || 'Failed to load finance data';
-    container.innerHTML = `${pageHeader('Finance')}${errorState(fin.error)}`;
+    container.innerHTML = `${pageHeader('Sarah Finance')}${errorState(fin.error)}`;
   }
 }

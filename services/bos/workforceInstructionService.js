@@ -39,9 +39,16 @@ export async function createWorkforceInstruction(companyId, actor, body = {}) {
         throw httpError("instruction text is required", 400, "BOS_INSTRUCTION_VALIDATION");
     }
 
-    const source = body.source === INSTRUCTION_SOURCE.ADMIN_SARAH
-        ? INSTRUCTION_SOURCE.ADMIN_SARAH
-        : INSTRUCTION_SOURCE.HUMAN;
+    let source = INSTRUCTION_SOURCE.HUMAN;
+    if (body.source === INSTRUCTION_SOURCE.ADMIN_SARAH) source = INSTRUCTION_SOURCE.ADMIN_SARAH;
+    else if (body.source === INSTRUCTION_SOURCE.BOS_ORCHESTRATOR) source = INSTRUCTION_SOURCE.BOS_ORCHESTRATOR;
+    else if (body.source === INSTRUCTION_SOURCE.MODULE_SARAH) source = INSTRUCTION_SOURCE.MODULE_SARAH;
+
+    const automationKey = body.automationKey ? String(body.automationKey).trim() : null;
+    if (automationKey) {
+        const open = await findOpenInstructionByAutomationKey(companyId, automationKey);
+        if (open) return open;
+    }
     const priority = body.priority === "high" ? "high" : "normal";
 
     const row = await repo.create(companyId, {
@@ -56,6 +63,7 @@ export async function createWorkforceInstruction(companyId, actor, body = {}) {
         issuerModule: body.issuerModule || "admin",
         linkedRecordType: body.linkedRecordType || null,
         linkedRecordId: body.linkedRecordId || null,
+        automationKey,
         resultSummary: null,
         completedAt: null,
         completedByUid: null,
@@ -72,10 +80,31 @@ export async function createWorkforceInstruction(companyId, actor, body = {}) {
     await publish(companyId, EventTypes.WORKFORCE_INSTRUCTION_ISSUED, {
         instructionId: row.id,
         targetModule,
+        targetModuleLabel: MODULE_LABELS[targetModule] || targetModule,
+        instruction,
         source,
     });
 
     return row;
+}
+
+export async function findOpenInstructionByAutomationKey(companyId, automationKey) {
+    const key = String(automationKey || "").trim();
+    if (!key) return null;
+    const items = await listWorkforceInstructions(companyId, { limit: 40 });
+    return (
+        items.find(
+            (i) =>
+                i.automationKey === key &&
+                (i.status === INSTRUCTION_STATUS.PENDING || i.status === INSTRUCTION_STATUS.IN_PROGRESS)
+        ) || null
+    );
+}
+
+const BOS_SYSTEM_ACTOR = { uid: null, role: "owner" };
+
+export function bosOrchestratorActor() {
+    return { ...BOS_SYSTEM_ACTOR };
 }
 
 export async function listWorkforceInstructions(companyId, { targetModule, status, limit = 30 } = {}) {

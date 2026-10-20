@@ -17,6 +17,7 @@ import {
 import { mountSarahChat } from '../sarah/sarah-ui.js';
 import { mountWorkforceInstructionsPanel } from '../workforceInstructionsPanel.js';
 import { getSarahPageContext } from '../core/sarahPageContext.js';
+import { consumePendingSarahNav } from '../portalWorkforceNav.js';
 
 const HR_WORKSPACES = [
   { id: 'overview', label: 'Overview', icon: 'fa-gauge-high' },
@@ -284,7 +285,8 @@ function repaint(container) {
 }
 
 export async function renderHr(container) {
-  hrState = { workspace: 'overview' };
+  const pending = consumePendingSarahNav('hr');
+  hrState = { workspace: pending || 'overview' };
   container.innerHTML = `
     <div class="fin-module hr-module sw-module">
       ${pageHeader('Sarah HR', 'People management — preview workspaces; live employee data requires backend integration.')}
@@ -293,4 +295,5 @@ export async function renderHr(container) {
     </div>
   `;
   bindHrUi(container);
+  if (hrState.workspace === 'sarah') void mountHrSarahChat(container);
 }

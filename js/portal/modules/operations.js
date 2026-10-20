@@ -25,6 +25,7 @@ import {
 import { mountSarahChat } from '../sarah/sarah-ui.js';
 import { mountWorkforceInstructionsPanel } from '../workforceInstructionsPanel.js';
 import { getSarahPageContext } from '../core/sarahPageContext.js';
+import { consumePendingSarahNav } from '../portalWorkforceNav.js';
 
 const OPS_SECTIONS = [
   { id: 'overview', label: 'Overview', icon: 'fa-gauge-high' },
@@ -776,6 +777,8 @@ export async function renderOperations(container) {
     return;
   }
 
+  const pendingSection = consumePendingSarahNav('operations');
+  if (pendingSection) opsSection = pendingSection;
   opsSection = opsSection || 'overview';
   container.innerHTML = loadingState('Loading Operations…');
   const companyId = state.companyId;

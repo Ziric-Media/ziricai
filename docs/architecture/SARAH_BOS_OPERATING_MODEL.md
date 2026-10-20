@@ -46,6 +46,51 @@ flowchart TB
   Portal[Client Portal modules] --> R
 ```
 
+## Canonical customer-led chain (target behaviour)
+
+Most work enters through **Sarah Sales** (WhatsApp, email, Messenger, web chat). The Sarah team coordinates through **persistent commercial cycles** and **workforce instructions** — not one shared chat transcript.
+
+| Step | Who talks to the customer | Who coordinates | Record / gate |
+|------|---------------------------|-----------------|---------------|
+| 1 | Sales Sarah discovers need | — | Conversation + optional lead |
+| 2 | Sales asks “Do you want a quotation?” | — | Customer consent |
+| 3 | Sales opens a **commercial cycle** | **Admin Sarah** receives delegation | Cycle `quotation_pending` |
+| 4 | Admin delegates | **Finance Sarah** prepares quote | Quotation invoice (draft → ready) |
+| 5 | Admin hands off | **Sales Sarah** sends quote to client | Cycle `quotation_sent` |
+| 6 | Client accepts | Sales records acceptance | Deposit vs full payment per **org policy** |
+| 7 | Client sends proof of payment | Sales submits proof → **Admin** routes | POP on cycle — not verified yet |
+| 8 | Admin delegates | **Finance Sarah verifies** against invoice | **`payment_verified` required** before ops |
+| 9 | Admin authorises | **Operations Sarah** creates project / tasks | Mobilisation |
+| 10 | Ops scopes manpower | **HR Sarah** proposes human vs AI staffing | Assignments (preview → live HRIS) |
+
+**Non-negotiable:** Operations must not treat proof-of-payment as cleared funds; Finance verification is the gate before work authorisation and mobilisation.
+
+```mermaid
+sequenceDiagram
+  participant C as Customer
+  participant SS as Sales Sarah
+  participant SA as Admin Sarah
+  participant SF as Finance Sarah
+  participant SO as Operations Sarah
+  participant SH as HR Sarah
+
+  C->>SS: Product / service request
+  SS->>C: Offer quotation?
+  C->>SS: Yes
+  SS->>SA: Open commercial cycle
+  SA->>SF: Prepare quotation
+  SF->>SA: Quotation ready
+  SA->>SS: Send quote to client
+  SS->>C: Quotation + payment terms
+  C->>SS: Accept + payment proof
+  SS->>SA: Submit proof
+  SA->>SF: Verify payment
+  SF->>SA: Payment verified
+  SA->>SO: Authorise project / mobilise
+  SA->>SH: Staffing plan
+  SO->>C: Delivery (when policy allows)
+```
+
 ## Reference lifecycle (configurable per company)
 
 Stages are **templates**, not one rigid sequence (deposits, credit terms, HR vs automated delivery, vertical-specific steps).
@@ -148,6 +193,22 @@ Stages are **templates**, not one rigid sequence (deposits, credit terms, HR vs 
 **Sarah tools:** `issueWorkforceInstruction` (Admin only), `listWorkforceInstructions`, `completeWorkforceInstruction`
 
 **Targets:** `sales`, `finance`, `operations`, `hr`
+
+## B2 autonomous orchestration (pilot)
+
+**Pilot tenant:** same as commercial cycle (`central-motors-rtb` / demo mapping).
+
+**Cycle → instructions:** `services/bos/bosCycleWorkforceBridge.js` listens to commercial cycle creates/actions and issues deduplicated workforce instructions (`automationKey`) so each module sees work in its Sarah workspace + notifications.
+
+**Background Sarah (optional):** On `WorkforceInstructionIssued`, `services/bos/workforceSarahAutopilot.js` enqueues `EXECUTE_SARAH_WORKFORCE` for pilot tenants (disable with `BOS_SARAH_AUTOPILOT=false`). Module Sarah runs tools (`applyBosCommercialCycleAction`, `issueWorkforceInstruction`, `completeWorkforceInstruction`) without a human opening chat.
+
+**Sarah tools:** `openBosCommercialCycle`, `listBosCommercialCycles`, `applyBosCommercialCycleAction` (Sales/Admin/Finance/Ops per stage gates).
+
+**Disable bridge:** `BOS_CYCLE_WORKFORCE_BRIDGE=false`.
+
+**Inbound quotation consent (pilot):** `detectQuotationConsent` in `services/conversation/salesContext.js` + `services/bos/bosInboundSalesBridge.js` on WhatsApp (and same worker path for other channels using `PROCESS_INBOUND_MESSAGE`). Customer says yes to a quote or explicitly requests one → commercial cycle opens with `conversationId`, `customerPhone`, CRM `leadStage` → `FINANCE_QUOTE`, workforce bridge + autopilot continue the chain.
+
+**Still manual / upcoming:** Email/webchat-specific tuning; org-wide deposit vs full-payment policy object; HR assignment engine wired to real tasks; full project entity beyond mobilisation task.
 
 ---
 

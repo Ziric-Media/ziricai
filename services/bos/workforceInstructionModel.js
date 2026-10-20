@@ -28,6 +28,8 @@ export const INSTRUCTION_SOURCE = {
     ADMIN_SARAH: "admin_sarah",
     HUMAN: "human",
     MODULE_SARAH: "module_sarah",
+    /** Event/cycle bridge — not a human or chat turn. */
+    BOS_ORCHESTRATOR: "bos_orchestrator",
 };
 
 export function normalizeTargetModule(raw) {

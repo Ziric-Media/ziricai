@@ -5,6 +5,7 @@ import { upsertTenantCustomer } from "../storage/tenantStorage.js";
 import { upsertDurableCustomer } from "../database/customerRepository.js";
 import { countPassengersFromText } from "../inventory/seatingCapacity.js";
 import { parseIntroducedPerson, parseRelationshipSpeaker, parseOccupation } from "../customerIdentity.js";
+import { isInventoryBrowseIntent } from "./inventoryIntent.js";
 
 export const LEAD_STAGES = [
     "NEW",
@@ -678,6 +679,9 @@ function inferStageAdvance(text, currentStage) {
     if (/\b(book|test drive|schedule|appointment)\b/.test(lower)) {
         return advanceLeadStage(current, /\bconfirm|booked\b/.test(lower) ? "TEST_DRIVE_BOOKED" : "TEST_DRIVE_REQUESTED");
     }
+    if (isInventoryBrowseIntent(text)) {
+        return advanceLeadStage(current, "VEHICLES_RECOMMENDED");
+    }
     if (/\b(what do you have|show me|options|available|in stock|search)\b/.test(lower)) {
         return advanceLeadStage(current, "DISCOVERY");
     }
@@ -1006,10 +1010,65 @@ export function buildRecommendedVehicleRecords(vehicles = [], { reason, requirem
             location: v.location || null,
             primaryImageUrl: Array.isArray(v.images) ? v.images[0] || null : null,
             reason: reason || buildInventoryRecommendationReason(v, { familySize, ...(requirements ? { customerRequirements: requirements } : {}) }),
-            requirements: requirements?.length ? [...requirements] : undefined,
+            ...(requirements?.length ? { requirements: [...requirements] } : {}),
             recommendedAt: now,
             position: index + 1,
         }));
+}
+
+function lastAssistantMessageText(recentMessages = []) {
+    for (let i = recentMessages.length - 1; i >= 0; i--) {
+        const m = recentMessages[i];
+        const role = String(m?.role || "").toLowerCase();
+        if (role === "assistant" || role === "ai") {
+            return String(m.content || m.message || "");
+        }
+    }
+    return "";
+}
+
+/**
+ * Customer agreed to receive a formal quotation (explicit ask or “yes” to Sarah’s offer).
+ * @param {string} text — current inbound message
+ * @param {{ recentMessages?: object[] }} [options]
+ * @returns {{ consented: boolean, kind?: string }}
+ */
+export function detectQuotationConsent(text, { recentMessages = [] } = {}) {
+    const raw = String(text || "").trim();
+    const lower = raw.toLowerCase();
+    if (!lower) return { consented: false };
+
+    const explicit = [
+        /\b(send|get|give|prepare|make|draw up)\s+(me\s+)?(a\s+)?(quotation|quote)\b/,
+        /\b(i\s+)?(want|need|would like)\s+(a\s+)?(formal\s+)?(quotation|quote)\b/,
+        /\b(quotation|quote)\s+please\b/,
+        /\bplease\s+(send\s+)?(the\s+)?(quotation|quote)\b/,
+        /\byes\s*[,.]?\s*(please\s+)?(send\s+)?(the\s+)?(quotation|quote)\b/,
+    ];
+    if (explicit.some((re) => re.test(lower))) {
+        return { consented: true, kind: "explicit_request" };
+    }
+
+    const affirmative =
+        /^(yes|yeah|yep|yup|sure|ok|okay|please|go ahead|definitely|absolutely|correct)\b/i.test(lower) ||
+        /\b(yes please|that works|sounds good|do it|go for it)\b/i.test(lower);
+
+    if (affirmative) {
+        const assistant = lastAssistantMessageText(recentMessages).toLowerCase();
+        const offerPatterns = [
+            /\b(quotation|quote|formal quote|pricing quote)\b/,
+            /\bwould you like (a |an )?(quotation|quote)\b/,
+            /\b(want|like) (a |an )?(quotation|quote)\b/,
+            /\bshall i (prepare|send) (you )?(a |an )?(quotation|quote)\b/,
+            /\bcan i (prepare|send) (you )?(a |an )?(quotation|quote)\b/,
+            /\bdo you want (a |an )?(quotation|quote)\b/,
+        ];
+        if (assistant && offerPatterns.some((re) => re.test(assistant))) {
+            return { consented: true, kind: "affirmative_to_offer" };
+        }
+    }
+
+    return { consented: false };
 }
 
 /**
@@ -1212,6 +1271,9 @@ export function mergeSalesContext(existing = {}, signals = {}) {
         merged.objections = [...new Set([...(merged.objections || []), ...signals.objections])];
     }
 
+    if (signals.bosCommercialCycleId) merged.bosCommercialCycleId = signals.bosCommercialCycleId;
+    if (signals.quotationRequestedAt) merged.quotationRequestedAt = signals.quotationRequestedAt;
+
     merged.updatedAt = new Date().toISOString();
     return merged;
 }
@@ -1302,6 +1364,11 @@ export function formatSalesContextForPrompt(customer) {
     const stageObjective = getLeadStageObjective(normalizedStage);
     const lines = ["SALES CONTEXT (from customer record — use for guidance, not as inventory/booking truth):"];
     if (normalizedStage) lines.push(`- Lead stage: ${normalizedStage}`);
+    if (ctx.bosCommercialCycleId) {
+        lines.push(
+            `- BOS commercial cycle: ${ctx.bosCommercialCycleId} (formal quotation requested — Sarah Admin coordinates Finance; reassure the customer quote is being prepared)`
+        );
+    }
     lines.push(`- Stage objective: ${stageObjective}`);
     lines.push(`- Sales progression: ${progressionStage}`);
     if (ctx.occupation) lines.push(`- Occupation: ${ctx.occupation}`);

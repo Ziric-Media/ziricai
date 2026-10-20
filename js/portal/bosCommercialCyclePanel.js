@@ -21,7 +21,7 @@ const STAGE_ACTIONS = {
   quotation_pending: [
     { action: 'prepare-quotation', label: 'Prepare quotation (Finance)', tone: 'finance' },
   ],
-  quotation_ready: [{ action: 'send-quotation', label: 'Send quotation', tone: 'finance' }],
+  quotation_ready: [{ action: 'send-quotation', label: 'Send quotation (Sales)', tone: 'sales' }],
 };
 
 function actionsForStage(stage) {

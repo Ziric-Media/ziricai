@@ -23,6 +23,8 @@ export const FINANCE_SARAH_ALLOWED_TOOL_NAMES = new Set([
     "viewFinanceTransactions",
     "listWorkforceInstructions",
     "completeWorkforceInstruction",
+    "listBosCommercialCycles",
+    "applyBosCommercialCycleAction",
 ]);
 
 /** Representative tools that must never appear in Finance Sarah (negative test guard). */

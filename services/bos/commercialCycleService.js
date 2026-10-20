@@ -19,6 +19,7 @@ import {
 } from "../finance/financeInvoiceService.js";
 import { createTaskForAccess } from "../tenants/taskService.js";
 import { publish, EventTypes } from "../events/index.js";
+import { syncWorkforceInstructionsForCycle } from "./bosCycleWorkforceBridge.js";
 
 const QUOTATION_MARKER = "__DOC:quotation__";
 
@@ -88,6 +89,30 @@ export async function getCommercialCycle(companyId, cycleId) {
     return row || null;
 }
 
+function normalizePhoneKey(phone) {
+    const digits = String(phone || "").replace(/\D/g, "");
+    if (digits.length >= 10) return digits.slice(-10);
+    return digits;
+}
+
+/** Active cycle for customer phone (excludes completed / exception / mobilised). */
+export async function findOpenCommercialCycleForCustomer(companyId, customerPhone) {
+    const key = normalizePhoneKey(customerPhone);
+    if (!key) return null;
+    const items = await listCommercialCycles(companyId, { seedIfEmpty: false });
+    const terminal = new Set([
+        CYCLE_STAGES.COMPLETED,
+        CYCLE_STAGES.EXCEPTION,
+        CYCLE_STAGES.MOBILISED,
+    ]);
+    for (const c of items) {
+        if (normalizePhoneKey(c.customerPhone) !== key) continue;
+        if (terminal.has(c.stage)) continue;
+        return c;
+    }
+    return null;
+}
+
 export async function createCommercialCycle(companyId, actor, body = {}) {
     const customerName = String(body.customerName || "").trim();
     const title = String(body.title || "").trim();
@@ -95,7 +120,7 @@ export async function createCommercialCycle(companyId, actor, body = {}) {
         throw httpError("customerName and title are required", 400, "BOS_VALIDATION");
     }
     const stage = CYCLE_STAGES.QUOTATION_PENDING;
-    return cycleRepo.create(companyId, {
+    const created = await cycleRepo.create(companyId, {
         title,
         customerName,
         customerPhone: body.customerPhone || null,
@@ -111,11 +136,16 @@ export async function createCommercialCycle(companyId, actor, body = {}) {
         mobilisedAt: null,
         mobilisedTaskIds: [],
         projectId: body.projectId || `proj-${Date.now().toString(36).slice(2, 8)}`,
+        conversationId: body.conversationId || null,
+        sourceChannel: body.sourceChannel || null,
+        inboundConsentKind: body.inboundConsentKind || null,
         delegations: [],
         activityLog: [
             {
                 type: "cycle_created",
-                message: `Commercial cycle opened for ${customerName}.`,
+                message: body.conversationId
+                    ? `Commercial cycle opened for ${customerName} from ${body.sourceChannel || "channel"} conversation.`
+                    : `Commercial cycle opened for ${customerName}.`,
                 actorRole: SARAH_ROLES.SALES,
                 actorUid: actor.uid,
                 at: nowIso(),
@@ -124,6 +154,10 @@ export async function createCommercialCycle(companyId, actor, body = {}) {
         createdByUid: actor.uid,
         updatedByUid: actor.uid,
     });
+    await syncWorkforceInstructionsForCycle(companyId, created, "created").catch((err) => {
+        console.warn("[bos] cycle bridge (created):", err.message);
+    });
+    return created;
 }
 
 /**
@@ -196,8 +230,8 @@ export async function applyCommercialCycleAction(companyId, cycleId, action, act
             patch.stageLabel = STAGE_LABELS[rule.to];
             patch.activityLog = appendLog(cycle, {
                 type: "quotation_sent",
-                message: "Quotation sent to customer.",
-                actorRole: SARAH_ROLES.FINANCE,
+                message: "Sales Sarah sent quotation to customer.",
+                actorRole: SARAH_ROLES.SALES,
                 actorUid: actor.uid,
             });
             await publish(companyId, EventTypes.QUOTATION_SENT, {
@@ -333,6 +367,9 @@ export async function applyCommercialCycleAction(companyId, cycleId, action, act
     }
 
     const updated = await cycleRepo.update(companyId, cycleId, patch);
+    await syncWorkforceInstructionsForCycle(companyId, updated, action).catch((err) => {
+        console.warn("[bos] cycle bridge:", action, err.message);
+    });
     return updated;
 }
 

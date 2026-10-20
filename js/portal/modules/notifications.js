@@ -9,6 +9,7 @@ import {
   startNotificationPolling,
   registerNotificationRefresh,
 } from '../core/notificationPolling.js';
+import { bindNotificationItemNavigation } from '../notificationNavigation.js';
 
 export { startNotificationPolling, stopNotificationPolling } from '../core/notificationPolling.js';
 
@@ -87,6 +88,8 @@ export async function renderNotifications(container) {
     renderNotifications(container);
   });
 
+  bindNotificationItemNavigation(container);
+
   container.querySelector('#markAllReadBtn')?.addEventListener('click', async () => {
     const result = await markAllNotificationsRead(companyId);
     if (result.error) {
@@ -109,13 +112,15 @@ export async function renderNotificationDrawer() {
   drawer.innerHTML = items.length
     ? items.map((n) => notificationItem(n, true)).join('')
     : `<p class="empty-drawer">${renderEmptyState({ message: 'No notifications yet' })}</p>`;
+  bindNotificationItemNavigation(drawer);
 }
 
 function notificationItem(n, compact = false) {
   const colorClass = n.color === 'red' ? 'red' : n.color === 'green' ? 'green' : n.color === 'yellow' ? 'yellow' : 'blue';
   const body = n.message && n.title && n.message !== n.title ? n.message : n.message || '';
+  const navigable = n.meta?.navigate?.page;
   return `
-    <div class="notification-item ${n.read ? '' : 'unread'} ${compact ? 'compact' : ''}" data-id="${escapeHtml(n.id)}">
+    <div class="notification-item ${n.read ? '' : 'unread'} ${compact ? 'compact' : ''} ${navigable ? 'notification-item--navigable' : ''}" data-id="${escapeHtml(n.id)}" ${navigable ? 'role="button" tabindex="0"' : ''}>
       <div class="notification-icon ${escapeHtml(colorClass)}"><i class="fa-solid ${escapeHtml(n.icon || 'fa-bell')}"></i></div>
       <div class="notification-content">
         <div class="notification-title">${escapeHtml(n.title || 'Notification')}</div>

@@ -64,6 +64,11 @@ import {
     listWorkforceInstructionsTool,
     completeWorkforceInstructionTool,
 } from "./workforceInstructions.js";
+import {
+    listBosCommercialCycles,
+    openBosCommercialCycle,
+    applyBosCommercialCycleAction,
+} from "./bosCommercialCycle.js";
 
 const ALL_TOOLS = [
     viewAnalytics,
@@ -128,6 +133,9 @@ const ALL_TOOLS = [
     issueWorkforceInstruction,
     listWorkforceInstructionsTool,
     completeWorkforceInstructionTool,
+    listBosCommercialCycles,
+    openBosCommercialCycle,
+    applyBosCommercialCycleAction,
 ];
 
 let initialized = false;

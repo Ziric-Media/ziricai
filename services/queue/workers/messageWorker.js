@@ -1,6 +1,5 @@
-import { askAI, askAIWithTools } from "../../openai.js";
-
-import { sendWhatsAppTypingIndicator } from "../../whatsapp.js";
+import { sendWhatsAppTypingIndicator, downloadWhatsAppMedia } from "../../whatsapp.js";
+import { askAI, askAIWithTools, transcribeAudio } from "../../openai.js";
 
 import { sendMessage as integrationSend } from "../../integrations/integrationHub.js";
 
@@ -25,9 +24,16 @@ import {
 } from "../../ai-core/whatsappConversationPrompt.js";
 import { getCompany } from "../../tenants/companyService.js";
 import { getDefaultAiEmployee } from "../../tenants/aiEmployeeService.js";
+import { getWhatsAppIntegration } from "../../tenants/integrationService.js";
 import { customerDocId, conversationDocId } from "../../storage/tenantStorage.js";
 import { getConversationTakeoverState } from "../../conversation/takeoverSafety.js";
-import { initAiTools, getOpenAIToolDefinitions, runTool } from "../../tools/index.js";
+import {
+    initAiTools,
+    getOpenAIToolDefinitions,
+    runTool,
+    CLIENT_ZERO_INBOUND_TOOL_NAMES,
+} from "../../tools/index.js";
+import { isClientZeroCompanyId } from "../../clientZero/clientZero.js";
 import {
     extractSchedulingFromText,
     formatSchedulingContextForPrompt,
@@ -55,7 +61,11 @@ import {
     extractSalesSignals,
     persistSalesContext,
     mergeSalesContext,
+    detectQuotationConsent,
+    advanceLeadStage,
 } from "../../conversation/salesContext.js";
+import { isBosPilotTenant } from "../../bos/bosPilot.js";
+import { maybeOpenCommercialCycleFromInbound } from "../../bos/bosInboundSalesBridge.js";
 import {
     isVehicleReferenceIntent,
     isGalleryImageIntent,
@@ -79,11 +89,73 @@ import { superviseReply } from "../../intelligence/aiSupervisor.js";
 import { JOB_TYPES, registerJobHandler, markJobOutboundSent } from "../jobQueue.js";
 
 const NON_TEXT_REPLY = "Please send a text message so I can help you.";
+const VOICE_NOTE_FAIL_REPLY =
+    "I received your voice note but couldn't understand it clearly. Please try again or send a short text message.";
+
+/**
+ * Download WhatsApp audio and transcribe with Whisper.
+ * @returns {Promise<string|null>} transcript text or null on failure
+ */
+async function tryTranscribeVoiceNote(job) {
+    const mediaList = Array.isArray(job?.media) ? job.media : [];
+    const audio = mediaList.find((m) => m?.type === "audio" && m?.id) || mediaList[0];
+    const mediaId = audio?.id;
+    if (!mediaId) {
+        console.warn("[whatsapp] Voice note missing Meta media id", { jobId: job?.id });
+        return null;
+    }
+
+    try {
+        const downloaded = await downloadWhatsAppMedia(mediaId);
+        const { text } = await transcribeAudio(downloaded.buffer, {
+            mimeType: audio?.mimeType || downloaded.mimeType,
+            filename: `wa-voice-${String(mediaId).slice(-8)}.ogg`,
+        });
+        const transcript = String(text || "").trim();
+        if (!transcript) {
+            console.warn("[whatsapp] Empty voice transcript", {
+                jobId: job?.id,
+                mediaIdSuffix: String(mediaId).slice(-6),
+            });
+            return null;
+        }
+        console.log("[whatsapp] Voice note transcribed", {
+            jobId: job?.id,
+            companyId: job?.companyId || null,
+            chars: transcript.length,
+            mediaIdSuffix: String(mediaId).slice(-6),
+        });
+        return transcript;
+    } catch (err) {
+        console.warn("[whatsapp] Voice note transcription failed", {
+            jobId: job?.id,
+            mediaIdSuffix: String(mediaId).slice(-6),
+            message: err.message,
+            code: err.code || err.status || null,
+        });
+        return null;
+    }
+}
 
 initAiTools();
 
-async function sendViaIntegration(channel, companyId, to, payload) {
-    return integrationSend(channel || "whatsapp", { companyId }, { to, ...payload });
+async function sendViaIntegration(channel, companyId, to, payload, phoneNumberId = null) {
+    return integrationSend(
+        channel || "whatsapp",
+        { companyId, phoneNumberId: phoneNumberId || null },
+        { to, ...payload, phoneNumberId: phoneNumberId || undefined }
+    );
+}
+
+async function resolveOutboundPhoneNumberId(job, companyId) {
+    if (job?.phoneNumberId) return String(job.phoneNumberId).trim();
+    if (!companyId) return null;
+    try {
+        const integration = await getWhatsAppIntegration(companyId);
+        return integration?.phoneNumberId ? String(integration.phoneNumberId).trim() : null;
+    } catch {
+        return null;
+    }
 }
 
 async function trySendOutbound(job, channel, companyId, to, text, responseSource = "ai") {
@@ -119,7 +191,8 @@ async function trySendOutbound(job, channel, companyId, to, text, responseSource
     }
 
     try {
-        const result = await sendViaIntegration(channel, companyId, to, { text });
+        const phoneNumberId = await resolveOutboundPhoneNumberId(job, companyId);
+        const result = await sendViaIntegration(channel, companyId, to, { text }, phoneNumberId);
         const metaMessageId = result?.messages?.[0]?.id || null;
         if (metaMessageId) {
             await markJobOutboundSent(job.id, metaMessageId);
@@ -130,6 +203,7 @@ async function trySendOutbound(job, channel, companyId, to, text, responseSource
                 companyId,
                 to,
                 responseSource,
+                phoneNumberIdSuffix: phoneNumberId ? String(phoneNumberId).slice(-4) : null,
                 metaMessageIdPrefix: String(metaMessageId).slice(0, 24),
             });
         }
@@ -178,7 +252,14 @@ async function trySendOutboundPlan(job, channel, companyId, to, plan, responseSo
     }
 
     try {
-        const results = await sendViaIntegration(channel, companyId, to, { messages: plan.messages });
+        const phoneNumberId = await resolveOutboundPhoneNumberId(job, companyId);
+        const results = await sendViaIntegration(
+            channel,
+            companyId,
+            to,
+            { messages: plan.messages },
+            phoneNumberId
+        );
         const wamids = (Array.isArray(results) ? results : [results])
             .map((r) => r?.messages?.[0]?.id)
             .filter(Boolean);
@@ -198,6 +279,7 @@ async function trySendOutboundPlan(job, channel, companyId, to, plan, responseSo
                 to,
                 responseSource,
                 parts: wamids.length,
+                phoneNumberIdSuffix: phoneNumberId ? String(phoneNumberId).slice(-4) : null,
                 metaMessageIdPrefix: String(wamids[0]).slice(0, 24),
             });
         }
@@ -217,7 +299,9 @@ async function trySendOutboundPlan(job, channel, companyId, to, plan, responseSo
 }
 
 async function processInboundMessage(job) {
-    const { phone, text, from, contactName, messageType, companyId, timestamp, channel, externalId } = job;
+    const { phone, from, contactName, companyId, timestamp, channel, externalId } = job;
+    let { text, messageType } = job;
+    const media = Array.isArray(job.media) ? job.media : [];
 
     const sender = from || phone;
     const outboundChannel = channel || "whatsapp";
@@ -228,6 +312,7 @@ async function processInboundMessage(job) {
         from: sender,
         messageType,
         externalIdPrefix: externalId ? String(externalId).slice(0, 24) : null,
+        hasMedia: media.length > 0,
     });
 
     if (resolvedCompanyId) {
@@ -242,6 +327,52 @@ async function processInboundMessage(job) {
                 humanTakeover: takeover.meta?.humanTakeover,
                 mode: takeover.meta?.mode,
             });
+            return;
+        }
+    }
+
+    /* Voice notes → speech-to-text, then continue on the normal Sarah text path. */
+    if (messageType === "audio" && !String(text || "").trim()) {
+        if (outboundChannel === "whatsapp" && externalId) {
+            const phoneNumberId = await resolveOutboundPhoneNumberId(job, resolvedCompanyId);
+            await sendWhatsAppTypingIndicator(externalId, { phoneNumberId, companyId: resolvedCompanyId });
+        }
+
+        const transcript = await tryTranscribeVoiceNote(job);
+        if (transcript) {
+            text = transcript;
+            messageType = "text";
+            job.text = transcript;
+            job.messageType = "text";
+            job.transcribedFromVoice = true;
+
+            try {
+                await saveInboundMessage(sender, transcript, {
+                    channel: outboundChannel,
+                    companyId: resolvedCompanyId,
+                    contactName,
+                    externalId,
+                    source: "voice_note_transcript",
+                });
+            } catch (persistErr) {
+                console.warn("[whatsapp] Failed to persist voice transcript inbound:", persistErr.message);
+            }
+        } else {
+            const metaMessageId = await trySendOutbound(
+                job,
+                outboundChannel,
+                resolvedCompanyId,
+                sender,
+                VOICE_NOTE_FAIL_REPLY,
+                "fallback"
+            );
+            if (metaMessageId) {
+                await saveOutboundMessage(sender, VOICE_NOTE_FAIL_REPLY, {
+                    channel: outboundChannel,
+                    companyId: resolvedCompanyId,
+                    externalId: metaMessageId,
+                });
+            }
             return;
         }
     }
@@ -265,8 +396,9 @@ async function processInboundMessage(job) {
         return;
     }
 
-    if (outboundChannel === "whatsapp" && externalId) {
-        await sendWhatsAppTypingIndicator(externalId);
+    if (outboundChannel === "whatsapp" && externalId && !job.transcribedFromVoice) {
+        const phoneNumberId = await resolveOutboundPhoneNumberId(job, resolvedCompanyId);
+        await sendWhatsAppTypingIndicator(externalId, { phoneNumberId, companyId: resolvedCompanyId });
     }
     const customer =
         (resolvedCompanyId
@@ -383,20 +515,77 @@ async function processInboundMessage(job) {
         });
     }
 
+    if (resolvedCompanyId && isBosPilotTenant(resolvedCompanyId)) {
+        const consent = detectQuotationConsent(text, { recentMessages: history });
+        if (consent.consented) {
+            try {
+                const bosResult = await maybeOpenCommercialCycleFromInbound({
+                    companyId: resolvedCompanyId,
+                    customerPhone: sender,
+                    customerName: customerDisplayName,
+                    conversationId,
+                    channel: outboundChannel,
+                    salesContext: salesContextForTurn,
+                    inboundText: text,
+                    consentKind: consent.kind,
+                    leadId: customerId,
+                });
+                if (bosResult?.opened && bosResult.cycleId) {
+                    const bosPatch = {
+                        bosCommercialCycleId: bosResult.cycleId,
+                        quotationRequestedAt: new Date().toISOString(),
+                        leadStage: advanceLeadStage(salesContextForTurn?.leadStage, "FINANCE_QUOTE"),
+                    };
+                    salesContextForTurn = mergeSalesContext(salesContextForTurn, bosPatch);
+                    await persistSalesContext(resolvedCompanyId, sender, bosPatch);
+                    await syncFromSalesTurn(resolvedCompanyId, sender, {
+                        contactName,
+                        channel: outboundChannel,
+                        salesContext: salesContextForTurn,
+                        aiEmployeeId: agent?.id || null,
+                        aiEmployeeName: agent?.name || "Sarah",
+                    }).catch((err) => {
+                        console.warn("[bos-inbound] CRM sync failed:", err.message);
+                    });
+                    refreshedCustomer = { ...refreshedCustomer, salesContext: salesContextForTurn };
+                    console.log("[bos-inbound] Commercial cycle opened from quotation consent", {
+                        companyId: resolvedCompanyId,
+                        cycleId: bosResult.cycleId,
+                        phone: sender,
+                        kind: consent.kind,
+                    });
+                }
+            } catch (bosErr) {
+                console.warn("[bos-inbound] cycle open failed:", bosErr.message);
+            }
+        }
+    }
+
+    const clientZeroInbound = isClientZeroCompanyId(resolvedCompanyId);
+
     const systemPrompt = buildWhatsAppSystemPrompt({
         agent,
         companyId: resolvedCompanyId,
         companyName,
         customer: refreshedCustomer,
         contactName,
+        isNewConversation,
+        inboundMessage: text,
+        historyLength: history.length,
+        channel: outboundChannel,
     });
 
     let schedulingContext =
-        resolvedCompanyId && sender
+        !clientZeroInbound && resolvedCompanyId && sender
             ? await getSchedulingContext(resolvedCompanyId, sender, outboundChannel)
             : {};
     const extractedScheduling = extractSchedulingFromText(text, schedulingContext);
-    if (resolvedCompanyId && sender && Object.keys(extractedScheduling).length) {
+    if (
+        !clientZeroInbound &&
+        resolvedCompanyId &&
+        sender &&
+        Object.keys(extractedScheduling).length
+    ) {
         schedulingContext = await saveSchedulingContext(
             resolvedCompanyId,
             sender,
@@ -406,7 +595,7 @@ async function processInboundMessage(job) {
     }
 
     let testDrivePlan =
-        resolvedCompanyId && sender
+        !clientZeroInbound && resolvedCompanyId && sender
             ? await getTestDrivePlan(resolvedCompanyId, sender, outboundChannel)
             : [];
 
@@ -415,7 +604,7 @@ async function processInboundMessage(job) {
 
     let authoritativeBookingContext = "";
     let preloadedBookingResult = null;
-    if (resolvedCompanyId && isBookingRecapIntent(text)) {
+    if (!clientZeroInbound && resolvedCompanyId && isBookingRecapIntent(text)) {
         preloadedBookingResult = await runTool("getCustomerBookings", {
             companyId: resolvedCompanyId,
             customerId,
@@ -439,7 +628,7 @@ async function processInboundMessage(job) {
     let galleryOutboundContext = "";
     let galleryVehicleTargets = [];
 
-    if (resolvedCompanyId && isGalleryImageIntent(text)) {
+    if (!clientZeroInbound && resolvedCompanyId && isGalleryImageIntent(text)) {
         const conversationRecommended = await getRecommendedVehicles(resolvedCompanyId, sender, outboundChannel);
         galleryVehicleTargets = resolveGalleryVehicleTargets(
             text,
@@ -466,7 +655,7 @@ async function processInboundMessage(job) {
         }
     }
 
-    if (resolvedCompanyId && isVehicleReferenceIntent(text)) {
+    if (!clientZeroInbound && resolvedCompanyId && isVehicleReferenceIntent(text)) {
         const conversationRecommended = await getRecommendedVehicles(resolvedCompanyId, sender, outboundChannel);
         resolvedVehicleReference = resolveVehicleReference(
             text,
@@ -501,6 +690,7 @@ async function processInboundMessage(job) {
     }
 
     const shouldPreloadAvailability =
+        !clientZeroInbound &&
         resolvedCompanyId &&
         schedulingVehicleRef?.vehicleId &&
         (isSchedulingDelegationIntent(text) ||
@@ -590,7 +780,13 @@ async function processInboundMessage(job) {
 
     let authoritativePlanFinalizeContext = "";
     let preloadedFinalizeResults = null;
-    if (resolvedCompanyId && sender && isPlanConfirmationIntent(text) && testDrivePlan.some((e) => e.status === "PENDING")) {
+    if (
+        !clientZeroInbound &&
+        resolvedCompanyId &&
+        sender &&
+        isPlanConfirmationIntent(text) &&
+        testDrivePlan.some((e) => e.status === "PENDING")
+    ) {
         const finalize = await finalizePendingPlanEntries(
             {
                 companyId: resolvedCompanyId,
@@ -659,7 +855,11 @@ async function processInboundMessage(job) {
         testDrivePlan,
     };
 
-    const aiTools = resolvedCompanyId ? getOpenAIToolDefinitions() : [];
+    const aiTools = resolvedCompanyId
+        ? clientZeroInbound
+            ? getOpenAIToolDefinitions({ toolNames: CLIENT_ZERO_INBOUND_TOOL_NAMES })
+            : getOpenAIToolDefinitions()
+        : [];
     let reply;
     let toolResults = [];
 
@@ -696,7 +896,7 @@ async function processInboundMessage(job) {
     }
 
     let outboundPlan = null;
-    if (outboundChannel === "whatsapp") {
+    if (outboundChannel === "whatsapp" && !clientZeroInbound) {
         if (galleryVehicleTargets.length) {
             const enrichedVehicles = await enrichRecommendedVehiclesForOutbound(
                 resolvedCompanyId,

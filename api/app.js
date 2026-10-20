@@ -190,6 +190,7 @@ import { isDemoTenant } from "../services/core/dataMode.js";
 import { assertSarahChatAccess } from "../services/sarah/sarahAuth.js";
 import { buildSarahContext } from "../services/sarah/sarahContext.js";
 import { handleSarahChat } from "../services/sarah/sarahOrchestrator.js";
+import { mountSarahSessionHttpRoutes } from "../services/sarah/sarahSessionRoutes.js";
 import { getToolsForContext } from "../services/sarah/toolRegistry.js";
 import { initSarahTools } from "../services/sarah/tools/index.js";
 import {
@@ -217,6 +218,10 @@ import { isMetaWebhookPath, normalizeWebhookPath } from "../services/integration
 import { initEventSystem } from "../services/events/index.js";
 import { applyApiVersionHeader } from "../services/api/routeRegistry.js";
 import { mountCustomerOpsRoutes } from "../services/api/customerOpsRoutes.js";
+import { mountFinanceAcceptanceRoutes } from "../services/api/financeAcceptanceRoutes.js";
+import { isFinanceAcceptanceRuntimeActive } from "../services/auth/financeAcceptanceMode.js";
+import { seedFinanceAcceptanceTenantIfNeeded } from "../services/finance/financeAcceptanceSeed.js";
+import { mountIntegrationRoutesForStartup } from "../services/env/isolatedStartup.js";
 import { getDashboardSnapshot, getPopularQuestionsSnapshot } from "../services/analytics/dashboardService.js";
 import { listEvents } from "../services/events/eventStore.js";
 import {
@@ -1585,6 +1590,7 @@ app.get("/api/automations/:companyId/runs", requireTenantScope(), async (req, re
 
 /** Sarah — AI Operating Assistant */
 initSarahTools();
+mountSarahSessionHttpRoutes(app);
 
 const SARAH_LANDING_MAX_MESSAGE_CHARS = 500;
 
@@ -1650,7 +1656,12 @@ app.get("/api/sarah/tools", requireTenantScope({ optional: true }), async (req, 
             requiredPermissions: t.requiredPermissions || [],
             platformOnly: Boolean(t.platformOnly),
         }));
-        res.json({ tools, role: ctx.role, companyId: ctx.companyId });
+        res.json({
+            tools,
+            role: ctx.role,
+            companyId: ctx.companyId,
+            financeSarah: Boolean(ctx.financeSarah),
+        });
     } catch (err) {
         console.error("[api/sarah/tools] error:", err.message);
         res.status(err.status || 500).json({ error: err.message || "Failed to list Sarah tools" });
@@ -2470,9 +2481,17 @@ app.get("/webhook", (req, res) => handleWhatsAppWebhook(req, res));
 app.post("/webhook", (req, res) => handleWhatsAppWebhook(req, res));
 
 /** Unified integration webhooks + monitoring API */
-mountIntegrationRoutes(app);
+if (!mountIntegrationRoutesForStartup(app, mountIntegrationRoutes)) {
+    console.error("[startup] Integration routes skipped for isolated startup");
+}
 
 /** Phase 3–6 Customer Operations — CRM, Inbox, Appointments, Notifications, Reports */
+if (isFinanceAcceptanceRuntimeActive()) {
+    mountFinanceAcceptanceRoutes(app);
+    await seedFinanceAcceptanceTenantIfNeeded();
+    console.error("[startup] Finance acceptance loopback mode active (memory + mock auth)");
+}
+
 mountCustomerOpsRoutes(app);
 }
 
@@ -2537,6 +2556,8 @@ export async function runBackgroundInit() {
         startMessageWorker();
         const { startAiTaskWorker } = await import("../services/queue/workers/aiTaskWorker.js");
         startAiTaskWorker();
+        const { startWorkforceSarahWorker } = await import("../services/queue/workers/workforceSarahWorker.js");
+        startWorkforceSarahWorker();
         await initQueue();
         console.error("[startup] Storage backend:", adapter.name);
 

@@ -16,6 +16,8 @@ const JOB_TYPES = {
     PROCESS_EVENT: "PROCESS_EVENT",
     /** Operations Centre — AI-assigned task execution (tenant-scoped). */
     EXECUTE_AI_TASK: "EXECUTE_AI_TASK",
+    /** BOS — module Sarah executes workforce instruction without a human in chat. */
+    EXECUTE_SARAH_WORKFORCE: "EXECUTE_SARAH_WORKFORCE",
 };
 
 /** @type {Map<string, Function>} */

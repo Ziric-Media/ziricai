@@ -52,7 +52,7 @@ export const TRANSITIONS = {
     "send-quotation": {
         from: [CYCLE_STAGES.QUOTATION_READY],
         to: CYCLE_STAGES.QUOTATION_SENT,
-        owner: SARAH_ROLES.FINANCE,
+        owner: SARAH_ROLES.SALES,
     },
     "accept-quotation": {
         from: [CYCLE_STAGES.QUOTATION_SENT],
