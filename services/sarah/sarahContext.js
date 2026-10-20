@@ -14,6 +14,7 @@ import {
     PORTAL_SARAH_SURFACES,
     isPortalClientSurface,
 } from "./portalSarahSurfaces.js";
+import { PORTAL_NAV_TARGETS } from "./portalNavigation.js";
 import {
     listPendingInstructionsForModule,
     listWorkforceInstructions,
@@ -91,6 +92,11 @@ export async function buildSarahContext(req, overrides = {}) {
     return {
         companyId,
         companyName: resolvedCompany?.name || companyId,
+        companyIndustry:
+            resolvedCompany?.industry ||
+            workspace?.company?.industry ||
+            company?.industry ||
+            null,
         uid: tenant.uid,
         email: tenant.email,
         role,
@@ -159,9 +165,26 @@ export function buildWorkspaceContextHint(ctx) {
     );
 
     if (moduleKey === "admin" || surface === PORTAL_SARAH_SURFACES.ADMIN || surface === "portal") {
+        const portalGuide = Object.entries(PORTAL_NAV_TARGETS)
+            .map(([id, meta]) => `${meta.label} (${id})`)
+            .join("; ");
         parts.push(
-            "Sarah Admin: company-wide coordination — integrations, AI employees, knowledge, analytics, cross-module navigation."
+            "Sarah Admin: company-wide coordinator — you may guide the owner across every portal module using navigatePortal (respect their role permissions)."
         );
+        parts.push(`Portal modules: ${portalGuide}`);
+        parts.push(
+            "Workforce Sarah modules: Sarah Sales (conversations/inbox), Sarah Finance (finance), Sarah Operations (operations), Sarah HR (hr). Delegate cross-module work with issueWorkforceInstruction and BOS commercial cycles."
+        );
+        const industry = String(ctx.companyIndustry || "").trim();
+        if (industry) {
+            parts.push(
+                `Tenant industry: ${industry}. Offer practical, industry-aware advice for this business when the owner asks (workflows, customer expectations, compliance tone) — stay within ZiricAI capabilities and their configured data.`
+            );
+        } else {
+            parts.push(
+                "Tenant industry is not set — ask or infer cautiously from company name and knowledge base; suggest setting industry in Settings when relevant."
+            );
+        }
     }
     if (moduleKey === "operations" || surface === PORTAL_SARAH_SURFACES.OPERATIONS) {
         parts.push("Sarah Operations: tasks, projects, client database, workflows. Prefer listTasks / createTask for operational work.");

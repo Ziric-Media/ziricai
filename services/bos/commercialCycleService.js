@@ -198,9 +198,19 @@ export async function applyCommercialCycleAction(companyId, cycleId, action, act
                 throw httpError("Finance role required to prepare quotation", 403, "BOS_FORBIDDEN");
             }
             const counterpartyName = body.counterpartyName || cycle.customerName;
-            const lineItems = Array.isArray(body.lineItems) ? body.lineItems : [
-                { description: body.description || cycle.title, quantity: 1, unitPrice: body.unitPrice ?? 0 },
-            ];
+            const lineItems = Array.isArray(body.lineItems)
+                ? body.lineItems.map((li) => ({
+                      ...li,
+                      unitAmount:
+                          li.unitAmount ?? li.unitPrice ?? (Number(li.amount) || 0),
+                  }))
+                : [
+                      {
+                          description: body.description || cycle.title,
+                          quantity: 1,
+                          unitAmount: body.unitAmount ?? body.unitPrice ?? 0,
+                      },
+                  ];
             const invoice = await createFinanceInvoiceForAccess(companyId, access, {
                 invoiceKind: "receivable",
                 status: "draft",

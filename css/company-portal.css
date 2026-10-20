@@ -173,7 +173,7 @@
     background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
 }
 .portal-body .bos-nav-items a[data-page="sarah"] .icon {
-    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
     color: #fff;
 }
 .portal-body .bos-nav-items a[data-page="sarah"] .bos-nav-icon .fin-ws-sarah-icon {
@@ -2710,7 +2710,8 @@
 
 /* Full-page Sarah chat (portal module) */
 .portal-body .page-content:has(.portal-sarah-page),
-.portal-body .page-content:has(.fin-module--sarah) {
+.portal-body .page-content:has(.fin-module--sarah),
+.portal-body .page-content:has(.sw-sarah-page) {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -2719,14 +2720,35 @@
     padding: 16px 24px 24px;
 }
 
-.portal-sarah-page {
+.portal-body .sw-module-body:has(.sw-sarah-page),
+.portal-body .sales-module-body:has(.sw-sarah-page),
+.portal-body .hr-module-main:has(.sw-sarah-page),
+.portal-body .ops-module-body:has(.sw-sarah-page) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.portal-body .sw-module:has(.sw-sarah-page),
+.portal-body .sales-module:has(.sw-sarah-page) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.portal-sarah-page,
+.portal-body .sw-sarah-page {
     display: grid;
     grid-template-columns: minmax(240px, 300px) 1fr;
     gap: 0;
     flex: 1;
     min-height: 0;
-    height: auto;
-    max-height: none;
+    height: 100%;
+    max-height: 100%;
     margin: 0;
     border: 1px solid var(--border-color);
     border-radius: 16px;
@@ -2831,8 +2853,10 @@
 .portal-sarah-page-main {
     display: flex;
     flex-direction: column;
+    flex: 1;
     min-height: 0;
     min-width: 0;
+    overflow: hidden;
 }
 
 .portal-sarah-page-main-header {
@@ -2860,12 +2884,17 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
 }
 
 .portal-sarah-chat-mount--page .portal-sarah-messages {
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
     max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     padding: 20px 24px;
     gap: 12px;
 }
@@ -6802,58 +6831,118 @@
 
 /* Sarah BOS — workforce instructions */
 .bos-instruction-panel-host {
-    margin-bottom: 12px;
+    flex-shrink: 0;
+    padding: 12px 16px 0;
+    max-height: min(42vh, 320px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.portal-sarah-page-main > .bos-instruction-panel-host:first-child {
+    padding-top: 14px;
 }
 .bos-instruction-panel {
-    border-radius: 12px;
-    border: 1px solid color-mix(in srgb, var(--brand-primary, #1e40af) 14%, var(--border-color));
-    background: var(--bg-secondary, #fff);
-    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--brand-primary, #2563eb) 22%, var(--border-color));
+    background: linear-gradient(
+        165deg,
+        color-mix(in srgb, var(--brand-primary, #2563eb) 7%, var(--bg-card)) 0%,
+        var(--bg-secondary, #f8fafc) 48%,
+        var(--bg-card) 100%
+    );
+    padding: 14px 16px 16px;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--brand-primary, #2563eb) 8%, transparent);
 }
 .bos-instruction-panel-head h3 {
-    margin: 0 0 4px;
-    font-size: 0.9rem;
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+}
+.bos-instruction-panel-head h3 i {
+    color: var(--brand-primary);
+    opacity: 0.9;
 }
 .bos-instruction-panel-head p {
-    margin: 0 0 10px;
-    font-size: 0.75rem;
+    margin: 0 0 12px;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
 }
 .bos-instruction-quick-form {
     display: grid;
-    grid-template-columns: 140px 1fr auto;
+    grid-template-columns: minmax(120px, 150px) 1fr auto;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--bg-card) 88%, var(--brand-primary) 12%);
+    border: 1px dashed color-mix(in srgb, var(--brand-primary) 25%, var(--border-color));
+}
+.bos-instruction-quick-form select,
+.bos-instruction-quick-form input {
+    font-size: 0.8125rem;
 }
 .bos-instruction-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
 }
 .bos-instruction-card {
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 85%, var(--brand-primary) 15%);
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: var(--bg-card);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.bos-instruction-card:hover {
+    border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--border-color));
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--brand-primary) 6%, transparent);
 }
 .bos-instruction-head {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: 8px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 .bos-instruction-target {
-    font-size: 0.72rem;
-    font-weight: 700;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--brand-primary);
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--brand-primary) 12%, transparent);
 }
 .bos-instruction-status {
     font-size: 0.72rem;
+    font-weight: 600;
     color: var(--text-secondary);
 }
 .bos-instruction-text {
     margin: 0;
-    font-size: 0.82rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+.bos-instruction-result {
+    margin: 8px 0 0;
+    font-size: 0.78rem;
 }
 .bos-instruction-actions {
-    margin-top: 8px;
+    margin-top: 10px;
+}
+.bos-instruction-panel.loading,
+.bos-instruction-panel--error {
+    text-align: center;
+    padding: 20px;
+}
+@media (max-width: 720px) {
+    .bos-instruction-quick-form {
+        grid-template-columns: 1fr;
+    }
 }

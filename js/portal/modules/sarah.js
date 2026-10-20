@@ -17,7 +17,7 @@ export async function renderSarah(container) {
           </div>
         </div>
         <p class="portal-sarah-page-intro">
-          Full-screen chat so you can read replies, tool results, and next steps clearly. Sarah can operate your workspace on your behalf when you ask.
+          Company-wide assistant — every portal module, your Sarah workforce, and industry-aware guidance for your business. Ask Sarah to navigate anywhere or delegate work to Sales, Finance, Operations, or HR Sarah.
         </p>
         <h3 class="portal-sarah-page-aside-heading">Can help with</h3>
         <ul class="portal-sarah-cap-list">

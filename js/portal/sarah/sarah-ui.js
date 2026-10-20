@@ -80,12 +80,14 @@ function persistTranscript(companyId, persistenceScope, transcript) {
 }
 
 export const SARAH_CAPABILITIES = [
-  { icon: 'fa-chart-line', label: 'Analytics & reports' },
-  { icon: 'fa-inbox', label: 'Inbox & conversations' },
-  { icon: 'fa-users', label: 'CRM search & leads' },
-  { icon: 'fa-robot', label: 'AI Employees' },
-  { icon: 'fa-book', label: 'Knowledge base' },
-  { icon: 'fa-plug', label: 'Integrations & channels' },
+  { icon: 'fa-wand-magic-sparkles', label: 'Sarah workforce coordination' },
+  { icon: 'fa-inbox', label: 'Sarah Sales · channels & inbox' },
+  { icon: 'fa-coins', label: 'Sarah Finance · quotes & ledger' },
+  { icon: 'fa-list-check', label: 'Sarah Operations · tasks & delivery' },
+  { icon: 'fa-user-tie', label: 'Sarah HR · people & staffing' },
+  { icon: 'fa-users', label: 'CRM · customers & leads' },
+  { icon: 'fa-robot', label: 'AI Employees & knowledge' },
+  { icon: 'fa-chart-line', label: 'Analytics & integrations' },
 ];
 
 function applyUiHints(hints = []) {
@@ -113,12 +115,18 @@ function applyUiHints(hints = []) {
   }
 }
 
+const INTERNAL_ACTION_MESSAGE_RE = /Each line item requires unitAmount/i;
+
 function formatActionSummary(actions = []) {
   return actions
     .filter((a) => a.tool)
     .map((a) => {
       const icon = a.success ? '✓' : '✗';
-      return `${icon} ${a.tool}${a.message ? `: ${a.message.slice(0, 200)}` : ''}`;
+      let msg = a.message ? String(a.message).slice(0, 200) : '';
+      if (msg && INTERNAL_ACTION_MESSAGE_RE.test(msg)) {
+        msg = 'Quotation line items need a description and unit price — try again with amounts in major currency units (e.g. 1500.00).';
+      }
+      return `${icon} ${a.tool}${msg ? `: ${msg}` : ''}`;
     });
 }
 

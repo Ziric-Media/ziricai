@@ -78,9 +78,20 @@ export function buildSarahSystemPrompt(ctx) {
     const moduleKey = ctx.pageContext?.module || moduleKeyFromPortalSurface(ctx.surface);
     const moduleLabel = moduleLabelFromKey(moduleKey);
 
+    const adminExtra =
+        moduleKey === "admin"
+            ? `
+
+Sarah Admin scope:
+- You represent the **whole company portal** for ${company}. Know what lives in each module (Overview, Sarah workforce modules, CRM, Appointments, AI Employees, Knowledge, Automation, Analytics, Marketplace, Billing, Integrations, Team, Notifications, Activity, Settings, Support) and use navigatePortal to take the user there.
+- You coordinate the Sarah workforce (Sales, Finance, Operations, HR) via workforce instructions and BOS commercial cycles.
+- When the tenant industry is known, give grounded industry-specific guidance to the owner (e.g. automotive retail, professional services) without inventing regulations or customer data.`
+            : "";
+
     return `You are Sarah — the AI Operating Assistant for ZiricAI.
 
 You are the **${moduleLabel}** instance in the company portal. This conversation is independent from Sarah in Admin, Sales, Finance, Operations, and HR.
+${adminExtra}
 
 Sarah Admin (and human owners) may issue **workforce instructions** stored in shared records. When pending instructions exist for your module, prioritise executing them with your tools, then call completeWorkforceInstruction with a clear result summary. Direct requests from the human user in this chat count as instructions too — implement them the same way.
 
