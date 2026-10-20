@@ -169,7 +169,7 @@ export function buildWorkspaceContextHint(ctx) {
             .map(([id, meta]) => `${meta.label} (${id})`)
             .join("; ");
         parts.push(
-            "Sarah Admin: company-wide coordinator — you may guide the owner across every portal module using navigatePortal (respect their role permissions)."
+            "Sarah Admin: company-wide coordinator — answer company questions in this chat first; use navigatePortal with takeUserThere only when the owner explicitly asks to open a module (respect role permissions)."
         );
         parts.push(`Portal modules: ${portalGuide}`);
         parts.push(

@@ -10,6 +10,7 @@ import {
 } from './api.js';
 import { showToast } from '../admin/ui.js';
 import { persistenceScopeToSurface, surfaceToModuleKey } from './sarah/sarahModuleSurfaces.js';
+import { bindSarahCollapsiblePanelPersistence, renderSarahCollapsiblePanel } from './sarahCollapsiblePanel.js';
 
 function statusLabel(s) {
   const map = {
@@ -78,12 +79,9 @@ export async function mountWorkforceInstructionsPanel(container, options = {}) {
     ? 'Open instructions issued to Sales, Finance, Operations, and HR Sarah'
     : 'Execute these in chat (Sarah will use module tools), or mark done as a human';
 
-  container.innerHTML = `
+  const panelKey = adminView ? 'workforce-delegations-admin' : `workforce-instructions-${scope}`;
+  const inner = `
     <section class="bos-instruction-panel" aria-labelledby="bos-instruction-heading">
-      <header class="bos-instruction-panel-head">
-        <h3 id="bos-instruction-heading"><i class="fa-solid fa-share-nodes" aria-hidden="true"></i> ${escapeHtml(title)}</h3>
-        <p class="muted">${escapeHtml(subtitle)}</p>
-      </header>
       ${
         adminView
           ? `<form class="bos-instruction-quick-form" id="bosInstructionQuickForm">
@@ -102,6 +100,16 @@ export async function mountWorkforceInstructionsPanel(container, options = {}) {
       }
       <div class="bos-instruction-list">${items.length ? items.map((i) => renderInstructionCard(i, { moduleView: !adminView })).join('') : '<p class="muted">No open instructions.</p>'}</div>
     </section>`;
+
+  container.innerHTML = renderSarahCollapsiblePanel({
+    panelKey,
+    title,
+    subtitle,
+    icon: 'fa-share-nodes',
+    bodyHtml: inner,
+    defaultOpen: false,
+  });
+  bindSarahCollapsiblePanelPersistence(container);
 
   container.querySelector('#bosInstructionQuickForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();

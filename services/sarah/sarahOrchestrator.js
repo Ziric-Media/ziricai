@@ -22,6 +22,22 @@ import {
 } from "./platformKnowledge.js";
 import { SARAH_PERSONA, resolvePersonaFromSurface } from "./sarahPersona.js";
 import { isPortalClientSurface, moduleKeyFromPortalSurface } from "./portalSarahSurfaces.js";
+import {
+    deferUiHintsForConsent,
+    isNavigationConsentDecline,
+    isNavigationConsentYes,
+    shouldSkipNavigationDefer,
+} from "./navigationConsent.js";
+import { sanitizeNavigateUiHints } from "./portalNavigation.js";
+import { can } from "./permissions.js";
+
+const INTERNAL_TOOL_MESSAGE_RE = /Each line item requires unitAmount/i;
+
+function userFacingActionText(action) {
+    const msg = String(action?.message || action?.error || "").trim();
+    if (!msg || INTERNAL_TOOL_MESSAGE_RE.test(msg)) return "";
+    return msg;
+}
 
 bootstrapEnv();
 
@@ -207,6 +223,32 @@ export async function handleSarahChat(ctx, input) {
     ctx.lastUserMessage = message;
     ctx.message = message;
 
+    const sessionCtx = getSessionContext(session);
+    const pendingUiHints = sessionCtx.pendingUiHints;
+    if (pendingUiHints?.length && isPortalClientSurface(ctx.surface)) {
+        if (isNavigationConsentYes(message)) {
+            await setSessionContext(session, { pendingUiHints: null, pendingUiLabel: null });
+            const label = sessionCtx.pendingUiLabel || "that section";
+            const reply = `Opening ${label} now.`;
+            await appendMessage(session, "user", message);
+            await appendMessage(session, "assistant", reply);
+            return {
+                reply,
+                sessionId: session.id,
+                actions: [],
+                uiHints: pendingUiHints,
+                mode: "navigation-confirmed",
+            };
+        }
+        if (isNavigationConsentDecline(message)) {
+            await setSessionContext(session, { pendingUiHints: null, pendingUiLabel: null });
+            const reply = "No problem — I'll stay here. Ask anytime if you want me to open a module.";
+            await appendMessage(session, "user", message);
+            await appendMessage(session, "assistant", reply);
+            return { reply, sessionId: session.id, actions: [], uiHints: [], mode: "openai" };
+        }
+    }
+
     if (isPortalClientSurface(ctx.surface)) {
         const moduleScope = moduleKeyFromPortalSurface(ctx.surface);
         if (moduleScope && session.context?.sarahModuleScope !== moduleScope) {
@@ -297,9 +339,31 @@ export async function handleSarahChat(ctx, input) {
         }
 
         if (!reply && actions.length) {
-            reply = actions.map((a) => a.message || a.error).filter(Boolean).join("\n\n");
+            reply = actions.map((a) => userFacingActionText(a)).filter(Boolean).join("\n\n");
         }
         if (!reply) reply = "I completed the requested action. Anything else?";
+
+        let finalUiHints = sanitizeNavigateUiHints(dedupeUiHints(uiHints), ctx.role || "viewer", can);
+
+        if (
+            isPortalClientSurface(ctx.surface) &&
+            !shouldSkipNavigationDefer({
+                mode: input.mode,
+                consentGranted: false,
+                waIntent: null,
+                uiHints: finalUiHints,
+            })
+        ) {
+            const deferred = deferUiHintsForConsent(reply, finalUiHints);
+            if (deferred.deferred) {
+                await setSessionContext(session, {
+                    pendingUiHints: deferred.pendingUiHints,
+                    pendingUiLabel: deferred.pendingUiLabel,
+                });
+                reply = deferred.reply;
+                finalUiHints = deferred.uiHints;
+            }
+        }
 
         await appendMessage(session, "user", message);
         await appendMessage(session, "assistant", reply);
@@ -308,7 +372,7 @@ export async function handleSarahChat(ctx, input) {
             reply,
             sessionId: session.id,
             actions,
-            uiHints: dedupeUiHints(uiHints),
+            uiHints: finalUiHints,
             mode: "openai",
         };
     } catch (err) {

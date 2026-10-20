@@ -5,6 +5,7 @@ import { escapeHtml } from '../admin/ui.js';
 import { state } from './core/dataStore.js';
 import { fetchBosCommercialCycles, postBosCommercialCycleAction } from './api.js';
 import { showToast } from '../admin/ui.js';
+import { bindSarahCollapsiblePanelPersistence, renderSarahCollapsiblePanel } from './sarahCollapsiblePanel.js';
 
 const STAGE_ACTIONS = {
   quotation_sent: [{ action: 'accept-quotation', label: 'Accept quotation (Sales)', tone: 'sales' }],
@@ -74,14 +75,19 @@ export async function mountBosCommercialCyclePanel(container) {
   }
 
   const items = res.data?.items || [];
-  container.innerHTML = `
+  const inner = `
     <section class="bos-cycle-panel" aria-labelledby="bos-cycle-heading">
-      <header class="bos-cycle-panel-head">
-        <h3 id="bos-cycle-heading"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> Commercial cycle</h3>
-        <p class="muted">Quote → verified payment → mobilisation · shared business record (Central Motors pilot)</p>
-      </header>
       <div class="bos-cycle-list">${items.length ? items.map(renderCycleCard).join('') : '<p class="muted">No cycles yet.</p>'}</div>
     </section>`;
+  container.innerHTML = renderSarahCollapsiblePanel({
+    panelKey: 'bos-commercial-cycle',
+    title: 'Commercial cycle',
+    subtitle: 'Quote → verified payment → mobilisation (pilot)',
+    icon: 'fa-diagram-project',
+    bodyHtml: inner,
+    defaultOpen: false,
+  });
+  bindSarahCollapsiblePanelPersistence(container);
 
   container.querySelectorAll('.bos-cycle-action').forEach((btn) => {
     btn.addEventListener('click', async () => {

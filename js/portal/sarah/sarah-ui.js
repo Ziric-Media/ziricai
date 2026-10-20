@@ -117,15 +117,17 @@ function applyUiHints(hints = []) {
 
 const INTERNAL_ACTION_MESSAGE_RE = /Each line item requires unitAmount/i;
 
+function isInternalActionNoise(action) {
+  const msg = String(action?.message || action?.error || '');
+  return INTERNAL_ACTION_MESSAGE_RE.test(msg);
+}
+
 function formatActionSummary(actions = []) {
   return actions
-    .filter((a) => a.tool)
+    .filter((a) => a.tool && !isInternalActionNoise(a))
     .map((a) => {
       const icon = a.success ? '✓' : '✗';
-      let msg = a.message ? String(a.message).slice(0, 200) : '';
-      if (msg && INTERNAL_ACTION_MESSAGE_RE.test(msg)) {
-        msg = 'Quotation line items need a description and unit price — try again with amounts in major currency units (e.g. 1500.00).';
-      }
+      const msg = a.message ? String(a.message).slice(0, 200) : '';
       return `${icon} ${a.tool}${msg ? `: ${msg}` : ''}`;
     });
 }
