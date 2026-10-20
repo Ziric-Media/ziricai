@@ -32,6 +32,14 @@
     </script>
 </head>
 <body class="portal-body">
+    <script>
+    (function () {
+      if (location.hostname === 'marketing.ziricai.com') {
+        var app = (window.__ZIRICAI_CONFIG__ && window.__ZIRICAI_CONFIG__.sites && window.__ZIRICAI_CONFIG__.sites.app) || 'https://app.ziricai.com';
+        location.replace(app.replace(/\/$/, '') + '/');
+      }
+    })();
+    </script>
     <div class="auth-screen open" id="loginScreen">
         <div class="auth-card portal-auth-card">
             <div class="auth-brand">
