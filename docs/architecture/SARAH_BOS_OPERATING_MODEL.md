@@ -137,6 +137,18 @@ Stages are **templates**, not one rigid sequence (deposits, credit terms, HR vs 
 
 **Events:** `QuotationSent`, `PaymentReceived` (verified payload), `WorkAuthorised`, `CommercialCycleMobilised`.
 
+## B2 workforce instructions (implemented)
+
+**Storage:** `companies/{companyId}/sarahWorkforceInstructions`
+
+**Flow:** Sarah Admin (or human via Admin panel) issues instruction → target module Sarah sees it in UI + chat context → module Sarah executes with module tools → `completeWorkforceInstruction`.
+
+**API:** `GET/POST /api/portal/bos/instructions/:companyId`, `POST .../:id/complete`
+
+**Sarah tools:** `issueWorkforceInstruction` (Admin only), `listWorkforceInstructions`, `completeWorkforceInstruction`
+
+**Targets:** `sales`, `finance`, `operations`, `hr`
+
 ---
 
 *Document captures product/architecture intent for the Sarah BOS programme.*

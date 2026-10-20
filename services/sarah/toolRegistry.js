@@ -8,6 +8,11 @@ import {
     SARAH_TOOL_POLICY,
     resolvePersonaFromSurface,
 } from "./sarahPersona.js";
+import {
+    FINANCE_SARAH_TOOL_DENIED,
+    isToolAllowedInFinanceSarah,
+} from "./financeSarahToolPolicy.js";
+import { PORTAL_SARAH_SURFACES } from "./portalSarahSurfaces.js";
 
 /** @type {Map<string, import('./tools/types.js').SarahToolDefinition>} */
 const registry = new Map();
@@ -59,6 +64,13 @@ export function getToolsForContext(ctx) {
         if (toolPolicy === SARAH_TOOL_POLICY.PUBLIC) {
             if (!PUBLIC_SARAH_TOOL_NAMES.has(tool.name)) return false;
         }
+        if (tool.name === "issueWorkforceInstruction") {
+            const s = String(ctx.surface || "").toLowerCase();
+            const admin =
+                s === PORTAL_SARAH_SURFACES.ADMIN || s === "portal" || ctx.pageContext?.module === "admin";
+            if (!admin) return false;
+        }
+        if (!isToolAllowedInFinanceSarah(tool.name, ctx)) return false;
         if (ctx.canUseTool && !ctx.canUseTool(tool)) return false;
         return true;
     });
@@ -96,6 +108,14 @@ export async function executeTool(name, ctx, args = {}) {
             success: false,
             error: `Public Sarah cannot use "${name}".`,
             code: "PUBLIC_TOOL_DENIED",
+        };
+    }
+
+    if (!isToolAllowedInFinanceSarah(name, ctx)) {
+        return {
+            success: false,
+            error: `Tool "${name}" is not available in Finance Sarah.`,
+            code: FINANCE_SARAH_TOOL_DENIED,
         };
     }
 

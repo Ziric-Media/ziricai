@@ -56,6 +56,8 @@ export const TENANT_COLLECTIONS = {
     SARAH_SESSIONS: "sarahSessions",
     /** Sarah BOS — commercial cycle (quote → verified pay → mobilise) per tenant. */
     BOS_COMMERCIAL_CYCLES: "bosCommercialCycles",
+    /** Sarah BOS — Admin/human → module Sarah workforce instructions. */
+    SARAH_WORKFORCE_INSTRUCTIONS: "sarahWorkforceInstructions",
 };
 
 /** Subcollections under companies/{companyId}/analytics (flat names for TenantRepository) */

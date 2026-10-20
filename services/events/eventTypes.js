@@ -26,6 +26,8 @@ export const EventTypes = {
     WORK_AUTHORISED: "WorkAuthorised",
     /** Sarah BOS — delivery tasks created for a commercial cycle. */
     COMMERCIAL_CYCLE_MOBILISED: "CommercialCycleMobilised",
+    WORKFORCE_INSTRUCTION_ISSUED: "WorkforceInstructionIssued",
+    WORKFORCE_INSTRUCTION_COMPLETED: "WorkforceInstructionCompleted",
 };
 
 /** All event type values as array */

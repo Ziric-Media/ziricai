@@ -9,7 +9,34 @@ import {
   updatePortalTask,
   fetchAiEmployees,
   fetchPortalTeam,
+  fetchCrmCustomers,
 } from '../api.js';
+import { navigateTo } from '../router.js';
+import {
+  renderSarahHorizontalNav,
+  renderSwKpiGrid,
+  renderDonutChart,
+  renderBarChart,
+  renderSwChartCard,
+  renderSwOverviewQuad,
+  renderSparkBars,
+  renderSarahWorkspaceChatShell,
+} from '../sarahWorkspaceUi.js';
+import { mountSarahChat } from '../sarah/sarah-ui.js';
+import { mountWorkforceInstructionsPanel } from '../workforceInstructionsPanel.js';
+import { getSarahPageContext } from '../core/sarahPageContext.js';
+
+const OPS_SECTIONS = [
+  { id: 'overview', label: 'Overview', icon: 'fa-gauge-high' },
+  { id: 'sarah', label: 'Sarah', sarah: true },
+  { id: 'projects', label: 'Projects', icon: 'fa-folder-tree' },
+  { id: 'tasks', label: 'Tasks', icon: 'fa-list-check' },
+  { id: 'clients', label: 'Client database', icon: 'fa-database' },
+  { id: 'workflows', label: 'Workflows & SLA', icon: 'fa-diagram-project' },
+];
+
+/** @type {string} */
+let opsSection = 'overview';
 
 const RETRY_BTN =
   '<button class="btn btn-secondary btn-sm" type="button" onclick="location.reload()">Retry</button>';
@@ -440,8 +467,134 @@ function renderTaskList(tasks, ctx) {
   </div>`;
 }
 
-function renderPage(container, data) {
-  const { tasks, team, agents, filter } = data;
+function countActiveProjects(tasks) {
+  const ids = new Set();
+  for (const t of tasks) {
+    const pid = t.projectId || t.project || t.metadata?.projectId;
+    if (pid) ids.add(String(pid));
+  }
+  if (ids.size) return ids.size;
+  const open = tasks.filter((t) => !isDone(t)).length;
+  return open ? Math.min(5, Math.max(1, Math.ceil(open / 4))) : 0;
+}
+
+function renderOpsOverviewPanel(stats, clientCount, projectCount) {
+  const totalTasks = stats.open + stats.inProgress + stats.done;
+  const quad = renderSwOverviewQuad(
+    [
+      renderSwChartCard(
+        'Task mix',
+        'Status breakdown',
+        renderDonutChart(
+          [
+            { label: 'Open', value: stats.open, color: '#3b82f6' },
+            { label: 'In progress', value: stats.inProgress, color: '#8b5cf6' },
+            { label: 'Done', value: stats.done, color: '#10b981' },
+            { label: 'Overdue', value: stats.overdue, color: '#ef4444' },
+          ],
+          { centerLabel: 'Tasks', centerValue: totalTasks, compact: true }
+        )
+      ),
+      renderSwChartCard(
+        'Delivery & clients',
+        'Projects and CRM',
+        renderBarChart([
+          { label: 'Projects', value: projectCount, color: '#0ea5e9' },
+          { label: 'Open tasks', value: stats.open, color: '#3b82f6' },
+          { label: 'Clients', value: clientCount, color: '#6366f1' },
+        ])
+      ),
+      renderSwChartCard(
+        'Throughput',
+        'Completion trend shape',
+        renderSparkBars(
+          [stats.open, stats.inProgress, stats.done, stats.overdue, stats.open, stats.inProgress, stats.done],
+          { color: '#0284c7' }
+        )
+      ),
+      renderSwChartCard(
+        'Risk',
+        'Overdue vs active',
+        renderDonutChart(
+          [
+            { label: 'Overdue', value: stats.overdue, color: '#ef4444' },
+            { label: 'On track', value: Math.max(0, stats.open + stats.inProgress - stats.overdue), color: '#10b981' },
+          ],
+          { centerLabel: 'Focus', centerValue: stats.overdue, compact: true }
+        )
+      ),
+    ].join('')
+  );
+  return `${renderSwKpiGrid([
+    { label: 'Active projects', value: projectCount, icon: 'fa-folder-open', tone: 'ops' },
+    { label: 'Open tasks', value: stats.open, icon: 'fa-circle-dot', tone: 'ops' },
+    { label: 'In progress', value: stats.inProgress, icon: 'fa-spinner', tone: 'accent' },
+    { label: 'Clients', value: clientCount, icon: 'fa-users', tone: 'ops' },
+    { label: 'Overdue', value: stats.overdue, icon: 'fa-triangle-exclamation', tone: 'warn' },
+    { label: 'Completed', value: stats.done, icon: 'fa-check', tone: 'success' },
+  ])}
+  ${quad}
+  <p class="sw-overview-tip"><i class="fa-solid fa-compass" aria-hidden="true"></i> Use <strong>Tasks</strong> for day-to-day work, <strong>Projects</strong> for grouped delivery, and <strong>Client database</strong> for CRM context.</p>`;
+}
+
+function renderOpsSarahPanel() {
+  return renderSarahWorkspaceChatShell({
+    title: 'Sarah',
+    subtitle: 'Operations Assistant',
+    intro:
+      'Ask Sarah to summarise open work, explain task statuses, or navigate to clients and workflows. Task changes still happen in the Tasks workspace.',
+    capabilities: [
+      { icon: 'fa-list-check', label: 'Tasks & priorities' },
+      { icon: 'fa-folder-tree', label: 'Projects & delivery' },
+      { icon: 'fa-database', label: 'Client context' },
+      { icon: 'fa-robot', label: 'AI employee assignments' },
+    ],
+    suggestions: [
+      'What tasks are overdue?',
+      'How do I assign work to an AI employee?',
+      'Open the client database',
+      'Explain task execution status',
+    ],
+    chatMountId: 'opsSarahPageChat',
+    accent: 'ops',
+  });
+}
+
+function renderOpsProjectsPanel() {
+  return `<section class="card ops-shell-card">
+    <div class="card-header"><h3><i class="fa-solid fa-folder-tree"></i> Projects</h3></div>
+    <div class="card-body">
+      <p class="muted">Group tasks into projects for delivery tracking. Full project boards connect when project IDs are set on tasks from the API.</p>
+      ${renderEmptyState({
+        title: 'No project boards yet',
+        message: 'Create tasks with a project reference, or use Tasks while project grouping rolls out.',
+        actionHtml: '<button type="button" class="btn btn-secondary btn-sm" data-ops-section-jump="tasks">Go to Tasks</button>',
+      })}
+    </div>
+  </section>`;
+}
+
+function renderOpsClientsPanel(clientCount) {
+  return `<section class="card ops-shell-card">
+    <div class="card-header"><h3><i class="fa-solid fa-database"></i> Client database <span class="muted">(${clientCount})</span></h3></div>
+    <div class="card-body">
+      <p class="muted">Operational view of CRM clients linked to tasks and Sarah Operations.</p>
+      <button type="button" class="btn btn-primary btn-sm" id="opsOpenCrm"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open full CRM</button>
+    </div>
+  </section>`;
+}
+
+function renderOpsWorkflowsPanel() {
+  return `<section class="card ops-shell-card">
+    <div class="card-header"><h3><i class="fa-solid fa-diagram-project"></i> Workflows & SLA</h3></div>
+    <div class="card-body">
+      <p class="muted">Automation runs, SLAs, and escalation paths for operations work will appear here.</p>
+      <p class="fin-capability-badge fin-capability-badge--unavailable"><i class="fa-solid fa-eye-slash"></i> Preview · connect Automation module for live runs</p>
+    </div>
+  </section>`;
+}
+
+function renderOpsTasksPanel(tasks, team, agents, filter, stats) {
   const teamByUid = new Map();
   for (const m of team) {
     const uid = m.uid || m.id;
@@ -450,29 +603,15 @@ function renderPage(container, data) {
   const agentsById = new Map(agents.map((a) => [a.id, a]));
   filter.teamByUid = teamByUid;
   filter.agentsById = agentsById;
-
-  const stats = countStats(tasks);
   const filtered = applyFilters(tasks, filter);
-  const companyId = state.companyId;
-  const ctx = { companyId, team, agents, teamByUid, agentsById, onSuccess: () => renderOperations(container) };
 
-  container.innerHTML = `
-    ${pageHeader(
-      'Operations',
-      `Task workspace for ${escapeHtml(state.company?.name || 'your company')}.`,
-      `<div class="ops-header-actions">
-        ${canCreate() ? '<button type="button" class="btn btn-primary" id="opsBtnNewTask"><i class="fa-solid fa-plus"></i> New Task</button>' : ''}
-        ${canAssignAi() ? '<button type="button" class="btn btn-secondary" id="opsBtnAssignAi"><i class="fa-solid fa-robot"></i> Assign to AI</button>' : ''}
-      </div>`
-    )}
-
-    <div class="ops-kpi-grid">
+  return `
+    <div class="ops-kpi-grid ops-kpi-grid--compact">
       <div class="ops-kpi"><span class="ops-kpi-label">Open</span><span class="ops-kpi-value">${stats.open}</span></div>
       <div class="ops-kpi"><span class="ops-kpi-label">In progress</span><span class="ops-kpi-value">${stats.inProgress}</span></div>
       <div class="ops-kpi"><span class="ops-kpi-label">Completed</span><span class="ops-kpi-value">${stats.done}</span></div>
       <div class="ops-kpi ops-kpi-warn"><span class="ops-kpi-label">Overdue</span><span class="ops-kpi-value">${stats.overdue}</span></div>
     </div>
-
     <div class="card ops-toolbar-card">
       <div class="ops-toolbar">
         <input type="search" id="opsSearch" placeholder="Search tasks…" value="${escapeHtml(filter.q || '')}" />
@@ -496,18 +635,115 @@ function renderPage(container, data) {
         </select>
       </div>
     </div>
-
     <div class="card">
       <div class="card-header"><h3><i class="fa-solid fa-list-check"></i> Tasks <span class="muted">(${filtered.length})</span></h3></div>
       <div class="card-body" id="opsTaskListHost">${renderTaskList(filtered, filter)}</div>
+    </div>`;
+}
+
+async function mountOpsSarahChat(container) {
+  const root = container.querySelector('[data-sw-sarah-chat]');
+  if (!root || root.dataset.mounted === '1') return;
+  root.dataset.mounted = '1';
+  const instrHost = container.querySelector('[data-workforce-instructions-host]');
+  if (instrHost) await mountWorkforceInstructionsPanel(instrHost, { persistenceScope: 'opsSarah', adminView: false });
+
+  await mountSarahChat(root, {
+    mode: 'page',
+    persistenceScope: 'opsSarah',
+    welcomeMessage:
+      "Hi! I'm Sarah, your Operations assistant. I can help you understand tasks, projects, and client context in this workspace.",
+    suggestions: [
+      'Summarise open and overdue tasks',
+      'How do AI task assignments work?',
+      'Take me to the client database',
+      'What is execution status on AI tasks?',
+    ],
+    getPageContext: () => ({ ...getSarahPageContext(), module: 'operations', section: opsSection }),
+  });
+}
+
+function renderPage(container, data) {
+  const { tasks, team, agents, filter, clientCount = 0 } = data;
+  const teamByUid = new Map();
+  for (const m of team) {
+    const uid = m.uid || m.id;
+    if (uid) teamByUid.set(uid, m);
+  }
+  const agentsById = new Map(agents.map((a) => [a.id, a]));
+  const stats = countStats(tasks);
+  const projectCount = countActiveProjects(tasks);
+  const companyId = state.companyId;
+  const ctx = { companyId, team, agents, teamByUid, agentsById, onSuccess: () => renderOperations(container) };
+
+  const headerActions =
+    opsSection === 'tasks'
+      ? `<div class="ops-header-actions">
+        ${canCreate() ? '<button type="button" class="btn btn-primary" id="opsBtnNewTask"><i class="fa-solid fa-plus"></i> New Task</button>' : ''}
+        ${canAssignAi() ? '<button type="button" class="btn btn-secondary" id="opsBtnAssignAi"><i class="fa-solid fa-robot"></i> Assign to AI</button>' : ''}
+      </div>`
+      : '';
+
+  let panelHtml = '';
+  switch (opsSection) {
+    case 'sarah':
+      panelHtml = renderOpsSarahPanel();
+      break;
+    case 'projects':
+      panelHtml = renderOpsProjectsPanel();
+      break;
+    case 'tasks':
+      panelHtml = renderOpsTasksPanel(tasks, team, agents, filter, stats);
+      break;
+    case 'clients':
+      panelHtml = renderOpsClientsPanel(clientCount);
+      break;
+    case 'workflows':
+      panelHtml = renderOpsWorkflowsPanel();
+      break;
+    case 'overview':
+    default:
+      panelHtml = renderOpsOverviewPanel(stats, clientCount, projectCount);
+      break;
+  }
+
+  container.innerHTML = `
+    <div class="sw-module ops-module">
+      ${pageHeader(
+        'Sarah Operations',
+        `Delivery, tasks, and clients for ${escapeHtml(state.company?.name || 'your company')}.`,
+        headerActions
+      )}
+      ${renderSarahHorizontalNav(OPS_SECTIONS, opsSection, 'data-ops-section')}
+      <div class="sw-module-body ops-module-body" data-ops-panel>${panelHtml}</div>
     </div>
   `;
 
+  container.querySelectorAll('[data-ops-section]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      opsSection = btn.getAttribute('data-ops-section') || 'overview';
+      renderPage(container, data);
+    });
+  });
+  container.querySelector('[data-sw-nav-select]')?.addEventListener('change', (e) => {
+    opsSection = e.target.value || 'overview';
+    renderPage(container, data);
+  });
+  container.querySelectorAll('[data-ops-section-jump]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      opsSection = btn.getAttribute('data-ops-section-jump') || 'tasks';
+      renderPage(container, data);
+    });
+  });
+  container.querySelector('#opsOpenCrm')?.addEventListener('click', () => navigateTo('customers'));
+
+  if (opsSection === 'sarah') void mountOpsSarahChat(container);
+
+  if (opsSection !== 'tasks') return;
+
   const persistFilter = () => {
     opsCache = {
-      tasks,
-      team,
-      agents,
+      ...data,
       filter: {
         q: container.querySelector('#opsSearch')?.value || '',
         status: container.querySelector('#opsFilterStatus')?.value || 'all',
@@ -540,18 +776,20 @@ export async function renderOperations(container) {
     return;
   }
 
+  opsSection = opsSection || 'overview';
   container.innerHTML = loadingState('Loading Operations…');
   const companyId = state.companyId;
 
-  const [taskRes, teamRes, agentRes] = await Promise.all([
+  const [taskRes, teamRes, agentRes, clientRes] = await Promise.all([
     fetchPortalTasks(companyId),
     state.team?.length ? Promise.resolve({ data: { items: state.team } }) : fetchPortalTeam(companyId),
     fetchAiEmployees(companyId),
+    fetchCrmCustomers(companyId),
   ]);
 
   if (taskRes.error) {
     container.innerHTML = `
-      ${pageHeader('Operations', '')}
+      ${pageHeader('Sarah Operations', '')}
       ${errorState(taskRes.error)}
       <div style="text-align:center;margin-top:12px;">${RETRY_BTN}</div>`;
     return;
@@ -560,7 +798,8 @@ export async function renderOperations(container) {
   const tasks = taskRes.data?.items || [];
   const team = teamRes.data?.items || teamRes.data || state.team || [];
   const agents = (agentRes.data?.items || agentRes.data || []).filter((a) => a.status !== 'archived');
+  const clientCount = (clientRes.data?.items || clientRes.data || []).length;
 
   const filter = opsCache?.filter || { q: '', status: 'all', priority: 'all', assigneeType: 'all' };
-  renderPage(container, { tasks, team, agents, filter });
+  renderPage(container, { tasks, team, agents, filter, clientCount });
 }

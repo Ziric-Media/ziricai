@@ -261,6 +261,34 @@ export async function postBosCommercialCycleAction(companyId, cycleId, action, b
   );
 }
 
+export async function fetchWorkforceInstructions(companyId, { module, status, limit } = {}) {
+  const qs = new URLSearchParams();
+  if (module) qs.set('module', module);
+  if (status) qs.set('status', status);
+  if (limit) qs.set('limit', String(limit));
+  const q = qs.toString();
+  return request(`/api/portal/bos/instructions/${encodeURIComponent(companyId)}${q ? `?${q}` : ''}`);
+}
+
+export async function createWorkforceInstruction(companyId, body = {}) {
+  return request(`/api/portal/bos/instructions/${encodeURIComponent(companyId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+}
+
+export async function completeWorkforceInstructionApi(companyId, instructionId, body = {}) {
+  return request(
+    `/api/portal/bos/instructions/${encodeURIComponent(companyId)}/${encodeURIComponent(instructionId)}/complete`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    }
+  );
+}
+
 const portalTasksBase = (companyId) =>
   `/api/companies/${encodeURIComponent(companyId)}/crm/tasks`;
 

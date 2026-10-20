@@ -6799,3 +6799,61 @@
     gap: 8px;
     margin-top: 10px;
 }
+
+/* Sarah BOS — workforce instructions */
+.bos-instruction-panel-host {
+    margin-bottom: 12px;
+}
+.bos-instruction-panel {
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--brand-primary, #1e40af) 14%, var(--border-color));
+    background: var(--bg-secondary, #fff);
+    padding: 12px 14px;
+}
+.bos-instruction-panel-head h3 {
+    margin: 0 0 4px;
+    font-size: 0.9rem;
+}
+.bos-instruction-panel-head p {
+    margin: 0 0 10px;
+    font-size: 0.75rem;
+}
+.bos-instruction-quick-form {
+    display: grid;
+    grid-template-columns: 140px 1fr auto;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.bos-instruction-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.bos-instruction-card {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.bos-instruction-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.bos-instruction-target {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--brand-primary);
+}
+.bos-instruction-status {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+.bos-instruction-text {
+    margin: 0;
+    font-size: 0.82rem;
+}
+.bos-instruction-actions {
+    margin-top: 8px;
+}

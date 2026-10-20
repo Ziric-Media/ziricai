@@ -2,6 +2,7 @@ import { escapeHtml } from '../../admin/ui.js';
 import { sarahPageAvatarMarkup } from '../../shared/sarahAvatar.js';
 import { mountSarahChat, SARAH_CAPABILITIES, SUGGESTIONS, initPortalSarah } from '../sarah/sarah-ui.js';
 import { mountBosCommercialCyclePanel } from '../bosCommercialCyclePanel.js';
+import { mountWorkforceInstructionsPanel } from '../workforceInstructionsPanel.js';
 
 export async function renderSarah(container) {
   initPortalSarah();
@@ -31,6 +32,7 @@ export async function renderSarah(container) {
         </ul>
       </aside>
       <section class="portal-sarah-page-main" aria-label="Chat with Sarah">
+        <div id="workforceInstructionsHost" class="bos-instruction-panel-host"></div>
         <div id="bosCyclePanelHost" class="bos-cycle-panel-host"></div>
         <header class="portal-sarah-page-main-header">
           <div>
@@ -42,6 +44,9 @@ export async function renderSarah(container) {
       </section>
     </div>
   `;
+
+  const instrHost = container.querySelector('#workforceInstructionsHost');
+  if (instrHost) await mountWorkforceInstructionsPanel(instrHost, { persistenceScope: 'admin', adminView: true });
 
   const bosHost = container.querySelector('#bosCyclePanelHost');
   if (bosHost) await mountBosCommercialCyclePanel(bosHost);

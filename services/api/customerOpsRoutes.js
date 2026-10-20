@@ -55,6 +55,7 @@ import { publish, EventTypes } from "../events/index.js";
 import { mountSupportCaseRoutes } from "./supportCaseRoutes.js";
 import { mountFinanceRoutes } from "./financeRoutes.js";
 import { mountBosRoutes } from "./bosRoutes.js";
+import { mountWorkforceInstructionRoutes } from "./workforceInstructionRoutes.js";
 
 function tenantTaskAccess(req) {
     return { role: req.tenant?.role, uid: req.tenant?.uid ?? null };
@@ -126,6 +127,7 @@ const PIPELINE_STAGES = ["new", "contacted", "qualified", "proposal", "won", "lo
  */
 export function mountCustomerOpsRoutes(app) {
     mountBosRoutes(app);
+    mountWorkforceInstructionRoutes(app);
     mountFinanceRoutes(app);
     mountTenantTaskRoutes(app, {
         listPath: "/api/portal/tasks/:companyId",

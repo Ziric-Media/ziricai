@@ -12,7 +12,12 @@ import {
     moduleKeyFromPortalSurface,
     moduleLabelFromKey,
     PORTAL_SARAH_SURFACES,
+    isPortalClientSurface,
 } from "./portalSarahSurfaces.js";
+import {
+    listPendingInstructionsForModule,
+    listWorkforceInstructions,
+} from "../bos/workforceInstructionService.js";
 
 function readSarahPageContextFromRequest(req) {
     if (!req) return null;
@@ -65,6 +70,23 @@ export async function buildSarahContext(req, overrides = {}) {
     const defaultAgent = agentList.find((a) => a.isDefault) || agentList[0] || null;
     const surface = overrides.surface || "portal-admin";
     const pageContext = overrides.pageContext ?? readSarahPageContextFromRequest(req) ?? null;
+    const moduleKey = pageContext?.module || moduleKeyFromPortalSurface(surface);
+
+    let workforceInstructionsPending = [];
+    let workforceInstructionsRecent = [];
+    if (isPortalClientSurface(surface)) {
+        try {
+            if (moduleKey === "admin") {
+                workforceInstructionsRecent = await listWorkforceInstructions(companyId, { limit: 12 });
+            } else if (["sales", "finance", "operations", "hr"].includes(moduleKey)) {
+                workforceInstructionsPending = await listPendingInstructionsForModule(companyId, moduleKey, {
+                    limit: 10,
+                });
+            }
+        } catch (err) {
+            console.warn("[sarahContext] workforce instructions load failed:", err.message);
+        }
+    }
 
     return {
         companyId,
@@ -78,6 +100,8 @@ export async function buildSarahContext(req, overrides = {}) {
         sessionId: overrides.sessionId || null,
         surface,
         pageContext,
+        workforceInstructionsPending,
+        workforceInstructionsRecent,
         canUseTool: (tool) => canUseTool({ role, isSuperAdmin: tenant.isSuperAdmin }, tool),
         workspace,
         workspaceLinks: workspace?.workspaceLinks || null,
@@ -158,6 +182,33 @@ export function buildWorkspaceContextHint(ctx) {
         );
         parts.push(
             "Finance Sarah: explain workspace Finance and permissions; do not create ledger records from chat unless write tools are explicitly enabled."
+        );
+    }
+
+    const pending = ctx.workforceInstructionsPending || [];
+    if (pending.length) {
+        parts.push(
+            `Pending instructions from Sarah Admin or humans (${pending.length}): ${pending
+                .map((i) => `[${i.id}] ${i.instruction}`)
+                .join(" | ")}. Use listWorkforceInstructions, execute with your module tools, then completeWorkforceInstruction.`
+        );
+    }
+    if (moduleKey === "admin" && ctx.workforceInstructionsRecent?.length) {
+        const open = ctx.workforceInstructionsRecent.filter((i) =>
+            ["pending", "in_progress"].includes(i.status)
+        );
+        if (open.length) {
+            parts.push(
+                `Open workforce delegations you issued (${open.length}): ${open
+                    .slice(0, 5)
+                    .map((i) => `${i.targetModuleLabel}: ${i.instruction.slice(0, 80)}`)
+                    .join("; ")}`
+            );
+        }
+    }
+    if (moduleKey === "admin") {
+        parts.push(
+            "Sarah Admin coordinates the workforce: use issueWorkforceInstruction to delegate to Sales, Finance, Operations, or HR Sarah. Humans may also assign instructions via the portal."
         );
     }
 

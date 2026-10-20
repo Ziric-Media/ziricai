@@ -4,6 +4,7 @@
 import { escapeHtml } from '../admin/ui.js';
 import { sarahPageAvatarMarkup } from '../shared/sarahAvatar.js';
 import { mountSarahChat } from './sarah/sarah-ui.js';
+import { mountWorkforceInstructionsPanel } from './workforceInstructionsPanel.js';
 import { buildFinanceSarahPageContext } from './financeSarahContext.js';
 import { state } from './core/dataStore.js';
 import { can } from './permissions.js';
@@ -62,6 +63,7 @@ export function renderFinanceSarahPageShell() {
           <span class="text-muted">Shift+Enter for a new line · Enter to send</span>
         </div>
       </header>
+      <div class="bos-instruction-panel-host" data-workforce-instructions-host></div>
       <div class="portal-sarah-page-chat" id="finSarahPageChat" data-fin-sarah-page-chat></div>
     </section>
   </div>`;
@@ -74,6 +76,10 @@ export function renderFinanceSarahPageShell() {
 export async function mountFinanceSarahPageChat(chatRoot, getFinState) {
   if (!chatRoot) return;
   finGetter = getFinState;
+  const page = chatRoot.closest('.portal-sarah-page-main');
+  const instrHost = page?.querySelector('[data-workforce-instructions-host]');
+  if (instrHost) await mountWorkforceInstructionsPanel(instrHost, { persistenceScope: 'finance', adminView: false });
+
   chatRoot.innerHTML = '';
   chatRoot.removeAttribute('data-mounted');
   await mountSarahChat(chatRoot, {
