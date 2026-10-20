@@ -79,6 +79,7 @@ export async function mountFinanceSarahPageChat(chatRoot, getFinState) {
   await mountSarahChat(chatRoot, {
     mode: 'page',
     persistenceScope: 'finance',
+    sessionSurface: 'portal-finance',
     getPageContext: () => buildFinanceSarahPageContext(getFinState?.()),
     welcomeMessage: FINANCE_WELCOME,
     suggestions: FINANCE_SARAH_SUGGESTIONS,

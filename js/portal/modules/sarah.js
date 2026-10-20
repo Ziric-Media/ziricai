@@ -48,7 +48,15 @@ export async function renderSarah(container) {
 
   const chatRoot = container.querySelector('#portalSarahPageChat');
   if (chatRoot) {
-    await mountSarahChat(chatRoot, { mode: 'page' });
+    await mountSarahChat(chatRoot, {
+      mode: 'page',
+      persistenceScope: 'admin',
+      getPageContext: () => ({
+        page: 'sarah',
+        label: 'Sarah Admin',
+        module: 'admin',
+      }),
+    });
     chatRoot.querySelector('#portalSarahInput')?.focus();
   }
 }

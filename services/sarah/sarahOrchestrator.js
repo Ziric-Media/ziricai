@@ -21,6 +21,7 @@ import {
     PLATFORM_DEFAULT_REPLY,
 } from "./platformKnowledge.js";
 import { SARAH_PERSONA, resolvePersonaFromSurface } from "./sarahPersona.js";
+import { isPortalClientSurface, moduleKeyFromPortalSurface } from "./portalSarahSurfaces.js";
 
 bootstrapEnv();
 
@@ -116,8 +117,8 @@ async function runPublicLandingDemoMode(_ctx, message, session) {
         reply = getPlatformAnswer("general").answer || PLATFORM_DEFAULT_REPLY;
     }
 
-    appendMessage(session.id, "user", message);
-    appendMessage(session.id, "assistant", reply);
+    await appendMessage(session, "user", message);
+    await appendMessage(session, "assistant", reply);
     return {
         reply,
         sessionId: session.id,
@@ -133,13 +134,13 @@ async function runDemoMode(ctx, message, session) {
         return runPublicLandingDemoMode(ctx, message, session);
     }
 
-    const sessionContext = getSessionContext(session.id);
+    const sessionContext = getSessionContext(session);
     const platformMatch = matchPlatformQuestion(message);
 
     if (platformMatch && !matchDemoIntent(message, sessionContext)) {
         const reply = platformMatch.answer;
-        appendMessage(session.id, "user", message);
-        appendMessage(session.id, "assistant", reply);
+        await appendMessage(session, "user", message);
+        await appendMessage(session, "assistant", reply);
         return { reply, sessionId: session.id, actions: [], uiHints: [], mode: "demo" };
     }
 
@@ -151,10 +152,10 @@ async function runDemoMode(ctx, message, session) {
         const result = await executeTool(intent.tool, ctx, intent.args);
         actions.push(result);
         uiHints = result.uiHints || [];
-        recordAction(session.id, { tool: intent.tool, success: result.success });
+        await recordAction(session, { tool: intent.tool, success: result.success });
 
         if (intent.tool === "createEmployee" && result.data?.employee) {
-            setSessionContext(session.id, {
+            await setSessionContext(session, {
                 lastAgentId: result.data.agentId,
                 lastAgentName: result.data.employee.name,
                 lastKnowledgeBaseId: result.data.knowledgeBaseId,
@@ -162,14 +163,14 @@ async function runDemoMode(ctx, message, session) {
         }
 
         const reply = result.message || result.error || "Done.";
-        appendMessage(session.id, "user", message);
-        appendMessage(session.id, "assistant", reply);
+        await appendMessage(session, "user", message);
+        await appendMessage(session, "assistant", reply);
         return { reply, sessionId: session.id, actions, uiHints, mode: "demo" };
     }
 
     if (platformMatch) {
-        appendMessage(session.id, "user", message);
-        appendMessage(session.id, "assistant", platformMatch.answer);
+        await appendMessage(session, "user", message);
+        await appendMessage(session, "assistant", platformMatch.answer);
         return {
             reply: platformMatch.answer,
             sessionId: session.id,
@@ -180,8 +181,8 @@ async function runDemoMode(ctx, message, session) {
     }
 
     const fallback = getPlatformAnswer("general").answer || PLATFORM_DEFAULT_REPLY;
-    appendMessage(session.id, "user", message);
-    appendMessage(session.id, "assistant", fallback);
+    await appendMessage(session, "user", message);
+    await appendMessage(session, "assistant", fallback);
     return { reply: fallback, sessionId: session.id, actions, uiHints, mode: "demo" };
 }
 
@@ -196,17 +197,28 @@ export async function handleSarahChat(ctx, input) {
         return { reply: "Please send a message.", sessionId: input.sessionId || null, actions: [], uiHints: [] };
     }
 
-    const session = getOrCreateSession(input.sessionId, ctx.companyId);
+    const session = await getOrCreateSession(input.sessionId, ctx.companyId, {
+        userId: ctx.uid,
+        uid: ctx.uid,
+        surface: ctx.surface || "portal-admin",
+    });
     ctx.sessionId = session.id;
     ctx.sarahSession = session;
     ctx.lastUserMessage = message;
     ctx.message = message;
 
+    if (isPortalClientSurface(ctx.surface)) {
+        const moduleScope = moduleKeyFromPortalSurface(ctx.surface);
+        if (moduleScope && session.context?.sarahModuleScope !== moduleScope) {
+            await setSessionContext(session, { sarahModuleScope: moduleScope });
+        }
+    }
+
     if (!openai) {
         return runDemoMode(ctx, message, session);
     }
 
-    const history = getSessionHistory(session.id);
+    const history = getSessionHistory(session);
     const systemPrompt = buildSarahSystemPrompt(ctx);
     const tools = getOpenAIToolDefinitions(ctx);
 
@@ -249,7 +261,7 @@ export async function handleSarahChat(ctx, input) {
                         fnArgs = {};
                     }
 
-                    const sessionCtx = getSessionContext(session.id);
+                    const sessionCtx = getSessionContext(session);
                     if (fnName === "uploadKnowledge" || fnName === "trainAI") {
                         if (!fnArgs.employeeName && sessionCtx.lastAgentName) {
                             fnArgs.employeeName = sessionCtx.lastAgentName;
@@ -259,10 +271,10 @@ export async function handleSarahChat(ctx, input) {
                     const result = await executeTool(fnName, ctx, fnArgs);
                     actions.push(result);
                     if (result.uiHints) uiHints.push(...result.uiHints);
-                    recordAction(session.id, { tool: fnName, success: result.success });
+                    await recordAction(session, { tool: fnName, success: result.success });
 
                     if (fnName === "createEmployee" && result.data?.employee) {
-                        setSessionContext(session.id, {
+                        await setSessionContext(session, {
                             lastAgentId: result.data.agentId,
                             lastAgentName: result.data.employee.name,
                             lastKnowledgeBaseId: result.data.knowledgeBaseId,
@@ -289,8 +301,8 @@ export async function handleSarahChat(ctx, input) {
         }
         if (!reply) reply = "I completed the requested action. Anything else?";
 
-        appendMessage(session.id, "user", message);
-        appendMessage(session.id, "assistant", reply);
+        await appendMessage(session, "user", message);
+        await appendMessage(session, "assistant", reply);
 
         return {
             reply,

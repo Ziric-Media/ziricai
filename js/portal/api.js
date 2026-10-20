@@ -503,33 +503,34 @@ export async function refreshWhatsAppMetaAuth(companyId, payload = {}) {
 }
 
 export async function sarahChat(payload) {
+  const surface = payload?.surface || 'portal-admin';
   return request('/api/sarah/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      surface: 'portal',
       ...payload,
+      surface,
     }),
   });
 }
 
-export async function fetchSarahActiveSession(companyId) {
-  const qs = new URLSearchParams({ surface: 'portal' });
+export async function fetchSarahActiveSession(companyId, surface = 'portal-admin') {
+  const qs = new URLSearchParams({ surface: surface || 'portal-admin' });
   if (companyId) qs.set('companyId', companyId);
   return request(`/api/sarah/sessions/active?${qs}`, { silent: true });
 }
 
-export async function fetchSarahSession(sessionId, companyId) {
-  const qs = new URLSearchParams({ surface: 'portal' });
+export async function fetchSarahSession(sessionId, companyId, surface = 'portal-admin') {
+  const qs = new URLSearchParams({ surface: surface || 'portal-admin' });
   if (companyId) qs.set('companyId', companyId);
   return request(`/api/sarah/sessions/${encodeURIComponent(sessionId)}?${qs}`, { silent: true });
 }
 
-export async function createSarahSession(companyId) {
+export async function createSarahSession(companyId, surface = 'portal-admin') {
   return request('/api/sarah/sessions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ surface: 'portal', companyId }),
+    body: JSON.stringify({ surface: surface || 'portal-admin', companyId }),
   });
 }
 

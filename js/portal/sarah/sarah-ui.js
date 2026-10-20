@@ -1,5 +1,6 @@
 /**
  * Sarah chat UI for Company Portal — full-page module + optional floating shortcut.
+ * Each workforce module keeps its own transcript + server session (surface-scoped).
  */
 import { state } from '../core/dataStore.js';
 import { navigateTo } from '../router.js';
@@ -18,13 +19,7 @@ import {
   readSarahTranscript,
   writeSarahTranscript,
 } from '../../shared/sarahConversationPersistence.js';
-
-let sessionId = null;
-let sending = false;
-/** @type {HTMLElement | null} */
-let chatMount = null;
-/** @type {{ role: string, content: string, actions?: unknown[] }[]} */
-let transcript = [];
+import { persistenceScopeToSurface, PORTAL_SARAH_SURFACES } from './sarahModuleSurfaces.js';
 
 const WELCOME =
   "Hi! I'm Sarah, your AI operating assistant. Ask me to view analytics, search CRM, manage AI employees, upload knowledge, or connect channels — I'll walk you through it.";
@@ -37,36 +32,51 @@ export const SUGGESTIONS = [
   'Is my WhatsApp connected?',
 ];
 
-/** @type {{ scope: string, getPageContext: () => object|null, welcome: string, suggestions: string[] }} */
-let activeMount = {
-  scope: 'portal',
-  getPageContext: () => getSarahPageContext(),
-  welcome: WELCOME,
-  suggestions: SUGGESTIONS,
-};
+/** @typedef {{ sessionId: string|null, sending: boolean, transcript: { role: string, content: string, actions?: unknown[] }[], chatMount: HTMLElement|null, mount: object }} SarahScopeState */
 
-function sessionStorageKey(companyId) {
-  const scope = activeMount.scope === 'finance' ? 'financeSarahSession' : 'sarahSession';
-  return `ziricai.portal.${scope}.${companyId || 'unknown'}`;
+/** @type {Map<string, SarahScopeState>} */
+const scopeStates = new Map();
+
+function getScopeState(persistenceScope) {
+  const key = persistenceScope || 'admin';
+  if (!scopeStates.has(key)) {
+    scopeStates.set(key, {
+      sessionId: null,
+      sending: false,
+      transcript: [],
+      chatMount: null,
+      mount: {
+        persistenceScope: key,
+        sessionSurface: persistenceScopeToSurface(key),
+        getPageContext: () => getSarahPageContext(),
+        welcome: WELCOME,
+        suggestions: SUGGESTIONS,
+      },
+    });
+  }
+  return scopeStates.get(key);
 }
 
-function transcriptStorageKey(companyId) {
-  const scope = activeMount.scope === 'finance' ? 'financeSarahTranscript' : 'sarahTranscript';
-  return `ziricai.portal.${scope}.${companyId || 'unknown'}`;
+function sessionStorageKey(companyId, persistenceScope) {
+  return `ziricai.portal.sarah.${persistenceScope || 'admin'}.${companyId || 'unknown'}`;
 }
 
-function persistSessionId(companyId, id) {
+function transcriptStorageKey(companyId, persistenceScope) {
+  return `ziricai.portal.sarah.transcript.${persistenceScope || 'admin'}.${companyId || 'unknown'}`;
+}
+
+function persistSessionId(companyId, persistenceScope, id) {
   if (!companyId || !id) return;
-  writeSarahSessionId(sessionStorageKey(companyId), id);
+  writeSarahSessionId(sessionStorageKey(companyId, persistenceScope), id);
 }
 
-function readPersistedSessionId(companyId) {
-  return readSarahSessionId(sessionStorageKey(companyId));
+function readPersistedSessionId(companyId, persistenceScope) {
+  return readSarahSessionId(sessionStorageKey(companyId, persistenceScope));
 }
 
-function persistTranscript(companyId) {
+function persistTranscript(companyId, persistenceScope, transcript) {
   if (!companyId) return;
-  writeSarahTranscript(transcriptStorageKey(companyId), transcript);
+  writeSarahTranscript(transcriptStorageKey(companyId, persistenceScope), transcript);
 }
 
 export const SARAH_CAPABILITIES = [
@@ -112,14 +122,14 @@ function formatActionSummary(actions = []) {
     });
 }
 
-function q(sel) {
-  return chatMount?.querySelector(sel) ?? null;
+function q(scopeState, sel) {
+  return scopeState.chatMount?.querySelector(sel) ?? null;
 }
 
 const TYPING_MIN_MS = 450;
 
-function appendTypingIndicator() {
-  const messages = q('#portalSarahMessages');
+function appendTypingIndicator(scopeState) {
+  const messages = q(scopeState, '#portalSarahMessages');
   if (!messages) return null;
   const typing = document.createElement('div');
   typing.className = 'portal-sarah-msg ai typing';
@@ -143,24 +153,24 @@ async function removeTypingIndicator(typing, startedAt) {
   typing.remove();
 }
 
-function appendMessage(text, role, { skipScroll = false, track = true } = {}) {
-  const messages = q('#portalSarahMessages');
+function appendMessage(scopeState, text, role, { skipScroll = false, track = true } = {}) {
+  const messages = q(scopeState, '#portalSarahMessages');
   if (!messages) return;
   const el = document.createElement('div');
   el.className = `portal-sarah-msg ${role}`;
   el.textContent = text;
   messages.appendChild(el);
   if (track) {
-    transcript.push({ role: role === 'user' ? 'user' : 'ai', content: text });
-    persistTranscript(state.companyId);
+    scopeState.transcript.push({ role: role === 'user' ? 'user' : 'ai', content: text });
+    persistTranscript(state.companyId, scopeState.mount.persistenceScope, scopeState.transcript);
   }
   if (!skipScroll) messages.scrollTop = messages.scrollHeight;
 }
 
-function appendActionBlock(actions) {
+function appendActionBlock(scopeState, actions) {
   const summaries = formatActionSummary(actions);
   if (!summaries.length) return;
-  const messages = q('#portalSarahMessages');
+  const messages = q(scopeState, '#portalSarahMessages');
   const el = document.createElement('div');
   el.className = 'portal-sarah-actions';
   el.innerHTML = summaries.map((s) => `<div class="portal-sarah-action">${s}</div>`).join('');
@@ -168,95 +178,105 @@ function appendActionBlock(actions) {
   messages.scrollTop = messages.scrollHeight;
 }
 
-function renderStoredMessages(messages = []) {
-  const container = q('#portalSarahMessages');
+function renderStoredMessages(scopeState, messages = []) {
+  const container = q(scopeState, '#portalSarahMessages');
   if (!container) return;
   container.innerHTML = '';
-  transcript = messages.map((msg) => ({
+  scopeState.transcript = messages.map((msg) => ({
     role: msg.role === 'user' ? 'user' : 'ai',
     content: String(msg.content || ''),
     actions: msg.actions,
   }));
+  const welcome = scopeState.mount.welcome || WELCOME;
   if (!messages.length) {
-    transcript = [];
-    appendMessage(activeMount.welcome || WELCOME, 'ai', { track: false });
-    persistTranscript(state.companyId);
+    scopeState.transcript = [];
+    appendMessage(scopeState, welcome, 'ai', { track: false });
+    persistTranscript(state.companyId, scopeState.mount.persistenceScope, scopeState.transcript);
     return;
   }
   for (const msg of messages) {
     const role = msg.role === 'user' ? 'user' : 'ai';
-    appendMessage(msg.content || '', role, { skipScroll: true, track: false });
-    if (msg.actions?.length) appendActionBlock(msg.actions);
+    appendMessage(scopeState, msg.content || '', role, { skipScroll: true, track: false });
+    if (msg.actions?.length) appendActionBlock(scopeState, msg.actions);
   }
-  persistTranscript(state.companyId);
+  persistTranscript(state.companyId, scopeState.mount.persistenceScope, scopeState.transcript);
   container.scrollTop = container.scrollHeight;
 }
 
-async function restoreSarahConversation(companyId) {
-  const persistedId = readPersistedSessionId(companyId);
+async function restoreSarahConversation(scopeState, companyId) {
+  const { persistenceScope, sessionSurface } = scopeState.mount;
+  const persistedId = readPersistedSessionId(companyId, persistenceScope);
   if (persistedId) {
-    const { data, error } = await fetchSarahSession(persistedId, companyId);
+    const { data, error } = await fetchSarahSession(persistedId, companyId, sessionSurface);
     if (!error && data?.session?.messages?.length) {
-      sessionId = data.session.sessionId;
-      persistSessionId(companyId, sessionId);
-      renderStoredMessages(data.session.messages);
+      scopeState.sessionId = data.session.sessionId;
+      persistSessionId(companyId, persistenceScope, scopeState.sessionId);
+      renderStoredMessages(scopeState, data.session.messages);
       return;
     }
   }
 
-  const { data, error } = await fetchSarahActiveSession(companyId);
+  let { data, error } = await fetchSarahActiveSession(companyId, sessionSurface);
+  if (
+    (error || !data?.session?.messages?.length) &&
+    sessionSurface === PORTAL_SARAH_SURFACES.admin
+  ) {
+    ({ data, error } = await fetchSarahActiveSession(companyId, 'portal'));
+  }
   if (!error && data?.session?.messages?.length) {
-    sessionId = data.session.sessionId;
-    persistSessionId(companyId, sessionId);
-    renderStoredMessages(data.session.messages);
+    scopeState.sessionId = data.session.sessionId;
+    persistSessionId(companyId, persistenceScope, scopeState.sessionId);
+    renderStoredMessages(scopeState, data.session.messages);
     return;
   }
 
-  const local = readSarahTranscript(transcriptStorageKey(companyId));
+  const local = readSarahTranscript(transcriptStorageKey(companyId, persistenceScope));
   if (local.length) {
-    renderStoredMessages(local);
+    renderStoredMessages(scopeState, local);
     return;
   }
 
-  renderStoredMessages([]);
+  renderStoredMessages(scopeState, []);
 }
 
-async function submitMessage(text) {
+async function submitMessage(scopeState, text) {
   const trimmed = text.trim();
-  if (!trimmed || sending) return;
+  if (!trimmed || scopeState.sending) return;
   if (!state.companyId) {
     showToast('No company context', 'error');
     return;
   }
 
-  sending = true;
-  appendMessage(trimmed, 'user');
-  const input = q('#portalSarahInput');
+  scopeState.sending = true;
+  appendMessage(scopeState, trimmed, 'user');
+  const input = q(scopeState, '#portalSarahInput');
   if (input) input.value = '';
 
   const typingStarted = Date.now();
-  const typing = appendTypingIndicator();
+  const typing = appendTypingIndicator(scopeState);
 
+  const { sessionSurface } = scopeState.mount;
   const { data, error } = await sarahChat({
     message: trimmed,
-    sessionId,
+    sessionId: scopeState.sessionId,
     companyId: state.companyId,
-    pageContext: activeMount.getPageContext(),
+    surface: sessionSurface,
+    pageContext: scopeState.mount.getPageContext(),
   });
 
   await removeTypingIndicator(typing, typingStarted);
-  sending = false;
+  scopeState.sending = false;
 
   if (error) {
-    appendMessage(error, 'ai');
+    appendMessage(scopeState, error, 'ai');
     showToast(error, 'error');
     return;
   }
 
-  sessionId = data.sessionId || sessionId;
-  persistSessionId(state.companyId, sessionId);
-  appendMessage(data.reply || 'Done.', 'ai');
-  appendActionBlock(data.actions);
+  scopeState.sessionId = data.sessionId || scopeState.sessionId;
+  persistSessionId(state.companyId, scopeState.mount.persistenceScope, scopeState.sessionId);
+  appendMessage(scopeState, data.reply || 'Done.', 'ai');
+  appendActionBlock(scopeState, data.actions);
   applyUiHints(data.uiHints);
 
   if (data.actions?.some((a) => a.success && a.tool)) {
@@ -264,26 +284,31 @@ async function submitMessage(text) {
   }
 }
 
-function bindSuggestions(container) {
+function bindSuggestions(scopeState, container) {
   container.querySelectorAll('.portal-sarah-chip').forEach((btn) => {
-    btn.addEventListener('click', () => submitMessage(btn.dataset.q || btn.textContent || ''));
+    btn.addEventListener('click', () => submitMessage(scopeState, btn.dataset.q || btn.textContent || ''));
   });
 }
 
 /**
  * Mount interactive chat into a container (full-page or embedded).
  * @param {HTMLElement} container
- * @param {{ mode?: 'page' | 'widget' }} [options]
+ * @param {{ mode?: 'page' | 'widget', persistenceScope?: string, sessionSurface?: string, getPageContext?: () => object|null, welcomeMessage?: string, suggestions?: string[] }} [options]
  */
 export async function mountSarahChat(container, options = {}) {
   const mode = options.mode || 'page';
-  activeMount = {
-    scope: options.persistenceScope || 'portal',
+  const persistenceScope = options.persistenceScope || 'admin';
+  const scopeState = getScopeState(persistenceScope);
+  scopeState.mount = {
+    persistenceScope,
+    sessionSurface: options.sessionSurface || persistenceScopeToSurface(persistenceScope),
     getPageContext: options.getPageContext || (() => getSarahPageContext()),
     welcome: options.welcomeMessage || WELCOME,
     suggestions: options.suggestions || SUGGESTIONS,
   };
-  chatMount = container;
+  scopeState.chatMount = container;
+  container.dataset.sarahPersistenceScope = persistenceScope;
+  container.dataset.sarahSurface = scopeState.mount.sessionSurface;
   container.classList.add(
     'portal-sarah-chat-mount',
     mode === 'page' ? 'portal-sarah-chat-mount--page' : 'portal-sarah-chat-mount--widget'
@@ -299,34 +324,34 @@ export async function mountSarahChat(container, options = {}) {
     </form>
   `;
 
-  const suggestionsEl = q('#portalSarahSuggestions');
+  const suggestionsEl = q(scopeState, '#portalSarahSuggestions');
   if (suggestionsEl) {
-    suggestionsEl.innerHTML = activeMount.suggestions
+    suggestionsEl.innerHTML = scopeState.mount.suggestions
       .map(
         (text) =>
           `<button type="button" class="portal-sarah-chip" data-q="${text.replace(/"/g, '&quot;')}">${text}</button>`
       )
       .join('');
-    bindSuggestions(suggestionsEl);
+    bindSuggestions(scopeState, suggestionsEl);
   }
 
-  q('#portalSarahForm')?.addEventListener('submit', (e) => {
+  q(scopeState, '#portalSarahForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const input = q('#portalSarahInput');
-    if (input?.value.trim()) submitMessage(input.value);
+    const input = q(scopeState, '#portalSarahInput');
+    if (input?.value.trim()) submitMessage(scopeState, input.value);
   });
 
-  q('#portalSarahInput')?.addEventListener('keydown', (e) => {
+  q(scopeState, '#portalSarahInput')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      q('#portalSarahForm')?.requestSubmit();
+      q(scopeState, '#portalSarahForm')?.requestSubmit();
     }
   });
 
   if (state.companyId) {
-    await restoreSarahConversation(state.companyId);
+    await restoreSarahConversation(scopeState, state.companyId);
   } else {
-    renderStoredMessages([]);
+    renderStoredMessages(scopeState, []);
   }
 }
 
@@ -342,3 +367,5 @@ export function initPortalSarah() {
 export function openPortalSarah() {
   navigateTo('sarah');
 }
+
+export { PORTAL_SARAH_SURFACES };

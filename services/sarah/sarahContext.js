@@ -1,108 +1,165 @@
-/**
- * Resolve Sarah execution context — user, tenant, role, permissions, workspace snapshot.
- */
-import { resolveTenantContext } from "../core/tenantContext.js";
-import { getPermissions, canUseTool } from "./permissions.js";
-import { getPortalCompanyAsync } from "../portal/portalDemo.js";
-import { getWorkspaceSnapshot } from "../portal/workspaceService.js";
-import { listAiEmployees } from "../tenants/aiEmployeeService.js";
-import { listKnowledgeDocuments } from "../tenants/knowledgeService.js";
-import { getWhatsAppIntegration } from "../tenants/integrationService.js";
-
-/**
- * Build Sarah context from Express request + optional overrides.
- * @param {import('express').Request} req
- * @param {{ companyId?: string, sessionId?: string, surface?: string }} [overrides]
- */
-export async function buildSarahContext(req, overrides = {}) {
-    const tenant = await resolveTenantContext(req);
-    const companyId = overrides.companyId || tenant.companyId || process.env.DEFAULT_COMPANY_ID || "demo-central-motors";
-    const role = tenant.role || "owner";
-    const permissions = getPermissions(role);
-
-    const [company, workspace, agents, knowledgeDocs, waIntegration] = await Promise.all([
-        getPortalCompanyAsync(companyId).catch(() => null),
-        getWorkspaceSnapshot(companyId).catch(() => null),
-        listAiEmployees(companyId).catch(() => []),
-        listKnowledgeDocuments(companyId).catch(() => []),
-        getWhatsAppIntegration(companyId).catch(() => null),
-    ]);
-
-    const resolvedCompany = workspace?.company || company || { id: companyId, name: companyId };
-    const kbSummary = {
-        knowledgeBaseId: workspace?.workspaceLinks?.knowledgeBaseId || `kb-${companyId}`,
-        documentCount: knowledgeDocs.length,
-        titles: knowledgeDocs.slice(0, 8).map((d) => d.title).filter(Boolean),
-    };
-
-    const agentList = agents.map((a) => ({
-        id: a.id,
-        name: a.name,
-        role: a.roleLabel || a.role,
-        isDefault: Boolean(a.isDefault),
-        status: a.status || "active",
-    }));
-
-    const defaultAgent = agentList.find((a) => a.isDefault) || agentList[0] || null;
-
-    return {
-        companyId,
-        companyName: resolvedCompany?.name || companyId,
-        uid: tenant.uid,
-        email: tenant.email,
-        role,
-        isSuperAdmin: tenant.isSuperAdmin,
-        permissions,
-        profile: tenant.profile,
-        sessionId: overrides.sessionId || null,
-        surface: overrides.surface || "portal",
-        canUseTool: (tool) => canUseTool({ role, isSuperAdmin: tenant.isSuperAdmin }, tool),
-        workspace,
-        workspaceLinks: workspace?.workspaceLinks || null,
-        resources: workspace?.resources || null,
-        agents: agentList,
-        defaultAgent,
-        kbSummary,
-        integrations: {
-            whatsapp: waIntegration || {
-                provider: "whatsapp",
-                status: "not_configured",
-            },
-        },
-        plan: workspace?.company?.plan || resolvedCompany?.plan || "trial",
-    };
-}
-
-export function assertToolAccess(ctx, tool) {
-    if (ctx.canUseTool(tool)) return;
-    const permList = (tool.requiredPermissions || []).join(", ") || "elevated access";
-    throw Object.assign(
-        new Error(`You don't have permission to use "${tool.name}". Required: ${permList}.`),
-        { code: "PERMISSION_DENIED", status: 403 }
-    );
-}
-
-export function buildWorkspaceContextHint(ctx) {
-    const parts = [];
-    if (ctx.defaultAgent?.name) {
-        parts.push(`Default AI employee: ${ctx.defaultAgent.name} (${ctx.defaultAgent.role || "support"})`);
-    }
-    if (ctx.agents?.length) {
-        parts.push(`AI team (${ctx.agents.length}): ${ctx.agents.map((a) => a.name).join(", ")}`);
-    }
-    if (ctx.kbSummary?.documentCount != null) {
-        parts.push(`Knowledge base: ${ctx.kbSummary.documentCount} document(s)`);
-        if (ctx.kbSummary.titles?.length) {
-            parts.push(`Topics include: ${ctx.kbSummary.titles.slice(0, 3).join("; ")}`);
-        }
-    }
-    if (ctx.integrations?.whatsapp?.status) {
-        parts.push(`WhatsApp: ${ctx.integrations.whatsapp.status}`);
-    }
-    if (ctx.resources) {
-        parts.push(
-            `Workspace: ${ctx.resources.aiEmployees || 0} agents, ${ctx.resources.knowledge || 0} KB items, ${ctx.resources.crm || 0} CRM contacts`
-        );
-    }
-    return parts.join(". ");
-}
+/**
+ * Resolve Sarah execution context — user, tenant, role, permissions, workspace snapshot.
+ */
+import { resolveTenantContext } from "../core/tenantContext.js";
+import { getPermissions, canUseTool } from "./permissions.js";
+import { getPortalCompanyAsync } from "../portal/portalDemo.js";
+import { getWorkspaceSnapshot } from "../portal/workspaceService.js";
+import { listAiEmployees } from "../tenants/aiEmployeeService.js";
+import { listKnowledgeDocuments } from "../tenants/knowledgeService.js";
+import { getWhatsAppIntegration } from "../tenants/integrationService.js";
+import {
+    moduleKeyFromPortalSurface,
+    moduleLabelFromKey,
+    PORTAL_SARAH_SURFACES,
+} from "./portalSarahSurfaces.js";
+
+function readSarahPageContextFromRequest(req) {
+    if (!req) return null;
+    if (req.body?.pageContext && typeof req.body.pageContext === "object") {
+        return req.body.pageContext;
+    }
+    const raw = req.query?.pageContext;
+    if (!raw) return null;
+    try {
+        return typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Build Sarah context from Express request + optional overrides.
+ * @param {import('express').Request} req
+ * @param {{ companyId?: string, sessionId?: string, surface?: string }} [overrides]
+ */
+export async function buildSarahContext(req, overrides = {}) {
+    const tenant = await resolveTenantContext(req);
+    const companyId = overrides.companyId || tenant.companyId || process.env.DEFAULT_COMPANY_ID || "demo-central-motors";
+    const role = tenant.role || "owner";
+    const permissions = getPermissions(role);
+
+    const [company, workspace, agents, knowledgeDocs, waIntegration] = await Promise.all([
+        getPortalCompanyAsync(companyId).catch(() => null),
+        getWorkspaceSnapshot(companyId).catch(() => null),
+        listAiEmployees(companyId).catch(() => []),
+        listKnowledgeDocuments(companyId).catch(() => []),
+        getWhatsAppIntegration(companyId).catch(() => null),
+    ]);
+
+    const resolvedCompany = workspace?.company || company || { id: companyId, name: companyId };
+    const kbSummary = {
+        knowledgeBaseId: workspace?.workspaceLinks?.knowledgeBaseId || `kb-${companyId}`,
+        documentCount: knowledgeDocs.length,
+        titles: knowledgeDocs.slice(0, 8).map((d) => d.title).filter(Boolean),
+    };
+
+    const agentList = agents.map((a) => ({
+        id: a.id,
+        name: a.name,
+        role: a.roleLabel || a.role,
+        isDefault: Boolean(a.isDefault),
+        status: a.status || "active",
+    }));
+
+    const defaultAgent = agentList.find((a) => a.isDefault) || agentList[0] || null;
+    const surface = overrides.surface || "portal-admin";
+    const pageContext = overrides.pageContext ?? readSarahPageContextFromRequest(req) ?? null;
+
+    return {
+        companyId,
+        companyName: resolvedCompany?.name || companyId,
+        uid: tenant.uid,
+        email: tenant.email,
+        role,
+        isSuperAdmin: tenant.isSuperAdmin,
+        permissions,
+        profile: tenant.profile,
+        sessionId: overrides.sessionId || null,
+        surface,
+        pageContext,
+        canUseTool: (tool) => canUseTool({ role, isSuperAdmin: tenant.isSuperAdmin }, tool),
+        workspace,
+        workspaceLinks: workspace?.workspaceLinks || null,
+        resources: workspace?.resources || null,
+        agents: agentList,
+        defaultAgent,
+        kbSummary,
+        integrations: {
+            whatsapp: waIntegration || {
+                provider: "whatsapp",
+                status: "not_configured",
+            },
+        },
+        plan: workspace?.company?.plan || resolvedCompany?.plan || "trial",
+    };
+}
+
+export function assertToolAccess(ctx, tool) {
+    if (ctx.canUseTool(tool)) return;
+    const permList = (tool.requiredPermissions || []).join(", ") || "elevated access";
+    throw Object.assign(
+        new Error(`You don't have permission to use "${tool.name}". Required: ${permList}.`),
+        { code: "PERMISSION_DENIED", status: 403 }
+    );
+}
+
+export function buildWorkspaceContextHint(ctx) {
+    const parts = [];
+    if (ctx.defaultAgent?.name) {
+        parts.push(`Default AI employee: ${ctx.defaultAgent.name} (${ctx.defaultAgent.role || "support"})`);
+    }
+    if (ctx.agents?.length) {
+        parts.push(`AI team (${ctx.agents.length}): ${ctx.agents.map((a) => a.name).join(", ")}`);
+    }
+    if (ctx.kbSummary?.documentCount != null) {
+        parts.push(`Knowledge base: ${ctx.kbSummary.documentCount} document(s)`);
+        if (ctx.kbSummary.titles?.length) {
+            parts.push(`Topics include: ${ctx.kbSummary.titles.slice(0, 3).join("; ")}`);
+        }
+    }
+    if (ctx.integrations?.whatsapp?.status) {
+        parts.push(`WhatsApp: ${ctx.integrations.whatsapp.status}`);
+    }
+    if (ctx.resources) {
+        parts.push(
+            `Workspace: ${ctx.resources.aiEmployees || 0} agents, ${ctx.resources.knowledge || 0} KB items, ${ctx.resources.crm || 0} CRM contacts`
+        );
+    }
+
+    const surface = String(ctx.surface || "portal-admin").toLowerCase();
+    const moduleKey = ctx.pageContext?.module || moduleKeyFromPortalSurface(surface);
+    const moduleLabel = moduleLabelFromKey(moduleKey);
+    parts.push(
+        `Sarah workforce module: ${moduleLabel} (surface ${surface}). This chat is separate from Sarah in other modules — stay focused on ${moduleLabel} responsibilities.`
+    );
+
+    if (moduleKey === "admin" || surface === PORTAL_SARAH_SURFACES.ADMIN || surface === "portal") {
+        parts.push(
+            "Sarah Admin: company-wide coordination — integrations, AI employees, knowledge, analytics, cross-module navigation."
+        );
+    }
+    if (moduleKey === "operations" || surface === PORTAL_SARAH_SURFACES.OPERATIONS) {
+        parts.push("Sarah Operations: tasks, projects, client database, workflows. Prefer listTasks / createTask for operational work.");
+        if (ctx.pageContext?.section) parts.push(`Operations section: ${ctx.pageContext.section}`);
+    }
+    if (moduleKey === "hr" || surface === PORTAL_SARAH_SURFACES.HR) {
+        parts.push("Sarah HR: team and HR workflows (some areas may be preview until HRIS is connected).");
+        if (ctx.pageContext?.workspace) parts.push(`HR workspace: ${ctx.pageContext.workspace}`);
+    }
+    if (moduleKey === "sales" || surface === PORTAL_SARAH_SURFACES.SALES) {
+        parts.push("Sarah Sales: inbox, leads, and channel conversations. Prefer viewConversations and CRM tools.");
+        if (ctx.pageContext?.section) parts.push(`Sales section: ${ctx.pageContext.section}`);
+    }
+    if (moduleKey === "finance" || surface === PORTAL_SARAH_SURFACES.FINANCE || ctx.pageContext?.module === "finance") {
+        const pc = ctx.pageContext;
+        parts.push(
+            `Finance UI (descriptive): ${pc?.financeWorkspaceLabel || pc?.financeWorkspace || "Finance"}`
+        );
+        parts.push(
+            "Finance Sarah: explain workspace Finance and permissions; do not create ledger records from chat unless write tools are explicitly enabled."
+        );
+    }
+
+    return parts.join(". ");
+}

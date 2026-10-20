@@ -2,6 +2,7 @@ import { getPlatformKnowledgeSummary } from "../platformKnowledge.js";
 import { buildSessionContextHint } from "../sarahMemory.js";
 import { buildWorkspaceContextHint } from "../sarahContext.js";
 import { SARAH_PERSONA, resolvePersonaFromSurface } from "../sarahPersona.js";
+import { moduleKeyFromPortalSurface, moduleLabelFromKey } from "../portalSarahSurfaces.js";
 
 const PUBLIC_RECEPTION_PLAYBOOK = `
 Identity:
@@ -74,8 +75,12 @@ export function buildSarahSystemPrompt(ctx) {
     const roleLabel = ctx.role || "team member";
     const company = ctx.companyName || ctx.companyId;
     const workspaceHint = buildWorkspaceContextHint(ctx);
+    const moduleKey = ctx.pageContext?.module || moduleKeyFromPortalSurface(ctx.surface);
+    const moduleLabel = moduleLabelFromKey(moduleKey);
 
     return `You are Sarah — the AI Operating Assistant for ZiricAI.
+
+You are the **${moduleLabel}** instance in the company portal. This conversation is independent from Sarah in Admin, Sales, Finance, Operations, and HR.
 
 You help ${company} staff perform platform actions through natural conversation.
 The signed-in user is a ${roleLabel}. Respect their permissions — never claim to perform actions you cannot execute.
