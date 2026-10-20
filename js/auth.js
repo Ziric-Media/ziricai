@@ -39,6 +39,8 @@ const AUTH_ERROR_MESSAGES = {
     'This domain is not authorized for sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains.',
   'auth/missing-password': 'Please enter your password.',
   'auth/missing-email': 'Please enter your email address.',
+  'auth/internal-error':
+    'Sign-in failed (Firebase internal error). Try a private window without extensions, or confirm app.ziricai.com uses the production Firebase project (ziricai), not staging.',
 };
 
 let cachedEnforcement = null;
@@ -195,15 +197,16 @@ export async function resolveAuthProfile(user, options = {}) {
     return profile;
   }
 
-  const allowDemo = options.allowDemo !== false && (await isLaxTenantMode());
-  if (allowDemo && typeof options.demoFallback === 'function') {
-    return options.demoFallback(user);
-  }
-
+  // Staging/production memberships often exist only on the API — never demo-fallback before session.
   const serverProfile = await fetchServerSessionProfile(user);
   if (serverProfile) {
     updateLastLogin(user.uid).catch(() => {});
     return serverProfile;
+  }
+
+  const allowDemo = options.allowDemo !== false && (await isLaxTenantMode());
+  if (allowDemo && typeof options.demoFallback === 'function') {
+    return options.demoFallback(user);
   }
 
   if (result.error && !allowDemo) {

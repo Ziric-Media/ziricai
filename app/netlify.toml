@@ -109,3 +109,13 @@
   MARKETING_BASE_URL = "https://marketing.ziricai.com"
   APP_BASE_URL = "https://app.ziricai.com"
   ADMIN_BASE_URL = "https://admin.ziricai.com"
+  # Production portal must use Firebase `ziricai` (same as Railway API token verify).
+  # Site-level Netlify vars are often staging — override here for production deploys.
+  FIREBASE_API_KEY = "AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8"
+  FIREBASE_AUTH_DOMAIN = "ziricai.firebaseapp.com"
+  FIREBASE_PROJECT_ID = "ziricai"
+  FIREBASE_STORAGE_BUCKET = "ziricai.firebasestorage.app"
+  FIREBASE_MESSAGING_SENDER_ID = "482382497730"
+  FIREBASE_APP_ID = "1:482382497730:web:6bc2f8668a1598fa13f85b"
+  FIREBASE_MEASUREMENT_ID = "G-92ZVT0731S"
+  FIREBASE_DATABASE_ID = "default"
