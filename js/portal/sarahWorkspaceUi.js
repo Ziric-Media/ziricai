@@ -2,7 +2,7 @@
  * Shared Sarah workforce UI — horizontal nav, KPI grids, lightweight charts (no chart libs).
  */
 import { escapeHtml } from '../admin/ui.js';
-import { sarahPageAvatarMarkup } from '../shared/sarahAvatar.js';
+import { sarahNavIconMarkup, sarahPageAvatarMarkup } from '../shared/sarahAvatar.js';
 
 /**
  * @param {Array<{ id: string, label: string, icon?: string, badge?: string, sarah?: boolean }>} items
