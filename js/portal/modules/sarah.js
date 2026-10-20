@@ -11,7 +11,7 @@ export async function renderSarah(container) {
           ${sarahPageAvatarMarkup()}
           <div>
             <h2 class="portal-sarah-page-title">Sarah</h2>
-            <p class="portal-sarah-page-subtitle">AI Operating Assistant</p>
+            <p class="portal-sarah-page-subtitle">Sarah Admin · company-wide assistant</p>
           </div>
         </div>
         <p class="portal-sarah-page-intro">

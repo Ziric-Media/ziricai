@@ -15,3 +15,11 @@ export function sarahPageAvatarMarkup() {
     <img src="${src}" alt="" class="portal-sarah-page-avatar-img" width="48" height="48" />
   </div>`;
 }
+
+/** Compact Sarah portrait for Finance workspace nav (matches other nav icons). */
+export function sarahNavIconMarkup() {
+  const src = resolveSarahAvatarUrl();
+  return `<span class="fin-ws-sarah-icon" aria-hidden="true">
+    <img src="${src}" alt="" class="fin-ws-sarah-avatar" width="18" height="18" />
+  </span>`;
+}

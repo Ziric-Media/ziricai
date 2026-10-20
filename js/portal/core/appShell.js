@@ -6,15 +6,23 @@ import { canAccessModule } from '../permissions.js';
 
 export const NAV_SECTIONS = [
   {
+    id: 'sarah-workforce',
+    label: 'Sarah workforce',
+    items: [
+      { id: 'sarah', label: 'Sarah Admin', icon: 'fa-sparkles' },
+      { id: 'conversations', label: 'Sarah Sales', icon: 'fa-inbox', live: true },
+      { id: 'finance', label: 'Sarah Finance', icon: 'fa-coins' },
+      { id: 'operations', label: 'Sarah Operations', icon: 'fa-list-check' },
+      { id: 'hr', label: 'Sarah HR', icon: 'fa-user-tie', navTag: 'preview' },
+    ],
+  },
+  {
     id: 'operate',
     label: 'Operate',
     items: [
       { id: 'dashboard', label: 'Overview', icon: 'fa-gauge-high' },
-      { id: 'sarah', label: 'Sarah', icon: 'fa-sparkles' },
-      { id: 'conversations', label: 'Inbox', icon: 'fa-inbox', live: true },
       { id: 'customers', label: 'CRM', icon: 'fa-users' },
       { id: 'appointments', label: 'Appointments', icon: 'fa-calendar-check' },
-      { id: 'operations', label: 'Operations', icon: 'fa-list-check' },
       { id: 'agents', label: 'AI Employees', icon: 'fa-robot' },
       { id: 'knowledge', label: 'Knowledge Base', icon: 'fa-book' },
       { id: 'automation', label: 'Automation', icon: 'fa-diagram-project' },
@@ -103,10 +111,18 @@ function navLink(item) {
         ? '<span class="indicator online"></span>'
         : '';
 
+  const navTag =
+    item.navTag === 'preview'
+      ? '<span class="bos-nav-tag bos-nav-tag-preview">Preview</span>'
+      : item.navTag === 'integration'
+        ? '<span class="bos-nav-tag bos-nav-tag-integration">Awaiting integration</span>'
+        : '';
+
   return `
     <a href="#" data-page="${item.id}" ${state.currentPage === item.id ? 'class="active"' : ''}>
       <span class="icon"><i class="fa-solid ${item.icon}"></i></span>
-      <span>${item.label}</span>
+      <span class="bos-nav-label">${item.label}</span>
+      ${navTag}
       ${badge}
     </a>`;
 }

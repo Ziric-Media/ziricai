@@ -86,7 +86,26 @@ const PERMISSION_MATRIX = {
   canUpdateAnyTask: ['owner', 'manager'],
   canCompleteTasks: ['owner', 'manager', 'finance', 'hr', 'sales', 'support', 'reception', 'marketing', 'viewer'],
 
+  canViewFinance: ['owner', 'manager', 'finance', 'viewer'],
+  canCreateFinance: ['owner', 'manager', 'finance'],
+  canUpdateFinance: ['owner', 'manager', 'finance'],
+  canVoidFinance: ['owner', 'finance'],
+  canExportFinance: ['owner', 'manager', 'finance'],
+
+  /** HR workspace landing (preview sections); not confidential employee records. */
+  canViewHr: ['owner', 'manager', 'hr', 'viewer'],
+  canManageHr: ['owner', 'manager', 'hr'],
+
 };
+
+/** Sarah specialist workspaces — owners always discover; feature gates remain on actions/APIs. */
+export const SARAH_WORKSPACE_MODULE_IDS = new Set([
+  'sarah',
+  'conversations',
+  'finance',
+  'operations',
+  'hr',
+]);
 
 
 
@@ -130,6 +149,12 @@ export const MODULE_PERMISSIONS = {
 
   /** Operations Centre (Phase 1) — task workspace. */
   operations: 'canViewTasks',
+
+  /** Company workspace finance (not subscription billing). */
+  finance: 'canViewFinance',
+
+  /** Sarah HR — people-management workspace (preview-first). */
+  hr: 'canViewHr',
 
 };
 
@@ -244,14 +269,16 @@ export function getVisibleModules(role) {
 
  */
 
+export function canDiscoverSarahWorkspace(role, moduleId) {
+  return normalizeRole(role) === 'owner' && SARAH_WORKSPACE_MODULE_IDS.has(moduleId);
+}
+
 export function canAccessModule(role, moduleId) {
+  if (canDiscoverSarahWorkspace(role, moduleId)) return true;
 
   const perm = MODULE_PERMISSIONS[moduleId];
-
   if (!perm) return true;
-
   return can(role, perm);
-
 }
 
 
@@ -284,6 +311,15 @@ export const PERMISSION_LABELS = {
   canUpdateOwnTasks: 'Can Update Own Tasks',
   canUpdateAnyTask: 'Can Update Any Task',
   canCompleteTasks: 'Can Complete Tasks',
+
+  canViewFinance: 'Can View Finance',
+  canCreateFinance: 'Can Create Finance Records',
+  canUpdateFinance: 'Can Update Finance Records',
+  canVoidFinance: 'Can Void Finance Records',
+  canExportFinance: 'Can Export Finance Data',
+
+  canViewHr: 'Can View HR Workspace',
+  canManageHr: 'Can Manage HR Records',
 
 };
 

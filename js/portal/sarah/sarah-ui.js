@@ -12,35 +12,22 @@ import {
 import { getSarahPageContext } from '../core/sarahPageContext.js';
 import { MODULE_LABELS } from '../core/appShell.js';
 import { invalidateHub } from '../core/dataService.js';
+import {
+  readSarahSessionId,
+  writeSarahSessionId,
+  readSarahTranscript,
+  writeSarahTranscript,
+} from '../../shared/sarahConversationPersistence.js';
 
 let sessionId = null;
 let sending = false;
 /** @type {HTMLElement | null} */
 let chatMount = null;
+/** @type {{ role: string, content: string, actions?: unknown[] }[]} */
+let transcript = [];
 
 const WELCOME =
   "Hi! I'm Sarah, your AI operating assistant. Ask me to view analytics, search CRM, manage AI employees, upload knowledge, or connect channels — I'll walk you through it.";
-
-function sessionStorageKey(companyId) {
-  return `ziricai.portal.sarahSession.${companyId || 'unknown'}`;
-}
-
-function persistSessionId(companyId, id) {
-  if (!companyId || !id) return;
-  try {
-    sessionStorage.setItem(sessionStorageKey(companyId), id);
-  } catch {
-    /* ignore quota / private mode */
-  }
-}
-
-function readPersistedSessionId(companyId) {
-  try {
-    return sessionStorage.getItem(sessionStorageKey(companyId));
-  } catch {
-    return null;
-  }
-}
 
 export const SUGGESTIONS = [
   'What is in my workspace?',
@@ -49,6 +36,38 @@ export const SUGGESTIONS = [
   'How many AI employees do I have?',
   'Is my WhatsApp connected?',
 ];
+
+/** @type {{ scope: string, getPageContext: () => object|null, welcome: string, suggestions: string[] }} */
+let activeMount = {
+  scope: 'portal',
+  getPageContext: () => getSarahPageContext(),
+  welcome: WELCOME,
+  suggestions: SUGGESTIONS,
+};
+
+function sessionStorageKey(companyId) {
+  const scope = activeMount.scope === 'finance' ? 'financeSarahSession' : 'sarahSession';
+  return `ziricai.portal.${scope}.${companyId || 'unknown'}`;
+}
+
+function transcriptStorageKey(companyId) {
+  const scope = activeMount.scope === 'finance' ? 'financeSarahTranscript' : 'sarahTranscript';
+  return `ziricai.portal.${scope}.${companyId || 'unknown'}`;
+}
+
+function persistSessionId(companyId, id) {
+  if (!companyId || !id) return;
+  writeSarahSessionId(sessionStorageKey(companyId), id);
+}
+
+function readPersistedSessionId(companyId) {
+  return readSarahSessionId(sessionStorageKey(companyId));
+}
+
+function persistTranscript(companyId) {
+  if (!companyId) return;
+  writeSarahTranscript(transcriptStorageKey(companyId), transcript);
+}
 
 export const SARAH_CAPABILITIES = [
   { icon: 'fa-chart-line', label: 'Analytics & reports' },
@@ -73,9 +92,11 @@ function applyUiHints(hints = []) {
       showToast(`Taking you to ${label}…`, 'info');
     }
     if (hint.openWizard === 'connectWhatsApp') {
-      import('../whatsappConnect.js').then(({ openWhatsAppConnectWizard }) => {
-        openWhatsAppConnectWizard({ companyId: state.companyId || state.company?.id });
-      });
+      import('../../shared/siteUrls.js').then(({ portalModuleUrl }) =>
+        import(portalModuleUrl('../whatsappConnect.js')).then(({ openWhatsAppConnectWizard }) => {
+          openWhatsAppConnectWizard({ companyId: state.companyId || state.company?.id });
+        })
+      );
     } else if (hint.openWizard) {
       showToast(`Wizard: ${hint.openWizard}`, 'info');
     }
@@ -95,13 +116,44 @@ function q(sel) {
   return chatMount?.querySelector(sel) ?? null;
 }
 
-function appendMessage(text, role, { skipScroll = false } = {}) {
+const TYPING_MIN_MS = 450;
+
+function appendTypingIndicator() {
+  const messages = q('#portalSarahMessages');
+  if (!messages) return null;
+  const typing = document.createElement('div');
+  typing.className = 'portal-sarah-msg ai typing';
+  typing.setAttribute('role', 'status');
+  typing.setAttribute('aria-label', 'Sarah is typing');
+  typing.innerHTML = '<span></span><span></span><span></span>';
+  messages.appendChild(typing);
+  messages.scrollTop = messages.scrollHeight;
+  requestAnimationFrame(() => {
+    typing.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+  return typing;
+}
+
+async function removeTypingIndicator(typing, startedAt) {
+  if (!typing?.isConnected) return;
+  const elapsed = Date.now() - (startedAt || 0);
+  if (elapsed < TYPING_MIN_MS) {
+    await new Promise((r) => setTimeout(r, TYPING_MIN_MS - elapsed));
+  }
+  typing.remove();
+}
+
+function appendMessage(text, role, { skipScroll = false, track = true } = {}) {
   const messages = q('#portalSarahMessages');
   if (!messages) return;
   const el = document.createElement('div');
   el.className = `portal-sarah-msg ${role}`;
   el.textContent = text;
   messages.appendChild(el);
+  if (track) {
+    transcript.push({ role: role === 'user' ? 'user' : 'ai', content: text });
+    persistTranscript(state.companyId);
+  }
   if (!skipScroll) messages.scrollTop = messages.scrollHeight;
 }
 
@@ -120,15 +172,23 @@ function renderStoredMessages(messages = []) {
   const container = q('#portalSarahMessages');
   if (!container) return;
   container.innerHTML = '';
+  transcript = messages.map((msg) => ({
+    role: msg.role === 'user' ? 'user' : 'ai',
+    content: String(msg.content || ''),
+    actions: msg.actions,
+  }));
   if (!messages.length) {
-    appendMessage(WELCOME, 'ai');
+    transcript = [];
+    appendMessage(activeMount.welcome || WELCOME, 'ai', { track: false });
+    persistTranscript(state.companyId);
     return;
   }
   for (const msg of messages) {
     const role = msg.role === 'user' ? 'user' : 'ai';
-    appendMessage(msg.content || '', role, { skipScroll: true });
+    appendMessage(msg.content || '', role, { skipScroll: true, track: false });
     if (msg.actions?.length) appendActionBlock(msg.actions);
   }
+  persistTranscript(state.companyId);
   container.scrollTop = container.scrollHeight;
 }
 
@@ -145,14 +205,20 @@ async function restoreSarahConversation(companyId) {
   }
 
   const { data, error } = await fetchSarahActiveSession(companyId);
-  if (error || !data?.session?.messages?.length) {
-    renderStoredMessages([]);
+  if (!error && data?.session?.messages?.length) {
+    sessionId = data.session.sessionId;
+    persistSessionId(companyId, sessionId);
+    renderStoredMessages(data.session.messages);
     return;
   }
 
-  sessionId = data.session.sessionId;
-  persistSessionId(companyId, sessionId);
-  renderStoredMessages(data.session.messages);
+  const local = readSarahTranscript(transcriptStorageKey(companyId));
+  if (local.length) {
+    renderStoredMessages(local);
+    return;
+  }
+
+  renderStoredMessages([]);
 }
 
 async function submitMessage(text) {
@@ -168,19 +234,17 @@ async function submitMessage(text) {
   const input = q('#portalSarahInput');
   if (input) input.value = '';
 
-  const typing = document.createElement('div');
-  typing.className = 'portal-sarah-msg typing';
-  typing.innerHTML = '<span></span><span></span><span></span>';
-  q('#portalSarahMessages')?.appendChild(typing);
+  const typingStarted = Date.now();
+  const typing = appendTypingIndicator();
 
   const { data, error } = await sarahChat({
     message: trimmed,
     sessionId,
     companyId: state.companyId,
-    pageContext: getSarahPageContext(),
+    pageContext: activeMount.getPageContext(),
   });
 
-  typing.remove();
+  await removeTypingIndicator(typing, typingStarted);
   sending = false;
 
   if (error) {
@@ -213,6 +277,12 @@ function bindSuggestions(container) {
  */
 export async function mountSarahChat(container, options = {}) {
   const mode = options.mode || 'page';
+  activeMount = {
+    scope: options.persistenceScope || 'portal',
+    getPageContext: options.getPageContext || (() => getSarahPageContext()),
+    welcome: options.welcomeMessage || WELCOME,
+    suggestions: options.suggestions || SUGGESTIONS,
+  };
   chatMount = container;
   container.classList.add(
     'portal-sarah-chat-mount',
@@ -231,10 +301,12 @@ export async function mountSarahChat(container, options = {}) {
 
   const suggestionsEl = q('#portalSarahSuggestions');
   if (suggestionsEl) {
-    suggestionsEl.innerHTML = SUGGESTIONS.map(
-      (text) =>
-        `<button type="button" class="portal-sarah-chip" data-q="${text.replace(/"/g, '&quot;')}">${text}</button>`
-    ).join('');
+    suggestionsEl.innerHTML = activeMount.suggestions
+      .map(
+        (text) =>
+          `<button type="button" class="portal-sarah-chip" data-q="${text.replace(/"/g, '&quot;')}">${text}</button>`
+      )
+      .join('');
     bindSuggestions(suggestionsEl);
   }
 
