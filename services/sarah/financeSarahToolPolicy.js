@@ -4,6 +4,7 @@
  */
 import { SARAH_PERSONA } from "./sarahPersona.js";
 import { isPortalClientSurface, PORTAL_SARAH_SURFACES } from "./portalSarahSurfaces.js";
+import { isFinanceSarahPaymentsEnabled } from "../finance/financeSarahPaymentsGate.js";
 
 /** Stable rejection code for dispatch boundary tests. */
 export const FINANCE_SARAH_TOOL_DENIED = "FINANCE_SARAH_TOOL_DENIED";
@@ -12,7 +13,7 @@ export const FINANCE_SARAH_TOOL_DENIED = "FINANCE_SARAH_TOOL_DENIED";
 export const SARAH_SESSION_MODULE_SCOPE_FINANCE = "finance";
 
 /**
- * Explicit allowlist for Finance Sarah (G1: informational only; G2 adds read tools here).
+ * Explicit allowlist for Finance Sarah (F1 read + F2 confirm-gated writes).
  * @type {ReadonlySet<string>}
  */
 export const FINANCE_SARAH_ALLOWED_TOOL_NAMES = new Set([
@@ -22,6 +23,14 @@ export const FINANCE_SARAH_ALLOWED_TOOL_NAMES = new Set([
     "viewInvoiceAging",
     "viewInvoiceDetails",
     "viewFinanceTransactions",
+    "viewFinanceChartOfAccounts",
+    "viewFinanceTrialBalance",
+    "viewFinanceJournalEntries",
+    "prepareFinanceInvoiceDraft",
+    "prepareFinanceQuotationDraft",
+    "prepareFinanceLedgerEntryDraft",
+    "prepareFinanceManualJournalDraft",
+    "confirmFinanceWrite",
     "listWorkforceInstructions",
     "completeWorkforceInstruction",
     "listBosCommercialCycles",
@@ -149,5 +158,7 @@ export function resolveSarahToolCatalogueInputs(input) {
  */
 export function isToolAllowedInFinanceSarah(toolName, ctx) {
     if (!ctx?.financeSarah) return true;
-    return FINANCE_SARAH_ALLOWED_TOOL_NAMES.has(toolName);
+    if (FINANCE_SARAH_ALLOWED_TOOL_NAMES.has(toolName)) return true;
+    if (toolName === "prepareFinanceInvoicePaymentDraft" && isFinanceSarahPaymentsEnabled()) return true;
+    return false;
 }

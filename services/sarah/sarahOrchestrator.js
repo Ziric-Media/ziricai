@@ -30,6 +30,11 @@ import {
 } from "./navigationConsent.js";
 import { sanitizeNavigateUiHints } from "./portalNavigation.js";
 import { can } from "./permissions.js";
+import {
+    applyFinanceSarahSessionStickiness,
+    shouldPersistFinanceSessionScope,
+    SARAH_SESSION_MODULE_SCOPE_FINANCE,
+} from "./financeSarahToolPolicy.js";
 
 const INTERNAL_TOOL_MESSAGE_RE = /Each line item requires unitAmount/i;
 
@@ -41,7 +46,9 @@ function userFacingActionText(action) {
 
 bootstrapEnv();
 
-initSarahTools();
+function ensureSarahToolsInitialized() {
+    initSarahTools();
+}
 
 const openai = process.env.OPENAI_API_KEY
     ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -208,6 +215,7 @@ async function runDemoMode(ctx, message, session) {
  * @param {{ message: string, sessionId?: string }} input
  */
 export async function handleSarahChat(ctx, input) {
+    ensureSarahToolsInitialized();
     const message = String(input.message || "").trim();
     if (!message) {
         return { reply: "Please send a message.", sessionId: input.sessionId || null, actions: [], uiHints: [] };
@@ -222,6 +230,13 @@ export async function handleSarahChat(ctx, input) {
     ctx.sarahSession = session;
     ctx.lastUserMessage = message;
     ctx.message = message;
+
+    applyFinanceSarahSessionStickiness(ctx, session);
+    if (shouldPersistFinanceSessionScope(ctx)) {
+        if (session.context?.sarahModuleScope !== SARAH_SESSION_MODULE_SCOPE_FINANCE) {
+            await setSessionContext(session, { sarahModuleScope: SARAH_SESSION_MODULE_SCOPE_FINANCE });
+        }
+    }
 
     const sessionCtx = getSessionContext(session);
     const pendingUiHints = sessionCtx.pendingUiHints;
@@ -249,7 +264,7 @@ export async function handleSarahChat(ctx, input) {
         }
     }
 
-    if (isPortalClientSurface(ctx.surface)) {
+    if (isPortalClientSurface(ctx.surface) && !ctx.financeSarah) {
         const moduleScope = moduleKeyFromPortalSurface(ctx.surface);
         if (moduleScope && session.context?.sarahModuleScope !== moduleScope) {
             await setSessionContext(session, { sarahModuleScope: moduleScope });

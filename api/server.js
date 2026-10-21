@@ -5,10 +5,12 @@ import express from "express";
 import { bootstrapEnv } from "../services/env/startupEnv.js";
 import { getConfiguredStorageBackend } from "../services/storage/storageAdapter.js";
 import { authRateLimit } from "../services/auth/authRateLimiter.js";
+import { createIsolatedStartupLifecycle, getIsolatedStartupConfig } from "../services/env/isolatedStartup.js";
 
+const isolatedStartup = getIsolatedStartupConfig(process.env);
 bootstrapEnv();
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = isolatedStartup?.port || Number(process.env.PORT) || 3000;
 const app = express();
 
 let appReady = false;
@@ -41,14 +43,28 @@ logStartup("ZiricAI booting", {
     storage: process.env.STORAGE_BACKEND || getConfiguredStorageBackend(),
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-    logStartup(`Listening on 0.0.0.0:${PORT}`);
+const bindHost =
+    isolatedStartup
+        ? isolatedStartup.host
+        : process.env.FINANCE_ACCEPTANCE_LOOPBACK === "1"
+        ? process.env.BIND_HOST || "127.0.0.1"
+        : process.env.BIND_HOST || "0.0.0.0";
+
+const isolatedLifecycle = isolatedStartup ? createIsolatedStartupLifecycle() : null;
+const listener = app.listen(PORT, bindHost, () => {
+    logStartup(`Listening on ${bindHost}:${PORT}`);
     console.error("===================================");
     console.error(`ZiricAI running on port ${PORT}`);
     console.error("Health: GET /api/health or GET /health");
     console.error(`Queue concurrency: ${process.env.QUEUE_CONCURRENCY || 1}`);
     console.error("===================================");
 });
+if (isolatedLifecycle) {
+    isolatedLifecycle.register(listener);
+    const shutdown = () => isolatedLifecycle.shutdown().catch((err) => console.error("[startup] isolated shutdown failed:", err));
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
+}
 
 process.on("uncaughtException", (err) => {
     console.error("[startup] uncaughtException:", err);
@@ -75,8 +91,12 @@ setImmediate(() => {
             fullHealthHandler = createHealthHandler();
             appReady = true;
             logStartup("Application routes mounted");
-            await runBackgroundInit();
-            logStartup("Background initialization complete");
+            if (isolatedStartup?.skipBackgroundInit) {
+                logStartup("Background initialization skipped for isolated startup");
+            } else {
+                await runBackgroundInit();
+                logStartup("Background initialization complete");
+            }
         })
         .catch((err) => {
             console.error("[startup] Fatal:", err);

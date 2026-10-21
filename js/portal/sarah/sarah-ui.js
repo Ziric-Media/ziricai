@@ -58,10 +58,16 @@ function getScopeState(persistenceScope) {
 }
 
 function sessionStorageKey(companyId, persistenceScope) {
+  if (persistenceScope === 'finance') {
+    return `ziricai.portal.financeSarahSession.${companyId || 'unknown'}`;
+  }
   return `ziricai.portal.sarah.${persistenceScope || 'admin'}.${companyId || 'unknown'}`;
 }
 
 function transcriptStorageKey(companyId, persistenceScope) {
+  if (persistenceScope === 'finance') {
+    return `ziricai.portal.financeSarahTranscript.${companyId || 'unknown'}`;
+  }
   return `ziricai.portal.sarah.transcript.${persistenceScope || 'admin'}.${companyId || 'unknown'}`;
 }
 

@@ -21,9 +21,11 @@
 | Quotation version + approval (BOS) | Partial | Backend documented | Portal + Sarah integration to verify |
 | Acceptance tests F-001–F-030 | — | Harness scripts exist | **Not run as formal SF suite** |
 
-**F1 implementation (2026-10-21):** SF-01 read tools landed in repo — `viewFinanceOverviewSummary`, paginated tenant scan + `dataCoverage`, Finance allowlist tightened (BOS writes removed). **Deploy Railway** to activate in production Sarah Finance chat.
+**F1 implementation (2026-10-21):** SF-01 read tools — `viewFinanceOverviewSummary`, paginated tenant scan + `dataCoverage`, Finance allowlist tightened (BOS writes removed).
 
-**Next after deploy:** Run acceptance harness (F-001–F-006), then authorize **F2** workflow writes separately.
+**F2 implementation (2026-10-22):** Confirm-gated writes — `prepareFinanceInvoiceDraft`, `prepareFinanceQuotationDraft`, `prepareFinanceLedgerEntryDraft`, `confirmFinanceWrite`. See [`SF_CORE_01_FULL_PROGRAM.md`](./SF_CORE_01_FULL_PROGRAM.md).
+
+**Production:** Deploy Railway + Netlify for Sarah Finance F1+F2. **F3–F5** (GL, payments, full acceptance suite) remain open per full program doc.
 
 ---
 

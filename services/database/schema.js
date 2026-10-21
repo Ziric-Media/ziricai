@@ -28,6 +28,9 @@ export const TENANT_COLLECTIONS = {
     FINANCE_CATEGORIES: "financeCategories",
     /** Server-only dedupe ledger for retry-safe financial writes (doc id = hash(scope,key)). */
     FINANCE_IDEMPOTENCY_KEYS: "financeIdempotencyKeys",
+    /** SF-02 F3b — tenant chart of accounts + manual journal entries */
+    FINANCE_GL_ACCOUNTS: "financeGlAccounts",
+    FINANCE_JOURNAL_ENTRIES: "financeJournalEntries",
     AUTOMATIONS: "automations",
     ANALYTICS: "analytics",
     EVENTS: "events",

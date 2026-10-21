@@ -1,5 +1,6 @@
 /**
  * Sarah chat UI for Company Portal — full-page module + optional floating shortcut.
+ * Each workforce module keeps its own transcript + server session (surface-scoped).
  */
 import { state } from '../core/dataStore.js';
 import { navigateTo } from '../router.js';
@@ -12,35 +13,16 @@ import {
 import { getSarahPageContext } from '../core/sarahPageContext.js';
 import { MODULE_LABELS } from '../core/appShell.js';
 import { invalidateHub } from '../core/dataService.js';
-
-let sessionId = null;
-let sending = false;
-/** @type {HTMLElement | null} */
-let chatMount = null;
+import {
+  readSarahSessionId,
+  writeSarahSessionId,
+  readSarahTranscript,
+  writeSarahTranscript,
+} from '../../shared/sarahConversationPersistence.js';
+import { persistenceScopeToSurface, PORTAL_SARAH_SURFACES } from './sarahModuleSurfaces.js';
 
 const WELCOME =
   "Hi! I'm Sarah, your AI operating assistant. Ask me to view analytics, search CRM, manage AI employees, upload knowledge, or connect channels — I'll walk you through it.";
-
-function sessionStorageKey(companyId) {
-  return `ziricai.portal.sarahSession.${companyId || 'unknown'}`;
-}
-
-function persistSessionId(companyId, id) {
-  if (!companyId || !id) return;
-  try {
-    sessionStorage.setItem(sessionStorageKey(companyId), id);
-  } catch {
-    /* ignore quota / private mode */
-  }
-}
-
-function readPersistedSessionId(companyId) {
-  try {
-    return sessionStorage.getItem(sessionStorageKey(companyId));
-  } catch {
-    return null;
-  }
-}
 
 export const SUGGESTIONS = [
   'What is in my workspace?',
@@ -50,13 +32,68 @@ export const SUGGESTIONS = [
   'Is my WhatsApp connected?',
 ];
 
+/** @typedef {{ sessionId: string|null, sending: boolean, transcript: { role: string, content: string, actions?: unknown[] }[], chatMount: HTMLElement|null, mount: object }} SarahScopeState */
+
+/** @type {Map<string, SarahScopeState>} */
+const scopeStates = new Map();
+
+function getScopeState(persistenceScope) {
+  const key = persistenceScope || 'admin';
+  if (!scopeStates.has(key)) {
+    scopeStates.set(key, {
+      sessionId: null,
+      sending: false,
+      transcript: [],
+      chatMount: null,
+      mount: {
+        persistenceScope: key,
+        sessionSurface: persistenceScopeToSurface(key),
+        getPageContext: () => getSarahPageContext(),
+        welcome: WELCOME,
+        suggestions: SUGGESTIONS,
+      },
+    });
+  }
+  return scopeStates.get(key);
+}
+
+function sessionStorageKey(companyId, persistenceScope) {
+  if (persistenceScope === 'finance') {
+    return `ziricai.portal.financeSarahSession.${companyId || 'unknown'}`;
+  }
+  return `ziricai.portal.sarah.${persistenceScope || 'admin'}.${companyId || 'unknown'}`;
+}
+
+function transcriptStorageKey(companyId, persistenceScope) {
+  if (persistenceScope === 'finance') {
+    return `ziricai.portal.financeSarahTranscript.${companyId || 'unknown'}`;
+  }
+  return `ziricai.portal.sarah.transcript.${persistenceScope || 'admin'}.${companyId || 'unknown'}`;
+}
+
+function persistSessionId(companyId, persistenceScope, id) {
+  if (!companyId || !id) return;
+  writeSarahSessionId(sessionStorageKey(companyId, persistenceScope), id);
+}
+
+function readPersistedSessionId(companyId, persistenceScope) {
+  return readSarahSessionId(sessionStorageKey(companyId, persistenceScope));
+}
+
+function persistTranscript(companyId, persistenceScope, transcript) {
+  if (!companyId) return;
+  writeSarahTranscript(transcriptStorageKey(companyId, persistenceScope), transcript);
+}
+
 export const SARAH_CAPABILITIES = [
-  { icon: 'fa-chart-line', label: 'Analytics & reports' },
-  { icon: 'fa-inbox', label: 'Inbox & conversations' },
-  { icon: 'fa-users', label: 'CRM search & leads' },
-  { icon: 'fa-robot', label: 'AI Employees' },
-  { icon: 'fa-book', label: 'Knowledge base' },
-  { icon: 'fa-plug', label: 'Integrations & channels' },
+  { icon: 'fa-wand-magic-sparkles', label: 'Sarah workforce coordination' },
+  { icon: 'fa-inbox', label: 'Sarah Sales · channels & inbox' },
+  { icon: 'fa-coins', label: 'Sarah Finance · quotes & ledger' },
+  { icon: 'fa-list-check', label: 'Sarah Operations · tasks & delivery' },
+  { icon: 'fa-user-tie', label: 'Sarah HR · people & staffing' },
+  { icon: 'fa-users', label: 'CRM · customers & leads' },
+  { icon: 'fa-robot', label: 'AI Employees & knowledge' },
+  { icon: 'fa-chart-line', label: 'Analytics & integrations' },
 ];
 
 function applyUiHints(hints = []) {
@@ -73,42 +110,83 @@ function applyUiHints(hints = []) {
       showToast(`Taking you to ${label}…`, 'info');
     }
     if (hint.openWizard === 'connectWhatsApp') {
-      import('../whatsappConnect.js').then(({ openWhatsAppConnectWizard }) => {
-        openWhatsAppConnectWizard({ companyId: state.companyId || state.company?.id });
-      });
+      import('../../shared/siteUrls.js').then(({ portalModuleUrl }) =>
+        import(portalModuleUrl('../whatsappConnect.js')).then(({ openWhatsAppConnectWizard }) => {
+          openWhatsAppConnectWizard({ companyId: state.companyId || state.company?.id });
+        })
+      );
     } else if (hint.openWizard) {
       showToast(`Wizard: ${hint.openWizard}`, 'info');
     }
   }
 }
 
+const INTERNAL_ACTION_MESSAGE_RE = /Each line item requires unitAmount/i;
+
+function isInternalActionNoise(action) {
+  const msg = String(action?.message || action?.error || '');
+  return INTERNAL_ACTION_MESSAGE_RE.test(msg);
+}
+
 function formatActionSummary(actions = []) {
   return actions
-    .filter((a) => a.tool)
+    .filter((a) => a.tool && !isInternalActionNoise(a))
     .map((a) => {
       const icon = a.success ? '✓' : '✗';
-      return `${icon} ${a.tool}${a.message ? `: ${a.message.slice(0, 200)}` : ''}`;
+      const msg = a.message ? String(a.message).slice(0, 200) : '';
+      return `${icon} ${a.tool}${msg ? `: ${msg}` : ''}`;
     });
 }
 
-function q(sel) {
-  return chatMount?.querySelector(sel) ?? null;
+function q(scopeState, sel) {
+  return scopeState.chatMount?.querySelector(sel) ?? null;
 }
 
-function appendMessage(text, role, { skipScroll = false } = {}) {
-  const messages = q('#portalSarahMessages');
+const TYPING_MIN_MS = 450;
+
+function appendTypingIndicator(scopeState) {
+  const messages = q(scopeState, '#portalSarahMessages');
+  if (!messages) return null;
+  const typing = document.createElement('div');
+  typing.className = 'portal-sarah-msg ai typing';
+  typing.setAttribute('role', 'status');
+  typing.setAttribute('aria-label', 'Sarah is typing');
+  typing.innerHTML = '<span></span><span></span><span></span>';
+  messages.appendChild(typing);
+  messages.scrollTop = messages.scrollHeight;
+  requestAnimationFrame(() => {
+    typing.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+  return typing;
+}
+
+async function removeTypingIndicator(typing, startedAt) {
+  if (!typing?.isConnected) return;
+  const elapsed = Date.now() - (startedAt || 0);
+  if (elapsed < TYPING_MIN_MS) {
+    await new Promise((r) => setTimeout(r, TYPING_MIN_MS - elapsed));
+  }
+  typing.remove();
+}
+
+function appendMessage(scopeState, text, role, { skipScroll = false, track = true } = {}) {
+  const messages = q(scopeState, '#portalSarahMessages');
   if (!messages) return;
   const el = document.createElement('div');
   el.className = `portal-sarah-msg ${role}`;
   el.textContent = text;
   messages.appendChild(el);
+  if (track) {
+    scopeState.transcript.push({ role: role === 'user' ? 'user' : 'ai', content: text });
+    persistTranscript(state.companyId, scopeState.mount.persistenceScope, scopeState.transcript);
+  }
   if (!skipScroll) messages.scrollTop = messages.scrollHeight;
 }
 
-function appendActionBlock(actions) {
+function appendActionBlock(scopeState, actions) {
   const summaries = formatActionSummary(actions);
   if (!summaries.length) return;
-  const messages = q('#portalSarahMessages');
+  const messages = q(scopeState, '#portalSarahMessages');
   const el = document.createElement('div');
   el.className = 'portal-sarah-actions';
   el.innerHTML = summaries.map((s) => `<div class="portal-sarah-action">${s}</div>`).join('');
@@ -116,83 +194,105 @@ function appendActionBlock(actions) {
   messages.scrollTop = messages.scrollHeight;
 }
 
-function renderStoredMessages(messages = []) {
-  const container = q('#portalSarahMessages');
+function renderStoredMessages(scopeState, messages = []) {
+  const container = q(scopeState, '#portalSarahMessages');
   if (!container) return;
   container.innerHTML = '';
+  scopeState.transcript = messages.map((msg) => ({
+    role: msg.role === 'user' ? 'user' : 'ai',
+    content: String(msg.content || ''),
+    actions: msg.actions,
+  }));
+  const welcome = scopeState.mount.welcome || WELCOME;
   if (!messages.length) {
-    appendMessage(WELCOME, 'ai');
+    scopeState.transcript = [];
+    appendMessage(scopeState, welcome, 'ai', { track: false });
+    persistTranscript(state.companyId, scopeState.mount.persistenceScope, scopeState.transcript);
     return;
   }
   for (const msg of messages) {
     const role = msg.role === 'user' ? 'user' : 'ai';
-    appendMessage(msg.content || '', role, { skipScroll: true });
-    if (msg.actions?.length) appendActionBlock(msg.actions);
+    appendMessage(scopeState, msg.content || '', role, { skipScroll: true, track: false });
+    if (msg.actions?.length) appendActionBlock(scopeState, msg.actions);
   }
+  persistTranscript(state.companyId, scopeState.mount.persistenceScope, scopeState.transcript);
   container.scrollTop = container.scrollHeight;
 }
 
-async function restoreSarahConversation(companyId) {
-  const persistedId = readPersistedSessionId(companyId);
+async function restoreSarahConversation(scopeState, companyId) {
+  const { persistenceScope, sessionSurface } = scopeState.mount;
+  const persistedId = readPersistedSessionId(companyId, persistenceScope);
   if (persistedId) {
-    const { data, error } = await fetchSarahSession(persistedId, companyId);
+    const { data, error } = await fetchSarahSession(persistedId, companyId, sessionSurface);
     if (!error && data?.session?.messages?.length) {
-      sessionId = data.session.sessionId;
-      persistSessionId(companyId, sessionId);
-      renderStoredMessages(data.session.messages);
+      scopeState.sessionId = data.session.sessionId;
+      persistSessionId(companyId, persistenceScope, scopeState.sessionId);
+      renderStoredMessages(scopeState, data.session.messages);
       return;
     }
   }
 
-  const { data, error } = await fetchSarahActiveSession(companyId);
-  if (error || !data?.session?.messages?.length) {
-    renderStoredMessages([]);
+  let { data, error } = await fetchSarahActiveSession(companyId, sessionSurface);
+  if (
+    (error || !data?.session?.messages?.length) &&
+    sessionSurface === PORTAL_SARAH_SURFACES.admin
+  ) {
+    ({ data, error } = await fetchSarahActiveSession(companyId, 'portal'));
+  }
+  if (!error && data?.session?.messages?.length) {
+    scopeState.sessionId = data.session.sessionId;
+    persistSessionId(companyId, persistenceScope, scopeState.sessionId);
+    renderStoredMessages(scopeState, data.session.messages);
     return;
   }
 
-  sessionId = data.session.sessionId;
-  persistSessionId(companyId, sessionId);
-  renderStoredMessages(data.session.messages);
+  const local = readSarahTranscript(transcriptStorageKey(companyId, persistenceScope));
+  if (local.length) {
+    renderStoredMessages(scopeState, local);
+    return;
+  }
+
+  renderStoredMessages(scopeState, []);
 }
 
-async function submitMessage(text) {
+async function submitMessage(scopeState, text) {
   const trimmed = text.trim();
-  if (!trimmed || sending) return;
+  if (!trimmed || scopeState.sending) return;
   if (!state.companyId) {
     showToast('No company context', 'error');
     return;
   }
 
-  sending = true;
-  appendMessage(trimmed, 'user');
-  const input = q('#portalSarahInput');
+  scopeState.sending = true;
+  appendMessage(scopeState, trimmed, 'user');
+  const input = q(scopeState, '#portalSarahInput');
   if (input) input.value = '';
 
-  const typing = document.createElement('div');
-  typing.className = 'portal-sarah-msg typing';
-  typing.innerHTML = '<span></span><span></span><span></span>';
-  q('#portalSarahMessages')?.appendChild(typing);
+  const typingStarted = Date.now();
+  const typing = appendTypingIndicator(scopeState);
 
+  const { sessionSurface } = scopeState.mount;
   const { data, error } = await sarahChat({
     message: trimmed,
-    sessionId,
+    sessionId: scopeState.sessionId,
     companyId: state.companyId,
-    pageContext: getSarahPageContext(),
+    surface: sessionSurface,
+    pageContext: scopeState.mount.getPageContext(),
   });
 
-  typing.remove();
-  sending = false;
+  await removeTypingIndicator(typing, typingStarted);
+  scopeState.sending = false;
 
   if (error) {
-    appendMessage(error, 'ai');
+    appendMessage(scopeState, error, 'ai');
     showToast(error, 'error');
     return;
   }
 
-  sessionId = data.sessionId || sessionId;
-  persistSessionId(state.companyId, sessionId);
-  appendMessage(data.reply || 'Done.', 'ai');
-  appendActionBlock(data.actions);
+  scopeState.sessionId = data.sessionId || scopeState.sessionId;
+  persistSessionId(state.companyId, scopeState.mount.persistenceScope, scopeState.sessionId);
+  appendMessage(scopeState, data.reply || 'Done.', 'ai');
+  appendActionBlock(scopeState, data.actions);
   applyUiHints(data.uiHints);
 
   if (data.actions?.some((a) => a.success && a.tool)) {
@@ -200,20 +300,31 @@ async function submitMessage(text) {
   }
 }
 
-function bindSuggestions(container) {
+function bindSuggestions(scopeState, container) {
   container.querySelectorAll('.portal-sarah-chip').forEach((btn) => {
-    btn.addEventListener('click', () => submitMessage(btn.dataset.q || btn.textContent || ''));
+    btn.addEventListener('click', () => submitMessage(scopeState, btn.dataset.q || btn.textContent || ''));
   });
 }
 
 /**
  * Mount interactive chat into a container (full-page or embedded).
  * @param {HTMLElement} container
- * @param {{ mode?: 'page' | 'widget' }} [options]
+ * @param {{ mode?: 'page' | 'widget', persistenceScope?: string, sessionSurface?: string, getPageContext?: () => object|null, welcomeMessage?: string, suggestions?: string[] }} [options]
  */
 export async function mountSarahChat(container, options = {}) {
   const mode = options.mode || 'page';
-  chatMount = container;
+  const persistenceScope = options.persistenceScope || 'admin';
+  const scopeState = getScopeState(persistenceScope);
+  scopeState.mount = {
+    persistenceScope,
+    sessionSurface: options.sessionSurface || persistenceScopeToSurface(persistenceScope),
+    getPageContext: options.getPageContext || (() => getSarahPageContext()),
+    welcome: options.welcomeMessage || WELCOME,
+    suggestions: options.suggestions || SUGGESTIONS,
+  };
+  scopeState.chatMount = container;
+  container.dataset.sarahPersistenceScope = persistenceScope;
+  container.dataset.sarahSurface = scopeState.mount.sessionSurface;
   container.classList.add(
     'portal-sarah-chat-mount',
     mode === 'page' ? 'portal-sarah-chat-mount--page' : 'portal-sarah-chat-mount--widget'
@@ -229,32 +340,34 @@ export async function mountSarahChat(container, options = {}) {
     </form>
   `;
 
-  const suggestionsEl = q('#portalSarahSuggestions');
+  const suggestionsEl = q(scopeState, '#portalSarahSuggestions');
   if (suggestionsEl) {
-    suggestionsEl.innerHTML = SUGGESTIONS.map(
-      (text) =>
-        `<button type="button" class="portal-sarah-chip" data-q="${text.replace(/"/g, '&quot;')}">${text}</button>`
-    ).join('');
-    bindSuggestions(suggestionsEl);
+    suggestionsEl.innerHTML = scopeState.mount.suggestions
+      .map(
+        (text) =>
+          `<button type="button" class="portal-sarah-chip" data-q="${text.replace(/"/g, '&quot;')}">${text}</button>`
+      )
+      .join('');
+    bindSuggestions(scopeState, suggestionsEl);
   }
 
-  q('#portalSarahForm')?.addEventListener('submit', (e) => {
+  q(scopeState, '#portalSarahForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const input = q('#portalSarahInput');
-    if (input?.value.trim()) submitMessage(input.value);
+    const input = q(scopeState, '#portalSarahInput');
+    if (input?.value.trim()) submitMessage(scopeState, input.value);
   });
 
-  q('#portalSarahInput')?.addEventListener('keydown', (e) => {
+  q(scopeState, '#portalSarahInput')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      q('#portalSarahForm')?.requestSubmit();
+      q(scopeState, '#portalSarahForm')?.requestSubmit();
     }
   });
 
   if (state.companyId) {
-    await restoreSarahConversation(state.companyId);
+    await restoreSarahConversation(scopeState, state.companyId);
   } else {
-    renderStoredMessages([]);
+    renderStoredMessages(scopeState, []);
   }
 }
 
@@ -270,3 +383,5 @@ export function initPortalSarah() {
 export function openPortalSarah() {
   navigateTo('sarah');
 }
+
+export { PORTAL_SARAH_SURFACES };

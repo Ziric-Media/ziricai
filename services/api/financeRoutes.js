@@ -24,6 +24,15 @@ import {
     createFinanceCategoryForAccess,
     updateFinanceCategoryForAccess,
 } from "../finance/financeCategoryService.js";
+import {
+    listFinanceGlAccountsForAccess,
+    createFinanceGlAccountForAccess,
+} from "../finance/financeGlAccountService.js";
+import {
+    listFinanceJournalEntriesForAccess,
+    createFinanceJournalEntryForAccess,
+    getFinanceJournalEntryForAccess,
+} from "../finance/financeJournalService.js";
 
 function financeAccess(req) {
     return { role: req.tenant?.role, uid: req.tenant?.uid ?? null };
@@ -52,6 +61,9 @@ function mountFinanceRouteTree(app, basePath) {
     const invPay = `${basePath}/invoices/:invoiceId/payments`;
     const catList = `${basePath}/categories`;
     const catItem = `${basePath}/categories/:categoryId`;
+    const glList = `${basePath}/gl-accounts`;
+    const journalList = `${basePath}/journal-entries`;
+    const journalItem = `${basePath}/journal-entries/:entryId`;
 
     app.get(txList, requireAuthenticatedTenantMember(), checkPermission("canViewFinance"), async (req, res) => {
         try {
@@ -252,6 +264,65 @@ function mountFinanceRouteTree(app, basePath) {
             res.json({ category });
         } catch (err) {
             financeError(res, err, "finance/categories/:id PATCH");
+        }
+    });
+
+    app.get(glList, requireAuthenticatedTenantMember(), checkPermission("canViewFinance"), async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const items = await listFinanceGlAccountsForAccess(companyId, financeAccess(req));
+            res.json({ items, companyId });
+        } catch (err) {
+            financeError(res, err, "finance/gl-accounts GET");
+        }
+    });
+
+    app.post(glList, requireAuthenticatedTenantMember(), checkPermission("canCreateFinance"), async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const account = await createFinanceGlAccountForAccess(companyId, financeAccess(req), req.body || {});
+            res.status(201).json({ account });
+        } catch (err) {
+            financeError(res, err, "finance/gl-accounts POST");
+        }
+    });
+
+    app.get(journalList, requireAuthenticatedTenantMember(), checkPermission("canViewFinance"), async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const items = await listFinanceJournalEntriesForAccess(companyId, financeAccess(req), {
+                max: parseInt(req.query.limit || "100", 10),
+            });
+            res.json({ items, companyId });
+        } catch (err) {
+            financeError(res, err, "finance/journal-entries GET");
+        }
+    });
+
+    app.post(journalList, requireAuthenticatedTenantMember(), checkPermission("canCreateFinance"), async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const entry = await createFinanceJournalEntryForAccess(companyId, financeAccess(req), req.body || {});
+            res.status(201).json({ entry });
+        } catch (err) {
+            financeError(res, err, "finance/journal-entries POST");
+        }
+    });
+
+    app.get(journalItem, requireAuthenticatedTenantMember(), checkPermission("canViewFinance"), async (req, res) => {
+        try {
+            const companyId = req.params.companyId;
+            const entry = await getFinanceJournalEntryForAccess(
+                companyId,
+                req.params.entryId,
+                financeAccess(req)
+            );
+            if (!entry) {
+                return res.status(404).json({ error: "Journal entry not found", code: "FINANCE_JOURNAL_NOT_FOUND" });
+            }
+            res.json({ entry });
+        } catch (err) {
+            financeError(res, err, "finance/journal-entries/:id GET");
         }
     });
 }

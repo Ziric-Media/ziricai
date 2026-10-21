@@ -60,6 +60,17 @@ import viewInvoiceAging from "./viewInvoiceAging.js";
 import viewInvoiceDetails from "./viewInvoiceDetails.js";
 import viewFinanceTransactions from "./viewFinanceTransactions.js";
 import viewFinanceOverviewSummary from "./viewFinanceOverviewSummary.js";
+import viewFinanceChartOfAccounts from "./viewFinanceChartOfAccounts.js";
+import viewFinanceTrialBalance from "./viewFinanceTrialBalance.js";
+import viewFinanceJournalEntries from "./viewFinanceJournalEntries.js";
+import {
+    prepareFinanceInvoiceDraft,
+    prepareFinanceQuotationDraft,
+    prepareFinanceLedgerEntryDraft,
+    prepareFinanceManualJournalDraft,
+    prepareFinanceInvoicePaymentDraft,
+    confirmFinanceWrite,
+} from "./financeSarahWriteTools.js";
 import {
     issueWorkforceInstruction,
     listWorkforceInstructionsTool,
@@ -132,6 +143,15 @@ const ALL_TOOLS = [
     viewInvoiceDetails,
     viewFinanceTransactions,
     viewFinanceOverviewSummary,
+    viewFinanceChartOfAccounts,
+    viewFinanceTrialBalance,
+    viewFinanceJournalEntries,
+    prepareFinanceInvoiceDraft,
+    prepareFinanceQuotationDraft,
+    prepareFinanceLedgerEntryDraft,
+    prepareFinanceManualJournalDraft,
+    prepareFinanceInvoicePaymentDraft,
+    confirmFinanceWrite,
     issueWorkforceInstruction,
     listWorkforceInstructionsTool,
     completeWorkforceInstructionTool,

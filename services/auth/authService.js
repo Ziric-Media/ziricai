@@ -10,7 +10,11 @@ import { TENANT_COLLECTIONS, ROOT } from "../database/schema.js";
 import { getStorageAdapter } from "../storage/storageAdapter.js";
 import { upsertTenantUser } from "../tenants/userService.js";
 import { getCompany } from "../tenants/companyService.js";
-import { getAdminFirestore, hasAdminCredentials } from "../database/firestoreAdmin.js";
+import {
+    assertFirebaseEmulatorConfiguration,
+    getAdminFirestore,
+    hasAdminCredentials,
+} from "../database/firestoreAdmin.js";
 import { auditLog } from "../audit/auditLog.js";
 
 const SUPERADMIN_ROLES = new Set(["superadmin", "super admin", "super-admin", "super_admin"]);
@@ -132,6 +136,20 @@ async function verifyIdTokenViaAdmin(idToken) {
 export async function verifyIdToken(idToken) {
     if (!idToken) return null;
 
+    if (process.env.ZIRICAI_FIREBASE_EMULATOR === "1") {
+        try {
+            assertFirebaseEmulatorConfiguration();
+        } catch (err) {
+            console.warn("[authService] Firebase emulator configuration rejected:", err.message);
+            return null;
+        }
+
+        // In emulator mode, Admin Auth is the only permitted verifier. Do not
+        // continue to the cloud Identity Toolkit fallback if it rejects a token
+        // or the local emulator is unavailable.
+        return verifyIdTokenViaAdmin(idToken);
+    }
+
     const viaAdmin = await verifyIdTokenViaAdmin(idToken);
     if (viaAdmin) return viaAdmin;
 
@@ -228,6 +246,24 @@ export async function resolveAuthFromRequest(req) {
         };
     }
 
+    const { verifyFinanceAcceptanceToken, FINANCE_ACCEPTANCE_TOKEN_PREFIX, isFinanceAcceptanceRuntimeActive } =
+        await import("./financeAcceptanceMode.js");
+    if (isFinanceAcceptanceRuntimeActive()) {
+        const acceptanceAuth = verifyFinanceAcceptanceToken(req, token);
+        if (acceptanceAuth) return acceptanceAuth;
+        if (token.startsWith(FINANCE_ACCEPTANCE_TOKEN_PREFIX)) {
+            return {
+                uid: null,
+                email: null,
+                role: null,
+                isSuperAdmin: false,
+                profile: null,
+                hasBearerToken: true,
+                tokenVerified: false,
+            };
+        }
+    }
+
     const verified = await verifyIdToken(token);
     if (!verified) {
         return {
@@ -242,7 +278,7 @@ export async function resolveAuthFromRequest(req) {
     }
 
     let profile = await getUserProfile(verified.uid);
-    if (!profile) {
+    if (!profile && process.env.ZIRICAI_FIREBASE_EMULATOR !== "1") {
         profile = await getUserProfileViaIdToken(verified.uid, token);
     }
 

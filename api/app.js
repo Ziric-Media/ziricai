@@ -1649,6 +1649,7 @@ app.get("/api/sarah/tools", requireTenantScope({ optional: true }), async (req, 
     try {
         const ctx = await buildSarahContext(req, {
             companyId: req.query?.companyId || req.tenant?.companyId,
+            surface: req.query?.surface || req.tenant?.surface || "portal-admin",
         });
         const tools = getToolsForContext(ctx).map((t) => ({
             name: t.name,

@@ -19,6 +19,8 @@ import {
     listPendingInstructionsForModule,
     listWorkforceInstructions,
 } from "../bos/workforceInstructionService.js";
+import { resolvePersonaFromSurface } from "./sarahPersona.js";
+import { resolveFinanceSarahActive } from "./financeSarahToolPolicy.js";
 
 function readSarahPageContextFromRequest(req) {
     if (!req) return null;
@@ -37,7 +39,7 @@ function readSarahPageContextFromRequest(req) {
 /**
  * Build Sarah context from Express request + optional overrides.
  * @param {import('express').Request} req
- * @param {{ companyId?: string, sessionId?: string, surface?: string }} [overrides]
+ * @param {{ companyId?: string, sessionId?: string, surface?: string, persona?: string, pageContext?: object|null }} [overrides]
  */
 export async function buildSarahContext(req, overrides = {}) {
     const tenant = await resolveTenantContext(req);
@@ -71,6 +73,13 @@ export async function buildSarahContext(req, overrides = {}) {
     const defaultAgent = agentList.find((a) => a.isDefault) || agentList[0] || null;
     const surface = overrides.surface || "portal-admin";
     const pageContext = overrides.pageContext ?? readSarahPageContextFromRequest(req) ?? null;
+    const persona = overrides.persona || resolvePersonaFromSurface(surface);
+    const financeSarah = resolveFinanceSarahActive({
+        persona,
+        surface,
+        uid: tenant.uid,
+        pageContext,
+    });
     const moduleKey = pageContext?.module || moduleKeyFromPortalSurface(surface);
 
     let workforceInstructionsPending = [];
@@ -105,6 +114,8 @@ export async function buildSarahContext(req, overrides = {}) {
         profile: tenant.profile,
         sessionId: overrides.sessionId || null,
         surface,
+        persona,
+        financeSarah,
         pageContext,
         workforceInstructionsPending,
         workforceInstructionsRecent,
@@ -204,10 +215,10 @@ export function buildWorkspaceContextHint(ctx) {
             `Finance UI (descriptive): ${pc?.financeWorkspaceLabel || pc?.financeWorkspace || "Finance"}`
         );
         parts.push(
-            "Finance Sarah: use allowlisted read tools (viewFinanceOverviewSummary, viewFinanceTransactions, viewOutstandingInvoices, viewInvoiceAging, viewInvoiceDetails) for company figures — never invent amounts."
+            "F-Sarah 1–2: Finance Sarah uses allowlisted read tools for figures and prepare* + confirmFinanceWrite for user-confirmed invoices, quotations, and income/expense entries — never invent amounts."
         );
         parts.push(
-            "State reporting period, currency, and dataCoverage.complete/limitations. Net movement is not profit or bank balance; outstanding invoices are not collected cash. Do not create or change Finance records from chat in F1."
+            "State reporting period, currency, and dataCoverage.complete/limitations. Net movement is not profit or bank balance. No payments, voids, or GL claims without dedicated tools."
         );
     }
 

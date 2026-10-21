@@ -50,6 +50,7 @@ export async function resolveTenantContext(req) {
         email: auth.email,
         isSuperAdmin: auth.isSuperAdmin,
         profile: auth.profile,
+        financeAcceptance: auth.financeAcceptance === true,
     };
 }
 
@@ -115,6 +116,19 @@ export async function assertAuthenticatedTenantMemberAccess(ctx, deps = {}) {
 
     if (!ctx.companyId) {
         throw Object.assign(new Error("companyId is required"), { status: 400, code: "MISSING_COMPANY_ID" });
+    }
+
+    if (ctx.financeAcceptance) {
+        const { isFinanceAcceptanceRuntimeActive, FINANCE_ACCEPTANCE_TENANT_ID } = await import(
+            "../auth/financeAcceptanceMode.js"
+        );
+        if (
+            isFinanceAcceptanceRuntimeActive() &&
+            ctx.companyId === FINANCE_ACCEPTANCE_TENANT_ID &&
+            ctx.profile?.companyId === FINANCE_ACCEPTANCE_TENANT_ID
+        ) {
+            return { via: "tenant" };
+        }
     }
 
     if (ctx.isSuperAdmin) {

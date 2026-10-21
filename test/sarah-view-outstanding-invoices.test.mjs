@@ -60,13 +60,13 @@ test("uses authenticated context rather than tool arguments for Finance access",
     });
 
     await tool.execute(
-        { companyId: "tenant-authenticated", uid: "user-authenticated", role: "finance_manager" },
+        { companyId: "tenant-authenticated", uid: "user-authenticated", role: "finance" },
         { companyId: "tenant-spoofed", uid: "user-spoofed", role: "owner" }
     );
 
     assert.deepEqual(calls, [{
         companyId: "tenant-authenticated",
-        access: { uid: "user-authenticated", role: "finance_manager" },
+        access: { uid: "user-authenticated", role: "finance" },
     }]);
 });
 
