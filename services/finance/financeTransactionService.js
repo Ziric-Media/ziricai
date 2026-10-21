@@ -69,6 +69,12 @@ export async function listFinanceTransactionsForAccess(companyId, access = {}, o
     return transactionService.list(companyId, options);
 }
 
+export async function listFinanceTransactionsPageForAccess(companyId, access = {}, options = {}) {
+    requireFinanceActor(access);
+    assertCanViewFinance(access.role);
+    return transactionService.listPage(companyId, options);
+}
+
 export async function getFinanceTransactionForAccess(companyId, transactionId, access = {}) {
     requireFinanceActor(access);
     assertCanViewFinance(access.role);

@@ -204,7 +204,10 @@ export function buildWorkspaceContextHint(ctx) {
             `Finance UI (descriptive): ${pc?.financeWorkspaceLabel || pc?.financeWorkspace || "Finance"}`
         );
         parts.push(
-            "Finance Sarah: explain workspace Finance and permissions; do not create ledger records from chat unless write tools are explicitly enabled."
+            "Finance Sarah: use allowlisted read tools (viewFinanceOverviewSummary, viewFinanceTransactions, viewOutstandingInvoices, viewInvoiceAging, viewInvoiceDetails) for company figures — never invent amounts."
+        );
+        parts.push(
+            "State reporting period, currency, and dataCoverage.complete/limitations. Net movement is not profit or bank balance; outstanding invoices are not collected cash. Do not create or change Finance records from chat in F1."
         );
     }
 

@@ -17,6 +17,7 @@ export const SARAH_SESSION_MODULE_SCOPE_FINANCE = "finance";
  */
 export const FINANCE_SARAH_ALLOWED_TOOL_NAMES = new Set([
     "platformHelp",
+    "viewFinanceOverviewSummary",
     "viewOutstandingInvoices",
     "viewInvoiceAging",
     "viewInvoiceDetails",
@@ -24,7 +25,6 @@ export const FINANCE_SARAH_ALLOWED_TOOL_NAMES = new Set([
     "listWorkforceInstructions",
     "completeWorkforceInstruction",
     "listBosCommercialCycles",
-    "applyBosCommercialCycleAction",
 ]);
 
 /** Representative tools that must never appear in Finance Sarah (negative test guard). */

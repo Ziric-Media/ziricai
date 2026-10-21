@@ -37,6 +37,12 @@ export async function listFinanceInvoicesForAccess(companyId, access = {}, optio
     return invoiceService.list(companyId, options);
 }
 
+export async function listFinanceInvoicesPageForAccess(companyId, access = {}, options = {}) {
+    requireFinanceActor(access);
+    assertCanViewFinance(access.role);
+    return invoiceService.listPage(companyId, options);
+}
+
 export async function getFinanceInvoiceForAccess(companyId, invoiceId, access = {}) {
     requireFinanceActor(access);
     assertCanViewFinance(access.role);

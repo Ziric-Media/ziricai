@@ -59,6 +59,7 @@ import viewOutstandingInvoices from "./viewOutstandingInvoices.js";
 import viewInvoiceAging from "./viewInvoiceAging.js";
 import viewInvoiceDetails from "./viewInvoiceDetails.js";
 import viewFinanceTransactions from "./viewFinanceTransactions.js";
+import viewFinanceOverviewSummary from "./viewFinanceOverviewSummary.js";
 import {
     issueWorkforceInstruction,
     listWorkforceInstructionsTool,
@@ -130,6 +131,7 @@ const ALL_TOOLS = [
     viewInvoiceAging,
     viewInvoiceDetails,
     viewFinanceTransactions,
+    viewFinanceOverviewSummary,
     issueWorkforceInstruction,
     listWorkforceInstructionsTool,
     completeWorkforceInstructionTool,
