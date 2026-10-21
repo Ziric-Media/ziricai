@@ -1,6 +1,6 @@
 /**
  * Company Portal — workspace Finance (ledger + invoices; not subscription billing).
- * Uses /api/portal/finance/* ; live payment recording intentionally disabled in UI.
+ * Uses /api/portal/finance/* ; invoice payments via recordFinanceInvoicePayment when enabled.
  */
 import { state } from '../core/dataStore.js';
 import { escapeHtml, pageHeader, errorState } from '../../admin/ui.js';
@@ -63,9 +63,10 @@ import {
   syncFinanceSarahAfterPaint,
 } from '../financeSarahPanel.js';
 import { consumePendingSarahNav } from '../portalWorkforceNav.js';
+import { invoiceAcceptsPortalPayment, promptAndRecordInvoicePayment } from '../financePaymentUi.js';
 
-/** Live customer payments blocked until Firestore atomicity is verified. */
-const PAYMENTS_UI_DISABLED = true;
+/** Set false to allow invoice payment recording via POST …/invoices/:id/payments. */
+const PAYMENTS_UI_DISABLED = false;
 
 /** @type {{ workspace: string, subTab: string, txs: object[], invoices: object[], categories: object[], loading: boolean, error: string|null }} */
 let fin = {
@@ -161,7 +162,7 @@ function renderWorkspaceIntro(workspaceId) {
     },
     expenses: {
       title: 'Expenses & Payables',
-      lede: 'Spend and supplier bills. Approval and payment recording stay disabled until separately authorized.',
+      lede: 'Spend and supplier bills. Record payments against sent invoices with remaining balance.',
     },
   }[workspaceId];
   if (!copy) return '';
@@ -303,7 +304,9 @@ function renderInvoicesList(invoiceKindFilter = null) {
               ${
                 PAYMENTS_UI_DISABLED
                   ? '<span class="fin-pay-disabled" title="Disabled until backend sign-off"><i class="fa-solid fa-lock"></i> Payments off</span>'
-                  : ''
+                  : can(role(), 'canCreateFinance') && invoiceAcceptsPortalPayment(inv)
+                    ? `<button type="button" class="btn btn-primary btn-sm" data-fin-record-pay="${escapeHtml(inv.id)}">Record payment</button>`
+                    : ''
               }
               ${canVoid && st !== 'void' && (Number(inv.amountPaidMinor) || 0) === 0 ? `<button type="button" class="btn btn-ghost btn-sm" data-fin-void-inv="${escapeHtml(inv.id)}">Void</button>` : ''}
             </div>
@@ -455,6 +458,7 @@ function paint(container) {
       </div>
       ${renderInvoiceUiOverlays(fin, {
         canUpdate: can(role(), 'canUpdateFinance'),
+        canCreate: can(role(), 'canCreateFinance'),
         canVoid: can(role(), 'canVoidFinance'),
         paymentsDisabled: PAYMENTS_UI_DISABLED,
       })}
@@ -502,6 +506,7 @@ function paint(container) {
   bindInvoiceUi(container, fin, {
     companyId,
     canUpdate: can(role(), 'canUpdateFinance'),
+    canCreate: can(role(), 'canCreateFinance'),
     canVoid: can(role(), 'canVoidFinance'),
     paymentsDisabled: PAYMENTS_UI_DISABLED,
     onRefresh: reloadData,
@@ -586,6 +591,20 @@ function bindFinanceEvents(container) {
         paint(container);
       } catch (e) {
         showToast(e?.message || 'Void failed', 'error');
+      }
+    });
+  });
+
+  container.querySelectorAll('[data-fin-record-pay]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-fin-record-pay');
+      const inv = fin.invoices.find((i) => i.id === id);
+      if (!inv) return;
+      const ok = await promptAndRecordInvoicePayment(companyId(), inv);
+      if (ok) {
+        await reloadData();
+        paint(container);
       }
     });
   });

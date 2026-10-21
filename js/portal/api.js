@@ -379,6 +379,17 @@ export async function voidFinanceInvoice(companyId, invoiceId, voidReason) {
   });
 }
 
+export async function recordFinanceInvoicePayment(companyId, invoiceId, body) {
+  return request(
+    `${financeBase(companyId)}/invoices/${encodeURIComponent(invoiceId)}/payments`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    }
+  );
+}
+
 export async function fetchFinanceCategories(companyId) {
   return request(`${financeBase(companyId)}/categories`);
 }

@@ -37,9 +37,11 @@ assert.equal(
 delete process.env.FINANCE_SARAH_PAYMENTS_ENABLED;
 
 const portal = readFileSync(join(ROOT, "js/portal/modules/finance.js"), "utf8");
-assert.match(portal, /PAYMENTS_UI_DISABLED = true/);
+const portalApi = readFileSync(join(ROOT, "js/portal/api.js"), "utf8");
+assert.match(portal, /PAYMENTS_UI_DISABLED = false/);
+assert.match(portalApi, /recordFinanceInvoicePayment/);
 
 console.log("✓ Payment Sarah tools implemented behind env gate");
-console.log("✓ Portal payments UI still disabled (default)");
-console.log("✓ Enable only after FINANCE_PAYMENT_REMEDIATION sign-off");
+console.log("✓ Portal invoice payment UI enabled (POST …/payments)");
+console.log("✓ Sarah invoice payments still require FINANCE_SARAH_PAYMENTS_ENABLED on API");
 console.log("\nFINANCE_SARAH_F4_READINESS_PASS");

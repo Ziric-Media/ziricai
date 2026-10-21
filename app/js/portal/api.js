@@ -244,12 +244,61 @@ export async function inviteTeamMember(companyId, { email, role, departmentId } 
   });
 }
 
+/* ── Sarah BOS commercial cycle (Central Motors pilot) ── */
+
+export async function fetchBosCommercialCycles(companyId) {
+  return request(`/api/portal/bos/cycles/${encodeURIComponent(companyId)}`);
+}
+
+export async function postBosCommercialCycleAction(companyId, cycleId, action, body = {}) {
+  return request(
+    `/api/portal/bos/cycles/${encodeURIComponent(companyId)}/${encodeURIComponent(cycleId)}/actions/${encodeURIComponent(action)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    }
+  );
+}
+
+export async function fetchWorkforceInstructions(companyId, { module, status, limit } = {}) {
+  const qs = new URLSearchParams();
+  if (module) qs.set('module', module);
+  if (status) qs.set('status', status);
+  if (limit) qs.set('limit', String(limit));
+  const q = qs.toString();
+  return request(`/api/portal/bos/instructions/${encodeURIComponent(companyId)}${q ? `?${q}` : ''}`);
+}
+
+export async function createWorkforceInstruction(companyId, body = {}) {
+  return request(`/api/portal/bos/instructions/${encodeURIComponent(companyId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+}
+
+export async function completeWorkforceInstructionApi(companyId, instructionId, body = {}) {
+  return request(
+    `/api/portal/bos/instructions/${encodeURIComponent(companyId)}/${encodeURIComponent(instructionId)}/complete`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    }
+  );
+}
+
+const portalTasksBase = (companyId) =>
+  `/api/companies/${encodeURIComponent(companyId)}/crm/tasks`;
+
+/** Operations Centre tasks — CRM paths (live on production API; portal alias when deployed). */
 export async function fetchPortalTasks(companyId) {
-  return request(`/api/portal/tasks/${encodeURIComponent(companyId)}`);
+  return request(portalTasksBase(companyId));
 }
 
 export async function createPortalTask(companyId, body) {
-  return request(`/api/portal/tasks/${encodeURIComponent(companyId)}`, {
+  return request(portalTasksBase(companyId), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body || {}),
@@ -257,14 +306,108 @@ export async function createPortalTask(companyId, body) {
 }
 
 export async function updatePortalTask(companyId, taskId, patch) {
+  return request(`${portalTasksBase(companyId)}/${encodeURIComponent(taskId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch || {}),
+  });
+}
+
+/* ── Workspace Finance (not subscription billing) ── */
+
+const financeBase = (companyId) => `/api/portal/finance/${encodeURIComponent(companyId)}`;
+
+export async function fetchFinanceTransactions(companyId, { limit = 200 } = {}) {
+  const qs = limit ? `?limit=${encodeURIComponent(limit)}` : '';
+  return request(`${financeBase(companyId)}/transactions${qs}`);
+}
+
+export async function createFinanceTransaction(companyId, body) {
+  return request(`${financeBase(companyId)}/transactions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+}
+
+export async function patchFinanceTransaction(companyId, transactionId, patch) {
+  return request(`${financeBase(companyId)}/transactions/${encodeURIComponent(transactionId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch || {}),
+  });
+}
+
+export async function voidFinanceTransaction(companyId, transactionId, voidReason) {
+  return request(`${financeBase(companyId)}/transactions/${encodeURIComponent(transactionId)}/void`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ voidReason }),
+  });
+}
+
+export async function fetchFinanceInvoices(companyId, { limit = 200 } = {}) {
+  const qs = limit ? `?limit=${encodeURIComponent(limit)}` : '';
+  return request(`${financeBase(companyId)}/invoices${qs}`);
+}
+
+export async function fetchFinanceInvoice(companyId, invoiceId) {
+  return request(`${financeBase(companyId)}/invoices/${encodeURIComponent(invoiceId)}`);
+}
+
+export async function createFinanceInvoice(companyId, body) {
+  return request(`${financeBase(companyId)}/invoices`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+}
+
+export async function patchFinanceInvoice(companyId, invoiceId, patch) {
+  return request(`${financeBase(companyId)}/invoices/${encodeURIComponent(invoiceId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch || {}),
+  });
+}
+
+export async function voidFinanceInvoice(companyId, invoiceId, voidReason) {
+  return request(`${financeBase(companyId)}/invoices/${encodeURIComponent(invoiceId)}/void`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ voidReason }),
+  });
+}
+
+export async function recordFinanceInvoicePayment(companyId, invoiceId, body) {
   return request(
-    `/api/portal/tasks/${encodeURIComponent(companyId)}/${encodeURIComponent(taskId)}`,
+    `${financeBase(companyId)}/invoices/${encodeURIComponent(invoiceId)}/payments`,
     {
-      method: 'PATCH',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch || {}),
+      body: JSON.stringify(body || {}),
     }
   );
+}
+
+export async function fetchFinanceCategories(companyId) {
+  return request(`${financeBase(companyId)}/categories`);
+}
+
+export async function createFinanceCategory(companyId, body) {
+  return request(`${financeBase(companyId)}/categories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+}
+
+export async function patchFinanceCategory(companyId, categoryId, patch) {
+  return request(`${financeBase(companyId)}/categories/${encodeURIComponent(categoryId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch || {}),
+  });
 }
 
 export async function updateTeamMemberRole(companyId, uid, role) {
@@ -387,34 +530,46 @@ export async function completeWhatsAppEmbeddedSignup(companyId, payload) {
   );
 }
 
+export async function refreshWhatsAppMetaAuth(companyId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/integrations/whatsapp/refresh-meta-auth`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
 export async function sarahChat(payload) {
+  const surface = payload?.surface || 'portal-admin';
   return request('/api/sarah/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      surface: 'portal',
       ...payload,
+      surface,
     }),
   });
 }
 
-export async function fetchSarahActiveSession(companyId) {
-  const qs = new URLSearchParams({ surface: 'portal' });
+export async function fetchSarahActiveSession(companyId, surface = 'portal-admin') {
+  const qs = new URLSearchParams({ surface: surface || 'portal-admin' });
   if (companyId) qs.set('companyId', companyId);
-  return request(`/api/sarah/sessions/active?${qs}`);
+  return request(`/api/sarah/sessions/active?${qs}`, { silent: true });
 }
 
-export async function fetchSarahSession(sessionId, companyId) {
-  const qs = new URLSearchParams({ surface: 'portal' });
+export async function fetchSarahSession(sessionId, companyId, surface = 'portal-admin') {
+  const qs = new URLSearchParams({ surface: surface || 'portal-admin' });
   if (companyId) qs.set('companyId', companyId);
-  return request(`/api/sarah/sessions/${encodeURIComponent(sessionId)}?${qs}`);
+  return request(`/api/sarah/sessions/${encodeURIComponent(sessionId)}?${qs}`, { silent: true });
 }
 
-export async function createSarahSession(companyId) {
+export async function createSarahSession(companyId, surface = 'portal-admin') {
   return request('/api/sarah/sessions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ surface: 'portal', companyId }),
+    body: JSON.stringify({ surface: surface || 'portal-admin', companyId }),
   });
 }
 

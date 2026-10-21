@@ -15,6 +15,7 @@ import {
   voidFinanceInvoice,
 } from './api.js';
 import { markQuotationNotes, stripQuotationNotes, isFinanceQuotation } from './financeQuotation.js';
+import { invoiceAcceptsPortalPayment, promptAndRecordInvoicePayment } from './financePaymentUi.js';
 
 export function createEmptyInvoiceDraft() {
   return {
@@ -238,7 +239,9 @@ function formatTs(val) {
 }
 
 function renderDetailDrawer(ui, invoice, linkedTxs, opts) {
-  const { canUpdate, canVoid, paymentsDisabled } = opts;
+  const { canUpdate, canCreate, canVoid, paymentsDisabled } = opts;
+  const showRecordPayment =
+    !paymentsDisabled && canCreate && invoiceAcceptsPortalPayment(invoice);
   const cur = invoice.currency || 'ZAR';
   const st = String(invoice.status || 'draft');
   const lines = Array.isArray(invoice.lineItems) ? invoice.lineItems : [];
@@ -314,6 +317,7 @@ function renderDetailDrawer(ui, invoice, linkedTxs, opts) {
       <footer class="fin-drawer-foot">
         ${canUpdate && st === 'draft' ? `<button type="button" class="btn btn-secondary btn-sm" data-fin-detail-edit>Edit draft</button>` : ''}
         ${canUpdate && st === 'draft' ? `<button type="button" class="btn btn-primary btn-sm" data-fin-detail-send>Mark sent</button>` : ''}
+        ${showRecordPayment ? `<button type="button" class="btn btn-primary btn-sm" data-fin-detail-pay>Record payment</button>` : ''}
         ${canVoid && st !== 'void' && (Number(invoice.amountPaidMinor) || 0) === 0 ? `<button type="button" class="btn btn-ghost btn-sm" data-fin-detail-void>Void invoice</button>` : ''}
         <button type="button" class="btn btn-secondary btn-sm" data-fin-close-detail>Close</button>
       </footer>
@@ -359,7 +363,7 @@ function readDraftFromDom(modal, draft) {
 }
 
 export function bindInvoiceUi(container, fin, ctx) {
-  const { companyId, canUpdate, canVoid, paymentsDisabled, onRefresh, onRepaint } = ctx;
+  const { companyId, canUpdate, canCreate, canVoid, paymentsDisabled, onRefresh, onRepaint } = ctx;
 
   container.querySelectorAll('[data-fin-inv-open]').forEach((el) => {
     const open = () => {
@@ -424,6 +428,16 @@ export function bindInvoiceUi(container, fin, ctx) {
       onRepaint();
     } catch (e) {
       showToast(e?.message || 'Void failed', 'error');
+    }
+  });
+
+  container.querySelector('[data-fin-detail-pay]')?.addEventListener('click', async () => {
+    const inv = fin.invoices.find((i) => i.id === fin.invoiceUi.detailId);
+    if (!inv) return;
+    const ok = await promptAndRecordInvoicePayment(companyId(), inv);
+    if (ok) {
+      await onRefresh();
+      onRepaint();
     }
   });
 

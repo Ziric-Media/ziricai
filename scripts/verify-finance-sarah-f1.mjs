@@ -29,7 +29,8 @@ assert.match(financeMod, /renderFinanceSarahPageShell/);
 assert.match(financeMod, /initFinanceSarah/);
 assert.match(financeMod, /syncFinanceSarahAfterPaint/);
 assert.match(financeMod, /workspace === 'sarah'/);
-assert.match(financeMod, /PAYMENTS_UI_DISABLED = true/);
+assert.match(financeMod, /PAYMENTS_UI_DISABLED = false/);
+assert.match(financeMod, /financePaymentUi\.js/);
 
 const nav = read("js/portal/financeWorkspaceNav.js");
 assert.match(nav, /id: 'sarah'/);
