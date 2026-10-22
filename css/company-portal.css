@@ -6627,6 +6627,24 @@
     width: 100%;
     margin-bottom: 4px;
 }
+
+.fin-workspace-nav--horizontal > .fin-workspace-nav-desktop {
+    flex-direction: row;
+    flex-wrap: wrap;
+    position: static;
+    gap: 8px;
+    padding: 10px 12px;
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+}
+
+.fin-workspace-nav--horizontal > .fin-workspace-nav-desktop .fin-ws-link {
+    width: auto;
+    border-radius: 999px;
+    padding: 8px 14px;
+    box-shadow: none;
+}
 .hr-module .hr-module-main {
     min-width: 0;
 }

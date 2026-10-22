@@ -3,13 +3,14 @@
  */
 import { state, subscribe } from './dataStore.js';
 import { canAccessModule } from '../permissions.js';
+import { sarahNavIconMarkup } from '../../shared/sarahAvatar.js';
 
 export const NAV_SECTIONS = [
   {
     id: 'sarah-workforce',
     label: 'Sarah workforce',
     items: [
-      { id: 'sarah', label: 'Sarah Admin', icon: 'fa-sparkles' },
+      { id: 'sarah', label: 'Sarah Admin', icon: 'fa-wand-magic-sparkles', navIcon: 'sarah' },
       { id: 'conversations', label: 'Sarah Sales', icon: 'fa-inbox', live: true },
       { id: 'finance', label: 'Sarah Finance', icon: 'fa-coins' },
       { id: 'operations', label: 'Sarah Operations', icon: 'fa-list-check' },
@@ -118,9 +119,14 @@ function navLink(item) {
         ? '<span class="bos-nav-tag bos-nav-tag-integration">Awaiting integration</span>'
         : '';
 
+  const iconInner =
+    item.navIcon === 'sarah'
+      ? sarahNavIconMarkup()
+      : `<i class="fa-solid ${item.icon}" aria-hidden="true"></i>`;
+
   return `
     <a href="#" data-page="${item.id}" ${state.currentPage === item.id ? 'class="active"' : ''}>
-      <span class="icon"><i class="fa-solid ${item.icon}"></i></span>
+      <span class="icon bos-nav-icon">${iconInner}</span>
       <span class="bos-nav-label">${item.label}</span>
       ${navTag}
       ${badge}

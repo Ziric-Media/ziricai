@@ -137,8 +137,8 @@ export function renderFinanceWorkspaceNav(fin) {
     (w) => `<option value="${escapeHtml(w.id)}" ${ws === w.id ? 'selected' : ''}>${escapeHtml(w.shortLabel)}</option>`
   ).join('');
 
-  return `<nav class="fin-workspace-nav" aria-label="Finance workspaces">
-    <div class="fin-workspace-nav-desktop">${items}</div>
+  return `<nav class="fin-workspace-nav fin-workspace-nav--horizontal sw-horizontal-nav fin-horizontal-nav" aria-label="Finance workspaces">
+    <div class="fin-workspace-nav-desktop sw-horizontal-nav-scroll">${items}</div>
     <label class="fin-workspace-nav-mobile fin-field">
       <span class="fin-sr-only">Finance workspace</span>
       <select class="fin-select fin-workspace-select" data-fin-workspace-select aria-label="Finance workspace">${mobileOptions}</select>
