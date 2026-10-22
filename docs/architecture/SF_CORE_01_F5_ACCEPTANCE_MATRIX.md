@@ -1,7 +1,11 @@
 # SF-CORE-01 — F5 acceptance matrix (F-001–F-030)
 
+**Programme status:** F5 **partial** — automated cases below; manual/deferred/live sign-off open. See evidence ladder in [`SF_CORE_01_FULL_PROGRAM.md`](./SF_CORE_01_FULL_PROGRAM.md).
+
 **Runner:** `node scripts/verify-finance-sarah-f5-acceptance.mjs`  
 **Optional loopback:** `npm run dev:finance-acceptance` on `127.0.0.1:3099` (extends coverage for HTTP + Sarah chat).
+
+**Locally verified (2026-10-22):** F-001–F-010, F-015, F-018 (gate), F-016, F-030-partial when suite + fresh loopback pass — **not** production-accepted.
 
 | ID | Spec focus | Automation | Notes |
 |----|------------|------------|-------|

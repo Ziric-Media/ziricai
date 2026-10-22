@@ -1,13 +1,17 @@
 # Sarah Finance — SF-CORE-01 · F0 foundation audit
 
 **Specification:** SF-CORE-01 v1.0 (21 October 2026)  
-**Audit date:** 2026-10-21  
+**Audit date:** 2026-10-21 (initial); **baseline refresh pending** (see below)  
 **Mode:** Read-only — no production changes implied by this document  
-**Prior audit:** [`FINANCE_SARAH_F0_CAPABILITY_AUDIT.md`](./FINANCE_SARAH_F0_CAPABILITY_AUDIT.md) (2026-10-16); this document realigns to SF-CORE-01 and records **current** evidence.
+**Prior audit:** [`FINANCE_SARAH_F0_CAPABILITY_AUDIT.md`](./FINANCE_SARAH_F0_CAPABILITY_AUDIT.md) (2026-10-16); this document realigns to SF-CORE-01 and records **point-in-time** evidence.
+
+> **Authoritative programme status (2026-10-22):** Use [`SF_CORE_01_FULL_PROGRAM.md`](./SF_CORE_01_FULL_PROGRAM.md) for phase status, evidence ladder (locally verified / committed / deployed / production-accepted), and the priority queue. **This F0 file’s executive summary and §13 matrix below are stale** until work item 1 (spec ↔ code reconciliation) produces an updated gap matrix.
 
 ---
 
-## Executive summary
+## Executive summary (stale — refresh in progress)
+
+The table below reflects the **2026-10-21 audit snapshot**. Implementation through **F3b**, local F5 automation, and portal payment UI (`e864637`) are **not** fully reflected here.
 
 | Layer | Verified | Partial | Missing / blocked |
 |-------|----------|---------|-------------------|
@@ -21,11 +25,7 @@
 | Quotation version + approval (BOS) | Partial | Backend documented | Portal + Sarah integration to verify |
 | Acceptance tests F-001–F-030 | — | Harness scripts exist | **Not run as formal SF suite** |
 
-**F1 implementation (2026-10-21):** SF-01 read tools — `viewFinanceOverviewSummary`, paginated tenant scan + `dataCoverage`, Finance allowlist tightened (BOS writes removed).
-
-**F2 implementation (2026-10-22):** Confirm-gated writes — `prepareFinanceInvoiceDraft`, `prepareFinanceQuotationDraft`, `prepareFinanceLedgerEntryDraft`, `confirmFinanceWrite`. See [`SF_CORE_01_FULL_PROGRAM.md`](./SF_CORE_01_FULL_PROGRAM.md).
-
-**Production:** Deploy Railway + Netlify for Sarah Finance F1+F2. **F3–F5** (GL, payments, full acceptance suite) remain open per full program doc.
+**Implemented since this snapshot (see full program doc):** F1 read intelligence (`b49ac9e`); F2 confirm-gated writes; F3/F3b GL read + tenant COA/journals (`74c98e5`); F5 automated subset locally green; F4 Sarah payments scaffold **gated**; portal payment UI committed/deployed separately from F4 Sarah enablement.
 
 ---
 
