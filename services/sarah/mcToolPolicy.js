@@ -37,6 +37,7 @@ export const PLATFORM_OPERATOR_BLOCKED_TOOLS = new Set([
     "connectIntegration",
     "navigatePortal",
     "bookAppointment",
+    "createTask",
     "generateQuote",
     "generateReport",
 ]);
@@ -55,6 +56,7 @@ export const MC_TENANT_READ_TOOLS = new Set([
     "viewAnalytics",
     "viewConversations",
     "searchCRM",
+    "listTasks",
     "viewBilling",
     "viewRecentActivity",
     "searchCompanyKnowledge",

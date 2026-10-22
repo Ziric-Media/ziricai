@@ -77,4 +77,4 @@ Archive stdout under `docs/architecture/evidence/` with date. Historical passes 
 
 **Local MVP gate:** **Met** for Sarah backend + loopback behaviour. **Not met** for production sign-off.
 
-**Programme action:** Stop **new** Sarah Finance scope; begin **Sarah Ops** MVP; keep advanced SF rows deferred in gap matrix.
+**Programme action:** Stop **new** Sarah Finance scope; Sarah Ops — spec [`SARAH_OPS_CORE_CAPABILITY_SPEC.md`](./SARAH_OPS_CORE_CAPABILITY_SPEC.md), gate [`SARAH_OPS_MVP_GATE.md`](./SARAH_OPS_MVP_GATE.md); keep advanced SF rows deferred in gap matrix.

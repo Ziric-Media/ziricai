@@ -55,6 +55,7 @@ import viewPlatformSupportOperations from "./viewPlatformSupportOperations.js";
 import viewPlatformSupportAttention from "./viewPlatformSupportAttention.js";
 import listTasks from "./listTasks.js";
 import createTask from "./createTask.js";
+import updateTask from "./updateTask.js";
 import viewOutstandingInvoices from "./viewOutstandingInvoices.js";
 import viewInvoiceAging from "./viewInvoiceAging.js";
 import viewInvoiceDetails from "./viewInvoiceDetails.js";
@@ -138,6 +139,7 @@ const ALL_TOOLS = [
     viewPlatformSupportAttention,
     listTasks,
     createTask,
+    updateTask,
     viewOutstandingInvoices,
     viewInvoiceAging,
     viewInvoiceDetails,
