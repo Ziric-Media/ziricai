@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ziricai.com/schemas/industry-preset/1.0.0",
+  "title": "ZiricAI Industry Preset",
+  "type": "object",
+  "required": [
+    "presetId",
+    "name",
+    "version",
+    "schemaVersion",
+    "description",
+    "industry",
+    "jurisdictions",
+    "status",
+    "owner",
+    "lastReviewedAt",
+    "sarahMapping"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "presetId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "schemaVersion": { "type": "string" },
+    "description": { "type": "string" },
+    "industry": { "type": "string" },
+    "subIndustries": { "type": "array", "items": { "type": "string" } },
+    "jurisdictions": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "validated", "approved", "deprecated", "retired"]
+    },
+    "owner": { "type": "string" },
+    "lastReviewedAt": { "type": "string", "format": "date" },
+    "sarahMapping": {
+      "type": "object",
+      "required": ["finance", "operations", "hr", "admin"],
+      "additionalProperties": false,
+      "properties": {
+        "finance": { "$ref": "#/$defs/sarahModuleMapping" },
+        "operations": { "$ref": "#/$defs/sarahModuleMapping" },
+        "hr": { "$ref": "#/$defs/sarahModuleMapping" },
+        "admin": { "$ref": "#/$defs/sarahModuleMapping" }
+      }
+    },
+    "modules": { "type": "array" },
+    "roles": { "type": "array" },
+    "workflows": { "type": "array" },
+    "kpis": { "type": "array" },
+    "knowledge": { "type": "array" },
+    "compliance": { "type": "array" },
+    "onboarding": { "type": "object" },
+    "integrations": { "type": "array" },
+    "acceptance": { "type": "object" }
+  },
+  "$defs": {
+    "sarahModuleMapping": {
+      "type": "object",
+      "required": ["purpose", "capabilities", "instructionBlockIds"],
+      "additionalProperties": false,
+      "properties": {
+        "purpose": { "type": "string" },
+        "capabilities": { "type": "array", "items": { "type": "string" } },
+        "instructionBlockIds": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

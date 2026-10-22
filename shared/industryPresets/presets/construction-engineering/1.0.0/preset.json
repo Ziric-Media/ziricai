@@ -1,0 +1,84 @@
+{
+  "presetId": "construction-engineering",
+  "name": "Construction & Engineering",
+  "version": "1.0.0",
+  "schemaVersion": "1.0.0",
+  "description": "General contractors, engineers, and project-led construction businesses.",
+  "industry": "construction",
+  "subIndustries": ["general_contractor", "civil_engineering", "mechanical_electrical"],
+  "jurisdictions": ["ZA", "global"],
+  "status": "validated",
+  "owner": "product-platform",
+  "lastReviewedAt": "2026-10-22",
+  "sarahMapping": {
+    "finance": {
+      "purpose": "Project billing, quotations, retention and subcontractor invoices within supported finance tools.",
+      "capabilities": [
+        "finance.quotations.prepare",
+        "finance.invoices.read",
+        "finance.transactions.read",
+        "finance.overview.read"
+      ],
+      "instructionBlockIds": ["construction.finance.terminology"]
+    },
+    "operations": {
+      "purpose": "Site tasks, milestones, and contractor coordination via tasks and supported ops tools.",
+      "capabilities": ["tasks.list", "tasks.create", "tasks.assign", "construction.siteInspections"],
+      "instructionBlockIds": ["construction.ops.siteWorkflows"]
+    },
+    "hr": {
+      "purpose": "Site and office roster with approved HR workflows and safety briefing tone.",
+      "capabilities": ["hr.roster.read", "construction.subcontractorCompliance"],
+      "instructionBlockIds": ["construction.hr.safetyBriefing"]
+    },
+    "admin": {
+      "purpose": "Cross-module coordination, onboarding checklist, and workforce delegations.",
+      "capabilities": ["admin.workforceInstructions", "admin.portalNavigation", "knowledge.search"],
+      "instructionBlockIds": ["construction.admin.overview"]
+    }
+  },
+  "modules": [
+    {
+      "moduleId": "optional-pack-construction-sales",
+      "displayName": "Construction sales AI employee (optional)",
+      "purpose": "Front-line enquiry handling via marketplace pack — not required for workforce Sarah.",
+      "requiredCapabilities": [],
+      "optionalCapabilities": ["integrations.whatsapp"],
+      "defaultActivationState": "off",
+      "relevantSarahEmployees": ["admin"]
+    }
+  ],
+  "roles": [
+    {
+      "roleId": "site_manager",
+      "label": "Site manager",
+      "permissions": ["canViewTasks", "canCreateTasks", "canAssignTasks", "canCompleteTasks"]
+    }
+  ],
+  "workflows": [],
+  "kpis": [],
+  "knowledge": [],
+  "compliance": [
+    {
+      "obligationId": "construction-safety-informational",
+      "jurisdiction": "ZA",
+      "summary": "Occupational health and safety obligations vary by activity — preset guidance is informational only.",
+      "humanReviewRequired": true
+    }
+  ],
+  "onboarding": {
+    "checklist": [
+      "business_identity",
+      "jurisdiction",
+      "finance_baseline",
+      "tasks_baseline",
+      "knowledge_seed",
+      "compliance_review"
+    ]
+  },
+  "integrations": [],
+  "acceptance": {
+    "automated": ["verify-industry-preset-schema"],
+    "manual": ["product-terminology-review"]
+  }
+}

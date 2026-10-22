@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0.0",
+  "capabilities": {
+    "finance.quotations.prepare": {
+      "class": "available",
+      "label": "Prepare quotations (confirm flow)",
+      "sarahModules": ["finance"]
+    },
+    "finance.invoices.read": {
+      "class": "available",
+      "label": "Read invoices and outstanding balances",
+      "sarahModules": ["finance"]
+    },
+    "finance.transactions.read": {
+      "class": "available",
+      "label": "Read posted income and expenses",
+      "sarahModules": ["finance"]
+    },
+    "finance.overview.read": {
+      "class": "available",
+      "label": "Finance overview summary",
+      "sarahModules": ["finance"]
+    },
+    "tasks.list": {
+      "class": "available",
+      "label": "List operational tasks",
+      "sarahModules": ["operations", "admin"]
+    },
+    "tasks.create": {
+      "class": "available",
+      "label": "Create tasks (permission-gated)",
+      "sarahModules": ["operations"]
+    },
+    "tasks.assign": {
+      "class": "configurable",
+      "label": "Assign tasks to team members",
+      "sarahModules": ["operations"]
+    },
+    "hr.roster.read": {
+      "class": "available",
+      "label": "List team roster (redacted fields per policy)",
+      "sarahModules": ["hr"]
+    },
+    "admin.workforceInstructions": {
+      "class": "available",
+      "label": "Issue and track workforce instructions",
+      "sarahModules": ["admin"]
+    },
+    "admin.portalNavigation": {
+      "class": "available",
+      "label": "Portal navigation with consent",
+      "sarahModules": ["admin"]
+    },
+    "knowledge.search": {
+      "class": "available",
+      "label": "Search tenant knowledge base",
+      "sarahModules": ["finance", "operations", "hr", "admin"]
+    },
+    "integrations.whatsapp": {
+      "class": "integration-dependent",
+      "label": "WhatsApp channel",
+      "sarahModules": ["admin", "sales"]
+    },
+    "construction.siteInspections": {
+      "class": "extension-required",
+      "label": "Site inspection photos and checklists",
+      "sarahModules": ["operations"]
+    },
+    "construction.projectCostCodes": {
+      "class": "extension-required",
+      "label": "Project cost-code ledger",
+      "sarahModules": ["finance"]
+    },
+    "construction.subcontractorCompliance": {
+      "class": "extension-required",
+      "label": "Subcontractor compliance document tracking",
+      "sarahModules": ["hr", "operations"]
+    }
+  }
+}
