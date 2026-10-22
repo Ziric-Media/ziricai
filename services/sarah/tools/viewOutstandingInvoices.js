@@ -70,7 +70,7 @@ export function createViewOutstandingInvoicesTool({
     return {
         name: "viewOutstandingInvoices",
         description:
-            "Read-only outstanding receivable invoice summary for this authenticated company. Totals remain separated by currency. This reflects the current invoice model and does not account for refunds, credit notes, or write-offs.",
+            "Read-only **unpaid** receivable invoice balances (sent/partial). Not cash collected — use viewFinanceTransactions for posted income/receipts. Totals separated by currency; excludes refunds, credit notes, write-offs.",
         parameters: {
             type: "object",
             properties: {},

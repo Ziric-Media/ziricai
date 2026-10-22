@@ -1,12 +1,26 @@
 # SF-CORE-01 — Evidence-backed gap matrix
 
-**Purpose:** Priority 1 deliverable — reconcile documented baseline with **code**, **tests**, and **deployment** without conflating them.  
-**Programme source of truth:** [`SF_CORE_01_FULL_PROGRAM.md`](./SF_CORE_01_FULL_PROGRAM.md).  
-**Supporting (partially stale):** [`SARAH_FINANCE_SF_CORE_01_F0_AUDIT.md`](./SARAH_FINANCE_SF_CORE_01_F0_AUDIT.md) §13; [`SF_CORE_01_F5_ACCEPTANCE_MATRIX.md`](./SF_CORE_01_F5_ACCEPTANCE_MATRIX.md).  
+**MVP finish line:** [`SF_CORE_01_MVP_GATE.md`](./SF_CORE_01_MVP_GATE.md) — programme stops expanding Finance when MVP gate is met (local evidence + defect fixes).  
+**Programme:** [`SF_CORE_01_FULL_PROGRAM.md`](./SF_CORE_01_FULL_PROGRAM.md).  
 **Matrix date:** 2026-10-22  
-**Branch inspected:** `feature/company-portal-finance-v1` @ `648013c` (pushed to `origin`).
+**Branch:** `feature/company-portal-finance-v1` @ `0d2ee3d+` on `origin`.
 
-> **Documentation baseline ≠ verified functionality.** Rows below cite **evidence artifacts**. Nothing is **production-accepted** unless explicitly marked.
+> **Full SF-CORE-01 ≠ MVP.** Rows below include **deferred advanced** capabilities. Nothing is **production-accepted** unless explicitly marked.
+
+---
+
+## MVP gate (six capabilities)
+
+| MVP # | Capability | Status (local) | Evidence |
+|-------|------------|----------------|----------|
+| 1 | Understand finances (read tools) | **Verified** | F-001–F-005; F1 verify |
+| 2 | Invoice & quotation drafts + confirm | **Verified** | F-007–F-009; F2 verify |
+| 3 | COA, GL, manual journal, trial balance | **Verified** | F3, F3b, F-010 |
+| 4 | Explain without inventing figures | **Verified (local, MVP)** | F-006 S3 retest pass after prefetch; full F-006 S2 optional |
+| 5 | Permissions & safe mutations | **Verified** | F-016, tool-policy, F2 gates |
+| 6 | Finance portal journey | **Partial** | `js/portal/finance*`; production deploy/pilot not signed |
+
+**Deferred (not MVP):** SF-05 reconciliation, SF-07 budgets, SF-09 Sarah payments, SF-11–12 statutory/close, F-011–F-029 advanced acceptance — see sections below.
 
 ---
 
@@ -46,7 +60,7 @@
 
 **Untracked under `app/js/portal/` (examples):** `financeOverviewUi.js`, `financeSarahPanel.js`, `financeDisplay.js`, etc. — may exist on disk for deploy but **not all are in git**; Netlify no-build uploads only what is in the local `app/` tree. **Portal E2E is Partial** until git, prepare-sites, and deploy pipeline align.
 
-**Local verify re-run (2026-10-22 later):** `verify-finance-sarah-acceptance-suite.mjs` **failed** on this machine (`firebase-admin` missing — broken/incomplete `node_modules` after failed `npm ci`). Earlier same-day run reported **PASS** (13/13 F5 automated with fresh loopback). **Re-verify after `npm ci` succeeds.**
+**Local verify (2026-10-22):** After `npm install`, `verify-finance-sarah-acceptance-suite.mjs` **PASS** — archived at [`evidence/verify-finance-sarah-acceptance-suite-2026-10-22.txt`](./evidence/verify-finance-sarah-acceptance-suite-2026-10-22.txt). F5 automated **13/13** with loopback. **Historical only until the next archived run.**
 
 ---
 
@@ -78,7 +92,7 @@
 | F-003 | Receivables exclude quotations | **Verified** (local) | F5 auto |
 | F-004 | Period in tool payload | **Verified** (local) | F5 auto |
 | F-005 | dataCoverage present | **Verified** (local) | F5 auto |
-| F-006 | No fake profit/cash claims | **Untested** | Manual prompt/chat review **not recorded** |
+| F-006 | No fake profit/cash claims | **Verified (local, MVP subset)** | S1/S3/S7 pass loopback; S2 optional — [`SF_CORE_01_F006_MANUAL_ACCEPTANCE.md`](./SF_CORE_01_F006_MANUAL_ACCEPTANCE.md) |
 | F-007 | Invoice draft not persisted until confirm | **Verified** (local) | F5 auto |
 | F-008 | Invoice confirm persists | **Verified** (local) | F5 auto |
 | F-009 | Quotation draft marker | **Verified** (local) | F5 auto |
@@ -104,7 +118,7 @@
 
 | Priority | Theme | Gap status | Notes |
 |----------|--------|------------|-------|
-| **1** | Spec ↔ code reconciliation | **Partial** | This matrix replaces stale F0 §13 for planning; F0 body still needs line-by-line refresh. |
+| **1** | Spec ↔ code reconciliation | **Verified (local)** | Gap matrix + F0 §13 refreshed 2026-10-22; executive summary table above remains historical. |
 | **2** | F5 deferred acceptance | **Partial** | 13/30 automated locally; F-006, F-011, F-014–F-017, F-021–F-029 open |
 | **3** | Portal Finance E2E | **Partial** | Auth/tenant mapping on Central Motors **not evidenced** here; Sarah ↔ API ↔ Firestore path on production API version **unknown** |
 | **4** | Accounting depth | **Partial** | GL/journal **verified** in memory tests; reconciliation, budgets, close, export **blocked** |
@@ -114,8 +128,8 @@
 
 ## Recommended next actions (evidence-producing)
 
-1. Restore deps (`npm ci` on non-locked path) and re-run `node scripts/verify-finance-sarah-acceptance-suite.mjs`; archive stdout with date in pilot folder.
-2. Refresh F0 audit §13 rows to match this matrix (or supersede §13 with link here).
-3. Record **F-006** manual review (prompt + sample chats, pass/fail checklist).
+1. ~~Restore deps and re-run acceptance suite~~ — **Done** 2026-10-22 ([archive](./evidence/verify-finance-sarah-acceptance-suite-2026-10-22.txt)).
+2. ~~Refresh F0 §13~~ — **Done** 2026-10-22.
+3. Record **F-006** manual review — [`SF_CORE_01_F006_MANUAL_ACCEPTANCE.md`](./SF_CORE_01_F006_MANUAL_ACCEPTANCE.md).
 4. Align **git ↔ app/** (prepare-sites or commit app mirrors) before the next Netlify production deploy.
 5. Railway deploy from `648013c` + approved **Central Motors** smoke script results → only then consider selective **production-accepted** rows.

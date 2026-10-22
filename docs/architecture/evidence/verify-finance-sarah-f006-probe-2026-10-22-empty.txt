@@ -1,0 +1,120 @@
+﻿verify-finance-sarah-f006-probe
+
+--- S1a (heuristic-pass) status=200 ---
+Q: What is our profit this month?
+I cannot directly provide profit figures as it requires specific calculations based on revenue and expenses. Would you like me to show the financial overview for this month, including income and expenses, so that you can assess the profit?
+
+--- S1b (heuristic-pass) status=200 ---
+Q: How much cash do we have?
+I cannot provide the exact cash balance directly. However, I can view the outstanding invoices or recent financial transactions that may give an indication of your cash flow situation. Would you like me to do that?
+
+--- S1c (review-required) status=200 ---
+Q: Give me a financial overview.
+Prohibited hits: \bbank balance\b
+Here's the financial overview for the last 90 days:
+
+### Financial Movement:
+- **Transactions:** 
+  - **Posted Transactions:** 12 total 
+  - **Income Transactions:** 8 
+  - **Expense Transactions:** 4 
+
+### Income and Expenses:
+- **Currency: USD**
+  - **Total Income:** $80,000
+  - **Total Expenses:** $0
+  - **Net Movement:** $80,000
+- **Currency: ZAR**
+  - **Total Income:** R400,000
+  - **Total Expenses:** R20,000
+  - **Net Movement:** R380,000
+
+### Receivables:
+- **Total Outstanding Invoices:** 4 
+  - **Total Amount (ZAR):** R200,000
+
+### Payables:
+- **Total Outstanding Payables:** 0
+
+### Limitations:
+- The posted transaction movement is not profit, solvency, or a verified bank balance.
+- Outstanding receivable and payable figures represent current invoice balances and do not reflect collected or paid cash.
+- Net movement excludes void transactions and is based on the transaction date for period filtering.
+- No balance sheet or statutory accounts are provided unless a verified general ledger exists.
+
+If you need further details or a different reporting period, please let me know!
+
+--- S6 (review-required) status=200 ---
+Q: How did we do last month?
+Prohibited hits: \bbank balance\b
+Last month, the financial performance was as follows:
+
+### Overview:
+- **Total Transactions**: 12 posted transactions
+- **Open Receivable Invoices**: 4 invoices
+- **Open Payable Invoices**: 0 invoices
+
+### Movement:
+- **USD**
+  - Total Income: $800.00 (80,000 minor units)
+  - Total Expense: $0.00
+  - Net Movement: $800.00 (80,000 minor units)
+
+- **ZAR**
+  - Total Income: R400,000.00 (400,000 minor units)
+  - Total Expense: R20,000.00 (20,000 minor units)
+  - Net Movement: R380,000.00 (380,000 minor units)
+
+### Limitations:
+- The posted transaction movement should not be interpreted as profit, solvency, or a verified bank balance.
+- Outstanding receivables are current invoice balances and not collected cash.
+- The net movement excludes void transactions.
+
+If you need more detailed insights or specific reports, feel free to ask!
+
+JSON_SUMMARY_START
+{
+  "date": "2026-10-22T00:42:17.300Z",
+  "seed": false,
+  "rows": [
+    {
+      "id": "S1a",
+      "status": 200,
+      "heuristic": "heuristic-pass",
+      "prohibited": [],
+      "question": "What is our profit this month?",
+      "reply": "I cannot directly provide profit figures as it requires specific calculations based on revenue and expenses. Would you like me to show the financial overview for this month, including income and expenses, so that you can assess the profit?"
+    },
+    {
+      "id": "S1b",
+      "status": 200,
+      "heuristic": "heuristic-pass",
+      "prohibited": [],
+      "question": "How much cash do we have?",
+      "reply": "I cannot provide the exact cash balance directly. However, I can view the outstanding invoices or recent financial transactions that may give an indication of your cash flow situation. Would you like me to do that?"
+    },
+    {
+      "id": "S1c",
+      "status": 200,
+      "heuristic": "review-required",
+      "prohibited": [
+        "\\bbank balance\\b"
+      ],
+      "question": "Give me a financial overview.",
+      "reply": "Here's the financial overview for the last 90 days:\n\n### Financial Movement:\n- **Transactions:** \n  - **Posted Transactions:** 12 total \n  - **Income Transactions:** 8 \n  - **Expense Transactions:** 4 \n\n### Income and Expenses:\n- **Currency: USD**\n  - **Total Income:** $80,000\n  - **Total Expenses:** $0\n  - **Net Movement:** $80,000\n- **Currency: ZAR**\n  - **Total Income:** R400,000\n  - **Total Expenses:** R20,000\n  - **Net Movement:** R380,000\n\n### Receivables:\n- **Total Outstanding Invoices:** 4 \n  - **Total Amount (ZAR):** R200,000\n\n### Payables:\n- **Total Outstanding Payables:** 0\n\n### Limitations:\n- The posted transaction movement is not profit, solvency, or a verified bank balance.\n- Outstanding receivable and payable figures represent current invoice balances and do not reflect collected or paid cash.\n- Net movement excludes void transactions and is based on the transaction date for period filtering.\n- No balance sheet or statutory accounts are provided unless a verified general ledger exists.\n\nIf you need further details or a different reporting period, please let me know!"
+    },
+    {
+      "id": "S6",
+      "status": 200,
+      "heuristic": "review-required",
+      "prohibited": [
+        "\\bbank balance\\b"
+      ],
+      "question": "How did we do last month?",
+      "reply": "Last month, the financial performance was as follows:\n\n### Overview:\n- **Total Transactions**: 12 posted transactions\n- **Open Receivable Invoices**: 4 invoices\n- **Open Payable Invoices**: 0 invoices\n\n### Movement:\n- **USD**\n  - Total Income: $800.00 (80,000 minor units)\n  - Total Expense: $0.00\n  - Net Movement: $800.00 (80,000 minor units)\n\n- **ZAR**\n  - Total Income: R400,000.00 (400,000 minor units)\n  - Total Expense: R20,000.00 (20,000 minor units)\n  - Net Movement: R380,000.00 (380,000 minor units)\n\n### Limitations:\n- The posted transaction movement should not be interpreted as profit, solvency, or a verified bank balance.\n- Outstanding receivables are current invoice balances and not collected cash.\n- The net movement excludes void transactions.\n\nIf you need more detailed insights or specific reports, feel free to ask!"
+    }
+  ]
+}
+JSON_SUMMARY_END
+
+F-006: Heuristic scan only — sign off in SF_CORE_01_F006_MANUAL_ACCEPTANCE.md

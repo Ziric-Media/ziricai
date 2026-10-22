@@ -9,6 +9,7 @@ import viewFinanceTransactions, {
 import {
     FINANCE_SARAH_TOOL_DENIED,
     isToolAllowedInFinanceSarah,
+    isFinanceCollectionsQuestion,
 } from "../services/sarah/financeSarahToolPolicy.js";
 import { executeTool, registerTool } from "../services/sarah/toolRegistry.js";
 
@@ -89,4 +90,9 @@ test("Finance policy allowlists transactions while execution remains default-den
     assert.equal(isToolAllowedInFinanceSarah(deniedName, { financeSarah: true }), false);
     const result = await executeTool(deniedName, { financeSarah: true });
     assert.equal(result.code, FINANCE_SARAH_TOOL_DENIED);
+});
+
+test("detects collections/cash-received questions for Finance routing", () => {
+    assert.equal(isFinanceCollectionsQuestion("How much money have we collected from customers?"), true);
+    assert.equal(isFinanceCollectionsQuestion("What is our profit?"), false);
 });

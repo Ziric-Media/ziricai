@@ -34,6 +34,8 @@ import {
     applyFinanceSarahSessionStickiness,
     shouldPersistFinanceSessionScope,
     SARAH_SESSION_MODULE_SCOPE_FINANCE,
+    financeSarahTurnSystemAddendum,
+    isFinanceCollectionsQuestion,
 } from "./financeSarahToolPolicy.js";
 
 const INTERNAL_TOOL_MESSAGE_RE = /Each line item requires unitAmount/i;
@@ -276,7 +278,8 @@ export async function handleSarahChat(ctx, input) {
     }
 
     const history = getSessionHistory(session);
-    const systemPrompt = buildSarahSystemPrompt(ctx);
+    let systemPrompt = buildSarahSystemPrompt(ctx);
+    systemPrompt += financeSarahTurnSystemAddendum(ctx, message);
     const tools = getOpenAIToolDefinitions(ctx);
 
     const messages = [{ role: "system", content: systemPrompt }];
@@ -293,6 +296,20 @@ export async function handleSarahChat(ctx, input) {
     try {
         let round = 0;
         let currentMessages = [...messages];
+
+        if (ctx.financeSarah && isFinanceCollectionsQuestion(message)) {
+            const prefetch = await executeTool("viewFinanceTransactions", ctx, { periodPreset: "all" });
+            actions.push(prefetch);
+            await recordAction(session, { tool: "viewFinanceTransactions", success: prefetch.success });
+            currentMessages.push({
+                role: "system",
+                content:
+                    "Authoritative prefetch (viewFinanceTransactions) for a collections/cash-received question. " +
+                    "Answer using posted income from this JSON only; outstanding receivable invoices are not collections. " +
+                    "State limitations (not bank balance). Payload: " +
+                    JSON.stringify(prefetch).slice(0, 6000),
+            });
+        }
 
         while (round < maxToolRounds) {
             const response = await openai.chat.completions.create({

@@ -1,16 +1,17 @@
 # SF-CORE-01 — Full program (Sarah Finance + Company Portal Finance)
 
-**Spec reference:** SF-CORE-01 v1.0 — capability matrix in [`SARAH_FINANCE_SF_CORE_01_F0_AUDIT.md`](./SARAH_FINANCE_SF_CORE_01_F0_AUDIT.md).  
-**Program baseline updated:** 2026-10-22 (post F1–F3b implementation, F5 local acceptance, portal payment UI commit).  
-**Gap matrix (Priority 1 deliverable):** [`SF_CORE_01_GAP_MATRIX.md`](./SF_CORE_01_GAP_MATRIX.md) — evidence-backed statuses; **does not** claim remaining work is complete.
+**Active finish line:** [`SF_CORE_01_MVP_GATE.md`](./SF_CORE_01_MVP_GATE.md) — six basic capabilities; **not** the full finance employee.  
+**Spec reference:** SF-CORE-01 v1.0 — [`SARAH_FINANCE_SF_CORE_01_F0_AUDIT.md`](./SARAH_FINANCE_SF_CORE_01_F0_AUDIT.md).  
+**Status register:** [`SF_CORE_01_GAP_MATRIX.md`](./SF_CORE_01_GAP_MATRIX.md) (MVP vs deferred).  
+**Program baseline updated:** 2026-10-22.
 
 ---
 
 ## Milestone framing
 
-Sarah Finance has moved **beyond a chatbot** into a **finance capability**: read intelligence, confirm-gated draft actions, and a general-ledger foundation. That is a strong programme milestone.
+**Current programme goal:** Ship **MVP Sarah Finance** (read, draft/confirm, basic GL, honest answers, permissions, portal journey), then move to **Sarah Ops / HR / Admin**. Advanced SF-CORE-01 items (reconciliation, budgets, close, statutory, industry presets) are **deferred** — see MVP gate doc.
 
-It is **not** yet proof of the **complete finance employee experience end to end** (portal + Sarah + APIs + authoritative records + production acceptance).
+Sarah Finance is already a **finance capability** in code (F1–F3b on branch). MVP closure = **evidence on the gate table** + serious defects fixed, **not** every F-001–F-030 case.
 
 ---
 
@@ -18,7 +19,7 @@ It is **not** yet proof of the **complete finance employee experience end to end
 
 | Level | Meaning | Current notes (2026-10-22) |
 |-------|---------|----------------------------|
-| **Locally verified** | Named scripts/tests pass on a developer machine (memory and/or loopback `:3099`). | Reported **PASS** 2026-10-22 (F5 **13/13** with fresh loopback). Re-run may require intact `node_modules` — see gap matrix if verify fails. |
+| **Locally verified** | Named scripts/tests pass on a developer machine (memory and/or loopback `:3099`). | **PASS** 2026-10-22 — [`evidence/verify-finance-sarah-acceptance-suite-2026-10-22.txt`](./evidence/verify-finance-sarah-acceptance-suite-2026-10-22.txt). Not production-accepted. |
 | **Committed** | On git branch `feature/company-portal-finance-v1` at `origin`. | F1 `b49ac9e`; F2–F3b/F5 harness `74c98e5`; portal payments `e864637`; docs `e624c83`; import fix `648013c`. |
 | **Deployed** | Live on hosting without implying sign-off. | **Portal:** `app.ziricai.com` — production deploy from local `app/` (no-build upload, Oct 2026). **API:** Railway production may lag branch; redeploy requires `railway login` + explicit release. |
 | **Production-accepted** | Documented sign-off on a live/staging tenant with ops approval. | **Not claimed.** F5 manual/deferred cases and pilot checklist open. |
@@ -38,13 +39,7 @@ It is **not** yet proof of the **complete finance employee experience end to end
 
 **Portal invoice payments (SF-09 / Tier B, not F4 Sarah):** `POST …/invoices/:id/payments` UI enabled in `e864637` and deployed to the portal; treat as **committed + deployed**, **not production-accepted** until payment remediation and live smoke are closed.
 
-### Programme completion estimate
-
-Roughly **~85% of the phased F0–F5 Sarah/backend track** (implementation through F3b, F4 scaffolded, F5 automated slice green locally).
-
-That figure must **not** be read as “85% of everything a finance employee needs.” Substantial **end-to-end product**, **accounting**, and **acceptance** work remains (see priority queue below).
-
-**Still not claimed at spec level:** Bank feeds, automated reconciliation, budgets/forecasts, period close, statutory filings, full BOS quotation E2E, audit/compliance stream, production pilot sign-off.
+**MVP vs full spec:** Backend Sarah MVP capabilities are largely **implemented**; **acceptance** is partial (local suite green; F-006 behavioural; portal/production pilot open). Full-spec items remain **deferred** per MVP gate — do not block Sarah Ops on them.
 
 ---
 
@@ -69,21 +64,29 @@ Optional loopback: `FINANCE_ACCEPTANCE_SKIP_PREPARE=1 npm run dev:finance-accept
 
 ---
 
-## Remaining work — priority queue
+## Execution order (MVP-focused)
 
-Do **not** jump straight into F4 Sarah payments or expand the tool surface without closing gaps in this order (reduces risk to financial records).
+| Step | Action | Exit condition | Status (2026-10-22) |
+|------|--------|----------------|---------------------|
+| **MVP** | [`SF_CORE_01_MVP_GATE.md`](./SF_CORE_01_MVP_GATE.md) checks | Gate table + local verify | **In progress** — suite PASS; F-006 S3 fix + retest; portal/deploy optional for **local** gate |
+| **Defer** | Advanced F5 / SF rows | Documented in gap matrix | **Done** — not blocking Ops |
+| **Pilot** | Central Motors / production | Explicit deploy + smoke | **Open** — separate from local MVP gate |
 
-### 1 — Reconcile specification with current code
+Do **not** expand Sarah Finance for deferred features. Do **not** enable F4 Sarah payments without remediation sign-off.
 
-Refresh the stale F0 audit and compare full SF-CORE-01 with implementation, test evidence, and commits.
+---
 
-**Exit criterion:** One authoritative **gap matrix** (verified / partial / blocked / untested / production-accepted) aligned to SF-CORE-01 §13 and F-001–F-030. **Draft:** [`SF_CORE_01_GAP_MATRIX.md`](./SF_CORE_01_GAP_MATRIX.md) — refresh after each evidence-producing sprint and after F0 §13 reconciliation.
+## Remaining work — priority queue (detail)
+
+### 1 — Reconcile specification with current code ✅
+
+Gap matrix published; F0 §13 refreshed. Refresh gap matrix after each evidence sprint.
 
 ### 2 — Close F5 deferred acceptance
 
 Prioritise:
 
-- **F-006** — manual review of financial claims (prompt/chat behaviour).
+- **F-006** — manual review — protocol [`SF_CORE_01_F006_MANUAL_ACCEPTANCE.md`](./SF_CORE_01_F006_MANUAL_ACCEPTANCE.md).
 - **F-011** — reconciliation (SF-05).
 - **F-014–F-017** — full quotation / BOS workflow.
 - **F-021–F-029** — audit, recovery, reporting, period close, export.

@@ -162,3 +162,24 @@ export function isToolAllowedInFinanceSarah(toolName, ctx) {
     if (toolName === "prepareFinanceInvoicePaymentDraft" && isFinanceSarahPaymentsEnabled()) return true;
     return false;
 }
+
+/** User asks about cash collected / receipts — must not be answered with unpaid AR alone. */
+const FINANCE_COLLECTIONS_QUESTION_RE =
+    /\b(collect(ed|ion|ions)?|received from customers?|cash from sales|money (we|you)('ve| have) (collected|received)|receipts from customers?|customer payments? received|how much (have we|did we) (collect|receive))\b/i;
+
+export function isFinanceCollectionsQuestion(message) {
+    return FINANCE_COLLECTIONS_QUESTION_RE.test(String(message || ""));
+}
+
+/**
+ * Per-turn system addendum for Finance Sarah (MVP honest reporting).
+ * @param {{ financeSarah?: boolean }} ctx
+ * @param {string} message
+ */
+export function financeSarahTurnSystemAddendum(ctx, message) {
+    if (!ctx?.financeSarah) return "";
+    if (isFinanceCollectionsQuestion(message)) {
+        return "\n\n[TURN ROUTING — mandatory] This question is about **money collected / posted income**, not unpaid invoices. Call **viewFinanceTransactions** (and/or viewFinanceOverviewSummary) before answering. Do **not** use viewOutstandingInvoices as the answer. Distinguish posted income from bank balance.";
+    }
+    return "";
+}

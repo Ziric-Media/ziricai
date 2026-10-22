@@ -90,7 +90,7 @@ export function createViewFinanceTransactionsTool({
     return {
         name: "viewFinanceTransactions",
         description:
-            "Read-only summary and bounded history of this company's ledger transactions for an optional reporting period. Totals are separated by currency; void transactions are excluded from totals. Check dataCoverage before claiming full-company totals.",
+            "Read-only posted ledger transactions (income, expense, transfer) for an optional period — use for **cash collected / receipts** (income rows), not unpaid invoices. Totals by currency; voids excluded. Check dataCoverage before full-company claims.",
         parameters: {
             type: "object",
             properties: {

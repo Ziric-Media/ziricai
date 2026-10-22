@@ -14,7 +14,7 @@
 | F-003 | Receivables exclude quotations | **Auto** | Quotation marker invoice |
 | F-004 | Period stated in tool payload | **Auto** | periodPreset 90d |
 | F-005 | dataCoverage present | **Auto** | `complete` / `totalsScope` |
-| F-006 | No fake profit/cash claims | **Manual** | Prompt/chat review |
+| F-006 | No fake profit/cash claims | **Manual** | [`SF_CORE_01_F006_MANUAL_ACCEPTANCE.md`](./SF_CORE_01_F006_MANUAL_ACCEPTANCE.md) — **Partial** (2026-10-22 loopback): S3 **Fail** F006-S3-001; S2 not run |
 | F-007 | Invoice draft not persisted until confirm | **Auto** | prepare without confirm |
 | F-008 | Invoice confirm persists | **Auto** | prepare + confirm |
 | F-009 | Quotation draft marker | **Auto** | notes marker on create |
