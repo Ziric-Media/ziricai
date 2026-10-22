@@ -16,6 +16,12 @@ import {
     industryPresetTurnSystemAddendum,
     resolveIndustryPresetForTenant,
 } from "../services/platform/industryPresetContext.js";
+import {
+    previewIndustryPresetActivation,
+    activateIndustryPresetForCompany,
+    deactivateIndustryPresetForCompany,
+} from "../services/platform/industryPresetActivationService.js";
+import { createCompany, getCompany } from "../services/tenants/companyService.js";
 
 console.log("verify-industry-preset-schema\n");
 
@@ -61,13 +67,28 @@ assert.ok(
     "unknown capability rejected"
 );
 
-process.env.INDUSTRY_PRESET_RUNTIME = "allow-validated";
+process.env.INDUSTRY_PRESET_RUNTIME = "1";
 const resolved = await resolveIndustryPresetForTenant({
     industryPresetId: "construction-engineering",
     industryPresetVersion: "1.0.0",
     industryPresetActivatedAt: "2026-10-22T12:00:00.000Z",
 });
-assert.equal(resolved.active, true, "resolved preset active under allow-validated");
+assert.equal(resolved.active, true, "resolved preset active when pinned and approved");
+
+const testCo = `preset-act-${Date.now()}`;
+await createCompany(testCo, { name: "Preset Activation Test Co", industry: "construction", country: "ZA" });
+const preview = await previewIndustryPresetActivation(testCo, "construction-engineering", "1.0.0", {});
+assert.equal(preview.ok, true, "activation preview ok");
+const activated = await activateIndustryPresetForCompany(
+    testCo,
+    { presetId: "construction-engineering", version: "1.0.0" },
+    {}
+);
+assert.equal(activated.ok, true, "activation succeeds");
+const stored = await getCompany(testCo);
+assert.equal(stored.industryPresetId, "construction-engineering");
+const deactivated = await deactivateIndustryPresetForCompany(testCo);
+assert.equal(deactivated.ok, true);
 
 const financeCtx = {
     industryPreset: resolved,
@@ -112,4 +133,4 @@ function financeToolNamesBaseline() {
 
 assert.deepEqual(financeToolNames(), financeToolNamesBaseline(), "Finance Sarah tool list unchanged with preset ctx");
 
-console.log("OK — industry preset Phase 1 checks passed.");
+console.log("OK — industry preset schema and activation checks passed.");

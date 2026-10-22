@@ -7,7 +7,7 @@
   "industry": "construction",
   "subIndustries": ["general_contractor", "civil_engineering", "mechanical_electrical"],
   "jurisdictions": ["ZA", "global"],
-  "status": "validated",
+  "status": "approved",
   "owner": "product-platform",
   "lastReviewedAt": "2026-10-22",
   "sarahMapping": {

@@ -65,6 +65,10 @@ export const ROUTE_CATALOG = [
     // Company workspace (tenant-scoped)
     { method: "GET", path: "/api/companies/:companyId", domain: "workspace", tenantScoped: true, description: "Company root document" },
     { method: "PATCH", path: "/api/companies/:companyId", domain: "workspace", tenantScoped: true, description: "Update company" },
+    { method: "GET", path: "/api/companies/:companyId/industry-presets", domain: "workspace", tenantScoped: true, description: "Industry preset catalogue" },
+    { method: "GET", path: "/api/companies/:companyId/industry-presets/:presetId/preview", domain: "workspace", tenantScoped: true, description: "Preview preset activation" },
+    { method: "POST", path: "/api/companies/:companyId/industry-presets/activate", domain: "workspace", tenantScoped: true, description: "Activate industry preset" },
+    { method: "POST", path: "/api/companies/:companyId/industry-presets/deactivate", domain: "workspace", tenantScoped: true, description: "Deactivate industry preset hints" },
     { method: "POST", path: "/api/companies", domain: "workspace", tenantScoped: false, description: "Create + provision company" },
     { method: "POST", path: "/api/companies/:companyId/suspend", domain: "workspace", tenantScoped: true, description: "Suspend company" },
     { method: "POST", path: "/api/companies/:companyId/archive", domain: "workspace", tenantScoped: true, description: "Archive company" },

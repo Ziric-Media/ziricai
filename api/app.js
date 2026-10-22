@@ -115,6 +115,12 @@ import {
     assertAllowedCompanyStatus,
 } from "../services/tenants/companyService.js";
 import {
+    activateIndustryPresetForCompany,
+    deactivateIndustryPresetForCompany,
+    listIndustryPresetsForTenantApi,
+    previewIndustryPresetActivation,
+} from "../services/platform/industryPresetActivationService.js";
+import {
     listDepartments,
     createDepartment,
     updateDepartment,
@@ -707,6 +713,75 @@ app.patch("/api/companies/:companyId", requireTenantScope(), checkPermission("ca
         res.status(500).json({ error: err.message || "Failed to update company" });
     }
 });
+
+app.get("/api/companies/:companyId/industry-presets", requireTenantScope(), async (req, res) => {
+    try {
+        res.json({ presets: listIndustryPresetsForTenantApi() });
+    } catch (err) {
+        console.error("[api/industry-presets GET] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to list industry presets" });
+    }
+});
+
+app.get("/api/companies/:companyId/industry-presets/:presetId/preview", requireTenantScope(), async (req, res) => {
+    try {
+        const version = req.query?.version ? String(req.query.version) : undefined;
+        const report = await previewIndustryPresetActivation(
+            req.params.companyId,
+            req.params.presetId,
+            version,
+            req.tenant
+        );
+        res.json(report);
+    } catch (err) {
+        console.error("[api/industry-presets preview] error:", err.message);
+        res.status(500).json({ error: err.message || "Failed to preview preset" });
+    }
+});
+
+app.post(
+    "/api/companies/:companyId/industry-presets/activate",
+    requireTenantScope(),
+    checkPermission("canManageWorkspace"),
+    async (req, res) => {
+        try {
+            const { presetId, version } = req.body || {};
+            if (!presetId) {
+                return res.status(400).json({ error: "presetId is required", code: "INVALID_REQUEST" });
+            }
+            const result = await activateIndustryPresetForCompany(
+                req.params.companyId,
+                { presetId, version },
+                req.tenant
+            );
+            if (!result.ok) {
+                const status =
+                    result.code === "VALIDATION_FAILED" || result.code === "READINESS_INCOMPLETE" ? 400 : 404;
+                return res.status(status).json(result);
+            }
+            res.json(result);
+        } catch (err) {
+            console.error("[api/industry-presets activate] error:", err.message);
+            res.status(500).json({ error: err.message || "Failed to activate preset" });
+        }
+    }
+);
+
+app.post(
+    "/api/companies/:companyId/industry-presets/deactivate",
+    requireTenantScope(),
+    checkPermission("canManageWorkspace"),
+    async (req, res) => {
+        try {
+            const result = await deactivateIndustryPresetForCompany(req.params.companyId);
+            if (!result.ok) return res.status(404).json(result);
+            res.json(result);
+        } catch (err) {
+            console.error("[api/industry-presets deactivate] error:", err.message);
+            res.status(500).json({ error: err.message || "Failed to deactivate preset" });
+        }
+    }
+);
 
 app.post("/api/companies/:companyId/suspend", requireTenantScope(), checkPermission("canManageStaff"), async (req, res) => {
     try {

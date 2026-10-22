@@ -232,6 +232,33 @@ export async function patchPortalBranding(companyId, branding) {
   });
 }
 
+export async function fetchIndustryPresetCatalogue(companyId) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/industry-presets`);
+}
+
+export async function previewIndustryPresetActivation(companyId, presetId, version) {
+  const qs = version ? `?version=${encodeURIComponent(version)}` : '';
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/industry-presets/${encodeURIComponent(presetId)}/preview${qs}`
+  );
+}
+
+export async function activateIndustryPreset(companyId, { presetId, version } = {}) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/industry-presets/activate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ presetId, version }),
+  });
+}
+
+export async function deactivateIndustryPreset(companyId) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/industry-presets/deactivate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+}
+
 export async function fetchWorkspaceSnapshot(companyId) {
   return request(`/api/portal/workspace/${encodeURIComponent(companyId)}`);
 }

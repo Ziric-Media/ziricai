@@ -6,7 +6,14 @@ import {
   showToast,
 } from '../../admin/ui.js';
 import { applyBranding } from '../auth-guard.js';
-import { patchPortalBranding, fetchIntegrationChannels } from '../api.js';
+import {
+  patchPortalBranding,
+  fetchIntegrationChannels,
+  fetchIndustryPresetCatalogue,
+  previewIndustryPresetActivation,
+  activateIndustryPreset,
+  deactivateIndustryPreset,
+} from '../api.js';
 import { DEMO_BRANDING, DEMO_TEAM } from '../demo-data.js';
 import { PORTAL_ROLES, roleLabel, getPermissions, can } from '../permissions.js';
 import { refreshNav } from '../router.js';
@@ -36,6 +43,14 @@ export async function renderSettings(container) {
   const primaryColor = branding.primaryColor || '#1e40af';
   const companyInitials = (company.name || 'CM').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   const canManageWorkspace = can(state.profile?.role, 'canManageWorkspace');
+  let industryPresets = [];
+  if (canManageWorkspace && companyId) {
+    const presetRes = await fetchIndustryPresetCatalogue(companyId);
+    if (!presetRes.error) industryPresets = presetRes.data?.presets || [];
+  }
+  const activePresetId = company.industryPresetId || '';
+  const activePresetVersion = company.industryPresetVersion || '';
+  const presetActivated = Boolean(company.industryPresetActivatedAt);
   const showDemoRoleTab =
     state.profile?.isDemo ||
     location.hostname === 'localhost' ||
@@ -231,6 +246,38 @@ export async function renderSettings(container) {
           </div>
         </div>
       </div>
+      <div class="portal-form-section" id="industryPresetSettings">
+        <div class="portal-form-section-header">
+          <div class="portal-form-section-icon"><i class="fa-solid fa-industry"></i></div>
+          <div>
+            <h4>Industry preset</h4>
+            <p>Configure workforce Sarah (Finance, Ops, HR, Admin) for your sector — does not change tool permissions.</p>
+          </div>
+        </div>
+        ${
+          presetActivated
+            ? `<p class="form-hint"><strong>Active:</strong> ${escapeHtml(activePresetId)} v${escapeHtml(activePresetVersion || '—')} (since ${escapeHtml(String(company.industryPresetActivatedAt || '').slice(0, 19))})</p>`
+            : `<p class="form-hint">No preset active — Sarah uses generic industry hints only.</p>`
+        }
+        <div class="form-group">
+          <label for="industryPresetSelect">Preset</label>
+          <select id="industryPresetSelect">
+            <option value="">— Select —</option>
+            ${industryPresets
+              .map(
+                (p) =>
+                  `<option value="${escapeHtml(p.presetId)}" data-version="${escapeHtml(p.version)}" ${p.presetId === activePresetId && p.version === activePresetVersion ? 'selected' : ''}>${escapeHtml(p.name)} (${escapeHtml(p.presetId)} v${escapeHtml(p.version)})${p.activatable ? '' : ' — not approved'}</option>`
+              )
+              .join('')}
+          </select>
+        </div>
+        <div class="portal-form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+          <button class="btn btn-secondary btn-sm" type="button" id="previewIndustryPresetBtn">Preview validation</button>
+          <button class="btn btn-primary btn-sm" type="button" id="activateIndustryPresetBtn">Activate preset</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="deactivateIndustryPresetBtn" ${presetActivated ? '' : 'disabled'}>Deactivate hints</button>
+        </div>
+        <pre id="industryPresetReport" class="portal-code-block" style="margin-top:12px;max-height:220px;overflow:auto;display:none;"></pre>
+      </div>
     </div>` : ''}
 
     <div class="settings-panel" id="tab-account">
@@ -260,6 +307,7 @@ export async function renderSettings(container) {
         <div class="portal-info-list">
           <div class="portal-info-row"><span class="label">Name</span><span class="value">${escapeHtml(company.name || '—')}</span></div>
           <div class="portal-info-row"><span class="label">Industry</span><span class="value">${escapeHtml(company.industry || '—')}</span></div>
+          <div class="portal-info-row"><span class="label">Industry preset</span><span class="value">${presetActivated ? `${escapeHtml(activePresetId)} v${escapeHtml(activePresetVersion || '—')}` : '—'}</span></div>
           <div class="portal-info-row"><span class="label">Email</span><span class="value">${escapeHtml(company.email || '—')}</span></div>
           <div class="portal-info-row"><span class="label">Phone</span><span class="value">${escapeHtml(company.phone || '—')}</span></div>
           <div class="portal-info-row"><span class="label">Website</span><span class="value">${escapeHtml(company.website || '—')}</span></div>
@@ -374,6 +422,77 @@ function bindSettingsEvents(container, companyInitials) {
     refreshNav();
     showToast(`Demo role set to ${roleLabel(role)}`, 'info');
     import('../router.js').then(({ navigateTo }) => navigateTo('dashboard'));
+  });
+
+  bindIndustryPresetSettings(container);
+}
+
+function selectedIndustryPresetFromUi(container) {
+  const select = container.querySelector('#industryPresetSelect');
+  if (!select?.value) return null;
+  const option = select.selectedOptions[0];
+  return {
+    presetId: select.value,
+    version: option?.dataset?.version || undefined,
+  };
+}
+
+function showIndustryPresetReport(container, payload) {
+  const pre = container.querySelector('#industryPresetReport');
+  if (!pre) return;
+  pre.style.display = 'block';
+  pre.textContent = JSON.stringify(payload, null, 2);
+}
+
+function bindIndustryPresetSettings(container) {
+  const companyId = state.companyId || state.company?.id;
+  if (!companyId || !container.querySelector('#industryPresetSettings')) return;
+
+  container.querySelector('#previewIndustryPresetBtn')?.addEventListener('click', async () => {
+    const sel = selectedIndustryPresetFromUi(container);
+    if (!sel?.presetId) {
+      showToast('Select a preset first.', 'error');
+      return;
+    }
+    const res = await previewIndustryPresetActivation(companyId, sel.presetId, sel.version);
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
+    showIndustryPresetReport(container, res.data);
+    showToast(res.data?.ok ? 'Preset passes validation.' : 'Preset has blocking issues — see report.', res.data?.ok ? 'success' : 'warning');
+  });
+
+  container.querySelector('#activateIndustryPresetBtn')?.addEventListener('click', async () => {
+    const sel = selectedIndustryPresetFromUi(container);
+    if (!sel?.presetId) {
+      showToast('Select a preset first.', 'error');
+      return;
+    }
+    const res = await activateIndustryPreset(companyId, sel);
+    if (res.error) {
+      showToast(res.error, 'error');
+      if (res.data) showIndustryPresetReport(container, res.data);
+      return;
+    }
+    showToast('Industry preset activated.', 'success');
+    setState({
+      company: { ...(state.company || {}), ...(res.data?.company || {}) },
+    });
+    await renderSettings(container);
+  });
+
+  container.querySelector('#deactivateIndustryPresetBtn')?.addEventListener('click', async () => {
+    const res = await deactivateIndustryPreset(companyId);
+    if (res.error) {
+      showToast(res.error, 'error');
+      return;
+    }
+    showToast('Industry preset hints deactivated.', 'info');
+    setState({
+      company: { ...(state.company || {}), ...(res.data?.company || {}), industryPresetActivatedAt: null },
+    });
+    await renderSettings(container);
   });
 }
 

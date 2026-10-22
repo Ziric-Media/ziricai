@@ -59,6 +59,13 @@ function normalizeCompanyRecord(companyId, data = {}, existing = {}) {
         id: companyId,
         name,
         industry: data.industry ?? existing.industry ?? "",
+        industryPresetId: data.industryPresetId ?? existing.industryPresetId ?? null,
+        industryPresetVersion: data.industryPresetVersion ?? existing.industryPresetVersion ?? null,
+        industryPresetActivatedAt:
+            data.industryPresetActivatedAt !== undefined
+                ? data.industryPresetActivatedAt
+                : existing.industryPresetActivatedAt ?? null,
+        industryPresetOverrides: data.industryPresetOverrides ?? existing.industryPresetOverrides ?? null,
         plan: data.plan ?? existing.plan ?? "starter",
         status: data.status ?? existing.status ?? COMPANY_STATUS.ACTIVE,
         email: data.email ?? existing.email ?? "",
