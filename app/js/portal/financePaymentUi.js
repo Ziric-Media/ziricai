@@ -1,7 +1,7 @@
 /**
  * Portal invoice payment recording (POST …/invoices/:id/payments).
  */
-import { showToast } from './admin/ui.js';
+import { showToast } from '../admin/ui.js';
 import { recordFinanceInvoicePayment } from './api.js';
 import { formatMoneyMajor, invoiceBalanceMinor, minorToMajor } from './financeDisplay.js';
 import { isFinanceQuotation } from './financeQuotation.js';
