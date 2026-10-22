@@ -1,7 +1,8 @@
 # SF-CORE-01 — Full program (Sarah Finance + Company Portal Finance)
 
 **Spec reference:** SF-CORE-01 v1.0 — capability matrix in [`SARAH_FINANCE_SF_CORE_01_F0_AUDIT.md`](./SARAH_FINANCE_SF_CORE_01_F0_AUDIT.md).  
-**Program baseline updated:** 2026-10-22 (post F1–F3b implementation, F5 local acceptance, portal payment UI commit).
+**Program baseline updated:** 2026-10-22 (post F1–F3b implementation, F5 local acceptance, portal payment UI commit).  
+**Gap matrix (Priority 1 deliverable):** [`SF_CORE_01_GAP_MATRIX.md`](./SF_CORE_01_GAP_MATRIX.md) — evidence-backed statuses; **does not** claim remaining work is complete.
 
 ---
 
@@ -17,8 +18,8 @@ It is **not** yet proof of the **complete finance employee experience end to end
 
 | Level | Meaning | Current notes (2026-10-22) |
 |-------|---------|----------------------------|
-| **Locally verified** | Named scripts/tests pass on a developer machine (memory and/or loopback `:3099`). | `verify-finance-sarah-acceptance-suite.mjs` reported **PASS**; F5 runner **13/13** automated cases when loopback is fresh. |
-| **Committed** | On git branch `feature/company-portal-finance-v1` at `origin`. | F1 `b49ac9e`; F2–F3b/F5 harness `74c98e5`; portal payment UI `e864637`. |
+| **Locally verified** | Named scripts/tests pass on a developer machine (memory and/or loopback `:3099`). | Reported **PASS** 2026-10-22 (F5 **13/13** with fresh loopback). Re-run may require intact `node_modules` — see gap matrix if verify fails. |
+| **Committed** | On git branch `feature/company-portal-finance-v1` at `origin`. | F1 `b49ac9e`; F2–F3b/F5 harness `74c98e5`; portal payments `e864637`; docs `e624c83`; import fix `648013c`. |
 | **Deployed** | Live on hosting without implying sign-off. | **Portal:** `app.ziricai.com` — production deploy from local `app/` (no-build upload, Oct 2026). **API:** Railway production may lag branch; redeploy requires `railway login` + explicit release. |
 | **Production-accepted** | Documented sign-off on a live/staging tenant with ops approval. | **Not claimed.** F5 manual/deferred cases and pilot checklist open. |
 
@@ -76,7 +77,7 @@ Do **not** jump straight into F4 Sarah payments or expand the tool surface witho
 
 Refresh the stale F0 audit and compare full SF-CORE-01 with implementation, test evidence, and commits.
 
-**Exit criterion:** One authoritative **gap matrix** (verified / partial / blocked / untested) aligned to SF-CORE-01 §13 and F-001–F-030.
+**Exit criterion:** One authoritative **gap matrix** (verified / partial / blocked / untested / production-accepted) aligned to SF-CORE-01 §13 and F-001–F-030. **Draft:** [`SF_CORE_01_GAP_MATRIX.md`](./SF_CORE_01_GAP_MATRIX.md) — refresh after each evidence-producing sprint and after F0 §13 reconciliation.
 
 ### 2 — Close F5 deferred acceptance
 

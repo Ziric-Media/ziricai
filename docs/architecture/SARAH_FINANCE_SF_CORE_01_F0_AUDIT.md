@@ -5,7 +5,7 @@
 **Mode:** Read-only — no production changes implied by this document  
 **Prior audit:** [`FINANCE_SARAH_F0_CAPABILITY_AUDIT.md`](./FINANCE_SARAH_F0_CAPABILITY_AUDIT.md) (2026-10-16); this document realigns to SF-CORE-01 and records **point-in-time** evidence.
 
-> **Authoritative programme status (2026-10-22):** Use [`SF_CORE_01_FULL_PROGRAM.md`](./SF_CORE_01_FULL_PROGRAM.md) for phase status, evidence ladder (locally verified / committed / deployed / production-accepted), and the priority queue. **This F0 file’s executive summary and §13 matrix below are stale** until work item 1 (spec ↔ code reconciliation) produces an updated gap matrix.
+> **Authoritative programme status (2026-10-22):** Use [`SF_CORE_01_FULL_PROGRAM.md`](./SF_CORE_01_FULL_PROGRAM.md) for phase status, evidence ladder, and priority queue. **Gap matrix (evidence-backed):** [`SF_CORE_01_GAP_MATRIX.md`](./SF_CORE_01_GAP_MATRIX.md). **This F0 file’s executive summary and §13 table below remain stale** — use the gap matrix for planning until §13 is line-refreshed.
 
 ---
 
