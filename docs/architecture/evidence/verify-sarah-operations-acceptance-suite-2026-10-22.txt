@@ -1,0 +1,190 @@
+﻿verify-sarah-operations-acceptance-suite
+
+--- verify-sarah-operations-tool-policy.mjs ---
+◇ injected env (5) from .env // tip: ⌘ suppress logs { quiet: true }
+verify-sarah-operations-tool-policy
+
+✓ operationsSarah allowlist on portal-operations
+✓ executeTool OPERATIONS_SARAH_TOOL_DENIED
+
+SARAH_OPERATIONS_TOOL_POLICY_PASS
+--- verify-sarah-operations-tasks-local.mjs ---
+◇ injected env (5) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+
+Sarah Operations task tools (local)
+
+PASS tools registered
+PASS permission matrix
+node : [storage] Using memory adapter (STORAGE_BACKEND=memory)
+At C:\Users\cash\AppData\Local\Temp\ps-script-eb60cb73-473a-4fda-86cb-b44be4918917.ps1:91 char:1
++ node scripts/verify-sarah-operations-acceptance-suite.mjs 2>&1 | Out- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([storage] Using...BACKEND=memory):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+PASS manager create + list via executeTool
+PASS sales create denied at tool gate
+PASS viewer sees assignee-only tasks
+PASS portal owner exposes task tools
+PASS manager updateTask status via executeTool
+[sarah/tool] updateTask failed: Task not found or not visible in this workspace.
+PASS sales updateTask denied
+PASS MC tenant scope: list yes, create blocked
+
+9/9 passed
+
+--- smoke-operations-centre-v1-local.mjs ---
+◇ injected env (5) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+smoke-operations-centre-v1-local
+
+[storage] Using memory adapter (STORAGE_BACKEND=memory)
+✓ [access-owner-list] Owner can open Operations and list tasks — service layer
+✓ [wf-manager-create] Manager can create a task — service layer
+✓ [wf-assign-update] Authorized user can assign and update a task — manager assign + sales own PATCH
+✓ [wf-complete] Permitted user can complete a task — service layer
+✓ [access-viewer-filter] Viewer sees only tasks allowed by server policy — list + direct GET guard
+✓ [security-api-policy] Direct API requests cannot bypass permissions — middleware 401 + service denials
+○ [persistence-memory] Tasks persist after reload when using Firestore — memory phase — use --live with STORAGE_BACKEND=firestore for M2
+
+--- Operations Centre v1 smoke checklist ---
+PASS | Access | Owner can open Operations and list tasks
+PASS | Task workflow | Manager can create a task
+PASS | Task workflow | Authorized user can assign and update a task
+PASS | Task workflow | Permitted user can complete a task
+PASS | Access | Viewer sees only tasks allowed by server policy
+PASS | Security | Direct API requests cannot bypass permissions
+SKIP | Persistence | Tasks persist after reload when using Firestore
+
+Totals: 6 PASS, 0 FAIL, 1 SKIP (7 rows)
+
+Copy test results (markdown):
+| Check | Result | Notes |
+|-------|--------|-------|
+| Owner can open Operations and list tasks | PASS | service layer |
+| Manager can create a task | PASS | service layer |
+| Authorized user can assign and update a task | PASS | manager assign + sales own PATCH |
+| Permitted user can complete a task | PASS | service layer |
+| Viewer sees only tasks allowed by server policy | PASS | list + direct GET guard |
+| Direct API requests cannot bypass permissions | PASS | middleware 401 + service denials |
+| Tasks persist after reload when using Firestore | SKIP | memory phase — use --live with STORAGE_BACKEND=firestore for M2 |
+--- verify-ai-task-execution-suite.mjs ---
+[storage] Using memory adapter (STORAGE_BACKEND=memory)
+[operations] AI task worker registered for EXECUTE_AI_TASK
+[queue] Initialized { backend: 'memory', configured: 'memory', concurrency: 1 }
+[queue] Enqueued {
+  jobId: '69c12410-e320-47b7-838e-92fe9cb0bd9e',
+  jobType: 'EXECUTE_AI_TASK',
+  status: 'queued',
+  companyId: 'ops-exec-suite-a',
+  customerId: null,
+  conversationId: null,
+  channel: 'operations',
+  externalMessageId: 'ai-task-exec:ops-exec-su',
+  attempt: 0,
+  depth: 1
+}
+[queue] Processing {
+  jobId: '69c12410-e320-47b7-838e-92fe9cb0bd9e',
+  jobType: 'EXECUTE_AI_TASK',
+  status: 'processing',
+  companyId: 'ops-exec-suite-a',
+  customerId: null,
+  conversationId: null,
+  channel: 'operations',
+  externalMessageId: 'ai-task-exec:ops-exec-su',
+  attempt: 1
+}
+[queue] Completed {
+  jobId: '69c12410-e320-47b7-838e-92fe9cb0bd9e',
+  jobType: 'EXECUTE_AI_TASK',
+  status: 'completed',
+  companyId: 'ops-exec-suite-a',
+  customerId: null,
+  conversationId: null,
+  channel: 'operations',
+  externalMessageId: 'ai-task-exec:ops-exec-su',
+  attempt: 1
+}
+[queue] Enqueued {
+  jobId: '19ccd0f7-476c-463f-b0e0-30de0f7a12b7',
+  jobType: 'EXECUTE_AI_TASK',
+  status: 'queued',
+  companyId: 'ops-exec-suite-a',
+  customerId: null,
+  conversationId: null,
+  channel: 'operations',
+  externalMessageId: 'ai-task-exec:ops-exec-su',
+  attempt: 0,
+  depth: 1
+}
+[queue] Processing {
+  jobId: '19ccd0f7-476c-463f-b0e0-30de0f7a12b7',
+  jobType: 'EXECUTE_AI_TASK',
+  status: 'processing',
+  companyId: 'ops-exec-suite-a',
+  customerId: null,
+  conversationId: null,
+  channel: 'operations',
+  externalMessageId: 'ai-task-exec:ops-exec-su',
+  attempt: 1
+}
+[queue] Duplicate skipped {
+  jobId: '19ccd0f7-476c-463f-b0e0-30de0f7a12b7',
+  jobType: 'EXECUTE_AI_TASK',
+  status: 'processing',
+  companyId: 'ops-exec-suite-a',
+  customerId: null,
+  conversationId: null,
+  channel: 'operations',
+  externalMessageId: 'ai-task-exec:ops-exec-su',
+  attempt: 1,
+  reason: 'active_job_or_wamid'
+}
+[queue] Enqueued {
+  jobId: '8aaabd0f-76ea-42d2-9feb-d900f0c933a2',
+  jobType: 'EXECUTE_AI_TASK',
+  status: 'queued',
+  companyId: 'ops-exec-suite-a',
+  customerId: null,
+  conversationId: null,
+  channel: 'operations',
+  externalMessageId: 'ai-task-exec:ops-exec-su',
+  attempt: 0,
+  depth: 1
+}
+[queue] Completed {
+  jobId: '19ccd0f7-476c-463f-b0e0-30de0f7a12b7',
+  jobType: 'EXECUTE_AI_TASK',
+  status: 'completed',
+  companyId: 'ops-exec-suite-a',
+  customerId: null,
+  conversationId: null,
+  channel: 'operations',
+  externalMessageId: 'ai-task-exec:ops-exec-su',
+  attempt: 1
+}
+[queue] Processing {
+  jobId: '8aaabd0f-76ea-42d2-9feb-d900f0c933a2',
+  jobType: 'EXECUTE_AI_TASK',
+  status: 'processing',
+  companyId: 'ops-exec-suite-a',
+  customerId: null,
+  conversationId: null,
+  channel: 'operations',
+  externalMessageId: 'ai-task-exec:ops-exec-su',
+  attempt: 1
+}
+[queue] Completed {
+  jobId: '8aaabd0f-76ea-42d2-9feb-d900f0c933a2',
+  jobType: 'EXECUTE_AI_TASK',
+  status: 'completed',
+  companyId: 'ops-exec-suite-a',
+  customerId: null,
+  conversationId: null,
+  channel: 'operations',
+  externalMessageId: 'ai-task-exec:ops-exec-su',
+  attempt: 1
+}
+AI_TASK_EXECUTION_SUITE_PASS
+
+SARAH_OPERATIONS_ACCEPTANCE_SUITE_PASS

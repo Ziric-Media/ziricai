@@ -21,6 +21,7 @@ import {
 } from "../bos/workforceInstructionService.js";
 import { resolvePersonaFromSurface } from "./sarahPersona.js";
 import { resolveFinanceSarahActive } from "./financeSarahToolPolicy.js";
+import { resolveOperationsSarahActive } from "./operationsSarahToolPolicy.js";
 
 function readSarahPageContextFromRequest(req) {
     if (!req) return null;
@@ -80,6 +81,12 @@ export async function buildSarahContext(req, overrides = {}) {
         uid: tenant.uid,
         pageContext,
     });
+    const operationsSarah = resolveOperationsSarahActive({
+        persona,
+        surface,
+        uid: tenant.uid,
+        pageContext,
+    });
     const moduleKey = pageContext?.module || moduleKeyFromPortalSurface(surface);
 
     let workforceInstructionsPending = [];
@@ -116,6 +123,7 @@ export async function buildSarahContext(req, overrides = {}) {
         surface,
         persona,
         financeSarah,
+        operationsSarah,
         pageContext,
         workforceInstructionsPending,
         workforceInstructionsRecent,

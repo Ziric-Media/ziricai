@@ -12,6 +12,10 @@ import {
     FINANCE_SARAH_TOOL_DENIED,
     isToolAllowedInFinanceSarah,
 } from "./financeSarahToolPolicy.js";
+import {
+    OPERATIONS_SARAH_TOOL_DENIED,
+    isToolAllowedInOperationsSarah,
+} from "./operationsSarahToolPolicy.js";
 import { PORTAL_SARAH_SURFACES } from "./portalSarahSurfaces.js";
 
 /** @type {Map<string, import('./tools/types.js').SarahToolDefinition>} */
@@ -71,6 +75,7 @@ export function getToolsForContext(ctx) {
             if (!admin) return false;
         }
         if (!isToolAllowedInFinanceSarah(tool.name, ctx)) return false;
+        if (!isToolAllowedInOperationsSarah(tool.name, ctx)) return false;
         if (ctx.canUseTool && !ctx.canUseTool(tool)) return false;
         return true;
     });
@@ -116,6 +121,14 @@ export async function executeTool(name, ctx, args = {}) {
             success: false,
             error: `Tool "${name}" is not available in Finance Sarah.`,
             code: FINANCE_SARAH_TOOL_DENIED,
+        };
+    }
+
+    if (!isToolAllowedInOperationsSarah(name, ctx)) {
+        return {
+            success: false,
+            error: `Tool "${name}" is not available in Operations Sarah.`,
+            code: OPERATIONS_SARAH_TOOL_DENIED,
         };
     }
 

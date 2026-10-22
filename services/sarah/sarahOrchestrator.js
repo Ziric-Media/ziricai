@@ -37,6 +37,11 @@ import {
     financeSarahTurnSystemAddendum,
     isFinanceCollectionsQuestion,
 } from "./financeSarahToolPolicy.js";
+import {
+    applyOperationsSarahSessionStickiness,
+    shouldPersistOperationsSessionScope,
+    SARAH_SESSION_MODULE_SCOPE_OPERATIONS,
+} from "./operationsSarahToolPolicy.js";
 
 const INTERNAL_TOOL_MESSAGE_RE = /Each line item requires unitAmount/i;
 
@@ -234,9 +239,15 @@ export async function handleSarahChat(ctx, input) {
     ctx.message = message;
 
     applyFinanceSarahSessionStickiness(ctx, session);
+    applyOperationsSarahSessionStickiness(ctx, session);
     if (shouldPersistFinanceSessionScope(ctx)) {
         if (session.context?.sarahModuleScope !== SARAH_SESSION_MODULE_SCOPE_FINANCE) {
             await setSessionContext(session, { sarahModuleScope: SARAH_SESSION_MODULE_SCOPE_FINANCE });
+        }
+    }
+    if (shouldPersistOperationsSessionScope(ctx)) {
+        if (session.context?.sarahModuleScope !== SARAH_SESSION_MODULE_SCOPE_OPERATIONS) {
+            await setSessionContext(session, { sarahModuleScope: SARAH_SESSION_MODULE_SCOPE_OPERATIONS });
         }
     }
 
@@ -266,7 +277,7 @@ export async function handleSarahChat(ctx, input) {
         }
     }
 
-    if (isPortalClientSurface(ctx.surface) && !ctx.financeSarah) {
+    if (isPortalClientSurface(ctx.surface) && !ctx.financeSarah && !ctx.operationsSarah) {
         const moduleScope = moduleKeyFromPortalSurface(ctx.surface);
         if (moduleScope && session.context?.sarahModuleScope !== moduleScope) {
             await setSessionContext(session, { sarahModuleScope: moduleScope });

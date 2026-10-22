@@ -1662,6 +1662,7 @@ app.get("/api/sarah/tools", requireTenantScope({ optional: true }), async (req, 
             role: ctx.role,
             companyId: ctx.companyId,
             financeSarah: Boolean(ctx.financeSarah),
+            operationsSarah: Boolean(ctx.operationsSarah),
         });
     } catch (err) {
         console.error("[api/sarah/tools] error:", err.message);
