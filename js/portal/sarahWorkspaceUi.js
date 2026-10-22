@@ -219,12 +219,12 @@ export function renderSarahWorkspaceChatShell({
       <ul class="portal-sarah-try-list">${suggestions.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>`
           : ''
       }
+      <div class="bos-instruction-panel-host bos-instruction-panel-host--aside" data-workforce-instructions-host></div>
     </aside>
     <section class="portal-sarah-page-main" aria-label="Chat with Sarah">
-      <header class="portal-sarah-page-main-header">
+      <header class="portal-sarah-page-main-header portal-sarah-page-main-header--compact">
         <div><strong>Conversation</strong><span class="text-muted">Enter to send · Shift+Enter for new line</span></div>
       </header>
-      <div class="bos-instruction-panel-host" data-workforce-instructions-host></div>
       <div class="portal-sarah-page-chat" id="${escapeHtml(chatMountId)}" data-sw-sarah-chat></div>
     </section>
   </div>`;

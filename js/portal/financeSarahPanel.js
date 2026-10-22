@@ -32,7 +32,7 @@ export const FINANCE_SARAH_CAPABILITIES = [
 let finGetter = null;
 
 export function renderFinanceSarahPageShell() {
-  return `<div class="portal-sarah-page fin-sarah-page">
+  return `<div class="portal-sarah-page sw-sarah-page fin-sarah-page sw-sarah-page--finance">
     <aside class="portal-sarah-page-aside" aria-label="Sarah Finance assistant">
       <div class="portal-sarah-page-brand">
         ${sarahPageAvatarMarkup()}
@@ -55,15 +55,15 @@ export function renderFinanceSarahPageShell() {
       <ul class="portal-sarah-try-list">
         ${FINANCE_SARAH_SUGGESTIONS.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}
       </ul>
+      <div class="bos-instruction-panel-host bos-instruction-panel-host--aside" data-workforce-instructions-host></div>
     </aside>
     <section class="portal-sarah-page-main" aria-label="Chat with Sarah">
-      <header class="portal-sarah-page-main-header">
+      <header class="portal-sarah-page-main-header portal-sarah-page-main-header--compact">
         <div>
           <strong>Conversation</strong>
-          <span class="text-muted">Shift+Enter for a new line · Enter to send</span>
+          <span class="text-muted">Enter to send · Shift+Enter for new line</span>
         </div>
       </header>
-      <div class="bos-instruction-panel-host" data-workforce-instructions-host></div>
       <div class="portal-sarah-page-chat" id="finSarahPageChat" data-fin-sarah-page-chat></div>
     </section>
   </div>`;
@@ -76,8 +76,8 @@ export function renderFinanceSarahPageShell() {
 export async function mountFinanceSarahPageChat(chatRoot, getFinState) {
   if (!chatRoot) return;
   finGetter = getFinState;
-  const page = chatRoot.closest('.portal-sarah-page-main');
-  const instrHost = page?.querySelector('[data-workforce-instructions-host]');
+  const shell = chatRoot.closest('.portal-sarah-page');
+  const instrHost = shell?.querySelector('[data-workforce-instructions-host]');
   if (instrHost) await mountWorkforceInstructionsPanel(instrHost, { persistenceScope: 'finance', adminView: false });
 
   chatRoot.innerHTML = '';

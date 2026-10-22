@@ -9,9 +9,17 @@ const FORBIDDEN_LINE_ITEM_KEYS = new Set([
     "taxAmountMinor",
 ]);
 
+/** Accept legacy BOS / portal aliases; persisted API shape is major `unitAmount` only. */
+function resolveLineUnitAmountMajor(raw) {
+    if (raw?.unitAmount != null && raw.unitAmount !== "") return raw.unitAmount;
+    if (raw?.unitPrice != null && raw.unitPrice !== "") return raw.unitPrice;
+    if (raw?.amount != null && raw.amount !== "") return raw.amount;
+    return null;
+}
+
 /**
  * Client line items: description, quantity, unitAmount (major units only).
- * @param {Array<{ description?: string, quantity?: number, unitAmount?: number }>} lineItems
+ * @param {Array<{ description?: string, quantity?: number, unitAmount?: number, unitPrice?: number }>} lineItems
  * @param {string} currency
  */
 export function computeInvoiceLineItems(lineItems, currency) {
@@ -44,12 +52,13 @@ export function computeInvoiceLineItems(lineItems, currency) {
                 code: "FINANCE_INVOICE_CREATE_INVALID",
             });
         }
-        if (raw?.unitAmount == null || raw.unitAmount === "") {
+        const unitAmountMajor = resolveLineUnitAmountMajor(raw);
+        if (unitAmountMajor == null || unitAmountMajor === "") {
             throw Object.assign(new Error("Each line item requires unitAmount (major units)"), {
                 code: "FINANCE_INVOICE_CREATE_INVALID",
             });
         }
-        const unitMinor = toMinorUnits(raw.unitAmount, currency);
+        const unitMinor = toMinorUnits(unitAmountMajor, currency);
         const lineTotalMinor = Math.round(unitMinor * qty);
         if (!Number.isSafeInteger(lineTotalMinor) || lineTotalMinor < 0) {
             throw Object.assign(new Error("Invalid line total"), { code: "FINANCE_INVOICE_CREATE_INVALID" });

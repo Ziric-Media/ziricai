@@ -335,7 +335,7 @@ export async function mountSarahChat(container, options = {}) {
     </div>
     <div class="portal-sarah-suggestions portal-sarah-suggestions--inline" id="portalSarahSuggestions"></div>
     <form class="portal-sarah-form" id="portalSarahForm">
-      <textarea id="portalSarahInput" rows="${mode === 'page' ? 3 : 1}" placeholder="Ask Sarah to do something…" autocomplete="off"></textarea>
+      <textarea id="portalSarahInput" rows="${mode === 'page' ? 1 : 1}" placeholder="Ask Sarah to do something…" autocomplete="off"></textarea>
       <button type="submit" class="btn btn-primary portal-sarah-send"><i class="fa-solid fa-paper-plane"></i><span>Send</span></button>
     </form>
   `;

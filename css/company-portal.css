@@ -2717,7 +2717,7 @@
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    padding: 16px 24px 24px;
+    padding: 10px 20px 16px;
 }
 
 .portal-body .sw-module-body:has(.sw-sarah-page),
@@ -2868,6 +2868,10 @@
     background: var(--bg-card);
 }
 
+.portal-sarah-page-main-header--compact {
+    padding: 8px 16px;
+}
+
 .portal-sarah-page-main-header strong {
     display: block;
     font-size: 15px;
@@ -2917,25 +2921,36 @@
 }
 
 .portal-sarah-chat-mount--page .portal-sarah-form {
-    padding: 16px 20px 20px;
-    align-items: flex-end;
+    padding: 8px 16px 12px;
+    align-items: center;
     flex-shrink: 0;
     background: var(--bg-secondary);
+    gap: 10px;
 }
 
 .portal-sarah-chat-mount--page .portal-sarah-form textarea {
     flex: 1;
-    min-height: 72px;
-    max-height: 200px;
+    min-height: 40px;
+    max-height: 120px;
     resize: vertical;
-    padding: 12px 14px;
+    padding: 8px 12px;
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 10px;
     font-size: 14px;
-    line-height: 1.45;
+    line-height: 1.4;
     font-family: inherit;
     background: var(--bg-input, var(--bg-card));
     color: var(--text-primary);
+}
+
+.portal-sarah-chat-mount--page .portal-sarah-send {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    height: auto;
+    align-self: center;
+    flex-shrink: 0;
 }
 
 .portal-sarah-send {
@@ -4231,11 +4246,26 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    gap: 6px;
 }
 
 .fin-module--sarah .page-header {
     flex-shrink: 0;
-    margin-bottom: 10px;
+    margin-bottom: 0;
+}
+
+.fin-module--sarah .page-header .title-section h1 {
+    font-size: 1.35rem;
+    line-height: 1.2;
+}
+
+.fin-module--sarah .page-header .title-section .subtitle {
+    margin-top: 2px;
+    font-size: 0.8125rem;
+}
+
+.fin-module--sarah .fin-workspace-nav--horizontal {
+    margin-bottom: 0;
 }
 
 .fin-module--sarah .fin-layout--sarah,
@@ -6260,12 +6290,43 @@
     flex-direction: column;
     gap: 16px;
 }
+
+.sw-module:has(.sw-sarah-page) {
+    gap: 6px;
+    flex: 1;
+    min-height: 0;
+}
+
+.sw-module:has(.sw-sarah-page) .page-header {
+    margin-bottom: 0;
+}
+
+.sw-module:has(.sw-sarah-page) .page-header .title-section h1 {
+    font-size: 1.35rem;
+    line-height: 1.2;
+}
+
+.sw-module:has(.sw-sarah-page) .page-header .title-section .subtitle {
+    margin-top: 2px;
+    font-size: 0.8125rem;
+}
+
 .sw-module-body {
     min-width: 0;
 }
 .sw-horizontal-nav {
     margin: 0 0 4px;
 }
+
+.sw-module:has(.sw-sarah-page) .sw-horizontal-nav {
+    margin: 0;
+}
+
+.sw-module:has(.sw-sarah-page) .sw-horizontal-nav-scroll {
+    padding: 6px 10px;
+    gap: 6px;
+}
+
 .sw-horizontal-nav-scroll {
     display: flex;
     flex-wrap: wrap;
@@ -6900,6 +6961,59 @@
 .portal-sarah-page-main > .bos-instruction-panel-host:first-child {
     padding-top: 14px;
 }
+
+.portal-sarah-page-aside .bos-instruction-panel-host--aside {
+    padding: 0;
+    margin: 4px 0 0;
+    flex-shrink: 0;
+}
+
+.portal-sarah-page-aside .bos-instruction-panel-host--aside .sarah-aux-panel {
+    margin-bottom: 0;
+    border-color: var(--border-color);
+}
+
+.portal-sarah-page-aside .bos-instruction-panel-host--aside .sarah-aux-panel-summary {
+    padding: 8px 10px;
+    font-size: 0.8125rem;
+}
+
+.portal-sarah-page-aside .bos-instruction-panel-host--aside .sarah-aux-panel-body {
+    max-height: min(28vh, 220px);
+    padding: 0 8px 8px;
+}
+
+.portal-sarah-page-aside .bos-instruction-panel-host--aside .bos-instruction-panel {
+    padding: 10px 10px 12px;
+    box-shadow: none;
+    border-radius: 10px;
+}
+
+.portal-sarah-page-aside .bos-instruction-panel-host--aside .bos-instruction-text {
+    font-size: 12px;
+}
+
+.portal-sarah-page-aside .bos-cycle-panel-host--aside {
+    padding: 0;
+    margin: 8px 0 0;
+}
+
+.portal-sarah-page-aside .bos-cycle-panel-host--aside .sarah-aux-panel-summary {
+    padding: 8px 10px;
+    font-size: 0.8125rem;
+}
+
+.portal-sarah-page-aside .bos-cycle-panel-host--aside .sarah-aux-panel-body {
+    max-height: min(28vh, 220px);
+    padding: 0 8px 8px;
+}
+
+.portal-sarah-page-aside .bos-cycle-panel-host--aside .bos-cycle-panel {
+    padding: 10px 10px 12px;
+    box-shadow: none;
+    border-radius: 10px;
+}
+
 .bos-instruction-panel {
     border-radius: 14px;
     border: 1px solid color-mix(in srgb, var(--brand-primary, #2563eb) 22%, var(--border-color));

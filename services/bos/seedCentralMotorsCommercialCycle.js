@@ -26,7 +26,7 @@ async function ensureDemoQuotationInvoice(companyId, cycleId, customerName, titl
         counterpartyName: customerName,
         currency: "ZAR",
         issueDate: new Date().toISOString().slice(0, 10),
-        lineItems: [{ description: title, quantity: 1, unitPrice: 15000 }],
+        lineItems: [{ description: title, quantity: 1, unitAmount: 15000 }],
         notes: `${QUOTATION_MARKER}\nBOS seed cycle ${cycleId}`,
     });
     return invoice.id;

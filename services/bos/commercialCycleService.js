@@ -78,7 +78,11 @@ function closeDelegation(cycle, type, resultSummary) {
 
 export async function listCommercialCycles(companyId, { seedIfEmpty = true } = {}) {
     if (seedIfEmpty && isBosPilotTenant(companyId)) {
-        await ensureCentralMotorsDemoCycle(companyId);
+        try {
+            await ensureCentralMotorsDemoCycle(companyId);
+        } catch (err) {
+            console.warn("[bos] demo cycle seed skipped:", err.message);
+        }
     }
     const items = await cycleRepo.list(companyId, { max: 50, orderByField: "updatedAt", orderDirection: "desc" });
     return items;

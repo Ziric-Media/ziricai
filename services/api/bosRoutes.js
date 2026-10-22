@@ -17,7 +17,9 @@ function bosAccess(req) {
 
 function bosError(res, err, label) {
     console.error(`[bos/${label}]`, err.message);
-    const status = err.status || 500;
+    const status =
+        err.status ||
+        (String(err.code || "").startsWith("FINANCE_") ? 400 : 500);
     res.status(status).json({ error: err.message || "BOS request failed", code: err.code || "BOS_ERROR" });
 }
 

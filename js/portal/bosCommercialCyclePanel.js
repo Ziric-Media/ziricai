@@ -99,7 +99,7 @@ export async function mountBosCommercialCyclePanel(container) {
           ? { reference: `POP-${Date.now().toString(36).slice(2, 8)}`, note: 'Customer WhatsApp proof (demo)' }
           : action === 'prepare-quotation'
             ? {
-                lineItems: [{ description: 'Vehicle deposit & delivery preparation', quantity: 1, unitPrice: 15000 }],
+                lineItems: [{ description: 'Vehicle deposit & delivery preparation', quantity: 1, unitAmount: 15000 }],
                 currency: 'ZAR',
               }
             : {};

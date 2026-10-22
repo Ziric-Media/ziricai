@@ -7,7 +7,7 @@ import { mountWorkforceInstructionsPanel } from '../workforceInstructionsPanel.j
 export async function renderSarah(container) {
   initPortalSarah();
   container.innerHTML = `
-    <div class="portal-sarah-page">
+    <div class="portal-sarah-page sw-sarah-page sw-sarah-page--admin">
       <aside class="portal-sarah-page-aside" aria-label="Sarah assistant info">
         <div class="portal-sarah-page-brand">
           ${sarahPageAvatarMarkup()}
@@ -30,14 +30,14 @@ export async function renderSarah(container) {
         <ul class="portal-sarah-try-list">
           ${SUGGESTIONS.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}
         </ul>
+        <div id="workforceInstructionsHost" class="bos-instruction-panel-host bos-instruction-panel-host--aside"></div>
+        <div id="bosCyclePanelHost" class="bos-cycle-panel-host bos-cycle-panel-host--aside"></div>
       </aside>
       <section class="portal-sarah-page-main" aria-label="Chat with Sarah">
-        <div id="workforceInstructionsHost" class="bos-instruction-panel-host"></div>
-        <div id="bosCyclePanelHost" class="bos-cycle-panel-host"></div>
-        <header class="portal-sarah-page-main-header">
+        <header class="portal-sarah-page-main-header portal-sarah-page-main-header--compact">
           <div>
             <strong>Conversation</strong>
-            <span class="text-muted">Shift+Enter for a new line · Enter to send</span>
+            <span class="text-muted">Enter to send · Shift+Enter for new line</span>
           </div>
         </header>
         <div class="portal-sarah-page-chat" id="portalSarahPageChat"></div>
