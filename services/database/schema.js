@@ -122,6 +122,13 @@ export const FIELD_SCHEMA = {
         id: "string",
         name: "string",
         industry: "string",
+        /** Industry Preset Library — pinned preset package (see docs/architecture/INDUSTRY_PRESET_MASTER_SPEC.md) */
+        industryPresetId: "string",
+        industryPresetVersion: "string",
+        /** ISO timestamp — preset hints active when set (unless INDUSTRY_PRESET_RUNTIME=0) */
+        industryPresetActivatedAt: "string",
+        /** Tenant overrides for preset defaults — must not expand permissions */
+        industryPresetOverrides: "map",
         /** Platform Intelligence segment — see docs/architecture/PLATFORM_INTELLIGENCE.md */
         organisationType: "string",
         sector: "string",

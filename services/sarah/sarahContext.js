@@ -21,6 +21,10 @@ import {
 } from "../bos/workforceInstructionService.js";
 import { resolvePersonaFromSurface } from "./sarahPersona.js";
 import { resolveFinanceSarahActive } from "./financeSarahToolPolicy.js";
+import {
+    buildIndustryPresetWorkspaceHint,
+    resolveIndustryPresetForTenant,
+} from "../platform/industryPresetContext.js";
 
 function readSarahPageContextFromRequest(req) {
     if (!req) return null;
@@ -56,6 +60,10 @@ export async function buildSarahContext(req, overrides = {}) {
     ]);
 
     const resolvedCompany = workspace?.company || company || { id: companyId, name: companyId };
+    const industryPreset = await resolveIndustryPresetForTenant(resolvedCompany).catch(() => ({
+        active: false,
+        reason: "resolve_failed",
+    }));
     const kbSummary = {
         knowledgeBaseId: workspace?.workspaceLinks?.knowledgeBaseId || `kb-${companyId}`,
         documentCount: knowledgeDocs.length,
@@ -133,6 +141,9 @@ export async function buildSarahContext(req, overrides = {}) {
             },
         },
         plan: workspace?.company?.plan || resolvedCompany?.plan || "trial",
+        industryPreset,
+        industryPresetId: resolvedCompany?.industryPresetId || null,
+        industryPresetVersion: resolvedCompany?.industryPresetVersion || null,
     };
 }
 
@@ -174,6 +185,9 @@ export function buildWorkspaceContextHint(ctx) {
     parts.push(
         `Sarah workforce module: ${moduleLabel} (surface ${surface}). This chat is separate from Sarah in other modules — stay focused on ${moduleLabel} responsibilities.`
     );
+
+    const presetHint = buildIndustryPresetWorkspaceHint(ctx);
+    if (presetHint) parts.push(presetHint);
 
     if (moduleKey === "admin" || surface === PORTAL_SARAH_SURFACES.ADMIN || surface === "portal") {
         const portalGuide = Object.entries(PORTAL_NAV_TARGETS)
