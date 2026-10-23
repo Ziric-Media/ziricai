@@ -7,6 +7,7 @@ const PERMISSION_MATRIX = {
     canReply: ["owner", "manager", "sales", "support", "reception"],
     canEditAI: ["owner", "manager", "marketing"],
     canManageStaff: ["owner", "manager"],
+    canManageIntegrations: ["owner", "manager"],
     canViewBilling: ["owner", "finance"],
     canExportData: ["owner", "manager", "finance"],
     /** Aligned with services/auth/permissionsService.js — Sarah task tools (Operations). */
@@ -16,6 +17,10 @@ const PERMISSION_MATRIX = {
     canUpdateOwnTasks: ["owner", "manager", "finance", "hr", "sales", "support", "reception", "marketing", "viewer"],
     canUpdateAnyTask: ["owner", "manager"],
     canCompleteTasks: ["owner", "manager", "finance", "hr", "sales", "support", "reception", "marketing", "viewer"],
+    /** Company workspace finance — mirrors js/portal/permissions.js (Sarah Finance read tools). */
+    canViewFinance: ["owner", "manager", "finance", "viewer"],
+    /** Finance Sarah prepare* + confirmFinanceWrite — confirmation gates unchanged in tool handlers. */
+    canCreateFinance: ["owner", "manager", "finance"],
 };
 
 const SUPERADMIN_ONLY = new Set(["generateReport"]);
