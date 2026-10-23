@@ -14,7 +14,7 @@ export default {
         properties: {
             status: {
                 type: "string",
-                enum: ["all", "open", "done"],
+                enum: ["all", "open", "in_progress", "done"],
                 description: "Filter by task status (default: all)",
             },
             limit: {
@@ -40,13 +40,14 @@ export default {
 
         const openCount = tasks.filter((t) => t.status !== "done").length;
         const doneCount = tasks.length - openCount;
+        const overdueCount = tasks.filter((t) => t.overdue).length;
 
         return {
             message:
                 tasks.length === 0
                     ? "No tasks match that filter in Operations."
-                    : `Found ${tasks.length} task(s) (${openCount} open, ${doneCount} done).`,
-            data: { tasks, count: tasks.length, companyId },
+                    : `Found ${tasks.length} task(s) (${openCount} open, ${doneCount} done${overdueCount ? `, ${overdueCount} overdue` : ""}).`,
+            data: { tasks, count: tasks.length, openCount, doneCount, overdueCount, companyId },
             uiHints: [{ navigate: "operations" }],
         };
     },

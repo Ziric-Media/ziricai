@@ -21,6 +21,10 @@ import {
 } from "../bos/workforceInstructionService.js";
 import { resolvePersonaFromSurface } from "./sarahPersona.js";
 import { resolveFinanceSarahActive } from "./financeSarahToolPolicy.js";
+import {
+    resolveIndustryPresetForTenant,
+    buildIndustryPresetWorkspaceHint,
+} from "../platform/industryPresetContext.js";
 
 function readSarahPageContextFromRequest(req) {
     if (!req) return null;
@@ -98,6 +102,11 @@ export async function buildSarahContext(req, overrides = {}) {
         }
     }
 
+    const industryPreset = await resolveIndustryPresetForTenant(resolvedCompany).catch(() => ({
+        active: false,
+        reason: "resolve_failed",
+    }));
+
     return {
         companyId,
         companyName: resolvedCompany?.name || companyId,
@@ -133,6 +142,7 @@ export async function buildSarahContext(req, overrides = {}) {
             },
         },
         plan: workspace?.company?.plan || resolvedCompany?.plan || "trial",
+        industryPreset,
     };
 }
 
@@ -248,6 +258,9 @@ export function buildWorkspaceContextHint(ctx) {
             "Sarah Admin coordinates the workforce: use issueWorkforceInstruction to delegate to Sales, Finance, Operations, or HR Sarah. Humans may also assign instructions via the portal."
         );
     }
+
+    const presetHint = buildIndustryPresetWorkspaceHint(ctx);
+    if (presetHint) parts.push(presetHint);
 
     return parts.join(". ");
 }

@@ -37,6 +37,7 @@ import {
     financeSarahTurnSystemAddendum,
     isFinanceCollectionsQuestion,
 } from "./financeSarahToolPolicy.js";
+import { industryPresetTurnSystemAddendum } from "../platform/industryPresetContext.js";
 
 const INTERNAL_TOOL_MESSAGE_RE = /Each line item requires unitAmount/i;
 
@@ -283,6 +284,7 @@ export async function handleSarahChat(ctx, input) {
     const history = getSarahSessionHistory(session);
     let systemPrompt = buildSarahSystemPrompt(ctx);
     systemPrompt += financeSarahTurnSystemAddendum(ctx, message);
+    systemPrompt += industryPresetTurnSystemAddendum(ctx);
     const tools = getOpenAIToolDefinitions(ctx);
 
     const messages = [{ role: "system", content: systemPrompt }];

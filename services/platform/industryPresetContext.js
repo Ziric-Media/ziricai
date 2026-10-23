@@ -127,6 +127,13 @@ export function industryPresetTurnSystemAddendum(ctx) {
         parts.push(`Operational capabilities for this module include: ${available.join("; ")}.`);
     }
 
+    const moduleKey = resolveSarahModuleKey(ctx);
+    if (moduleKey === "operations" && ctx.industryPreset?.industry === "automotive") {
+        parts.push(
+            "Sarah Operations tool surface: listTasks and createTask only for task writes. No updateTask tool — task completion happens in Operations → Tasks. Automotive inventory and dashboard aggregates are not exposed as Sarah tools; use Command Centre in the portal for those reads."
+        );
+    }
+
     parts.push(
         "Do not claim tools or data exist outside Sarah allowlists and tenant permissions. Preset text does not grant new permissions."
     );

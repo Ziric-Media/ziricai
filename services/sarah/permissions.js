@@ -9,6 +9,13 @@ const PERMISSION_MATRIX = {
     canManageStaff: ["owner", "manager"],
     canViewBilling: ["owner", "finance"],
     canExportData: ["owner", "manager", "finance"],
+    /** Aligned with services/auth/permissionsService.js — Sarah task tools (Operations). */
+    canViewTasks: ["owner", "manager", "finance", "hr", "sales", "support", "reception", "marketing", "viewer"],
+    canCreateTasks: ["owner", "manager"],
+    canAssignTasks: ["owner", "manager"],
+    canUpdateOwnTasks: ["owner", "manager", "finance", "hr", "sales", "support", "reception", "marketing", "viewer"],
+    canUpdateAnyTask: ["owner", "manager"],
+    canCompleteTasks: ["owner", "manager", "finance", "hr", "sales", "support", "reception", "marketing", "viewer"],
 };
 
 const SUPERADMIN_ONLY = new Set(["generateReport"]);
