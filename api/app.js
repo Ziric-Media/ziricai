@@ -125,6 +125,7 @@ import {
     inviteTeamMember,
     updateTeamMemberRole,
 } from "../services/tenants/userService.js";
+import { mapTeamRosterForRole } from "../services/tenants/teamRosterAccess.js";
 import {
     provisionCompany,
     provisionAgent,
@@ -218,6 +219,7 @@ import { isMetaWebhookPath, normalizeWebhookPath } from "../services/integration
 import { initEventSystem } from "../services/events/index.js";
 import { applyApiVersionHeader } from "../services/api/routeRegistry.js";
 import { mountCustomerOpsRoutes } from "../services/api/customerOpsRoutes.js";
+import { mountAutomotiveRoutes } from "../services/api/automotiveRoutes.js";
 import { mountFinanceAcceptanceRoutes } from "../services/api/financeAcceptanceRoutes.js";
 import { isFinanceAcceptanceRuntimeActive } from "../services/auth/financeAcceptanceMode.js";
 import { seedFinanceAcceptanceTenantIfNeeded } from "../services/finance/financeAcceptanceSeed.js";
@@ -792,7 +794,8 @@ app.delete("/api/companies/:companyId/departments/:deptId", requireTenantScope()
 /** Team — tenant membership */
 app.get("/api/companies/:companyId/team", requireTenantScope(), async (req, res) => {
     try {
-        const items = await listTeamMembers(req.params.companyId);
+        const raw = await listTeamMembers(req.params.companyId);
+        const items = mapTeamRosterForRole(req.tenant?.role, raw);
         res.json({ items, count: items.length });
     } catch (err) {
         res.status(500).json({ error: err.message || "Failed to load team" });
@@ -869,7 +872,8 @@ app.patch("/api/portal/company/:companyId", requireTenantScope(), checkPermissio
 app.get("/api/portal/team/:companyId", requireTenantScope(), async (req, res) => {
     try {
         const data = await getPortalTeamAsync(req.params.companyId);
-        res.json(data);
+        const items = mapTeamRosterForRole(req.tenant?.role, data.items || []);
+        res.json({ ...data, items, count: items.length });
     } catch (err) {
         console.error("[api/portal/team] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load team" });
@@ -1662,6 +1666,8 @@ app.get("/api/sarah/tools", requireTenantScope({ optional: true }), async (req, 
             role: ctx.role,
             companyId: ctx.companyId,
             financeSarah: Boolean(ctx.financeSarah),
+            hrSarah: Boolean(ctx.hrSarah),
+            adminSarah: Boolean(ctx.adminSarah),
         });
     } catch (err) {
         console.error("[api/sarah/tools] error:", err.message);
@@ -2494,6 +2500,7 @@ if (isFinanceAcceptanceRuntimeActive()) {
 }
 
 mountCustomerOpsRoutes(app);
+mountAutomotiveRoutes(app);
 }
 
 export async function runBackgroundInit() {

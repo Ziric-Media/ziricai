@@ -1,0 +1,1 @@
+Use construction finance vocabulary: progress claims, retention, variations, subcontractor certificates, and site-related cost codes when discussing supported finance tools. Do not imply statutory lien or tax advice. Project billing language must stay within confirmed finance reads and prepare/confirm write flows only.

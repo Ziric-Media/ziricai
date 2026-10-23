@@ -7,7 +7,8 @@ import { app } from "../../js/firebase.js";
 import { getFirebaseProjectId, getFirebaseDatabaseId } from "../../js/firebase-config.js";
 import { getDoc, globalUserRef, tenantDocRef } from "../database/firestoreClient.js";
 import { TENANT_COLLECTIONS, ROOT } from "../database/schema.js";
-import { getStorageAdapter } from "../storage/storageAdapter.js";
+import { getStorageAdapter, getConfiguredStorageBackend } from "../storage/storageAdapter.js";
+import { TenantRepository } from "../database/tenantRepository.js";
 import { upsertTenantUser } from "../tenants/userService.js";
 import { getCompany } from "../tenants/companyService.js";
 import {
@@ -215,6 +216,11 @@ export async function getUserProfile(uid) {
  */
 export async function getTenantMembership(uid, companyId) {
     if (!uid || !companyId) return null;
+    if (getConfiguredStorageBackend() === "memory") {
+        const repo = new TenantRepository(TENANT_COLLECTIONS.USERS);
+        const record = await repo.get(companyId, uid);
+        return record ? { uid, companyId, ...record } : null;
+    }
     try {
         const snap = await getDoc(tenantDocRef(companyId, TENANT_COLLECTIONS.USERS, uid));
         if (!snap.exists()) return null;

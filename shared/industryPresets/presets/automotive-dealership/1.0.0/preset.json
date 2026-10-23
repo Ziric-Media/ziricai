@@ -1,0 +1,49 @@
+{
+  "presetId": "automotive-dealership",
+  "name": "Automotive dealership",
+  "version": "1.0.0",
+  "schemaVersion": "1.0.0",
+  "description": "Franchise and independent vehicle dealerships — inventory, test drives, and sales pipeline.",
+  "industry": "automotive",
+  "subIndustries": ["new_vehicle", "used_vehicle", "multi_franchise"],
+  "jurisdictions": ["ZA", "global"],
+  "status": "approved",
+  "owner": "product-platform",
+  "lastReviewedAt": "2026-10-22",
+  "sarahMapping": {
+    "finance": {
+      "purpose": "Dealership invoicing and overview within supported finance tools.",
+      "capabilities": ["finance.invoices.read", "finance.transactions.read", "finance.overview.read"],
+      "instructionBlockIds": ["automotive.finance.terminology"]
+    },
+    "operations": {
+      "purpose": "Stock, appointments, and operational tasks via supported tools.",
+      "capabilities": ["tasks.list", "automotive.inventory.read", "automotive.dashboard.read"],
+      "instructionBlockIds": ["automotive.ops.dealershipWorkflows"]
+    },
+    "hr": {
+      "purpose": "Dealership roster and HR workflows.",
+      "capabilities": ["hr.roster.read"],
+      "instructionBlockIds": []
+    },
+    "admin": {
+      "purpose": "Cross-module coordination and portal navigation.",
+      "capabilities": ["admin.portalNavigation", "knowledge.search", "automotive.dashboard.read"],
+      "instructionBlockIds": ["automotive.admin.overview"]
+    }
+  },
+  "modules": [],
+  "roles": [],
+  "workflows": [],
+  "kpis": ["inventory.byAvailability", "sales.unitsSold", "crm.byStage", "appointments.testDrives"],
+  "knowledge": [],
+  "compliance": [],
+  "onboarding": {
+    "checklist": ["business_identity", "inventory_baseline", "crm_baseline", "appointments_baseline"]
+  },
+  "integrations": [],
+  "acceptance": {
+    "humanReviewRequired": true,
+    "notes": "Phase 1 — read-only dashboard metrics; Sarah hints only."
+  }
+}

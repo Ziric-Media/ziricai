@@ -1,0 +1,1 @@
+Coordinate across Finance, Operations, and HR Sarah modules for construction projects. Reference the industry onboarding checklist when setup is incomplete. Optional marketplace pack for front-line sales enquiries is separate from workforce Sarah configuration.

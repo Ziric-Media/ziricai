@@ -7138,3 +7138,20 @@
         grid-template-columns: 1fr;
     }
 }
+
+.automotive-command-centre .automotive-fin-section .automotive-fin-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+}
+.automotive-command-centre .automotive-metric-unavailable {
+    color: var(--text-secondary, #64748b);
+    font-weight: 600;
+}
+.automotive-command-centre .automotive-chart-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
