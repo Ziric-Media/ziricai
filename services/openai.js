@@ -209,3 +209,23 @@ export async function askAIWithTools(message, options = {}) {
         return { reply: "Sorry, I'm having trouble responding right now.", toolResults };
     }
 }
+
+/**
+ * Transcribe audio (WhatsApp voice notes) via OpenAI Whisper.
+ * @param {Buffer|Uint8Array} buffer
+ * @param {{ mimeType?: string, filename?: string }} [options]
+ * @returns {Promise<{ text: string }>}
+ */
+export async function transcribeAudio(buffer, options = {}) {
+    if (!openai) {
+        throw new Error("OPENAI_API_KEY is not configured for transcription");
+    }
+    const filename = options.filename || "audio.ogg";
+    const mimeType = options.mimeType || "audio/ogg";
+    const file = new File([buffer], filename, { type: mimeType });
+    const result = await openai.audio.transcriptions.create({
+        model: process.env.OPENAI_WHISPER_MODEL || "whisper-1",
+        file,
+    });
+    return { text: result.text || "" };
+}

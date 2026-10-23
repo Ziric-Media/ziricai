@@ -24,5 +24,9 @@ export function initAiTools() {
 }
 
 export { ALL_TOOLS };
+
+/** OpenAI tool names for Client Zero inbound WhatsApp (no automotive scheduling). */
+export const CLIENT_ZERO_INBOUND_TOOL_NAMES = Object.freeze([]);
+
 export { registerTool, getTool, listTools, getOpenAIToolDefinitions } from "./toolRegistry.js";
 export { runTool, buildIdempotencyKey } from "./toolRunner.js";

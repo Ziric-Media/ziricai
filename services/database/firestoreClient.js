@@ -248,6 +248,43 @@ export function serverTimestamp() {
     return clientServerTimestamp();
 }
 
+/** True when Firestore Admin is active and supports runTransaction (Railway production). */
+export async function adminFirestoreTransactionsAvailable() {
+    return useAdminBackend();
+}
+
+/**
+ * Run a Firestore Admin transaction. `tx.get/create/update` accept tenantDocRef descriptors.
+ * @template T
+ * @param {(tx: { get: Function, create: Function, update: Function }) => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+export async function runAdminFirestoreTransaction(fn) {
+    const admin = getAdminFirestore();
+    if (!admin) {
+        throw new Error("Firestore Admin is not configured for transactions");
+    }
+    return admin.runTransaction(async (transaction) => {
+        const tx = {
+            async get(ref) {
+                const docRef = ref?.__admin ?? ref;
+                const snap = await transaction.get(docRef);
+                return {
+                    exists: () => snap.exists,
+                    data: () => snap.data(),
+                };
+            },
+            create(ref, data) {
+                transaction.create(ref.__admin ?? ref, data);
+            },
+            update(ref, data) {
+                transaction.update(ref.__admin ?? ref, data);
+            },
+        };
+        return fn(tx);
+    });
+}
+
 export { hasAdminCredentials, isServerSide };
 
 export {
