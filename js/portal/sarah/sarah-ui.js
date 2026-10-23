@@ -72,8 +72,18 @@ function transcriptStorageKey(companyId, persistenceScope) {
 }
 
 function persistSessionId(companyId, persistenceScope, id) {
-  if (!companyId || !id) return;
-  writeSarahSessionId(sessionStorageKey(companyId, persistenceScope), id);
+  if (!companyId) return;
+  const key = sessionStorageKey(companyId, persistenceScope);
+  if (!id) {
+    try {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+  writeSarahSessionId(key, id);
 }
 
 function readPersistedSessionId(companyId, persistenceScope) {
@@ -229,6 +239,9 @@ async function restoreSarahConversation(scopeState, companyId) {
       persistSessionId(companyId, persistenceScope, scopeState.sessionId);
       renderStoredMessages(scopeState, data.session.messages);
       return;
+    }
+    if (error) {
+      persistSessionId(companyId, persistenceScope, '');
     }
   }
 

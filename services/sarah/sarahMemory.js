@@ -86,8 +86,11 @@ export function getSessionContext(sessionId) {
 /**
  * Build context hint string for Sarah system prompt from session memory.
  */
-export function buildSessionContextHint(sessionId) {
-    const ctx = getSessionContext(sessionId);
+export function buildSessionContextHint(sessionOrId) {
+    const ctx =
+        sessionOrId && typeof sessionOrId === "object"
+            ? sessionOrId.context || {}
+            : getSessionContext(sessionOrId);
     const parts = [];
     if (ctx.lastAgentName) parts.push(`Last discussed AI employee: ${ctx.lastAgentName}`);
     if (ctx.lastKbTopic) parts.push(`Last knowledge topic: ${ctx.lastKbTopic}`);

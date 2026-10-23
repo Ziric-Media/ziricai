@@ -8,13 +8,13 @@ import { buildSarahSystemPrompt } from "./prompts/systemPrompt.js";
 import { getOpenAIToolDefinitions, executeTool } from "./toolRegistry.js";
 import { initSarahTools } from "./tools/index.js";
 import {
-    getOrCreateSession,
-    appendMessage,
-    recordAction,
-    getSessionHistory,
-    getSessionContext,
-    setSessionContext,
-} from "./sarahMemory.js";
+    getOrCreateSarahSession,
+    appendSarahMessage,
+    recordSarahAction,
+    getSarahSessionHistory,
+    getSarahSessionContext,
+    setSarahSessionContext,
+} from "./sarahSessionStore.js";
 import {
     matchPlatformQuestion,
     getPlatformAnswer,
@@ -142,8 +142,8 @@ async function runPublicLandingDemoMode(_ctx, message, session) {
         reply = getPlatformAnswer("general").answer || PLATFORM_DEFAULT_REPLY;
     }
 
-    await appendMessage(session, "user", message);
-    await appendMessage(session, "assistant", reply);
+    await appendSarahMessage(session, "user", message);
+    await appendSarahMessage(session, "assistant", reply);
     return {
         reply,
         sessionId: session.id,
@@ -159,13 +159,13 @@ async function runDemoMode(ctx, message, session) {
         return runPublicLandingDemoMode(ctx, message, session);
     }
 
-    const sessionContext = getSessionContext(session);
+    const sessionContext = getSarahSessionContext(session);
     const platformMatch = matchPlatformQuestion(message);
 
     if (platformMatch && !matchDemoIntent(message, sessionContext)) {
         const reply = platformMatch.answer;
-        await appendMessage(session, "user", message);
-        await appendMessage(session, "assistant", reply);
+        await appendSarahMessage(session, "user", message);
+        await appendSarahMessage(session, "assistant", reply);
         return { reply, sessionId: session.id, actions: [], uiHints: [], mode: "demo" };
     }
 
@@ -177,10 +177,10 @@ async function runDemoMode(ctx, message, session) {
         const result = await executeTool(intent.tool, ctx, intent.args);
         actions.push(result);
         uiHints = result.uiHints || [];
-        await recordAction(session, { tool: intent.tool, success: result.success });
+        await recordSarahAction(session, { tool: intent.tool, success: result.success });
 
         if (intent.tool === "createEmployee" && result.data?.employee) {
-            await setSessionContext(session, {
+            await setSarahSessionContext(session, {
                 lastAgentId: result.data.agentId,
                 lastAgentName: result.data.employee.name,
                 lastKnowledgeBaseId: result.data.knowledgeBaseId,
@@ -188,14 +188,14 @@ async function runDemoMode(ctx, message, session) {
         }
 
         const reply = result.message || result.error || "Done.";
-        await appendMessage(session, "user", message);
-        await appendMessage(session, "assistant", reply);
+        await appendSarahMessage(session, "user", message);
+        await appendSarahMessage(session, "assistant", reply);
         return { reply, sessionId: session.id, actions, uiHints, mode: "demo" };
     }
 
     if (platformMatch) {
-        await appendMessage(session, "user", message);
-        await appendMessage(session, "assistant", platformMatch.answer);
+        await appendSarahMessage(session, "user", message);
+        await appendSarahMessage(session, "assistant", platformMatch.answer);
         return {
             reply: platformMatch.answer,
             sessionId: session.id,
@@ -206,8 +206,8 @@ async function runDemoMode(ctx, message, session) {
     }
 
     const fallback = getPlatformAnswer("general").answer || PLATFORM_DEFAULT_REPLY;
-    await appendMessage(session, "user", message);
-    await appendMessage(session, "assistant", fallback);
+    await appendSarahMessage(session, "user", message);
+    await appendSarahMessage(session, "assistant", fallback);
     return { reply: fallback, sessionId: session.id, actions, uiHints, mode: "demo" };
 }
 
@@ -223,10 +223,13 @@ export async function handleSarahChat(ctx, input) {
         return { reply: "Please send a message.", sessionId: input.sessionId || null, actions: [], uiHints: [] };
     }
 
-    const session = await getOrCreateSession(input.sessionId, ctx.companyId, {
+    const surface = String(ctx.surface || "portal-admin").trim().toLowerCase();
+    const session = await getOrCreateSarahSession({
+        sessionId: input.sessionId || null,
+        companyId: ctx.companyId,
         userId: ctx.uid,
-        uid: ctx.uid,
-        surface: ctx.surface || "portal-admin",
+        surface,
+        createIfMissing: true,
     });
     ctx.sessionId = session.id;
     ctx.sarahSession = session;
@@ -236,19 +239,19 @@ export async function handleSarahChat(ctx, input) {
     applyFinanceSarahSessionStickiness(ctx, session);
     if (shouldPersistFinanceSessionScope(ctx)) {
         if (session.context?.sarahModuleScope !== SARAH_SESSION_MODULE_SCOPE_FINANCE) {
-            await setSessionContext(session, { sarahModuleScope: SARAH_SESSION_MODULE_SCOPE_FINANCE });
+            await setSarahSessionContext(session, { sarahModuleScope: SARAH_SESSION_MODULE_SCOPE_FINANCE });
         }
     }
 
-    const sessionCtx = getSessionContext(session);
+    const sessionCtx = getSarahSessionContext(session);
     const pendingUiHints = sessionCtx.pendingUiHints;
     if (pendingUiHints?.length && isPortalClientSurface(ctx.surface)) {
         if (isNavigationConsentYes(message)) {
-            await setSessionContext(session, { pendingUiHints: null, pendingUiLabel: null });
+            await setSarahSessionContext(session, { pendingUiHints: null, pendingUiLabel: null });
             const label = sessionCtx.pendingUiLabel || "that section";
             const reply = `Opening ${label} now.`;
-            await appendMessage(session, "user", message);
-            await appendMessage(session, "assistant", reply);
+            await appendSarahMessage(session, "user", message);
+            await appendSarahMessage(session, "assistant", reply);
             return {
                 reply,
                 sessionId: session.id,
@@ -258,10 +261,10 @@ export async function handleSarahChat(ctx, input) {
             };
         }
         if (isNavigationConsentDecline(message)) {
-            await setSessionContext(session, { pendingUiHints: null, pendingUiLabel: null });
+            await setSarahSessionContext(session, { pendingUiHints: null, pendingUiLabel: null });
             const reply = "No problem — I'll stay here. Ask anytime if you want me to open a module.";
-            await appendMessage(session, "user", message);
-            await appendMessage(session, "assistant", reply);
+            await appendSarahMessage(session, "user", message);
+            await appendSarahMessage(session, "assistant", reply);
             return { reply, sessionId: session.id, actions: [], uiHints: [], mode: "openai" };
         }
     }
@@ -269,7 +272,7 @@ export async function handleSarahChat(ctx, input) {
     if (isPortalClientSurface(ctx.surface) && !ctx.financeSarah) {
         const moduleScope = moduleKeyFromPortalSurface(ctx.surface);
         if (moduleScope && session.context?.sarahModuleScope !== moduleScope) {
-            await setSessionContext(session, { sarahModuleScope: moduleScope });
+            await setSarahSessionContext(session, { sarahModuleScope: moduleScope });
         }
     }
 
@@ -277,7 +280,7 @@ export async function handleSarahChat(ctx, input) {
         return runDemoMode(ctx, message, session);
     }
 
-    const history = getSessionHistory(session);
+    const history = getSarahSessionHistory(session);
     let systemPrompt = buildSarahSystemPrompt(ctx);
     systemPrompt += financeSarahTurnSystemAddendum(ctx, message);
     const tools = getOpenAIToolDefinitions(ctx);
@@ -300,7 +303,7 @@ export async function handleSarahChat(ctx, input) {
         if (ctx.financeSarah && isFinanceCollectionsQuestion(message)) {
             const prefetch = await executeTool("viewFinanceTransactions", ctx, { periodPreset: "all" });
             actions.push(prefetch);
-            await recordAction(session, { tool: "viewFinanceTransactions", success: prefetch.success });
+            await recordSarahAction(session, { tool: "viewFinanceTransactions", success: prefetch.success });
             currentMessages.push({
                 role: "system",
                 content:
@@ -335,7 +338,7 @@ export async function handleSarahChat(ctx, input) {
                         fnArgs = {};
                     }
 
-                    const sessionCtx = getSessionContext(session);
+                    const sessionCtx = getSarahSessionContext(session);
                     if (fnName === "uploadKnowledge" || fnName === "trainAI") {
                         if (!fnArgs.employeeName && sessionCtx.lastAgentName) {
                             fnArgs.employeeName = sessionCtx.lastAgentName;
@@ -345,10 +348,10 @@ export async function handleSarahChat(ctx, input) {
                     const result = await executeTool(fnName, ctx, fnArgs);
                     actions.push(result);
                     if (result.uiHints) uiHints.push(...result.uiHints);
-                    await recordAction(session, { tool: fnName, success: result.success });
+                    await recordSarahAction(session, { tool: fnName, success: result.success });
 
                     if (fnName === "createEmployee" && result.data?.employee) {
-                        await setSessionContext(session, {
+                        await setSarahSessionContext(session, {
                             lastAgentId: result.data.agentId,
                             lastAgentName: result.data.employee.name,
                             lastKnowledgeBaseId: result.data.knowledgeBaseId,
@@ -388,7 +391,7 @@ export async function handleSarahChat(ctx, input) {
         ) {
             const deferred = deferUiHintsForConsent(reply, finalUiHints);
             if (deferred.deferred) {
-                await setSessionContext(session, {
+                await setSarahSessionContext(session, {
                     pendingUiHints: deferred.pendingUiHints,
                     pendingUiLabel: deferred.pendingUiLabel,
                 });
@@ -397,8 +400,8 @@ export async function handleSarahChat(ctx, input) {
             }
         }
 
-        await appendMessage(session, "user", message);
-        await appendMessage(session, "assistant", reply);
+        await appendSarahMessage(session, "user", message);
+        await appendSarahMessage(session, "assistant", reply);
 
         return {
             reply,

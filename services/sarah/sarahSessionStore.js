@@ -113,21 +113,29 @@ export async function getOrCreateSarahSession({
 }) {
     pruneMemoryExpired();
 
-    if (sessionId) {
-        let session = readSessionFromMemory(sessionId);
+    let resolvedSessionId = sessionId || null;
+
+    if (resolvedSessionId) {
+        let session = readSessionFromMemory(resolvedSessionId);
         if (!session) {
-            session = await readSessionFromFirestore(companyId, sessionId);
+            session = await readSessionFromFirestore(companyId, resolvedSessionId);
             if (session) writeSessionToMemory(session);
         }
         if (session && assertSessionAccess(session, { companyId, userId })) {
-            session.updatedAt = Date.now();
-            return session;
+            const expectedSurface = String(surface || "portal").trim();
+            const sessionSurface = String(session.surface || "portal").trim();
+            if (sessionSurface === expectedSurface) {
+                session.updatedAt = Date.now();
+                return session;
+            }
+            // Client reused a session id from another Sarah module — do not merge transcripts.
+            resolvedSessionId = null;
         }
     }
 
     if (!createIfMissing) return null;
 
-    const id = sessionId || createSessionId();
+    const id = resolvedSessionId || createSessionId();
     const session = {
         id,
         companyId,
