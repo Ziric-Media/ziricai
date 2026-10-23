@@ -15,6 +15,53 @@ let adminDb = null;
 let initAttempted = false;
 let initError = null;
 
+const EMULATOR_MODE_FLAG = "ZIRICAI_FIREBASE_EMULATOR";
+
+function isLoopbackHost(value) {
+    if (!value || String(value).includes("://")) return false;
+    try {
+        const url = new URL(`http://${value}`);
+        const port = Number(url.port);
+        return (
+            ["127.0.0.1", "localhost", "::1", "[::1]"].includes(url.hostname) &&
+            Number.isInteger(port) &&
+            port > 0 &&
+            port <= 65535 &&
+            url.pathname === "/" &&
+            !url.username &&
+            !url.password
+        );
+    } catch {
+        return false;
+    }
+}
+
+/** @returns {{ projectId: string, firestoreHost: string, authHost: string } | null} */
+export function getFirebaseEmulatorConfig() {
+    if (process.env[EMULATOR_MODE_FLAG] !== "1") return null;
+
+    const projectId = String(process.env.FIREBASE_PROJECT_ID || "").trim();
+    const firestoreHost = String(process.env.FIRESTORE_EMULATOR_HOST || "").trim();
+    const authHost = String(process.env.FIREBASE_AUTH_EMULATOR_HOST || "").trim();
+
+    if (!projectId.startsWith("demo-")) {
+        throw new Error(`${EMULATOR_MODE_FLAG}=1 requires a non-production demo-* FIREBASE_PROJECT_ID`);
+    }
+    if (!isLoopbackHost(firestoreHost) || !isLoopbackHost(authHost)) {
+        throw new Error(`${EMULATOR_MODE_FLAG}=1 requires loopback-only Firestore and Auth emulator hosts`);
+    }
+
+    return { projectId, firestoreHost, authHost };
+}
+
+export function assertFirebaseEmulatorConfiguration() {
+    const config = getFirebaseEmulatorConfig();
+    if (!config) {
+        throw new Error(`${EMULATOR_MODE_FLAG}=1 is required for the Sarah emulator test runtime`);
+    }
+    return config;
+}
+
 function parseServiceAccountJson() {
     const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
     if (!raw) return null;
