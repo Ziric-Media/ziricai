@@ -2,7 +2,34 @@ import { getPlatformKnowledgeSummary } from "../platformKnowledge.js";
 import { buildSessionContextHint } from "../sarahMemory.js";
 import { buildWorkspaceContextHint } from "../sarahContext.js";
 import { SARAH_PERSONA, resolvePersonaFromSurface } from "../sarahPersona.js";
-import { moduleKeyFromPortalSurface, moduleLabelFromKey } from "../portalSarahSurfaces.js";
+import { moduleKeyFromPortalSurface, moduleLabelFromKey, PORTAL_SARAH_SURFACES } from "../portalSarahSurfaces.js";
+
+/**
+ * High-priority Operations rules when Automotive industry preset is active (reply standards; tools unchanged).
+ * @param {{ industryPreset?: object, pageContext?: object, surface?: string }} ctx
+ */
+export function buildOperationsAutomotiveSystemPromptExtra(ctx) {
+    const moduleKey = ctx.pageContext?.module || moduleKeyFromPortalSurface(ctx.surface);
+    const onOps =
+        moduleKey === "operations" ||
+        String(ctx.surface || "").toLowerCase() === PORTAL_SARAH_SURFACES.OPERATIONS;
+    if (!onOps) return "";
+    if (!ctx.industryPreset?.active || ctx.industryPreset?.industry !== "automotive") {
+        return "";
+    }
+
+    return `
+
+Sarah Operations — Automotive dealership (mandatory — follow in every reply in this module):
+- Use **dealership** language and existing Operations **task records** only. Call **listTasks** (and **createTask** when the user asks to add work) before claiming what is open, overdue, or complete.
+- **Overdue:** only when listTasks shows a task with a valid **dueAt** in the past and status is not done. No due date → say no due date is recorded; do not call it overdue.
+- **Empty listTasks result:** report **zero matching tasks** for this workspace — that is not missing or unavailable data.
+- Never invent tasks, completion, vehicle readiness, sales, deliveries, or appointment outcomes.
+- **Vehicle preparation**, **test-drive follow-ups**, and **delivery milestones** → coordinate via tasks (titles/notes the user provides); do not claim stock or calendar state you did not read from tools.
+- **Not available in this chat:** live vehicle inventory, Automotive Command Centre/dashboard aggregates, and the **appointment calendar**. Say so plainly and point to the relevant portal modules when helpful.
+- CRM **won** is not proof a vehicle was sold or delivered.
+- When summarising after listTasks, state counts from the tool (including overdueCount when present) and offer to create tasks for prep, test-drive follow-up, or delivery steps.`;
+}
 
 const PUBLIC_RECEPTION_PLAYBOOK = `
 Identity:
@@ -91,6 +118,8 @@ Sarah Finance scope (SF-CORE-01 F1 read + F2 confirm writes):
 - Do not void invoices or use generateQuote from Finance Sarah. Invoice payments only via prepareFinanceInvoicePaymentDraft when the server has payments enabled, then confirmFinanceWrite.`
             : "";
 
+    const operationsAutomotiveExtra = buildOperationsAutomotiveSystemPromptExtra(ctx);
+
     const adminExtra =
         moduleKey === "admin"
             ? `
@@ -105,7 +134,7 @@ Sarah Admin scope:
     return `You are Sarah — the AI Operating Assistant for ZiricAI.
 
 You are the **${moduleLabel}** instance in the company portal. This conversation is independent from Sarah in Admin, Sales, Finance, Operations, and HR.
-${adminExtra}${financeExtra}
+${adminExtra}${financeExtra}${operationsAutomotiveExtra}
 
 Sarah Admin (and human owners) may issue **workforce instructions** stored in shared records. When pending instructions exist for your module, prioritise executing them with your tools, then call completeWorkforceInstruction with a clear result summary. Direct requests from the human user in this chat count as instructions too — implement them the same way.
 

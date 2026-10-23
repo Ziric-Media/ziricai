@@ -26,6 +26,29 @@ import {
     buildIndustryPresetWorkspaceHint,
 } from "../platform/industryPresetContext.js";
 
+/**
+ * Tenant company record for preset resolution — workspace first, then portal pack inner company.
+ * @param {object|null|undefined} workspace
+ * @param {object|null|undefined} portalCompanyPack — return value of getPortalCompanyAsync
+ * @param {string} companyId
+ */
+export function resolveSarahTenantCompanyRecord(workspace, portalCompanyPack, companyId) {
+    if (workspace?.company && typeof workspace.company === "object") {
+        return workspace.company;
+    }
+    if (
+        portalCompanyPack?.company &&
+        typeof portalCompanyPack.company === "object" &&
+        !Array.isArray(portalCompanyPack.company)
+    ) {
+        return portalCompanyPack.company;
+    }
+    if (portalCompanyPack?.id) {
+        return portalCompanyPack;
+    }
+    return { id: companyId, name: companyId };
+}
+
 function readSarahPageContextFromRequest(req) {
     if (!req) return null;
     if (req.body?.pageContext && typeof req.body.pageContext === "object") {
@@ -59,7 +82,7 @@ export async function buildSarahContext(req, overrides = {}) {
         getWhatsAppIntegration(companyId).catch(() => null),
     ]);
 
-    const resolvedCompany = workspace?.company || company || { id: companyId, name: companyId };
+    const resolvedCompany = resolveSarahTenantCompanyRecord(workspace, company, companyId);
     const kbSummary = {
         knowledgeBaseId: workspace?.workspaceLinks?.knowledgeBaseId || `kb-${companyId}`,
         documentCount: knowledgeDocs.length,
@@ -113,6 +136,7 @@ export async function buildSarahContext(req, overrides = {}) {
         companyIndustry:
             resolvedCompany?.industry ||
             workspace?.company?.industry ||
+            company?.company?.industry ||
             company?.industry ||
             null,
         uid: tenant.uid,
