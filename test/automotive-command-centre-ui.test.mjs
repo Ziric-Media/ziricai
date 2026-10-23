@@ -6,8 +6,8 @@ import {
     breakdownToChartRows,
     shouldApplyAutomotiveDashboardResponse,
     salesMetricCardTitle,
-} from "../app/js/portal/automotive/automotiveMetricDisplay.js";
-import { buildAutomotiveCommandCentreViewModel } from "../app/js/portal/automotive/automotiveCommandCentreModel.js";
+} from "../js/portal/automotive/automotiveMetricDisplay.js";
+import { buildAutomotiveCommandCentreViewModel } from "../js/portal/automotive/automotiveCommandCentreModel.js";
 
 const FIXTURE = {
     schemaVersion: "1.0.0",
