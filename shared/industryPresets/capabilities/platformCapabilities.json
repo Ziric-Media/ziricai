@@ -75,6 +75,16 @@
       "class": "extension-required",
       "label": "Subcontractor compliance document tracking",
       "sarahModules": ["hr", "operations"]
+    },
+    "automotive.inventory.read": {
+      "class": "available",
+      "label": "Read tenant vehicle inventory (canonical stock)",
+      "sarahModules": ["operations", "admin"]
+    },
+    "automotive.dashboard.read": {
+      "class": "available",
+      "label": "Read automotive dashboard metrics aggregate",
+      "sarahModules": ["operations", "admin"]
     }
   }
 }

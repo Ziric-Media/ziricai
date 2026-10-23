@@ -115,6 +115,8 @@ export const MODULE_PERMISSIONS = {
 
   dashboard: null,
 
+  automotiveCommandCentre: null,
+
   sarah: null,
 
   agents: 'canEditAI',

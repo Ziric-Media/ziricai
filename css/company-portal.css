@@ -6627,6 +6627,24 @@
     width: 100%;
     margin-bottom: 4px;
 }
+
+.fin-workspace-nav--horizontal > .fin-workspace-nav-desktop {
+    flex-direction: row;
+    flex-wrap: wrap;
+    position: static;
+    gap: 8px;
+    padding: 10px 12px;
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+}
+
+.fin-workspace-nav--horizontal > .fin-workspace-nav-desktop .fin-ws-link {
+    width: auto;
+    border-radius: 999px;
+    padding: 8px 14px;
+    box-shadow: none;
+}
 .hr-module .hr-module-main {
     min-width: 0;
 }
@@ -7119,4 +7137,21 @@
     .bos-instruction-quick-form {
         grid-template-columns: 1fr;
     }
+}
+
+.automotive-command-centre .automotive-fin-section .automotive-fin-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+}
+.automotive-command-centre .automotive-metric-unavailable {
+    color: var(--text-secondary, #64748b);
+    font-weight: 600;
+}
+.automotive-command-centre .automotive-chart-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }

@@ -3,13 +3,15 @@
  */
 import { state, subscribe } from './dataStore.js';
 import { canAccessModule } from '../permissions.js';
+import { sarahNavIconMarkup } from '../../shared/sarahAvatar.js';
+import { isAutomotivePresetActive } from '../automotive/automotivePreset.js';
 
 export const NAV_SECTIONS = [
   {
     id: 'sarah-workforce',
     label: 'Sarah workforce',
     items: [
-      { id: 'sarah', label: 'Sarah Admin', icon: 'fa-sparkles' },
+      { id: 'sarah', label: 'Sarah Admin', icon: 'fa-wand-magic-sparkles', navIcon: 'sarah' },
       { id: 'conversations', label: 'Sarah Sales', icon: 'fa-inbox', live: true },
       { id: 'finance', label: 'Sarah Finance', icon: 'fa-coins' },
       { id: 'operations', label: 'Sarah Operations', icon: 'fa-list-check' },
@@ -21,6 +23,12 @@ export const NAV_SECTIONS = [
     label: 'Operate',
     items: [
       { id: 'dashboard', label: 'Overview', icon: 'fa-gauge-high' },
+      {
+        id: 'automotiveCommandCentre',
+        label: 'Command Centre',
+        icon: 'fa-car',
+        requiresAutomotivePreset: true,
+      },
       { id: 'customers', label: 'CRM', icon: 'fa-users' },
       { id: 'appointments', label: 'Appointments', icon: 'fa-calendar-check' },
       { id: 'agents', label: 'AI Employees', icon: 'fa-robot' },
@@ -77,7 +85,10 @@ export function renderSidebarNav() {
 
   const role = state.profile?.role;
   nav.innerHTML = NAV_SECTIONS.map((section) => {
-    const items = section.items.filter((item) => canAccessModule(role, item.id));
+    const items = section.items.filter((item) => {
+      if (item.requiresAutomotivePreset && !isAutomotivePresetActive(state.company)) return false;
+      return canAccessModule(role, item.id);
+    });
     if (!items.length) return '';
 
     return `
@@ -118,9 +129,14 @@ function navLink(item) {
         ? '<span class="bos-nav-tag bos-nav-tag-integration">Awaiting integration</span>'
         : '';
 
+  const iconInner =
+    item.navIcon === 'sarah'
+      ? sarahNavIconMarkup()
+      : `<i class="fa-solid ${item.icon}" aria-hidden="true"></i>`;
+
   return `
     <a href="#" data-page="${item.id}" ${state.currentPage === item.id ? 'class="active"' : ''}>
-      <span class="icon"><i class="fa-solid ${item.icon}"></i></span>
+      <span class="icon bos-nav-icon">${iconInner}</span>
       <span class="bos-nav-label">${item.label}</span>
       ${navTag}
       ${badge}

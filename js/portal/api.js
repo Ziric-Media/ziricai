@@ -244,10 +244,20 @@ export async function inviteTeamMember(companyId, { email, role, departmentId } 
   });
 }
 
+/** Automotive Command Centre — Phase 1 read-only dashboard metrics. */
+export async function fetchAutomotiveDashboard(companyId, { from, to, periodDays } = {}) {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (periodDays != null) params.set('periodDays', String(periodDays));
+  const qs = params.toString() ? `?${params}` : '';
+  return request(`/api/companies/${encodeURIComponent(companyId)}/automotive/dashboard${qs}`);
+}
+
 /* ── Sarah BOS commercial cycle (Central Motors pilot) ── */
 
 export async function fetchBosCommercialCycles(companyId) {
-  return request(`/api/portal/bos/cycles/${encodeURIComponent(companyId)}`);
+  return request(`/api/portal/bos/cycles/${encodeURIComponent(companyId)}`, { silent: true });
 }
 
 export async function postBosCommercialCycleAction(companyId, cycleId, action, body = {}) {

@@ -81,6 +81,13 @@ function normalizeCompanyRecord(companyId, data = {}, existing = {}) {
             data.proactiveMonitoring !== undefined
                 ? data.proactiveMonitoring
                 : existing.proactiveMonitoring ?? null,
+        industryPresetId: data.industryPresetId ?? existing.industryPresetId ?? null,
+        industryPresetVersion: data.industryPresetVersion ?? existing.industryPresetVersion ?? null,
+        industryPresetActivatedAt:
+            data.industryPresetActivatedAt !== undefined
+                ? data.industryPresetActivatedAt
+                : existing.industryPresetActivatedAt ?? null,
+        industryPresetOverrides: data.industryPresetOverrides ?? existing.industryPresetOverrides ?? null,
         createdAt: existing.createdAt ?? data.createdAt ?? timestamp,
         updatedAt: timestamp,
         provisionedAt: data.provisionedAt ?? existing.provisionedAt ?? null,
