@@ -24,12 +24,14 @@
     "tasks.list": {
       "class": "available",
       "label": "List operational tasks",
-      "sarahModules": ["operations", "admin"]
+      "sarahModules": ["operations", "admin"],
+      "sarahTools": ["listTasks"]
     },
     "tasks.create": {
       "class": "available",
       "label": "Create tasks (permission-gated)",
-      "sarahModules": ["operations"]
+      "sarahModules": ["operations"],
+      "sarahTools": ["createTask"]
     },
     "tasks.assign": {
       "class": "configurable",
@@ -79,12 +81,14 @@
     "automotive.inventory.read": {
       "class": "available",
       "label": "Read tenant vehicle inventory (canonical stock)",
-      "sarahModules": ["operations", "admin"]
+      "sarahModules": ["operations", "admin"],
+      "sarahTools": []
     },
     "automotive.dashboard.read": {
       "class": "available",
       "label": "Read automotive dashboard metrics aggregate",
-      "sarahModules": ["operations", "admin"]
+      "sarahModules": ["operations", "admin"],
+      "sarahTools": []
     }
   }
 }

@@ -3,7 +3,7 @@
  */
 import platformCapabilities from "../../shared/industryPresets/capabilities/platformCapabilities.json" with { type: "json" };
 
-/** @type {Record<string, { class: string, label?: string, sarahModules?: string[] }>} */
+/** @type {Record<string, { class: string, label?: string, sarahModules?: string[], sarahTools?: string[] }>} */
 const CAPABILITIES = platformCapabilities.capabilities || {};
 
 export function getPlatformCapabilityCatalogue() {

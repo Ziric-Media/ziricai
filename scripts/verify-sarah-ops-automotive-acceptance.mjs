@@ -14,6 +14,10 @@ const {
     buildOperationsAutomotiveSystemPromptExtra,
     buildSarahSystemPrompt,
 } = await import("../services/sarah/prompts/systemPrompt.js");
+const {
+    industryPresetTurnSystemAddendum,
+    partitionPresetCapabilitiesForSarahAddendum,
+} = await import("../services/platform/industryPresetContext.js");
 const { isTaskOverdue, summarizeTaskForSarah } = await import("../services/sarah/tools/taskToolCommon.js");
 const { PORTAL_SARAH_SURFACES } = await import("../services/sarah/portalSarahSurfaces.js");
 const { SARAH_PERSONA } = await import("../services/sarah/sarahPersona.js");
@@ -91,6 +95,43 @@ const financeCtx = {
 assert.equal(buildOperationsAutomotiveSystemPromptExtra(financeCtx), "");
 
 console.log("✓ Operations Automotive system prompt (tenant gating)");
+
+// --- Full assembled prompt (orchestrator parity) ---
+const fullAddendum = industryPresetTurnSystemAddendum(autoCtx);
+const assembledPrompt = buildSarahSystemPrompt(autoCtx) + fullAddendum;
+assert.doesNotMatch(
+    assembledPrompt,
+    /Operational capabilities for this module include:/i,
+    "legacy misleading capability line must not appear"
+);
+assert.doesNotMatch(
+    assembledPrompt,
+    /Operational capabilities for this module include:[\s\S]*vehicle inventory/i,
+    "inventory must not be listed as Sarah-operational"
+);
+assert.match(fullAddendum, /not exposed as Sarah tools in this chat/i);
+assert.match(fullAddendum, /vehicle inventory/i);
+assert.match(fullAddendum, /automotive dashboard metrics/i);
+assert.match(fullAddendum, /Sarah tools for this module align with: List operational tasks/i);
+
+const partitioned = partitionPresetCapabilitiesForSarahAddendum(
+    autoPreset.preset.sarahMapping.operations.capabilities
+);
+assert.ok(partitioned.sarahToolBackedLabels.includes("List operational tasks"));
+assert.ok(partitioned.portalOnlyLabels.some((l) => /vehicle inventory/i.test(l)));
+assert.ok(partitioned.portalOnlyLabels.some((l) => /dashboard metrics/i.test(l)));
+
+const financeAddendum = industryPresetTurnSystemAddendum(financeCtx);
+assert.doesNotMatch(financeAddendum, /Automotive dealership \(mandatory/i);
+assert.doesNotMatch(financeAddendum, /vehicle inventory \(canonical stock\)/i);
+assert.match(financeAddendum, /Dealership invoicing/i);
+assert.doesNotMatch(
+    financeAddendum,
+    /not exposed as Sarah tools in this chat:.*Read invoices/i,
+    "unclassified finance capabilities must not be implied portal-only"
+);
+
+console.log("✓ Full prompt assembly (preset addendum capability honesty)");
 
 // --- Task / overdue rules (authoritative) ---
 const now = Date.parse("2026-10-24T10:00:00.000Z");

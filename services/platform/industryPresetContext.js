@@ -85,6 +85,35 @@ function mappingForContext(ctx) {
 }
 
 /**
+ * Split preset capability ids into Sarah-tool-backed vs portal/platform-only for addendum copy.
+ * Platform catalogue "available" ≠ Sarah chat tool exposure; sarahTools on each capability defines the latter.
+ * @param {string[]} capabilityIds
+ */
+export function partitionPresetCapabilitiesForSarahAddendum(capabilityIds = []) {
+    /** @type {string[]} */
+    const sarahToolBackedLabels = [];
+    /** @type {string[]} */
+    const portalOnlyLabels = [];
+
+    for (const id of capabilityIds) {
+        const cap = getPlatformCapability(id);
+        if (!cap || cap.class !== "available") continue;
+        const label = cap.label || id;
+        const tools = cap.sarahTools;
+        if (!Array.isArray(tools)) {
+            continue;
+        }
+        if (tools.length > 0) {
+            sarahToolBackedLabels.push(label);
+        } else {
+            portalOnlyLabels.push(label);
+        }
+    }
+
+    return { sarahToolBackedLabels, portalOnlyLabels };
+}
+
+/**
  * Short workspace hint fragment (included in buildWorkspaceContextHint).
  * @param {{ industryPreset?: object }} ctx
  */
@@ -113,18 +142,24 @@ export function industryPresetTurnSystemAddendum(ctx) {
         if (block?.body) parts.push(block.body);
     }
 
-    const gaps = summariseCapabilityGaps(mapping.capabilities || []);
+    const capabilityIds = mapping.capabilities || [];
+    const gaps = summariseCapabilityGaps(capabilityIds);
     if (gaps.length) {
         parts.push(`Capabilities not fully available: ${gaps.join(" ")}`);
     }
 
-    const available = (mapping.capabilities || [])
-        .map((id) => getPlatformCapability(id))
-        .filter((c) => c && c.class === "available")
-        .map((c) => c.label)
-        .filter(Boolean);
-    if (available.length) {
-        parts.push(`Operational capabilities for this module include: ${available.join("; ")}.`);
+    const { sarahToolBackedLabels, portalOnlyLabels } = partitionPresetCapabilitiesForSarahAddendum(
+        capabilityIds
+    );
+    if (sarahToolBackedLabels.length) {
+        parts.push(
+            `Sarah tools for this module align with: ${sarahToolBackedLabels.join("; ")}.`
+        );
+    }
+    if (portalOnlyLabels.length) {
+        parts.push(
+            `Platform capabilities for this module not exposed as Sarah tools in this chat: ${portalOnlyLabels.join("; ")}.`
+        );
     }
 
     const moduleKey = resolveSarahModuleKey(ctx);
