@@ -1,4 +1,5 @@
 import { listTasksForAccess } from "../../tenants/taskService.js";
+import { operationsTaskToolUiHints } from "../automotiveOpsStatusReply.js";
 import {
     requireSarahTenantContext,
     sarahTaskAccess,
@@ -48,7 +49,7 @@ export default {
                     ? "No tasks match that filter in Operations."
                     : `Found ${tasks.length} task(s) (${openCount} open, ${doneCount} done${overdueCount ? `, ${overdueCount} overdue` : ""}).`,
             data: { tasks, count: tasks.length, openCount, doneCount, overdueCount, companyId },
-            uiHints: [{ navigate: "operations" }],
+            uiHints: operationsTaskToolUiHints(ctx),
         };
     },
 };

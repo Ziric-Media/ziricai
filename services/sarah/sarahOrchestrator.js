@@ -38,6 +38,7 @@ import {
     isFinanceCollectionsQuestion,
 } from "./financeSarahToolPolicy.js";
 import { industryPresetTurnSystemAddendum } from "../platform/industryPresetContext.js";
+import { enhanceAutomotiveOpsStatusReply } from "./automotiveOpsStatusReply.js";
 
 const INTERNAL_TOOL_MESSAGE_RE = /Each line item requires unitAmount/i;
 
@@ -379,6 +380,8 @@ export async function handleSarahChat(ctx, input) {
             reply = actions.map((a) => userFacingActionText(a)).filter(Boolean).join("\n\n");
         }
         if (!reply) reply = "I completed the requested action. Anything else?";
+
+        reply = enhanceAutomotiveOpsStatusReply({ reply, ctx, message, actions }).reply;
 
         let finalUiHints = sanitizeNavigateUiHints(dedupeUiHints(uiHints), ctx.role || "viewer", can);
 

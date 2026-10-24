@@ -1,4 +1,5 @@
 import { createTaskForAccess } from "../../tenants/taskService.js";
+import { operationsTaskToolUiHints } from "../automotiveOpsStatusReply.js";
 import {
     requireSarahTenantContext,
     sarahTaskAccess,
@@ -55,7 +56,7 @@ export default {
         return {
             message: `Created task "${summary.title}" (id ${summary.id}).`,
             data: { task: summary, companyId },
-            uiHints: [{ navigate: "operations" }],
+            uiHints: operationsTaskToolUiHints(ctx),
             userFacingTruth: `Task "${summary.title}" was saved in Operations for this workspace.`,
         };
     },

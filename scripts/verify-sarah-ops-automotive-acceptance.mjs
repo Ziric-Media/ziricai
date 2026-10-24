@@ -21,6 +21,14 @@ const {
 const { isTaskOverdue, summarizeTaskForSarah } = await import("../services/sarah/tools/taskToolCommon.js");
 const { PORTAL_SARAH_SURFACES } = await import("../services/sarah/portalSarahSurfaces.js");
 const { SARAH_PERSONA } = await import("../services/sarah/sarahPersona.js");
+const {
+    automotiveOpsReplySemanticsChecklist,
+    enhanceAutomotiveOpsStatusReply,
+    getListTasksOutcome,
+    isAutomotiveOpsBroadStatusQuestion,
+    operationsTaskToolUiHints,
+    AUTOMOTIVE_OPS_LIMITATION_PARAGRAPH,
+} = await import("../services/sarah/automotiveOpsStatusReply.js");
 
 console.log("verify-sarah-ops-automotive-acceptance\n");
 
@@ -34,6 +42,9 @@ const AUTOMOTIVE_CO = {
 };
 
 const GENERIC_CO = { id: "generic-co", name: "Generic Co" };
+
+const STATUS_QUESTION =
+    "What Operations tasks are overdue or still open at Central Motors? Please summarise the current position and tell me what needs attention next.";
 
 // --- Company record resolution ---
 const fromWorkspace = resolveSarahTenantCompanyRecord(
@@ -146,56 +157,6 @@ assert.equal(sum.overdue, true);
 
 console.log("✓ Overdue classification (open/done/missing dueAt)");
 
-/** Model-independent reply checklist for acceptance reviews (fixture strings). */
-const TASK_LIST_SCOPE_RE =
-    /task list|task data|operations task list|recorded in.*task|available task data|based on.*task/i;
-
-/** Broad reassurance not tied to explicit Operations task-list scope (production gap). */
-const BROAD_REASSURANCE_RE =
-    /need your attention at this time|nothing needs (your )?attention|no operational issues overall|dealership has no issues|everything is fine at central motors/i;
-
-/**
- * @param {string} reply
- * @param {{ count?: number, overdueCount?: number, statusQuestion?: boolean }} listTasksData
- */
-export function automotiveOpsReplySemanticsChecklist(reply, listTasksData = {}) {
-    const text = String(reply || "");
-    const lower = text.toLowerCase();
-    const count = Number(listTasksData.count ?? 0);
-    const overdueCount = Number(listTasksData.overdueCount ?? 0);
-    const statusQuestion = listTasksData.statusQuestion !== false;
-
-    return {
-        statesZeroTasksWhenEmpty:
-            count === 0
-                ? /no overdue|zero|none|0 overdue|no matching|no recorded|no open|no tasks/i.test(text)
-                : true,
-        scopedToTaskEvidence:
-            count === 0 && statusQuestion ? TASK_LIST_SCOPE_RE.test(lower) : true,
-        avoidsUnscopedAllClear:
-            count === 0 && statusQuestion
-                ? !(BROAD_REASSURANCE_RE.test(lower) && !TASK_LIST_SCOPE_RE.test(lower))
-                : true,
-        dealershipAware: /dealership|vehicle preparation|test-drive|delivery milestone|central motors/i.test(text),
-        capabilityDisclosureWhenStatusAsked:
-            count === 0 && statusQuestion
-                ? /inventory|appointment|calendar|command centre/i.test(lower) &&
-                  /task list only|only the task|only.*task list|haven't verified|have not verified|not verified|did not check|can't confirm|cannot confirm|this conversation|this chat|available tools/i.test(
-                      lower
-                  )
-                : true,
-        noFalseToolClaims:
-            !/\b(checked|verified|reviewed|confirmed)\b.*\b(inventory|appointment calendar|command centre)\b/i.test(
-                lower
-            ) || /not verified|haven't|have not|can't|cannot|didn't|did not/i.test(lower),
-        groundedInToolCounts:
-            overdueCount === 0 ? !/\b(several|many|multiple) overdue\b/i.test(lower) : true,
-        noCrmWonAsDelivery: !/crm.*won.*delivered/i.test(lower),
-        noFabricatedPendingWork:
-            !/\b(pending prep|awaiting delivery|test drive scheduled|vehicle is ready)\b/i.test(lower),
-    };
-}
-
 const proposedAcceptanceReply = `There are currently no open or overdue tasks recorded in Central Motors' Operations task list. Based on the available task data, there are no outstanding tasks requiring attention.
 
 For the dealership, the next useful step is to ensure vehicle preparation, test-drive coordination and delivery milestones are being recorded as Operations tasks where applicable.
@@ -210,14 +171,6 @@ const proposedChecks = automotiveOpsReplySemanticsChecklist(proposedAcceptanceRe
     statusQuestion: true,
 });
 assert.ok(Object.values(proposedChecks).every(Boolean), JSON.stringify(proposedChecks, null, 2));
-
-const goodEmptyReply = proposedAcceptanceReply;
-const goodChecks = automotiveOpsReplySemanticsChecklist(goodEmptyReply, {
-    count: 0,
-    overdueCount: 0,
-    statusQuestion: true,
-});
-assert.ok(Object.values(goodChecks).every(Boolean), JSON.stringify(goodChecks));
 
 const productionWeakReply = `There are currently **zero matching tasks** in Operations at Central Motors. This means there are no overdue or open tasks that need your attention at this time.
 
@@ -237,6 +190,83 @@ assert.equal(
     false,
     "production-like gap: broad reassurance without task-list scope"
 );
+
+const listTasksActions = [
+    {
+        success: true,
+        tool: "listTasks",
+        data: { count: 0, overdueCount: 0, tasks: [] },
+    },
+];
+
+assert.ok(isAutomotiveOpsBroadStatusQuestion(STATUS_QUESTION));
+
+const enhanced = enhanceAutomotiveOpsStatusReply({
+    reply: productionWeakReply,
+    ctx: autoCtx,
+    message: STATUS_QUESTION,
+    actions: listTasksActions,
+});
+assert.equal(enhanced.modified, true);
+assert.equal(enhanced.limitationAppended, true);
+const enhancedChecks = automotiveOpsReplySemanticsChecklist(enhanced.reply, {
+    count: 0,
+    overdueCount: 0,
+    statusQuestion: true,
+});
+assert.equal(enhancedChecks.capabilityDisclosureWhenStatusAsked, true);
+assert.equal(enhancedChecks.noFabricatedPendingWork, true);
+assert.equal(
+    (enhanced.reply.match(/Important limitation:/g) || []).length,
+    1,
+    "limitation paragraph must not duplicate"
+);
+assert.ok(enhanced.reply.includes(AUTOMOTIVE_OPS_LIMITATION_PARAGRAPH));
+
+const enhancedTwice = enhanceAutomotiveOpsStatusReply({
+    reply: enhanced.reply,
+    ctx: autoCtx,
+    message: STATUS_QUESTION,
+    actions: listTasksActions,
+});
+assert.equal(enhancedTwice.limitationAppended, false, "existing disclosure must not duplicate");
+
+const unrelatedMessage = "How do I create a task in Operations? Walk me through the title field.";
+assert.equal(isAutomotiveOpsBroadStatusQuestion(unrelatedMessage), false);
+const unrelatedEnhance = enhanceAutomotiveOpsStatusReply({
+    reply: "Use createTask after you describe the work.",
+    ctx: autoCtx,
+    message: unrelatedMessage,
+    actions: listTasksActions,
+});
+assert.equal(unrelatedEnhance.modified, false);
+
+const financeEnhance = enhanceAutomotiveOpsStatusReply({
+    reply: productionWeakReply,
+    ctx: financeCtx,
+    message: STATUS_QUESTION,
+    actions: listTasksActions,
+});
+assert.equal(financeEnhance.modified, false);
+
+const noListTasks = enhanceAutomotiveOpsStatusReply({
+    reply: productionWeakReply,
+    ctx: autoCtx,
+    message: STATUS_QUESTION,
+    actions: [],
+});
+assert.equal(noListTasks.modified, false);
+
+const outcome = getListTasksOutcome(listTasksActions);
+assert.equal(outcome.called, true);
+assert.equal(outcome.count, 0);
+
+assert.deepEqual(operationsTaskToolUiHints({ surface: PORTAL_SARAH_SURFACES.OPERATIONS }), []);
+assert.deepEqual(operationsTaskToolUiHints({ surface: PORTAL_SARAH_SURFACES.ADMIN }), [
+    { navigate: "operations" },
+]);
+
+console.log("✓ Reply enhancement (disclosure, gating, navigation hints)");
 
 const badReply = "You have several overdue tasks. I checked inventory and booked a test drive.";
 const badChecks = automotiveOpsReplySemanticsChecklist(badReply, { count: 0, overdueCount: 0, statusQuestion: true });
