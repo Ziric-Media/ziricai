@@ -493,6 +493,7 @@ Each phase is independently reviewable. Programme milestones below supersede the
 | G2.1 — Production deploy & verification | **Pending** | See `ZIRICAI_WHATSAPP_GATEWAY_G2_1_CHECKLIST.md` |
 | G3 — Operator-approved remediation | **Not authorized** | No deactivations; no registry assign to Central Motors |
 | G4 — Registry-first routing | **Complete** | `WHATSAPP_GATEWAY_REGISTRY_ROUTING=primary` on Railway (post-deploy) |
+| G5 — Assignment/release hardening | **Merged (code)** | Saga assign/release, idempotency, owner check; flags default off — see G5 doc |
 | Client Zero (6157) | **Frozen** | Tenant-token integration untouched |
 
 **Next recommended step:** **G2.1** (not G3).
@@ -542,8 +543,10 @@ Each phase is independently reviewable. Programme milestones below supersede the
 
 ### Phase G5 — Assignment/release hardening (P1)
 
-- Transactions, idempotency, history subcollection  
-- **Acceptance:** Concurrency test; failed assign leaves no orphan claim  
+**Status:** **Implemented** — [`G5_WHATSAPP_GATEWAY_ASSIGNMENT_HARDENING.md`](./G5_WHATSAPP_GATEWAY_ASSIGNMENT_HARDENING.md). Enable `WHATSAPP_GATEWAY_ASSIGN_TRANSACTIONS=true` and/or `WHATSAPP_GATEWAY_STRICT_PROJECTION=true` after verification.
+
+- Transactions, idempotency, durable audit, release ordering, strict projection gate (feature-flagged)  
+- **Acceptance:** See G5 doc §8  
 
 ### Phase G6 — Readiness, diagnostics & operational monitoring (P1)
 

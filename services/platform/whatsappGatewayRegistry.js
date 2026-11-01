@@ -100,16 +100,53 @@ export function appendAllocationHistory(record, event) {
         operatorId: event.operatorId ?? null,
         reason: event.reason ?? null,
         leaseId: event.leaseId ?? record?.leaseId ?? null,
+        operationId: event.operationId ?? null,
+        outcome: event.outcome ?? "success",
+        previousAllocationStatus: event.previousAllocationStatus ?? null,
+        newAllocationStatus: event.newAllocationStatus ?? null,
+        previousCompanyId: event.previousCompanyId ?? null,
+        newCompanyId: event.newCompanyId ?? null,
+        phoneNumberIdSuffix: event.phoneNumberIdSuffix ?? null,
+        failureCode: event.failureCode ?? null,
     };
     return [...base, entry].slice(-ALLOCATION_HISTORY_MAX);
+}
+
+const IDEMPOTENCY_CACHE_MAX = 50;
+
+/** @param {object} record @param {string} operationId @param {object} cachedResult */
+export function cacheIdempotentOperation(record, operationId, cachedResult) {
+    if (!operationId) return record?.idempotencyCache || {};
+    const prev = record?.idempotencyCache && typeof record.idempotencyCache === "object" ? record.idempotencyCache : {};
+    const next = { ...prev, [operationId]: { ...cachedResult, at: nowIso() } };
+    const keys = Object.keys(next);
+    if (keys.length <= IDEMPOTENCY_CACHE_MAX) return next;
+    const trimmed = {};
+    for (const k of keys.slice(-IDEMPOTENCY_CACHE_MAX)) trimmed[k] = next[k];
+    return trimmed;
+}
+
+export function getIdempotentOperation(record, operationId) {
+    if (!operationId || !record?.idempotencyCache) return null;
+    return record.idempotencyCache[operationId] || null;
+}
+
+export function phoneSuffix(phoneNumberId) {
+    const s = String(phoneNumberId || "");
+    return s.length >= 4 ? s.slice(-4) : s || null;
 }
 
 /**
  * Build payload for registry write (assign claim).
  */
-export function registryPayloadForAssign(record, { companyId, leaseId, operatorId = null, reason = null }) {
+export function registryPayloadForAssign(
+    record,
+    { companyId, leaseId, operatorId = null, reason = null, operationId = null }
+) {
     const normalized = normalizeRegistryRecord(record) || {};
     const at = nowIso();
+    const prevAllocation = normalized.allocationStatus;
+    const prevCompany = normalized.assignedCompanyId || null;
     const next = {
         ...normalized,
         allocationStatus: ALLOCATION_ASSIGNED,
@@ -118,6 +155,7 @@ export function registryPayloadForAssign(record, { companyId, leaseId, operatorI
         assignedAt: at,
         leaseId,
         releasedAt: null,
+        registryVersion: (normalized.registryVersion || 0) + 1,
     };
     next.allocationHistory = appendAllocationHistory(normalized, {
         action: "assigned",
@@ -125,6 +163,13 @@ export function registryPayloadForAssign(record, { companyId, leaseId, operatorI
         operatorId,
         reason,
         leaseId,
+        operationId,
+        outcome: "success",
+        previousAllocationStatus: prevAllocation,
+        newAllocationStatus: ALLOCATION_ASSIGNED,
+        previousCompanyId: prevCompany,
+        newCompanyId: companyId,
+        phoneNumberIdSuffix: phoneSuffix(normalized.phoneNumberId),
     });
     return next;
 }
@@ -132,9 +177,13 @@ export function registryPayloadForAssign(record, { companyId, leaseId, operatorI
 /**
  * Build payload for registry write (release).
  */
-export function registryPayloadForRelease(record, { operatorId = null, reason = null } = {}) {
+export function registryPayloadForRelease(
+    record,
+    { operatorId = null, reason = null, operationId = null } = {}
+) {
     const normalized = normalizeRegistryRecord(record) || {};
     const previousCompanyId = normalized.assignedCompanyId || null;
+    const prevAllocation = normalized.allocationStatus;
     const at = nowIso();
     const next = {
         ...normalized,
@@ -144,6 +193,7 @@ export function registryPayloadForRelease(record, { operatorId = null, reason = 
         assignedAt: null,
         leaseId: null,
         releasedAt: at,
+        registryVersion: (normalized.registryVersion || 0) + 1,
     };
     next.allocationHistory = appendAllocationHistory(normalized, {
         action: "released",
@@ -151,6 +201,35 @@ export function registryPayloadForRelease(record, { operatorId = null, reason = 
         operatorId,
         reason: reason || "Pool number released",
         leaseId: null,
+        operationId,
+        outcome: "success",
+        previousAllocationStatus: prevAllocation,
+        newAllocationStatus: ALLOCATION_AVAILABLE,
+        previousCompanyId,
+        newCompanyId: null,
+        phoneNumberIdSuffix: phoneSuffix(normalized.phoneNumberId),
+    });
+    return next;
+}
+
+export function registryPayloadForSuspended(record, { operatorId = null, reason = null, operationId = null } = {}) {
+    const normalized = normalizeRegistryRecord(record) || {};
+    const next = {
+        ...normalized,
+        allocationStatus: ALLOCATION_SUSPENDED,
+        status: LEGACY_STATUS_IN_USE,
+        registryVersion: (normalized.registryVersion || 0) + 1,
+    };
+    next.allocationHistory = appendAllocationHistory(normalized, {
+        action: "suspended",
+        companyId: normalized.assignedCompanyId,
+        operatorId,
+        reason: reason || "Release projection step failed",
+        operationId,
+        outcome: "partial",
+        previousAllocationStatus: normalized.allocationStatus,
+        newAllocationStatus: ALLOCATION_SUSPENDED,
+        phoneNumberIdSuffix: phoneSuffix(normalized.phoneNumberId),
     });
     return next;
 }
@@ -158,7 +237,7 @@ export function registryPayloadForRelease(record, { operatorId = null, reason = 
 /**
  * Roll back a failed assign claim (restore prior snapshot fields).
  */
-export function registryPayloadForAssignRollback(priorRecord) {
+export function registryPayloadForAssignRollback(priorRecord, { operationId = null, reason = null } = {}) {
     const normalized = normalizeRegistryRecord(priorRecord) || {};
     const next = {
         ...normalized,
@@ -167,13 +246,24 @@ export function registryPayloadForAssignRollback(priorRecord) {
         assignedCompanyId: null,
         assignedAt: null,
         leaseId: null,
+        registryVersion: (normalized.registryVersion || 0) + 1,
     };
     next.allocationHistory = appendAllocationHistory(normalized, {
         action: "assign_rollback",
         companyId: null,
-        reason: "Tenant configure or activate failed",
+        reason: reason || "Tenant configure or activate failed",
+        operationId,
+        outcome: "failed",
+        previousAllocationStatus: ALLOCATION_ASSIGNED,
+        newAllocationStatus: ALLOCATION_AVAILABLE,
+        phoneNumberIdSuffix: phoneSuffix(normalized.phoneNumberId),
     });
     return next;
+}
+
+/** Allocation states that allow a new assign claim. */
+export function isAllocationAssignable(allocationStatus) {
+    return String(allocationStatus) === ALLOCATION_AVAILABLE;
 }
 
 export function sanitizeRegistryForApi(record) {
