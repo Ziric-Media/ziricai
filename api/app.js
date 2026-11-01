@@ -143,6 +143,15 @@ import {
 import { buildWhatsAppReconciliationReport } from "../services/platform/reconcileWhatsAppPhoneAssignments.js";
 import { scanWhatsAppGatewayProjectionDrift } from "../services/platform/whatsappGatewayRecovery.js";
 import {
+    evaluateCompanyWhatsAppReadiness,
+    evaluatePlatformWhatsAppGatewayHealth,
+} from "../services/platform/whatsappGatewayReadinessService.js";
+import {
+    simulateInboundRoutingProbe,
+    simulateOutboundRegistryProbe,
+    isLiveWhatsAppProbeAuthorized,
+} from "../services/platform/whatsappGatewayProbeService.js";
+import {
     getCustomerMarketplaceCatalog,
     getInstalledPacks,
     getCustomerPackDetail,
@@ -206,6 +215,7 @@ import {
 import {
     getPlatformWhatsAppIntegration,
     getPlatformWhatsAppIntegrationWithReadiness,
+    getWhatsAppIntegration,
 } from "../services/tenants/integrationService.js";
 import {
     registerPlatformWhatsAppIntegration,
@@ -1374,6 +1384,90 @@ app.get(
             const status = err.status || 500;
             console.error("[api/platform/whatsapp-numbers/projection-drift] error:", err.message);
             res.status(status).json({ error: err.message || "Projection drift scan failed" });
+        }
+    }
+);
+
+/** Super Admin — platform WhatsApp Gateway health (G6, read-only). */
+app.get(
+    "/api/platform/whatsapp-gateway/health",
+    requirePlatformAccess(),
+    async (_req, res) => {
+        try {
+            const report = await evaluatePlatformWhatsAppGatewayHealth();
+            res.json(report);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-gateway/health] error:", err.message);
+            res.status(status).json({ error: err.message || "Gateway health failed" });
+        }
+    }
+);
+
+/** Super Admin — tenant WhatsApp readiness report (G6, read-only). */
+app.get(
+    "/api/platform/companies/:companyId/whatsapp-gateway/readiness",
+    requirePlatformAccess(),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            const report = await evaluateCompanyWhatsAppReadiness(req.params.companyId);
+            res.json(report);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/companies/whatsapp-gateway/readiness] error:", err.message);
+            res.status(status).json({ error: err.message || "Readiness evaluation failed" });
+        }
+    }
+);
+
+/** Super Admin — simulated routing probes only (G6; no live Meta traffic). */
+app.post(
+    "/api/platform/companies/:companyId/whatsapp-gateway/simulate-probe",
+    requirePlatformAccess(),
+    authRateLimit("platform-integrations"),
+    validateCompanyIdParam("params"),
+    async (req, res) => {
+        try {
+            if (isLiveWhatsAppProbeAuthorized()) {
+                return res.status(403).json({
+                    error: "Live probe mode is configured — use dedicated live probe API when implemented",
+                    code: "USE_LIVE_PROBE_API",
+                });
+            }
+            const companyId = req.params.companyId;
+            const integration = await getWhatsAppIntegration(companyId);
+            const phoneNumberId = req.body?.phoneNumberId || integration?.phoneNumberId;
+            if (!phoneNumberId) {
+                return res.status(400).json({ error: "phoneNumberId required" });
+            }
+            const inbound = await simulateInboundRoutingProbe({
+                phoneNumberId: String(phoneNumberId),
+                expectedCompanyId: companyId,
+                correlationId: req.body?.correlationId || null,
+                operatorId: req.platformAuth?.via || null,
+            });
+            const outbound = await simulateOutboundRegistryProbe({
+                companyId,
+                phoneNumberId: String(phoneNumberId),
+                credentialsSource: integration?.credentialsSource || "env",
+                correlationId: req.body?.correlationId || null,
+            });
+            const readiness = await evaluateCompanyWhatsAppReadiness(companyId);
+            res.json({
+                simulated: true,
+                inbound,
+                outbound,
+                readiness: {
+                    overallState: readiness.overallState,
+                    operational: readiness.operational,
+                    behavioralEvidence: readiness.behavioralEvidence,
+                },
+            });
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-gateway/simulate-probe] error:", err.message);
+            res.status(status).json({ error: err.message || "Simulate probe failed" });
         }
     }
 );

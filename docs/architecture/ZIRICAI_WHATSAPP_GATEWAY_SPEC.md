@@ -494,6 +494,7 @@ Each phase is independently reviewable. Programme milestones below supersede the
 | G3 — Operator-approved remediation | **Not authorized** | No deactivations; no registry assign to Central Motors |
 | G4 — Registry-first routing | **Complete** | `WHATSAPP_GATEWAY_REGISTRY_ROUTING=primary` on Railway (post-deploy) |
 | G5 — Assignment/release hardening | **Merged (code)** | Saga assign/release, idempotency, owner check; flags default off — see G5 doc |
+| G6 — Behavioral readiness | **Merged (code)** | Readiness dimensions + simulated probes; deploy/live probes separate auth — see G6 doc |
 | Client Zero (6157) | **Frozen** | Tenant-token integration untouched |
 
 **Next recommended step:** **G2.1** (not G3).
@@ -548,10 +549,12 @@ Each phase is independently reviewable. Programme milestones below supersede the
 - Transactions, idempotency, durable audit, release ordering, strict projection gate (feature-flagged)  
 - **Acceptance:** See G5 doc §8  
 
-### Phase G6 — Readiness, diagnostics & operational monitoring (P1)
+### Phase G6 — Behavioral readiness (P1)
 
-- L1–L9 surfaced in MC API  
-- **Acceptance:** Operator can see why a line is not “operational”  
+**Status:** **Implemented (code)** — [`G6_WHATSAPP_GATEWAY_BEHAVIORAL_READINESS.md`](./G6_WHATSAPP_GATEWAY_BEHAVIORAL_READINESS.md). Simulated probes only; `OPERATIONAL` requires behavioral evidence.
+
+- Ten-dimension readiness, platform health, simulate-probe API  
+- **Acceptance:** See G6 doc §8; live probes and deploy require separate authorization  
 
 ### Phase G7 — Mission Control Gateway management (P2)
 
