@@ -139,6 +139,7 @@ import {
     releaseWhatsAppPoolNumber,
     ensureEnvSeedNumber,
 } from "../services/platform/whatsappNumberPoolService.js";
+import { buildWhatsAppReconciliationReport } from "../services/platform/reconcileWhatsAppPhoneAssignments.js";
 import {
     getCustomerMarketplaceCatalog,
     getInstalledPacks,
@@ -1278,6 +1279,24 @@ app.get(
     }
 );
 
+/** Super Admin — read-only Phone Number ID reconciliation (G2). */
+app.get(
+    "/api/platform/whatsapp-numbers/reconciliation",
+    requirePlatformAccess(),
+    async (req, res) => {
+        try {
+            const phoneSuffix = req.query.phoneSuffix ? String(req.query.phoneSuffix) : null;
+            const phoneNumberId = req.query.phoneNumberId ? String(req.query.phoneNumberId) : null;
+            const report = await buildWhatsAppReconciliationReport({ phoneSuffix, phoneNumberId });
+            res.json(report);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers/reconciliation] error:", err.message);
+            res.status(status).json({ error: err.message || "Reconciliation failed" });
+        }
+    }
+);
+
 /** Super Admin — add/update a Meta phone identity in the pool. */
 app.post(
     "/api/platform/whatsapp-numbers",
@@ -1316,6 +1335,8 @@ app.post(
                 companyId,
                 numberId: body.numberId,
                 activate: body.activate !== false,
+                operatorId: req.platformAuth?.userId || req.platformAuth?.via || null,
+                reason: body.reason || null,
             });
             auditLog("platform_whatsapp_pool_assign", {
                 companyId,
@@ -1340,6 +1361,8 @@ app.post(
         try {
             const result = await releaseWhatsAppPoolNumber({
                 numberId: req.params.numberId,
+                operatorId: req.platformAuth?.userId || req.platformAuth?.via || null,
+                reason: req.body?.reason || null,
             });
             auditLog("platform_whatsapp_pool_release", {
                 numberId: req.params.numberId,
