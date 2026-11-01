@@ -1,0 +1,226 @@
+﻿{
+  "generatedAt": "2026-11-01T00:04:22.073Z",
+  "filters": {
+    "phoneSuffix": "3699",
+    "phoneNumberId": null,
+    "baseUrl": "https://ziricai-production.up.railway.app"
+  },
+  "parityOk": true,
+  "issues": [],
+  "direct": {
+    "summary": {
+      "phoneIdsInReport": 1,
+      "duplicateActivePhoneIds": 1,
+      "registryMisaligned": 1
+    },
+    "conflicts": [
+      {
+        "phoneNumberIdMasked": "***3699",
+        "phoneSuffix": "3699",
+        "activeIntegrationCount": 4,
+        "totalIntegrationDocs": 4,
+        "duplicateActiveRouting": true,
+        "registry": {
+          "poolId": "wa-env-1209265748933699",
+          "allocationStatus": "available",
+          "assignedCompanyId": null,
+          "legacyStatus": "available"
+        },
+        "registryVsTenantsAligned": false,
+        "nondeterministicRoutingWinner": {
+          "companyId": "central-motors-rtb",
+          "status": "active",
+          "note": "First active match from collection group query — not guaranteed unique"
+        },
+        "integrations": [
+          {
+            "companyId": "central-motors-rtb",
+            "integrationDocId": "whatsapp",
+            "status": "active",
+            "phoneNumberIdMasked": "***3699",
+            "phoneSuffix": "3699",
+            "credentialsSource": "env",
+            "displayPhoneNumber": null,
+            "connectionMethod": "managed_or_unset",
+            "active": true,
+            "updatedAt": {
+              "_seconds": 1789427272,
+              "_nanoseconds": 352000000
+            },
+            "classification": "keep_active_candidate",
+            "reason": "Listed canonical backbone consumer"
+          },
+          {
+            "companyId": "p0-2-final-muaguvq8-usmg",
+            "integrationDocId": "6r1ETG9GdBaQkYixZGkt",
+            "status": "connected",
+            "phoneNumberIdMasked": "***3699",
+            "phoneSuffix": "3699",
+            "credentialsSource": null,
+            "displayPhoneNumber": null,
+            "connectionMethod": "managed_or_unset",
+            "active": true,
+            "updatedAt": {
+              "_seconds": 1789948071,
+              "_nanoseconds": 310000000
+            },
+            "classification": "deactivate_candidate",
+            "reason": "Likely test or portal QA tenant"
+          },
+          {
+            "companyId": "p0-2-final-muagwqwu-wnn1",
+            "integrationDocId": "gJcnoaoB6LdohKGfHQm0",
+            "status": "connected",
+            "phoneNumberIdMasked": "***3699",
+            "phoneSuffix": "3699",
+            "credentialsSource": null,
+            "displayPhoneNumber": null,
+            "connectionMethod": "managed_or_unset",
+            "active": true,
+            "updatedAt": {
+              "_seconds": 1789948153,
+              "_nanoseconds": 164000000
+            },
+            "classification": "deactivate_candidate",
+            "reason": "Likely test or portal QA tenant"
+          },
+          {
+            "companyId": "p0-2c-live-muag3zbz-3vzt",
+            "integrationDocId": "QQqrFemgCc38vnTJronN",
+            "status": "connected",
+            "phoneNumberIdMasked": "***3699",
+            "phoneSuffix": "3699",
+            "credentialsSource": null,
+            "displayPhoneNumber": null,
+            "connectionMethod": "managed_or_unset",
+            "active": true,
+            "updatedAt": {
+              "_seconds": 1789946806,
+              "_nanoseconds": 64000000
+            },
+            "classification": "deactivate_candidate",
+            "reason": "Likely test or portal QA tenant"
+          }
+        ],
+        "recommendedOperatorActions": [
+          "P0: Multiple active/connected tenants on one Phone Number ID — pick single canonical owner before registry-first routing.",
+          "Update registry assignedCompanyId/allocationStatus OR deactivate stray tenant integrations — operator approval required (no auto-fix).",
+          "Review deactivate_candidate tenants: p0-2-final-muaguvq8-usmg, p0-2-final-muagwqwu-wnn1, p0-2c-live-muag3zbz-3vzt"
+        ]
+      }
+    ],
+    "readOnly": true,
+    "filters": {
+      "phoneNumberId": null,
+      "phoneSuffix": "3699"
+    }
+  },
+  "http": {
+    "summary": {
+      "phoneIdsInReport": 1,
+      "duplicateActivePhoneIds": 1,
+      "registryMisaligned": 1
+    },
+    "conflicts": [
+      {
+        "phoneNumberIdMasked": "***3699",
+        "phoneSuffix": "3699",
+        "activeIntegrationCount": 4,
+        "totalIntegrationDocs": 4,
+        "duplicateActiveRouting": true,
+        "registry": {
+          "poolId": "wa-env-1209265748933699",
+          "allocationStatus": "available",
+          "assignedCompanyId": null,
+          "legacyStatus": "available"
+        },
+        "registryVsTenantsAligned": false,
+        "nondeterministicRoutingWinner": {
+          "companyId": "central-motors-rtb",
+          "status": "active",
+          "note": "First active match from collection group query — not guaranteed unique"
+        },
+        "integrations": [
+          {
+            "companyId": "central-motors-rtb",
+            "integrationDocId": "whatsapp",
+            "status": "active",
+            "phoneNumberIdMasked": "***3699",
+            "phoneSuffix": "3699",
+            "credentialsSource": "env",
+            "displayPhoneNumber": null,
+            "connectionMethod": "managed_or_unset",
+            "active": true,
+            "updatedAt": {
+              "_seconds": 1789427272,
+              "_nanoseconds": 352000000
+            },
+            "classification": "keep_active_candidate",
+            "reason": "Listed canonical backbone consumer"
+          },
+          {
+            "companyId": "p0-2-final-muaguvq8-usmg",
+            "integrationDocId": "6r1ETG9GdBaQkYixZGkt",
+            "status": "connected",
+            "phoneNumberIdMasked": "***3699",
+            "phoneSuffix": "3699",
+            "credentialsSource": null,
+            "displayPhoneNumber": null,
+            "connectionMethod": "managed_or_unset",
+            "active": true,
+            "updatedAt": {
+              "_seconds": 1789948071,
+              "_nanoseconds": 310000000
+            },
+            "classification": "deactivate_candidate",
+            "reason": "Likely test or portal QA tenant"
+          },
+          {
+            "companyId": "p0-2-final-muagwqwu-wnn1",
+            "integrationDocId": "gJcnoaoB6LdohKGfHQm0",
+            "status": "connected",
+            "phoneNumberIdMasked": "***3699",
+            "phoneSuffix": "3699",
+            "credentialsSource": null,
+            "displayPhoneNumber": null,
+            "connectionMethod": "managed_or_unset",
+            "active": true,
+            "updatedAt": {
+              "_seconds": 1789948153,
+              "_nanoseconds": 164000000
+            },
+            "classification": "deactivate_candidate",
+            "reason": "Likely test or portal QA tenant"
+          },
+          {
+            "companyId": "p0-2c-live-muag3zbz-3vzt",
+            "integrationDocId": "QQqrFemgCc38vnTJronN",
+            "status": "connected",
+            "phoneNumberIdMasked": "***3699",
+            "phoneSuffix": "3699",
+            "credentialsSource": null,
+            "displayPhoneNumber": null,
+            "connectionMethod": "managed_or_unset",
+            "active": true,
+            "updatedAt": {
+              "_seconds": 1789946806,
+              "_nanoseconds": 64000000
+            },
+            "classification": "deactivate_candidate",
+            "reason": "Likely test or portal QA tenant"
+          }
+        ],
+        "recommendedOperatorActions": [
+          "P0: Multiple active/connected tenants on one Phone Number ID — pick single canonical owner before registry-first routing.",
+          "Update registry assignedCompanyId/allocationStatus OR deactivate stray tenant integrations — operator approval required (no auto-fix).",
+          "Review deactivate_candidate tenants: p0-2-final-muaguvq8-usmg, p0-2-final-muagwqwu-wnn1, p0-2c-live-muag3zbz-3vzt"
+        ]
+      }
+    ],
+    "readOnly": true,
+    "filters": {
+      "phoneNumberId": null,
+      "phoneSuffix": "3699"
+    }
+  }
+}

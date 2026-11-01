@@ -8,7 +8,7 @@ Formal checkpoint **before** any G3 remediation. No tenant or registry mutations
 |-----------|--------|
 | G1 — Registry schema & authority | **Merged** (repo) |
 | G2 — Read-only reconciliation | **Merged** (repo) |
-| **G2.1 — Production deployment & verification** | **This document** |
+| **G2.1 — Production deployment & verification** | **Complete (2026-11-01)** |
 | G3 — Operator-approved remediation | **Not authorized** |
 | G4 — Registry-first routing | Pending |
 | Client Zero (6157) | **Frozen** |
@@ -21,8 +21,8 @@ Formal checkpoint **before** any G3 remediation. No tenant or registry mutations
 
 ## Preconditions
 
-- [ ] G1 + G2 code reviewed and merged to the branch Railway deploys from.
-- [ ] Stakeholder sign-off on proceeding with **deploy only** (no G3).
+- [x] G1 + G2 code reviewed and merged to the branch Railway deploys from (`main` @ 4542a91).
+- [x] Stakeholder sign-off on proceeding with **deploy only** (no G3) — authorized 2026-11-01.
 
 ## Step 1 — Review merged G1/G2 changes
 
@@ -93,9 +93,16 @@ Store immutable copies:
 
 G3 remediation must reference these baselines; any drift without explanation blocks G3.
 
+## Verification record (2026-11-01)
+
+- Deploy: `main` `4542a91` → Railway `ziricai-production.up.railway.app`
+- Unauthenticated GET → **401** `UNAUTHORIZED`
+- Parity: `scripts/g2-1-verify-reconciliation-parity.mjs` → **parityOk: true**
+- Evidence: `docs/audit/whatsapp-reconciliation-post-g2-1-deploy-suffix-3699-2026-11-01.json`
+
 ## Sign-off
 
 | Role | Name | Date | Deploy authorized | Parity verified |
 |------|------|------|-------------------|-----------------|
-| Programme owner | | | | |
-| Operator | | | | |
+| Programme owner | authorized G2.1 deploy | 2026-11-01 | Yes | Yes |
+| Operator | automated G2.1 run | 2026-11-01 | Yes | Yes |

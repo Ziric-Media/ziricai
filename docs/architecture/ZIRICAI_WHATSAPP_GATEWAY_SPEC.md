@@ -490,7 +490,7 @@ Each phase is independently reviewable. Programme milestones below supersede the
 |-----------|--------|--------|
 | G1 — Registry schema & authority | **Merged** | Normalization, allocation fields, history, operator attribution, API sanitize |
 | G2 — Read-only reconciliation | **Merged** | Service, CLI, `GET …/reconciliation`, MC API helper |
-| G2.1 — Production deploy & verification | **Pending** | See `ZIRICAI_WHATSAPP_GATEWAY_G2_1_CHECKLIST.md` |
+| G2.1 — Production deploy & verification | **Complete** | Parity verified 2026-11-01; see checklist |
 | G3 — Operator-approved remediation | **Not authorized** | No deactivations; no registry assign to Central Motors |
 | G4 — Registry-first routing | **Pending** | Webhook still uses collection-group lookup |
 | Client Zero (6157) | **Frozen** | Tenant-token integration untouched |
@@ -518,7 +518,7 @@ Each phase is independently reviewable. Programme milestones below supersede the
 
 ### Phase G2.1 — Production deployment & verification (P0 gate)
 
-**Status:** **Pending** — deploy not confirmed on Railway.
+**Status:** **Complete** — `main` 4542a91; parity OK vs CLI (suffix 3699).
 
 - Checklist: `docs/architecture/ZIRICAI_WHATSAPP_GATEWAY_G2_1_CHECKLIST.md`  
 - Parity script: `scripts/g2-1-verify-reconciliation-parity.mjs`  
@@ -575,6 +575,7 @@ Each phase is independently reviewable. Programme milestones below supersede the
 | `GET /api/platform/whatsapp-numbers/reconciliation` | MC/API read-only reconciliation (G2); `requirePlatformAccess()` |
 | `scripts/g2-1-verify-reconciliation-parity.mjs` | G2.1 CLI vs HTTP parity check |
 | `docs/audit/whatsapp-reconciliation-baseline-suffix-3699-2026-10-31.json` | G3 evidence baseline (pre-remediation) |
+| `docs/audit/whatsapp-reconciliation-post-g2-1-deploy-suffix-3699-2026-11-01.json` | G2.1 parity evidence (script + HTTP) |
 | `docs/architecture/ZIRICAI_WHATSAPP_GATEWAY_G2_1_CHECKLIST.md` | G2.1 gate |
 | `docs/architecture/ZIRICAI_WHATSAPP_GATEWAY_G3_REMEDIATION_PLAN.md` | G3 controlled-operation draft (not authorized) |
 | `services/platform/whatsappGatewayRegistry.js` | Allocation schema, history payloads, API sanitize (G1) |
@@ -611,3 +612,4 @@ Each phase is independently reviewable. Programme milestones below supersede the
 |------|--------|
 | 2026-11-01 | Phase 1 initial specification from Phase 0 audit |
 | 2026-11-01 | G1/G2 merged; G2.1 gate + G3 plan docs; roadmap renumbered G5–G10; 3699 baseline archived |
+| 2026-11-01 | G2.1 production deploy + parity verification on Railway |
