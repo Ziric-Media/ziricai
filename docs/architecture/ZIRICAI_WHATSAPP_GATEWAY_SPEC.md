@@ -1,6 +1,6 @@
 # ZiricAI WhatsApp Gateway — Architecture & Implementation Specification
 
-**Status:** Phase 1 (documentation only)  
+**Status:** G1–G4 implemented on production API (registry routing **primary** as of 2026-11-01)  
 **Product name:** ZiricAI WhatsApp Gateway  
 **Default model:** Hybrid **C** — managed ZiricAI numbers by default; Bring Your Own WhatsApp (BYO) / Embedded Signup as advanced  
 **Foundation:** Existing Path B (shared platform token, multiple Phone Number IDs, single webhook, tenant-scoped Sarah)  
