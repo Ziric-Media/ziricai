@@ -11,6 +11,35 @@ import {
     invalidatePhoneResolutionCache,
 } from "./integrationService.js";
 import { ServiceBase, TENANT_COLLECTIONS } from "../core/serviceBase.js";
+import { deriveAllocationStatus, ALLOCATION_ASSIGNED } from "../platform/whatsappGatewayRegistry.js";
+
+export function isStrictGatewayProjectionEnabled() {
+    return (
+        String(process.env.WHATSAPP_GATEWAY_STRICT_PROJECTION || "false").trim().toLowerCase() === "true"
+    );
+}
+
+async function assertManagedRegistryProjection(companyId, phoneNumberId, credentialsSource) {
+    if (!isStrictGatewayProjectionEnabled()) return;
+    if (String(credentialsSource || "").toLowerCase() === "tenant") return;
+    const phone = phoneNumberId ? String(phoneNumberId).trim() : "";
+    if (!phone) return;
+    const { findWhatsAppRegistryByPhoneNumberId } = await import(
+        "../platform/whatsappNumberPoolService.js"
+    );
+    const registry = await findWhatsAppRegistryByPhoneNumberId(phone);
+    const assigned = registry?.assignedCompanyId ? String(registry.assignedCompanyId) : null;
+    if (
+        !registry ||
+        deriveAllocationStatus(registry) !== ALLOCATION_ASSIGNED ||
+        assigned !== String(companyId)
+    ) {
+        throw platformError(
+            "Managed WhatsApp phoneNumberId must match a registry row assigned to this tenant",
+            409
+        );
+    }
+}
 
 export const WHATSAPP_INTEGRATION_DOC_ID = "whatsapp";
 export const WHATSAPP_STATUS_PENDING = "pending_configuration";
@@ -117,7 +146,11 @@ export function assessRuntimeReadiness(integration) {
     if (source === "env") {
         if (!process.env.WHATSAPP_TOKEN) missing.push("env.WHATSAPP_TOKEN");
     } else if (source === "tenant") {
-        missing.push("tenant_credentials_not_configured");
+        const token =
+            integration?.accessToken || integration?.whatsappToken || integration?.token || null;
+        if (!token || !String(token).trim()) {
+            missing.push("tenant_credentials_not_configured");
+        }
     } else if (source === null || source === undefined) {
         missing.push("credentialsSource");
     }
@@ -193,10 +226,22 @@ export async function configurePlatformWhatsAppIntegration(companyId, body = {})
         await assertNoCrossTenantActivePhone(companyId, patch.phoneNumberId);
     }
 
+    const effectiveSource = patch.credentialsSource ?? existing.credentialsSource;
+    if (patch.phoneNumberId) {
+        await assertManagedRegistryProjection(companyId, patch.phoneNumberId, effectiveSource);
+    }
+
     const saved = await persistIntegration(companyId, existing.id, {
         ...patch,
         status: existing.status,
     });
+
+    if (
+        saved.phoneNumberId &&
+        String(saved.status || "").toLowerCase() === WHATSAPP_STATUS_ACTIVE
+    ) {
+        warmPhoneResolutionCache(saved.phoneNumberId, saved);
+    }
 
     return sanitizeIntegrationForPlatform(saved);
 }
@@ -215,6 +260,7 @@ export async function activatePlatformWhatsAppIntegration(companyId, opts = {}) 
     }
 
     await assertNoCrossTenantActivePhone(companyId, existing.phoneNumberId);
+    await assertManagedRegistryProjection(companyId, existing.phoneNumberId, existing.credentialsSource);
 
     if (existing.credentialsSource === "env") {
         validateEnvActivation(existing, opts);

@@ -2,24 +2,25 @@
  * Platform WhatsApp number pool — controlled lease of Meta phone identities to tenants.
  * Numbers are never auto-assigned on company create; operators assign from AVAILABLE inventory.
  */
-import crypto from "crypto";
 import { getAdminFirestore, hasAdminCredentials } from "../database/firestoreAdmin.js";
+import { platformWhatsAppNumbersCollectionPath } from "../database/schema.js";
 import {
-    platformWhatsAppNumberPath,
-    platformWhatsAppNumbersCollectionPath,
-} from "../database/schema.js";
-import { getCompany } from "../tenants/companyService.js";
+    readPoolRegistryDoc,
+    writePoolRegistryDoc,
+    __memoryPoolForTests,
+} from "./whatsappNumberPoolPoolIO.js";
+import { executeGatewayAssign, executeGatewayRelease } from "./whatsappGatewayAssignmentService.js";
+import { registerPlatformWhatsAppIntegration } from "../tenants/platformWhatsAppIntegrationService.js";
+import { getWhatsAppIntegration } from "../tenants/integrationService.js";
 import {
-    registerPlatformWhatsAppIntegration,
-    configurePlatformWhatsAppIntegration,
-    activatePlatformWhatsAppIntegration,
-    deactivatePlatformWhatsAppIntegration,
-    WHATSAPP_STATUS_ACTIVE,
-} from "../tenants/platformWhatsAppIntegrationService.js";
-import {
-    getWhatsAppIntegration,
-    getPlatformWhatsAppIntegrationWithReadiness,
-} from "../tenants/integrationService.js";
+    normalizeRegistryRecord,
+    sanitizeRegistryForApi,
+    CONNECTION_MANAGED,
+    REGISTRATION_REGISTERED,
+    ALLOCATION_AVAILABLE,
+    deriveAllocationStatus,
+    ALLOCATION_ASSIGNED,
+} from "./whatsappGatewayRegistry.js";
 
 export const POOL_STATUS_AVAILABLE = "available";
 export const POOL_STATUS_IN_USE = "in_use";
@@ -28,9 +29,6 @@ export const POOL_STATUS_RETIRED = "retired";
 
 export const POOL_KIND_TEST = "test";
 export const POOL_KIND_PRODUCTION = "production";
-
-/** @type {Map<string, object>} */
-const memoryPool = new Map();
 
 function poolError(message, status = 400, code = undefined) {
     const err = new Error(message);
@@ -56,50 +54,33 @@ function useFirestore() {
 }
 
 function sanitizePoolNumber(record) {
-    if (!record) return null;
-    return {
-        id: record.id,
-        label: record.label || null,
-        displayPhoneNumber: record.displayPhoneNumber || null,
-        phoneNumberId: record.phoneNumberId || null,
-        businessAccountId: record.businessAccountId || null,
-        kind: record.kind || POOL_KIND_TEST,
-        status: record.status || POOL_STATUS_AVAILABLE,
-        assignedCompanyId: record.assignedCompanyId || null,
-        assignedAt: record.assignedAt || null,
-        credentialsSource: record.credentialsSource || "env",
-        notes: record.notes || null,
-        createdAt: record.createdAt || null,
-        updatedAt: record.updatedAt || null,
-    };
+    return sanitizeRegistryForApi(record);
 }
 
 async function readPoolDoc(numberId) {
-    if (!useFirestore()) {
-        return memoryPool.get(String(numberId)) || null;
-    }
-    const snap = await getAdminFirestore().doc(platformWhatsAppNumberPath(numberId)).get();
-    if (!snap.exists) return null;
-    return { id: snap.id, ...snap.data() };
+    return readPoolRegistryDoc(numberId);
 }
 
-async function writePoolDoc(numberId, data, { merge = true } = {}) {
-    const id = String(numberId);
-    const payload = { ...data, id, updatedAt: nowIso() };
+/**
+ * Gateway registry lookup by Meta phone_number_id (G1).
+ * @param {string} phoneNumberId
+ */
+export async function findWhatsAppRegistryByPhoneNumberId(phoneNumberId) {
+    const key = String(phoneNumberId || "").trim();
+    if (!key) return null;
+    await ensureEnvSeedNumber();
+    let items = [];
     if (!useFirestore()) {
-        const prev = memoryPool.get(id) || {};
-        const next = merge ? { ...prev, ...payload } : payload;
-        memoryPool.set(id, next);
-        return next;
-    }
-    const ref = getAdminFirestore().doc(platformWhatsAppNumberPath(id));
-    if (merge) {
-        await ref.set(payload, { merge: true });
+        items = Array.from(__memoryPoolForTests().values());
     } else {
-        await ref.set(payload);
+        const snap = await getAdminFirestore().collection(platformWhatsAppNumbersCollectionPath()).get();
+        items = snap.docs.map((d) => normalizeRegistryRecord({ id: d.id, ...d.data() }));
     }
-    const snap = await ref.get();
-    return { id: snap.id, ...snap.data() };
+    return items.find((n) => String(n.phoneNumberId) === key) || null;
+}
+
+async function writePoolDoc(numberId, data, options = {}) {
+    return writePoolRegistryDoc(numberId, data, options);
 }
 
 /**
@@ -110,7 +91,7 @@ export async function listWhatsAppPoolNumbers({ status = null, kind = null } = {
 
     let items = [];
     if (!useFirestore()) {
-        items = Array.from(memoryPool.values());
+        items = Array.from(__memoryPoolForTests().values());
     } else {
         const snap = await getAdminFirestore().collection(platformWhatsAppNumbersCollectionPath()).get();
         items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -139,24 +120,41 @@ export async function upsertWhatsAppPoolNumber(input = {}) {
         throw poolError("kind must be test or production", 400);
     }
 
-    if (existing?.status === POOL_STATUS_IN_USE && existing.phoneNumberId !== phoneNumberId) {
+    if (
+        existing &&
+        deriveAllocationStatus(existing) === ALLOCATION_ASSIGNED &&
+        existing.phoneNumberId !== phoneNumberId
+    ) {
         throw poolError("Cannot change phoneNumberId while number is in use", 409, "NUMBER_IN_USE");
     }
 
-    const record = {
+    const wabaId =
+        String(input.wabaId ?? input.businessAccountId ?? existing?.wabaId ?? existing?.businessAccountId ?? process.env.WABA_ID ?? "").trim() ||
+        null;
+    const baseAllocation = existing ? deriveAllocationStatus(existing) : ALLOCATION_AVAILABLE;
+
+    const record = normalizeRegistryRecord({
         id,
         label: String(input.label || existing?.label || `Ziric ${kind} ${phoneNumberId.slice(-4)}`).trim(),
         displayPhoneNumber: normalizePhoneDisplay(input.displayPhoneNumber ?? existing?.displayPhoneNumber ?? ""),
         phoneNumberId,
-        businessAccountId: String(input.businessAccountId ?? existing?.businessAccountId ?? process.env.WABA_ID ?? "").trim() || null,
+        wabaId,
+        businessAccountId: wabaId,
+        metaBusinessId: input.metaBusinessId ?? existing?.metaBusinessId ?? null,
         kind,
         status: existing?.status || POOL_STATUS_AVAILABLE,
+        allocationStatus: input.allocationStatus ?? baseAllocation,
         assignedCompanyId: existing?.assignedCompanyId || null,
         assignedAt: existing?.assignedAt || null,
+        assignedSarahId: input.assignedSarahId ?? existing?.assignedSarahId ?? null,
+        connectionMethod: input.connectionMethod ?? existing?.connectionMethod ?? CONNECTION_MANAGED,
+        registrationStatus: input.registrationStatus ?? existing?.registrationStatus ?? REGISTRATION_REGISTERED,
+        registeredAt: existing?.registeredAt || existing?.createdAt || nowIso(),
         credentialsSource: String(input.credentialsSource || existing?.credentialsSource || "env").toLowerCase(),
         notes: input.notes !== undefined ? String(input.notes || "") : existing?.notes || null,
         createdAt: existing?.createdAt || nowIso(),
-    };
+        allocationHistory: existing?.allocationHistory || [],
+    });
 
     const saved = await writePoolDoc(id, record, { merge: true });
     return sanitizePoolNumber(saved);
@@ -193,111 +191,11 @@ export async function ensureEnvSeedNumber() {
  * @param {{ companyId: string, numberId: string, activate?: boolean }} input
  */
 export async function assignWhatsAppPoolNumberToCompany(input = {}) {
-    const companyId = String(input.companyId || "").trim();
-    const numberId = String(input.numberId || "").trim();
-    const activate = input.activate !== false;
-
-    if (!companyId) throw poolError("companyId is required", 400);
-    if (!numberId) throw poolError("numberId is required", 400);
-
-    const company = await getCompany(companyId);
-    if (!company) throw poolError("Company not found", 404, "COMPANY_NOT_FOUND");
-
-    const poolNumber = await readPoolDoc(numberId);
-    if (!poolNumber) throw poolError("Pool number not found", 404, "POOL_NUMBER_NOT_FOUND");
-    if (poolNumber.status === POOL_STATUS_RETIRED) {
-        throw poolError("Pool number is retired", 409, "NUMBER_RETIRED");
-    }
-    if (poolNumber.status === POOL_STATUS_IN_USE && poolNumber.assignedCompanyId !== companyId) {
-        throw poolError(
-            `Number is in use by tenant ${poolNumber.assignedCompanyId}`,
-            409,
-            "NUMBER_IN_USE"
-        );
-    }
-
-    /* Claim inventory first so two operators cannot lease the same AVAILABLE number. */
-    if (poolNumber.status !== POOL_STATUS_IN_USE || poolNumber.assignedCompanyId !== companyId) {
-        await writePoolDoc(numberId, {
-            ...poolNumber,
-            status: POOL_STATUS_IN_USE,
-            assignedCompanyId: companyId,
-            assignedAt: nowIso(),
-            leaseId: crypto.randomBytes(6).toString("hex"),
-        });
-    }
-
-    let integration = await getWhatsAppIntegration(companyId);
-    if (!integration?.id) {
-        try {
-            integration = await registerPlatformWhatsAppIntegration(companyId, {
-                credentialsSource: poolNumber.credentialsSource || "env",
-            });
-        } catch (err) {
-            await writePoolDoc(numberId, {
-                ...poolNumber,
-                status: POOL_STATUS_AVAILABLE,
-                assignedCompanyId: null,
-                assignedAt: null,
-                leaseId: null,
-            });
-            throw err;
-        }
-    }
-
     try {
-        const existingActive = await getWhatsAppIntegration(companyId);
-        if (
-            existingActive?.status === WHATSAPP_STATUS_ACTIVE &&
-            existingActive.phoneNumberId &&
-            existingActive.phoneNumberId !== poolNumber.phoneNumberId
-        ) {
-            throw poolError(
-                "Company already has an active WhatsApp number; deactivate or release first",
-                409,
-                "TENANT_ALREADY_ACTIVE"
-            );
-        }
-
-        await configurePlatformWhatsAppIntegration(companyId, {
-            phoneNumberId: poolNumber.phoneNumberId,
-            displayPhoneNumber: poolNumber.displayPhoneNumber || "",
-            businessAccountId: poolNumber.businessAccountId || "",
-            credentialsSource: poolNumber.credentialsSource || "env",
-        });
-
-        let activation = null;
-        if (activate) {
-            activation = await activatePlatformWhatsAppIntegration(companyId, {
-                acknowledgeEnvCredentials: true,
-                source: "whatsapp_number_pool",
-                poolNumberId: numberId,
-            });
-        }
-
-        const leased = await readPoolDoc(numberId);
-        const readiness = await getPlatformWhatsAppIntegrationWithReadiness(companyId);
-
-        return {
-            success: true,
-            companyId,
-            number: sanitizePoolNumber(leased),
-            integration: readiness?.integration || activation?.integration || null,
-            runtimeReady: readiness?.runtimeReady ?? activation?.runtimeReady ?? null,
-            missing: readiness?.missing || activation?.missing || [],
-            activated: Boolean(activate),
-        };
+        return await executeGatewayAssign(input);
     } catch (err) {
-        if (poolNumber.status === POOL_STATUS_AVAILABLE) {
-            await writePoolDoc(numberId, {
-                ...poolNumber,
-                status: POOL_STATUS_AVAILABLE,
-                assignedCompanyId: null,
-                assignedAt: null,
-                leaseId: null,
-            });
-        }
-        throw err;
+        if (err.status) throw err;
+        throw poolError(err.message || "Assign failed", err.status || 500, err.code);
     }
 }
 
@@ -305,47 +203,13 @@ export async function assignWhatsAppPoolNumberToCompany(input = {}) {
  * Release a pool number from a tenant (makes it AVAILABLE again).
  * Clears phone metadata on the tenant integration when it matches the released number.
  */
-export async function releaseWhatsAppPoolNumber({ numberId = null, companyId = null } = {}) {
-    let poolNumber = null;
-    if (numberId) {
-        poolNumber = await readPoolDoc(numberId);
-    } else if (companyId) {
-        const all = await listWhatsAppPoolNumbers({ status: POOL_STATUS_IN_USE });
-        poolNumber = all.find((n) => n.assignedCompanyId === companyId) || null;
-        if (poolNumber) poolNumber = await readPoolDoc(poolNumber.id);
+export async function releaseWhatsAppPoolNumber(input = {}) {
+    try {
+        return await executeGatewayRelease(input);
+    } catch (err) {
+        if (err.status) throw err;
+        throw poolError(err.message || "Release failed", err.status || 500, err.code);
     }
-
-    if (!poolNumber) throw poolError("Pool number assignment not found", 404, "POOL_NUMBER_NOT_FOUND");
-
-    const assignedCompanyId = poolNumber.assignedCompanyId;
-    const released = await writePoolDoc(poolNumber.id, {
-        ...poolNumber,
-        status: POOL_STATUS_AVAILABLE,
-        assignedCompanyId: null,
-        assignedAt: null,
-        leaseId: null,
-    });
-
-    if (assignedCompanyId) {
-        const integration = await getWhatsAppIntegration(assignedCompanyId);
-        if (integration?.id && String(integration.phoneNumberId) === String(poolNumber.phoneNumberId)) {
-            if (integration.status === WHATSAPP_STATUS_ACTIVE) {
-                await deactivatePlatformWhatsAppIntegration(assignedCompanyId, {
-                    reason: "Pool number released",
-                });
-            }
-            await configurePlatformWhatsAppIntegration(assignedCompanyId, {
-                phoneNumberId: "",
-                displayPhoneNumber: "",
-            });
-        }
-    }
-
-    return {
-        success: true,
-        number: sanitizePoolNumber(released),
-        previousCompanyId: assignedCompanyId || null,
-    };
 }
 
 /**

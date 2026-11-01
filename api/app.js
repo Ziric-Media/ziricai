@@ -125,6 +125,7 @@ import {
     inviteTeamMember,
     updateTeamMemberRole,
 } from "../services/tenants/userService.js";
+import { createTeamMemberProfile } from "../services/tenants/teamMemberService.js";
 import { mapTeamRosterForRole } from "../services/tenants/teamRosterAccess.js";
 import {
     provisionCompany,
@@ -139,6 +140,8 @@ import {
     releaseWhatsAppPoolNumber,
     ensureEnvSeedNumber,
 } from "../services/platform/whatsappNumberPoolService.js";
+import { buildWhatsAppReconciliationReport } from "../services/platform/reconcileWhatsAppPhoneAssignments.js";
+import { scanWhatsAppGatewayProjectionDrift } from "../services/platform/whatsappGatewayRecovery.js";
 import {
     getCustomerMarketplaceCatalog,
     getInstalledPacks,
@@ -421,6 +424,32 @@ app.get("/api/auth/session", attachTenantContext(), async (req, res) => {
                     profile: linkedProfile,
                     role: linkedProfile.role || auth.role,
                     email: auth.email || linkedProfile.email || null,
+                };
+            }
+        }
+        const sessionCompanyId =
+            req.query?.companyId ||
+            req.query?.company ||
+            auth.profile?.companyId ||
+            auth.profile?.company ||
+            null;
+        if (auth.uid && sessionCompanyId && !auth.isSuperAdmin) {
+            const { getTenantMembership } = await import("../services/auth/authService.js");
+            const membership = await getTenantMembership(auth.uid, String(sessionCompanyId));
+            if (membership?.role) {
+                auth = {
+                    ...auth,
+                    role: membership.role,
+                    profile: auth.profile
+                        ? { ...auth.profile, role: membership.role, companyId: sessionCompanyId }
+                        : {
+                              uid: auth.uid,
+                              email: membership.email || auth.email,
+                              fullName: membership.fullName || membership.name,
+                              role: membership.role,
+                              companyId: sessionCompanyId,
+                              status: membership.status || "active",
+                          },
                 };
             }
         }
@@ -816,6 +845,32 @@ app.post("/api/companies/:companyId/team/invite", requireTenantScope(), checkPer
     }
 });
 
+app.post(
+    "/api/companies/:companyId/team/members",
+    requireAuthenticatedTenantMember(),
+    checkPermission("canManageStaff"),
+    async (req, res) => {
+        try {
+            const result = await createTeamMemberProfile(
+                req.params.companyId,
+                {
+                    email: req.body?.email,
+                    password: req.body?.password,
+                    fullName: req.body?.fullName || req.body?.name,
+                    role: req.body?.role,
+                },
+                { createdByUid: req.tenant?.uid || null }
+            );
+            res.status(201).json({ success: true, ...result });
+        } catch (err) {
+            res.status(err.status || 400).json({
+                error: err.message || "Failed to create member profile",
+                code: err.code || "TEAM_MEMBER_CREATE_FAILED",
+            });
+        }
+    }
+);
+
 app.patch("/api/companies/:companyId/team/:uid", requireTenantScope(), checkPermission("canManageStaff"), async (req, res) => {
     try {
         const member = await updateTeamMemberRole(req.params.companyId, req.params.uid, req.body?.role, req.body || {});
@@ -1108,7 +1163,18 @@ function respondPlatformWhatsAppError(res, err, label) {
     if (status >= 500) {
         console.error(`[${label}] error:`, err.message);
     }
-    res.status(status).json({ error: err.message || "WhatsApp integration request failed" });
+    res.status(status).json({
+        error: err.message || "WhatsApp integration request failed",
+        code: err.code || undefined,
+    });
+}
+
+/** G5 — Idempotency-Key header or body.operationId for assign/release. */
+function extractGatewayOperationId(req, body = {}) {
+    const header = req.headers["idempotency-key"] || req.headers["x-idempotency-key"];
+    if (header && String(header).trim()) return String(header).trim();
+    if (body?.operationId && String(body.operationId).trim()) return String(body.operationId).trim();
+    return null;
 }
 
 /** Super Admin — register WhatsApp integration (B-MC-5c-2b). */
@@ -1278,6 +1344,40 @@ app.get(
     }
 );
 
+/** Super Admin — read-only Phone Number ID reconciliation (G2). */
+app.get(
+    "/api/platform/whatsapp-numbers/reconciliation",
+    requirePlatformAccess(),
+    async (req, res) => {
+        try {
+            const phoneSuffix = req.query.phoneSuffix ? String(req.query.phoneSuffix) : null;
+            const phoneNumberId = req.query.phoneNumberId ? String(req.query.phoneNumberId) : null;
+            const report = await buildWhatsAppReconciliationReport({ phoneSuffix, phoneNumberId });
+            res.json(report);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers/reconciliation] error:", err.message);
+            res.status(status).json({ error: err.message || "Reconciliation failed" });
+        }
+    }
+);
+
+/** Super Admin — read-only registry ↔ projection drift scan (G5). */
+app.get(
+    "/api/platform/whatsapp-numbers/projection-drift",
+    requirePlatformAccess(),
+    async (_req, res) => {
+        try {
+            const report = await scanWhatsAppGatewayProjectionDrift();
+            res.json(report);
+        } catch (err) {
+            const status = err.status || 500;
+            console.error("[api/platform/whatsapp-numbers/projection-drift] error:", err.message);
+            res.status(status).json({ error: err.message || "Projection drift scan failed" });
+        }
+    }
+);
+
 /** Super Admin — add/update a Meta phone identity in the pool. */
 app.post(
     "/api/platform/whatsapp-numbers",
@@ -1316,12 +1416,17 @@ app.post(
                 companyId,
                 numberId: body.numberId,
                 activate: body.activate !== false,
+                operatorId: req.platformAuth?.userId || req.platformAuth?.via || null,
+                reason: body.reason || null,
+                operationId: extractGatewayOperationId(req, body),
             });
             auditLog("platform_whatsapp_pool_assign", {
                 companyId,
                 numberId: body.numberId,
                 phoneNumberId: result.number?.phoneNumberId,
                 activated: result.activated,
+                operationId: result.operationId,
+                idempotentReplay: result.idempotentReplay || false,
                 via: req.platformAuth?.via,
             });
             res.status(201).json(result);
@@ -1340,10 +1445,16 @@ app.post(
         try {
             const result = await releaseWhatsAppPoolNumber({
                 numberId: req.params.numberId,
+                companyId: req.body?.companyId || null,
+                operatorId: req.platformAuth?.userId || req.platformAuth?.via || null,
+                reason: req.body?.reason || null,
+                operationId: extractGatewayOperationId(req, req.body || {}),
             });
             auditLog("platform_whatsapp_pool_release", {
                 numberId: req.params.numberId,
                 previousCompanyId: result.previousCompanyId,
+                operationId: result.operationId,
+                idempotentReplay: result.idempotentReplay || false,
                 via: req.platformAuth?.via,
             });
             res.json(result);
@@ -2523,6 +2634,17 @@ export async function runBackgroundInit() {
         await seedDemoTenantsIfMissing().catch((err) => {
             console.error("[startup] Demo tenant seed skipped:", err.message);
         });
+        try {
+            const { ensureSmilemoreDentalProductionTenant } = await import(
+                "../services/storage/ensureSmilemoreDentalProduction.js"
+            );
+            const sm = await ensureSmilemoreDentalProductionTenant();
+            if (sm.migrated) {
+                console.error("[startup] Smile More Dentists production dental preset ensured for", sm.companyId);
+            }
+        } catch (err) {
+            console.error("[startup] Smile More dental production ensure skipped:", err.message);
+        }
         await seedCentralMotorsPilotIfEnabled().catch((err) => {
             console.error("[startup] Central Motors pilot seed skipped:", err.message);
         });
