@@ -77,7 +77,29 @@ async function assertOutboundSendContext(options = {}) {
         throw err;
     }
     const auth = await resolveOutboundAuth(options);
-    return { phoneNumberId, accessToken: auth.accessToken, credentialsSource: auth.credentialsSource };
+    const credentialsSource = options.credentialsSource || auth.credentialsSource;
+    try {
+        const { assertManagedOutboundRegistryAllowed } = await import(
+            "./platform/whatsappGatewayService.js"
+        );
+        await assertManagedOutboundRegistryAllowed({
+            companyId: options.companyId ?? null,
+            phoneNumberId,
+            credentialsSource,
+        });
+    } catch (err) {
+        if (err.code === "WHATSAPP_GATEWAY_REGISTRY_OUTBOUND_BLOCKED") {
+            console.error("[whatsapp-gateway]", err.message, {
+                companyId: options.companyId ?? null,
+                phoneNumberIdSuffix: String(phoneNumberId).slice(-4),
+            });
+            throw new WhatsAppCredentialError("registry_outbound_blocked", err.message, {
+                companyId: options.companyId ?? null,
+            });
+        }
+        throw err;
+    }
+    return { phoneNumberId, accessToken: auth.accessToken, credentialsSource };
 }
 
 /**

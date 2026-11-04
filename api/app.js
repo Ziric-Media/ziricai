@@ -135,7 +135,6 @@ import {
 import { provisionOperatorTenant } from "../services/platform/operatorTenantProvisionService.js";
 import {
     listWhatsAppPoolNumbers,
-    getWhatsAppPoolNumberById,
     upsertWhatsAppPoolNumber,
     assignWhatsAppPoolNumberToCompany,
     releaseWhatsAppPoolNumber,
@@ -151,9 +150,7 @@ import {
     simulateInboundRoutingProbe,
     simulateOutboundRegistryProbe,
     isLiveWhatsAppProbeAuthorized,
-    executeLiveGatewayVerificationBundle,
 } from "../services/platform/whatsappGatewayProbeService.js";
-import { listGatewayProbeEvents } from "../services/platform/whatsappGatewayProbeStore.js";
 import {
     getCustomerMarketplaceCatalog,
     getInstalledPacks,
@@ -197,11 +194,7 @@ import { resolveAuthFromRequest, tryEnsureOwnerProfileForAuthenticatedUser } fro
 import { trackSession, invalidateSession, buildSessionResponse } from "../services/auth/sessionService.js";
 import { checkPermission } from "../services/auth/permissionsService.js";
 import { resolveMarketplacePaymentBypass } from "../services/platform/marketplaceAuth.js";
-import {
-    requirePlatformAccess,
-    requirePlatformGatewayRead,
-    requirePlatformGatewayMutate,
-} from "../services/auth/platformAuth.js";
+import { requirePlatformAccess } from "../services/auth/platformAuth.js";
 import { requireFirebaseAuth } from "../services/auth/requireFirebaseAuth.js";
 import { validateCompanyIdParam, requireBodyFields, isValidCompanyId } from "../services/auth/validateInput.js";
 import { authRateLimit } from "../services/auth/authRateLimiter.js";
@@ -1348,7 +1341,7 @@ app.post(
 /** Super Admin — WhatsApp number pool inventory. */
 app.get(
     "/api/platform/whatsapp-numbers",
-    requirePlatformGatewayRead(),
+    requirePlatformAccess(),
     async (req, res) => {
         try {
             await ensureEnvSeedNumber();
@@ -1369,29 +1362,10 @@ app.get(
     }
 );
 
-/** G7 — single pool/registry row with full allocation history. */
-app.get(
-    "/api/platform/whatsapp-numbers/:numberId",
-    requirePlatformGatewayRead(),
-    async (req, res) => {
-        try {
-            const number = await getWhatsAppPoolNumberById(req.params.numberId);
-            if (!number) {
-                return res.status(404).json({ error: "WhatsApp pool number not found" });
-            }
-            res.json({ number });
-        } catch (err) {
-            const status = err.status || 500;
-            console.error("[api/platform/whatsapp-numbers/:numberId] error:", err.message);
-            res.status(status).json({ error: err.message || "Failed to load number" });
-        }
-    }
-);
-
 /** Super Admin — read-only Phone Number ID reconciliation (G2). */
 app.get(
     "/api/platform/whatsapp-numbers/reconciliation",
-    requirePlatformGatewayRead(),
+    requirePlatformAccess(),
     async (req, res) => {
         try {
             const phoneSuffix = req.query.phoneSuffix ? String(req.query.phoneSuffix) : null;
@@ -1409,7 +1383,7 @@ app.get(
 /** Super Admin — read-only registry ↔ projection drift scan (G5). */
 app.get(
     "/api/platform/whatsapp-numbers/projection-drift",
-    requirePlatformGatewayRead(),
+    requirePlatformAccess(),
     async (_req, res) => {
         try {
             const report = await scanWhatsAppGatewayProjectionDrift();
@@ -1425,7 +1399,7 @@ app.get(
 /** Super Admin — platform WhatsApp Gateway health (G6, read-only). */
 app.get(
     "/api/platform/whatsapp-gateway/health",
-    requirePlatformGatewayRead(),
+    requirePlatformAccess(),
     async (_req, res) => {
         try {
             const report = await evaluatePlatformWhatsAppGatewayHealth();
@@ -1438,47 +1412,10 @@ app.get(
     }
 );
 
-/** G7 — probe history (in-memory store; not durable across restarts). */
-app.get(
-    "/api/platform/whatsapp-gateway/probe-history",
-    requirePlatformGatewayRead(),
-    async (req, res) => {
-        try {
-            const companyId = req.query.companyId ? String(req.query.companyId) : null;
-            const limit = req.query.limit ? Math.min(Number(req.query.limit) || 20, 100) : 20;
-            const events = listGatewayProbeEvents({ companyId, limit });
-            res.json({
-                events,
-                persistence: "in_memory",
-                note: "Probe history is not durable across process restarts until a future store is authorized.",
-            });
-        } catch (err) {
-            const status = err.status || 500;
-            res.status(status).json({ error: err.message || "Probe history failed" });
-        }
-    }
-);
-
-/** G7 — usage metrics placeholder until platform analytics exposes stable aggregates. */
-app.get(
-    "/api/platform/whatsapp-gateway/usage-foundation",
-    requirePlatformGatewayRead(),
-    async (_req, res) => {
-        res.json({
-            available: false,
-            reason: "Tenant-level WhatsApp message volume aggregates are not yet exposed on a stable platform API.",
-            suggestedSources: [
-                "/api/operations/platform-analytics-overview",
-                "Tenant-scoped conversation metrics (future gateway filter by phoneNumberId)",
-            ],
-        });
-    }
-);
-
 /** Super Admin — tenant WhatsApp readiness report (G6, read-only). */
 app.get(
     "/api/platform/companies/:companyId/whatsapp-gateway/readiness",
-    requirePlatformGatewayRead(),
+    requirePlatformAccess(),
     validateCompanyIdParam("params"),
     async (req, res) => {
         try {
@@ -1495,7 +1432,7 @@ app.get(
 /** Super Admin — simulated routing probes only (G6; no live Meta traffic). */
 app.post(
     "/api/platform/companies/:companyId/whatsapp-gateway/simulate-probe",
-    requirePlatformGatewayMutate(),
+    requirePlatformAccess(),
     authRateLimit("platform-integrations"),
     validateCompanyIdParam("params"),
     async (req, res) => {
@@ -1543,49 +1480,10 @@ app.post(
     }
 );
 
-/** G10 — Live Meta verification (approved recipients only; operator). */
-app.post(
-    "/api/platform/companies/:companyId/whatsapp-gateway/live-probe",
-    requirePlatformGatewayMutate(),
-    authRateLimit("platform-integrations"),
-    validateCompanyIdParam("params"),
-    async (req, res) => {
-        try {
-            const companyId = req.params.companyId;
-            const integration = await getWhatsAppIntegration(companyId);
-            const phoneNumberId = req.body?.phoneNumberId || integration?.phoneNumberId;
-            if (!phoneNumberId) {
-                return res.status(400).json({ error: "phoneNumberId required" });
-            }
-            const result = await executeLiveGatewayVerificationBundle({
-                companyId,
-                phoneNumberId: String(phoneNumberId),
-                correlationId: req.body?.correlationId || null,
-                toE164: req.body?.toE164 || req.body?.recipient || null,
-                operatorId: req.platformAuth?.via || null,
-            });
-            const readiness = await evaluateCompanyWhatsAppReadiness(companyId);
-            res.json({
-                live: true,
-                ...result,
-                readiness: {
-                    overallState: readiness.overallState,
-                    operational: readiness.operational,
-                    behavioralEvidence: readiness.behavioralEvidence,
-                },
-            });
-        } catch (err) {
-            const status = err.status || 500;
-            console.error("[api/platform/whatsapp-gateway/live-probe] error:", err.message);
-            res.status(status).json({ error: err.message, code: err.code });
-        }
-    }
-);
-
 /** Super Admin — add/update a Meta phone identity in the pool. */
 app.post(
     "/api/platform/whatsapp-numbers",
-    requirePlatformGatewayMutate(),
+    requirePlatformAccess(),
     authRateLimit("platform-integrations"),
     requireBodyFields(["phoneNumberId"]),
     async (req, res) => {
@@ -1608,7 +1506,7 @@ app.post(
 /** Super Admin — assign pool number → tenant WhatsApp (Meta identity link). */
 app.post(
     "/api/platform/companies/:companyId/integrations/whatsapp/assign-pool-number",
-    requirePlatformGatewayMutate(),
+    requirePlatformAccess(),
     authRateLimit("platform-integrations"),
     validateCompanyIdParam("params"),
     requireBodyFields(["numberId"]),
@@ -1643,7 +1541,7 @@ app.post(
 /** Super Admin — release pool number back to AVAILABLE. */
 app.post(
     "/api/platform/whatsapp-numbers/:numberId/release",
-    requirePlatformGatewayMutate(),
+    requirePlatformAccess(),
     authRateLimit("platform-integrations"),
     async (req, res) => {
         try {

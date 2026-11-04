@@ -140,9 +140,23 @@ export async function resolveCompanyFromPhoneNumberId(phoneNumberId) {
         phoneNumberId: maskPhoneNumberId(key),
     });
 
+    const { resolveWhatsAppInboundCompanyId } = await import(
+        "../../platform/whatsappGatewayService.js"
+    );
+    const routed = await resolveWhatsAppInboundCompanyId(key);
+    if (routed.companyId) {
+        console.log("[whatsapp] Company resolved", {
+            companyId: routed.companyId,
+            gatewayMode: routed.mode,
+            gatewayVia: routed.via,
+            phoneNumberId: maskPhoneNumberId(key),
+        });
+        return routed.companyId;
+    }
+
     const integration = await findActiveWhatsAppIntegrationByPhoneNumberId(key);
     if (integration?.companyId) {
-        console.log("[whatsapp] Integration resolved", {
+        console.log("[whatsapp] Integration resolved (post-gateway miss)", {
             integrationId: integration.id,
             phoneNumberId: maskPhoneNumberId(key),
             status: integration.status,
