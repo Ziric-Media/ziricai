@@ -1,0 +1,1 @@
+Bookings start as requests until the practice confirms them. Respect published locations, services, and opening hours from the tenant practice profile. Do not invent chair counts, fees, or clinician rotas unless they appear in approved knowledge.

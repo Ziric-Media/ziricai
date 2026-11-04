@@ -32,6 +32,22 @@ export function conversationDocId(customerId, channel = "whatsapp") {
     return `${channel}::${customerId}`;
 }
 
+/** Stable tenant customer id for Sarah App Firebase uids (not phone-normalized). */
+export function resolveSarahAppCustomerId(uid) {
+    const safe = String(uid || "")
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 120);
+    return `sarah_app::${safe || "anonymous"}`;
+}
+
+function resolveCustomerIdForChannel(phone, channel, options = {}) {
+    if (channel === "sarah_app") {
+        return resolveSarahAppCustomerId(options.externalUserId || phone);
+    }
+    return customerDocId(phone);
+}
+
 /** Single canonical tenant conversation document id (e.g. whatsapp::27849000523). */
 export function resolveCanonicalConversationId(conversationIdOrPhone, channel = "whatsapp") {
     const phone = normalizePhone(conversationIdOrPhone);
@@ -116,7 +132,7 @@ export async function updateTenantCustomer(companyId, phone, patch) {
 
 export async function getOrCreateConversation(companyId, phone, channel = "whatsapp", meta = {}) {
     assertCompanyId(companyId);
-    const customerId = customerDocId(phone);
+    const customerId = resolveCustomerIdForChannel(phone, channel, meta);
     const conversationId = conversationDocId(customerId, channel);
     const customerName = meta.customerName || meta.contactName || customerId;
     const safeMeta = { ...meta, customerName };
@@ -160,8 +176,8 @@ export async function listTenantConversations(companyId, { limit = 50, channel =
 
 export async function saveTenantMessage(companyId, phone, role, content, options = {}) {
     assertCompanyId(companyId);
-    const customerId = customerDocId(phone);
     const channel = options.channel || "whatsapp";
+    const customerId = resolveCustomerIdForChannel(phone, channel, options);
     const conversationId = conversationDocId(customerId, channel);
 
     const resolvedCustomerName =
@@ -174,6 +190,7 @@ export async function saveTenantMessage(companyId, phone, role, content, options
         preview: String(content).slice(0, 120),
         customerName: resolvedCustomerName,
         status: "in_progress",
+        externalUserId: options.externalUserId || (channel === "sarah_app" ? phone : undefined),
     });
 
     const messageId = options.externalId || uid("msg");
@@ -195,7 +212,10 @@ export async function saveTenantMessage(companyId, phone, role, content, options
 
     await messagesRepo.set(companyId, messageId, entry);
 
-    const existingCustomer = (await getTenantCustomer(companyId, phone)) || {};
+    const existingCustomer =
+        channel === "sarah_app"
+            ? (await customersRepo.get(companyId, customerId)) || {}
+            : (await getTenantCustomer(companyId, phone)) || {};
     const customerPatch = {
         lastMessage: String(content).slice(0, 120),
         lastSeen: now(),
@@ -208,25 +228,43 @@ export async function saveTenantMessage(companyId, phone, role, content, options
         customerPatch.displayName = options.explicitDisplayName;
         customerPatch.name = options.explicitDisplayName;
     } else if (options.contactName) {
-        customerPatch.whatsappContactName = options.contactName;
-        if (
-            !existingCustomer.displayName &&
-            !isLikelyCompanyName(options.contactName, { companyName: options.companyName })
-        ) {
+        if (channel === "sarah_app") {
+            customerPatch.displayName = options.contactName;
             customerPatch.name = options.contactName;
+        } else {
+            customerPatch.whatsappContactName = options.contactName;
+            if (
+                !existingCustomer.displayName &&
+                !isLikelyCompanyName(options.contactName, { companyName: options.companyName })
+            ) {
+                customerPatch.name = options.contactName;
+            }
         }
     } else if (options.name && !existingCustomer.displayName) {
         customerPatch.name = options.name;
     }
 
-    await upsertTenantCustomer(companyId, phone, customerPatch);
+    if (channel === "sarah_app") {
+        await customersRepo.set(companyId, customerId, {
+            ...existingCustomer,
+            ...customerPatch,
+            id: customerId,
+            customerId,
+            companyId,
+            externalUserId: options.externalUserId || phone,
+            updatedAt: now(),
+            createdAt: existingCustomer.createdAt || now(),
+        });
+    } else {
+        await upsertTenantCustomer(companyId, phone, customerPatch);
+    }
 
     return { conversationId, messageId, role, customerId };
 }
 
-export async function getTenantConversationHistory(companyId, phone, channel = "whatsapp", max = 20) {
+export async function getTenantConversationHistory(companyId, phone, channel = "whatsapp", max = 20, options = {}) {
     assertCompanyId(companyId);
-    const customerId = customerDocId(phone);
+    const customerId = resolveCustomerIdForChannel(phone, channel, options);
     const conversationId = conversationDocId(customerId, channel);
     const all = await messagesRepo.list(companyId, { max: 500, orderByField: "createdAt" });
     const filtered = all
