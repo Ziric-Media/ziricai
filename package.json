@@ -12,6 +12,8 @@
         "dev:app": "node scripts/prepare-sites.js app && node api/server.js",
         "dev:finance-acceptance": "node scripts/run-finance-acceptance-server.mjs",
         "dev:admin": "node scripts/prepare-sites.js admin && node api/server.js",
+        "dev:users": "node scripts/prepare-sites.js users && node api/server.js",
+        "prepare:users": "node scripts/prepare-sites.js users",
         "start": "node api/server.js",
         "production": "node api/server.js",
         "tunnel": "npx --yes ngrok http 3000",

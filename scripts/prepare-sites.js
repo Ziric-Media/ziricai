@@ -115,17 +115,18 @@ function siteConfigBlock(site) {
   const apiBase =
     process.env.API_BASE_URL !== undefined
       ? process.env.API_BASE_URL
-      : site === 'marketing' || site === 'app' || site === 'admin'
+      : site === 'marketing' || site === 'app' || site === 'admin' || site === 'users'
         ? ''
         : '';
   const marketing = process.env.MARKETING_BASE_URL || 'https://marketing.ziricai.com';
   const publicWeb = process.env.PUBLIC_WEB_URL || process.env.ZIRICAI_ROOT_URL || 'https://ziricai.com';
   const app = process.env.APP_BASE_URL || 'https://app.ziricai.com';
   const admin = process.env.ADMIN_BASE_URL || 'https://admin.ziricai.com';
+  const sarah = process.env.SARAH_APP_BASE_URL || 'https://sarah.ziricai.com';
   return `<script>window.__ZIRICAI_CONFIG__=${JSON.stringify({
     apiBase,
     assetVersion: resolveAssetVersion(),
-    sites: { marketing, publicWeb, app, admin, api: apiBase || PRODUCTION_API_URL },
+    sites: { marketing, publicWeb, app, admin, sarah, api: apiBase || PRODUCTION_API_URL },
     landingSarahCompanyId: process.env.LANDING_SARAH_COMPANY_ID || 'ziricai',
     firebase: firebaseConfigFromEnv(),
   })};</script>`;
@@ -431,6 +432,18 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
     );
   }
 
+  if (site === 'users') {
+    const assetVersion = resolveAssetVersion();
+    out = out.replace(
+      /href="css\/sarah-app\.css"/,
+      `href="css/sarah-app.css?v=${assetVersion}"`
+    );
+    out = out.replace(
+      /src="js\/users\/main\.js"/,
+      `src="js/users/main.js?v=${assetVersion}"`
+    );
+  }
+
   if (site === 'admin') {
     const assetVersion = resolveAssetVersion();
     out = out.replace(/href="login\.html" data-site-link="login"/g, 'href="#" data-site-link="login"');
@@ -458,7 +471,7 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
     out = out.replace('</head>', `${siteConfigBlock(site)}\n</head>`);
   }
 
-  if (site === 'admin' || site === 'app' || site === 'marketing') {
+  if (site === 'admin' || site === 'app' || site === 'marketing' || site === 'users') {
     out = bumpBrandAssetUrls(out, resolveAssetVersion());
   }
 
@@ -655,6 +668,28 @@ function prepareApp() {
   copyPlatformBrandAssets(dir, ['favicon-portal.svg']);
 }
 
+function prepareUsers() {
+  const dir = path.join(ROOT, 'users');
+  rmDir(path.join(dir, 'css'));
+  rmDir(path.join(dir, 'js'));
+  rmDir(path.join(dir, 'assets'));
+
+  const shell = fs.existsSync(path.join(ROOT, 'sarah-app-shell.html'))
+    ? readText('sarah-app-shell.html')
+    : '<!DOCTYPE html><html><body>Sarah App shell missing</body></html>';
+  writeText('users/index.html', patchHtml(shell, { site: 'users', importmapMode: 'cdn' }));
+
+  copyDir(path.join(ROOT, 'js/users'), path.join(dir, 'js/users'));
+  copyDir(path.join(ROOT, 'js/shared'), path.join(dir, 'js/shared'));
+  for (const f of ['auth.js', 'firebase-config.js', 'firebase.js', 'users.js']) {
+    copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
+  }
+  copyFile(path.join(ROOT, 'css/sarah-app.css'), path.join(dir, 'css/sarah-app.css'));
+  copyFile(path.join(ROOT, 'users/manifest.webmanifest'), path.join(dir, 'manifest.webmanifest'));
+  copyFile(path.join(ROOT, 'js/users/sw.js'), path.join(dir, 'sw.js'));
+  copyPlatformBrandAssets(dir, []);
+}
+
 function prepareAdmin() {
   const dir = path.join(ROOT, 'admin');
   rmDir(path.join(dir, 'css'));
@@ -684,6 +719,7 @@ const runners = {
   marketing: prepareMarketing,
   app: prepareApp,
   admin: prepareAdmin,
+  users: prepareUsers,
 };
 
 async function main() {

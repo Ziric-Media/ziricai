@@ -1,0 +1,64 @@
+# Sarah App (consumer) — sarah.ziricai.com
+# Independent Netlify site. Base directory = users
+# Do not deploy until U0 sign-off and Netlify site + DNS are configured.
+
+[build]
+  command = "cd .. && npm ci && node scripts/prepare-sites.js users"
+  publish = "."
+
+[build.environment]
+  NETLIFY = "true"
+  USE_CDN_FIREBASE = "true"
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://ziricai-production.up.railway.app/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/node_modules/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[context.production.environment]
+  API_BASE_URL = ""
+  SARAH_APP_BASE_URL = "https://sarah.ziricai.com"
+  APP_BASE_URL = "https://app.ziricai.com"
+  ADMIN_BASE_URL = "https://admin.ziricai.com"
+  MARKETING_BASE_URL = "https://marketing.ziricai.com"
+  PUBLIC_WEB_URL = "https://ziricai.com"
+  FIREBASE_API_KEY = "AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8"
+  FIREBASE_AUTH_DOMAIN = "ziricai.firebaseapp.com"
+  FIREBASE_PROJECT_ID = "ziricai"
+  FIREBASE_STORAGE_BUCKET = "ziricai.firebasestorage.app"
+  FIREBASE_MESSAGING_SENDER_ID = "482382497730"
+  FIREBASE_APP_ID = "1:482382497730:web:6bc2f8668a1598fa13f85b"
+  FIREBASE_MEASUREMENT_ID = "G-92ZVT0731S"
+  FIREBASE_DATABASE_ID = "default"
+
+[context.deploy-preview.environment]
+  SARAH_APP_BASE_URL = ""
+
+[context.branch-deploy.environment]
+  SARAH_APP_BASE_URL = ""

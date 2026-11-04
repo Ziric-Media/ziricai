@@ -59,6 +59,33 @@ service cloud.firestore {
       }
     }
 
+    // Sarah App consumer profile (U1) — user-owned only
+    match /userProfiles/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /userPreferences/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /personalKnowledge/{userId} {
+      match /sections/{sectionKey} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+
+    match /personalSarah/{userId} {
+      match /sessions/{sessionId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+      match /tasks/{taskId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+      match /memories/{memoryId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+
     // Tenant root document
     match /companies/{companyId} {
       allow read: if canAccessCompany(companyId);
