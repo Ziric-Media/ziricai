@@ -2,7 +2,7 @@
 
 **Programme:** Sarah App & ZiricAI Platform Delivery  
 **Gate 1 status:** Phase 0 baseline **accepted** (2026-11-04 stakeholder decision)  
-**This document:** Inspection and planning only — **no Git operations executed**  
+**This document:** Gate 1B assessment; **AP-1–AP-3 executed 2026-11-04** (see § Execution record)  
 **Related:** [SARAH_APP_PROGRAMME_READINESS_AUDIT.md](./SARAH_APP_PROGRAMME_READINESS_AUDIT.md)
 
 ---
@@ -320,4 +320,22 @@ Execute **AP-1** only, then **AP-2** with commit groups — still **no deploy** 
 
 ---
 
-*End of Gate 1B assessment. No Git commands were run beyond read-only inspection (`log`, `show`, `diff`, `status`, `merge-base`).*
+## Execution record (AP-1 – AP-3, authorised 2026-11-04)
+
+| Step | Status | Evidence |
+|------|--------|----------|
+| **AP-1** | Done | Filesystem backup: `C:\Users\cash\OneDrive\DOCUMENTS\PROJECTS\ziricai-backup-pre-gate1b-20261104` (robocopy, `node_modules` excluded). Tag `backup/pre-gate1b-2026-11-04` on `7b9ddb6`. |
+| **AP-2** | Done | Branch **`programme/sarah-u1-u5-r0`**: C1 docs → C5 revenue → C2 U1 → C3 U2–U3 → C4 U4–U5 → C6 API → C7 tests (8 commits on branch before merge). |
+| **AP-3** | Done | Merged **`origin/main`** (`3d0e132`); `api/app.js` = origin G1–G6 gateway + Sarah mounts; gateway spec from origin. Follow-up commit **`5618d0a`** adds consumer Firestore path helpers omitted from staged set. |
+| **AP-4** | Pending | Portal/finance/admin/marketing WIP in stash **`gate1b-ap4-wip pre-merge`** — not restored. |
+| **AP-5** | Partial | Sarah U1–U5 + R0 + `whatsapp-gateway-routing` + `whatsapp-gateway-readiness` tests **pass** on programme branch. |
+| **AP-6** | **Not authorised** | `main` unchanged; **no push**. |
+
+**Merge blockers handled:** Untracked gateway artefacts that duplicated `origin/main` were moved to  
+`…\gate1b-untracked-merge-blockers\` under the AP-1 backup tree before merge.
+
+**Next approval:** AP-4 (WIP triage), AP-5 (full matrix if portal commits included), AP-6 (merge programme branch → `main` / push).
+
+---
+
+*End of Gate 1B plan and AP-1–AP-3 execution record.*
