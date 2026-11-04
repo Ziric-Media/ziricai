@@ -22,6 +22,14 @@ export const API_VERSION = "1";
 /** @type {RouteDefinition[]} */
 export const ROUTE_CATALOG = [
     // Health & platform
+    { method: "POST", path: "/api/users/bootstrap", domain: "consumer", tenantScoped: false, description: "Sarah App consumer profile bootstrap" },
+    { method: "GET", path: "/api/users/profile", domain: "consumer", tenantScoped: false, description: "Sarah App consumer profile + preferences" },
+    { method: "PATCH", path: "/api/users/profile", domain: "consumer", tenantScoped: false, description: "Update Sarah App consumer profile" },
+    { method: "POST", path: "/api/personal-sarah/chat", domain: "consumer", tenantScoped: false, description: "Personal Sarah assistant chat" },
+    { method: "GET", path: "/api/personal-sarah/sessions/active", domain: "consumer", tenantScoped: false, description: "Latest Personal Sarah session" },
+    { method: "GET", path: "/api/personal-knowledge/sections", domain: "consumer", tenantScoped: false, description: "My Knowledge sections" },
+    { method: "PUT", path: "/api/personal-knowledge/sections/:sectionKey", domain: "consumer", tenantScoped: false, description: "Update My Knowledge section" },
+
     { method: "GET", path: "/api/health", domain: "platform", tenantScoped: false, description: "Public liveness probe (status + timestamp)" },
     { method: "GET", path: "/health", domain: "platform", tenantScoped: false, description: "Public liveness probe alias (status + timestamp)" },
     { method: "GET", path: "/api/platform/health", domain: "platform", tenantScoped: false, description: "Full operational diagnostics (platform auth)" },
@@ -74,6 +82,7 @@ export const ROUTE_CATALOG = [
     { method: "DELETE", path: "/api/companies/:companyId/departments/:deptId", domain: "workspace", tenantScoped: true, description: "Delete department" },
     { method: "GET", path: "/api/companies/:companyId/team", domain: "workspace", tenantScoped: true, description: "Team roster" },
     { method: "POST", path: "/api/companies/:companyId/team/invite", domain: "workspace", tenantScoped: true, description: "Invite team member (stub)" },
+    { method: "POST", path: "/api/companies/:companyId/team/members", domain: "workspace", tenantScoped: true, description: "Create team member portal login" },
     { method: "PATCH", path: "/api/companies/:companyId/team/:uid", domain: "workspace", tenantScoped: true, description: "Update member role" },
 
     // Analytics
@@ -151,6 +160,29 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/billing/plans", domain: "billing", tenantScoped: false, description: "Plan catalog" },
     { method: "GET", path: "/api/billing/plans/:planId", domain: "billing", tenantScoped: false, description: "Plan detail" },
     { method: "POST", path: "/api/billing/check-limit", domain: "billing", tenantScoped: false, description: "Plan limit check" },
+
+    // Revenue Management (R0)
+    { method: "GET", path: "/api/revenue/catalogue/public", domain: "revenue", tenantScoped: false, description: "Public SKU catalogue" },
+    { method: "GET", path: "/api/revenue/catalogue/skus/:skuId", domain: "revenue", tenantScoped: false, description: "SKU detail" },
+    { method: "GET", path: "/api/revenue/entitlements/me", domain: "revenue", tenantScoped: false, description: "Consumer entitlements" },
+    { method: "GET", path: "/api/revenue/config/public", domain: "revenue", tenantScoped: false, description: "Commercial activation flags (read)" },
+    { method: "GET", path: "/api/platform/revenue/config", domain: "platform", tenantScoped: false, description: "MC revenue config" },
+    { method: "GET", path: "/api/platform/revenue/catalogue", domain: "platform", tenantScoped: false, description: "MC full catalogue" },
+    { method: "GET", path: "/api/platform/revenue/ledger", domain: "platform", tenantScoped: false, description: "MC revenue ledger" },
+    { method: "POST", path: "/api/platform/revenue/ledger/dry-run", domain: "platform", tenantScoped: false, description: "MC ledger dry-run" },
+
+    // Sarah Network (U4)
+    { method: "POST", path: "/api/sarah-network/grants", domain: "consumer", tenantScoped: false, description: "Create consent grant" },
+    { method: "GET", path: "/api/sarah-network/grants/:grantId", domain: "consumer", tenantScoped: false, description: "Get consent grant" },
+    { method: "POST", path: "/api/sarah-network/enquiries", domain: "consumer", tenantScoped: false, description: "Personal→Company enquiry" },
+    { method: "GET", path: "/api/sarah-network/requests", domain: "consumer", tenantScoped: false, description: "List network requests" },
+    { method: "GET", path: "/api/sarah-network/requests/:requestId", domain: "consumer", tenantScoped: false, description: "Get network request" },
+
+    // U5 — Company conversations
+    { method: "GET", path: "/api/discover/companies", domain: "consumer", tenantScoped: false, description: "Pilot discover list" },
+    { method: "GET", path: "/api/user-conversations", domain: "consumer", tenantScoped: false, description: "User chat list" },
+    { method: "GET", path: "/api/user-conversations/:companyId/messages", domain: "consumer", tenantScoped: false, description: "Company chat history" },
+    { method: "POST", path: "/api/user-conversations/:companyId/messages", domain: "consumer", tenantScoped: false, description: "Send company Sarah message" },
 
     // Onboarding
     { method: "GET", path: "/api/onboarding/industries", domain: "onboarding", tenantScoped: false, description: "Industry list" },

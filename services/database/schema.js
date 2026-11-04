@@ -6,7 +6,20 @@
 export const ROOT = {
     COMPANIES: "companies",
     USERS: "users",
+    /** Sarah App consumer profile (one doc per uid). */
+    USER_PROFILES: "userProfiles",
+    USER_PREFERENCES: "userPreferences",
+    /** Sarah App — personal assistant data under personalSarah/{uid}/… */
+    PERSONAL_SARAH: "personalSarah",
+    /** My Knowledge sections under personalKnowledge/{uid}/sections/… */
+    PERSONAL_KNOWLEDGE: "personalKnowledge",
     PLATFORM: "platform",
+};
+
+export const PERSONAL_SARAH_COLLECTIONS = {
+    SESSIONS: "sessions",
+    TASKS: "tasks",
+    MEMORIES: "memories",
 };
 
 /** Subcollections under companies/{companyId} */
@@ -21,6 +34,9 @@ export const TENANT_COLLECTIONS = {
     LEADS: "leads",
     CUSTOMERS: "customers",
     APPOINTMENTS: "appointments",
+    DENTAL_PATIENTS: "dentalPatients",
+    DENTAL_CLAIMS: "dentalClaims",
+    DENTAL_SALES: "dentalSales",
     TASKS: "tasks",
     /** Company Portal Finance v1 — tenant business ledger (not subscription billing). */
     FINANCE_TRANSACTIONS: "financeTransactions",
@@ -85,6 +101,34 @@ export const PLATFORM_MARKETPLACE = {
     REVIEWS: "reviews",
     RATINGS: "ratings",
 };
+
+/** Revenue Management System (R0+) — under platform/revenue/… */
+export const PLATFORM_REVENUE = {
+    ROOT: "revenue",
+    PRICING_CATALOG: "pricingCatalog",
+    REVENUE_LEDGER: "revenueLedger",
+    REVENUE_CONFIG: "revenueConfig",
+    LEGACY_ALIASES: "legacyPlanAliases",
+};
+
+export function platformRevenueLedgerPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_REVENUE.ROOT}/${PLATFORM_REVENUE.REVENUE_LEDGER}`;
+}
+
+export function platformRevenueConfigPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_REVENUE.ROOT}/${PLATFORM_REVENUE.REVENUE_CONFIG}`;
+}
+
+/** Sarah Network (U4+) — server writes only until rules ship */
+export const SARAH_NETWORK = {
+    ROOT: "sarahNetwork",
+    REQUESTS: "requests",
+    AUDIT: "audit",
+};
+
+export function sarahNetworkRequestPath(requestId) {
+    return `${SARAH_NETWORK.ROOT}/${SARAH_NETWORK.REQUESTS}/${requestId}`;
+}
 
 /** Legacy root-level collections (Phase 1 migration — superadmin / server only) */
 export const LEGACY_COLLECTIONS = {
