@@ -1,0 +1,239 @@
+{
+  "reason": "G3 authorized duplicate 3699 remediation (2026-11-01)",
+  "snapshots": [
+    {
+      "companyId": "central-motors-rtb",
+      "integrationDocId": "whatsapp",
+      "integrationPath": "companies/central-motors-rtb/integrations/whatsapp",
+      "integration": {
+        "companyId": "central-motors-rtb",
+        "provider": "whatsapp",
+        "channel": "whatsapp",
+        "credentialsSource": "env",
+        "businessAccountId": null,
+        "displayPhoneNumber": null,
+        "phoneNumberId": "1209265748933699",
+        "status": "active",
+        "updatedAt": {
+          "_seconds": 1789427272,
+          "_nanoseconds": 352000000
+        }
+      },
+      "company": {
+        "id": "central-motors-rtb",
+        "name": "Central Motors Rustenburg",
+        "industry": "Automotive",
+        "status": "active",
+        "email": "info@centralmotorsrtb.co.za",
+        "phone": "+27 14 000 0000",
+        "website": "https://centralmotorsrtb.co.za",
+        "owner": "",
+        "ownerEmail": "",
+        "ownerId": null,
+        "ownerUid": null,
+        "whatsappNumber": "",
+        "whatsappConnected": true,
+        "branding": {
+          "primaryColor": "#1e40af",
+          "whatsappGreeting": "Hi! Welcome to Central Motors Rustenburg. How can we help you today?"
+        },
+        "settings": {},
+        "provisionedAt": null,
+        "createdAt": {
+          "_seconds": 1788440176,
+          "_nanoseconds": 754000000
+        },
+        "plan": "starter",
+        "organizationType": null,
+        "sectorId": null,
+        "environment": null,
+        "proactiveMonitoring": null,
+        "industryPresetId": "automotive-dealership",
+        "industryPresetActivatedAt": "2026-10-23T18:37:41.415Z",
+        "industryPresetVersion": "1.0.0",
+        "sector": null,
+        "industryPresetOverrides": null,
+        "organisationType": null,
+        "updatedAt": {
+          "_seconds": 1792780662,
+          "_nanoseconds": 28000000
+        }
+      },
+      "capturedAt": "2026-11-01T00:12:59.113Z"
+    },
+    {
+      "companyId": "p0-2-final-muaguvq8-usmg",
+      "integrationDocId": "6r1ETG9GdBaQkYixZGkt",
+      "integrationPath": "companies/p0-2-final-muaguvq8-usmg/integrations/6r1ETG9GdBaQkYixZGkt",
+      "integration": {
+        "provider": "whatsapp",
+        "channel": "whatsapp",
+        "status": "connected",
+        "simulated": false,
+        "phoneNumberId": "***3699",
+        "webhookUrl": "/webhook",
+        "connectedAt": "2026-09-20T23:47:51.209Z",
+        "companyId": "p0-2-final-muaguvq8-usmg",
+        "createdAt": {
+          "_seconds": 1789948071,
+          "_nanoseconds": 310000000
+        },
+        "updatedAt": {
+          "_seconds": 1789948071,
+          "_nanoseconds": 310000000
+        }
+      },
+      "company": {
+        "id": "p0-2-final-muaguvq8-usmg",
+        "name": "P0-2 Final muaguvq8",
+        "industry": "",
+        "plan": "trial",
+        "status": "active",
+        "email": "p0-2-final-owner-1789948055338@ziricai-p0-2.invalid",
+        "phone": "",
+        "website": "",
+        "owner": "P0-2 Final Owner",
+        "ownerEmail": "p0-2-final-owner-1789948055338@ziricai-p0-2.invalid",
+        "ownerId": "gCgXQ9tzbsMF1D6MgbMMroU0TXa2",
+        "ownerUid": "gCgXQ9tzbsMF1D6MgbMMroU0TXa2",
+        "branding": {
+          "primaryColor": "#1e40af",
+          "whatsappGreeting": "Hi! Welcome to P0-2 Final muaguvq8. How can we help you today?"
+        },
+        "provisionedAt": "2026-09-20T23:47:32.793Z",
+        "createdAt": {
+          "_seconds": 1789948052,
+          "_nanoseconds": 839000000
+        },
+        "settings": {
+          "marketplace": {
+            "catalogAccess": true,
+            "enabledAt": "2026-09-20T23:47:38.724Z",
+            "enabled": true
+          }
+        },
+        "updatedAt": {
+          "_seconds": 1789948058,
+          "_nanoseconds": 827000000
+        }
+      },
+      "capturedAt": "2026-11-01T00:13:00.761Z"
+    },
+    {
+      "companyId": "p0-2-final-muagwqwu-wnn1",
+      "integrationDocId": "gJcnoaoB6LdohKGfHQm0",
+      "integrationPath": "companies/p0-2-final-muagwqwu-wnn1/integrations/gJcnoaoB6LdohKGfHQm0",
+      "integration": {
+        "provider": "whatsapp",
+        "channel": "whatsapp",
+        "status": "connected",
+        "simulated": false,
+        "phoneNumberId": "***3699",
+        "webhookUrl": "/webhook",
+        "connectedAt": "2026-09-20T23:49:13.051Z",
+        "companyId": "p0-2-final-muagwqwu-wnn1",
+        "createdAt": {
+          "_seconds": 1789948153,
+          "_nanoseconds": 164000000
+        },
+        "updatedAt": {
+          "_seconds": 1789948153,
+          "_nanoseconds": 164000000
+        }
+      },
+      "company": {
+        "id": "p0-2-final-muagwqwu-wnn1",
+        "name": "P0-2 Final muagwqwu",
+        "industry": "",
+        "plan": "trial",
+        "status": "active",
+        "email": "p0-2-final-owner-1789948142593@ziricai-p0-2.invalid",
+        "phone": "",
+        "website": "",
+        "owner": "P0-2 Final Owner",
+        "ownerEmail": "p0-2-final-owner-1789948142593@ziricai-p0-2.invalid",
+        "ownerId": "NhB45X2rsFM0n0ETYLRgY0XzVnL2",
+        "ownerUid": "NhB45X2rsFM0n0ETYLRgY0XzVnL2",
+        "branding": {
+          "primaryColor": "#1e40af",
+          "whatsappGreeting": "Hi! Welcome to P0-2 Final muagwqwu. How can we help you today?"
+        },
+        "provisionedAt": "2026-09-20T23:48:59.503Z",
+        "createdAt": {
+          "_seconds": 1789948139,
+          "_nanoseconds": 546000000
+        },
+        "settings": {
+          "marketplace": {
+            "catalogAccess": true,
+            "enabledAt": "2026-09-20T23:49:04.119Z",
+            "enabled": true
+          }
+        },
+        "updatedAt": {
+          "_seconds": 1789948144,
+          "_nanoseconds": 214000000
+        }
+      },
+      "capturedAt": "2026-11-01T00:13:02.281Z"
+    },
+    {
+      "companyId": "p0-2c-live-muag3zbz-3vzt",
+      "integrationDocId": "QQqrFemgCc38vnTJronN",
+      "integrationPath": "companies/p0-2c-live-muag3zbz-3vzt/integrations/QQqrFemgCc38vnTJronN",
+      "integration": {
+        "provider": "whatsapp",
+        "channel": "whatsapp",
+        "status": "connected",
+        "simulated": false,
+        "phoneNumberId": "***3699",
+        "webhookUrl": "/webhook",
+        "connectedAt": "2026-09-20T23:26:45.962Z",
+        "companyId": "p0-2c-live-muag3zbz-3vzt",
+        "createdAt": {
+          "_seconds": 1789946806,
+          "_nanoseconds": 64000000
+        },
+        "updatedAt": {
+          "_seconds": 1789946806,
+          "_nanoseconds": 64000000
+        }
+      },
+      "company": {
+        "id": "p0-2c-live-muag3zbz-3vzt",
+        "name": "P0-2c Live muag3zbz",
+        "industry": "",
+        "plan": "trial",
+        "status": "active",
+        "email": "p0-2c-live-owner-1789946800216@ziricai-p0-2c.invalid",
+        "phone": "",
+        "website": "",
+        "owner": "P0-2c Live Owner",
+        "ownerEmail": "p0-2c-live-owner-1789946800216@ziricai-p0-2c.invalid",
+        "ownerId": "JE6TL8OcJwVp2J7wLlspiwrSCt93",
+        "ownerUid": "JE6TL8OcJwVp2J7wLlspiwrSCt93",
+        "branding": {
+          "primaryColor": "#1e40af",
+          "whatsappGreeting": "Hi! Welcome to P0-2c Live muag3zbz. How can we help you today?"
+        },
+        "provisionedAt": "2026-09-20T23:26:37.307Z",
+        "createdAt": {
+          "_seconds": 1789946797,
+          "_nanoseconds": 358000000
+        },
+        "settings": {
+          "marketplace": {
+            "catalogAccess": true,
+            "enabledAt": "2026-09-20T23:26:42.265Z",
+            "enabled": true
+          }
+        },
+        "updatedAt": {
+          "_seconds": 1789946802,
+          "_nanoseconds": 364000000
+        }
+      },
+      "capturedAt": "2026-11-01T00:13:03.781Z"
+    }
+  ]
+}

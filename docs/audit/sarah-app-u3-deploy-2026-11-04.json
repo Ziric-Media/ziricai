@@ -1,0 +1,25 @@
+{
+  "phase": "U3",
+  "date": "2026-11-04",
+  "railway": {
+    "deployments": ["00cf106a-4f8e-4341-a3c3-cfeddfc5a509", "1e7bb31b-a8dc-4ba9-b274-49c50bc24ac3"],
+    "includes": ["U1 consumer API", "U2 personal-sarah", "U3 personal-knowledge"]
+  },
+  "netlifySarahApp": {
+    "site": "ziricai-sarah",
+    "siteId": "6200fa94-47d4-4486-a21f-8bdfbedcdf83",
+    "deployId": "6aeb3a0afb95ef689dc5f341",
+    "url": "https://ziricai-sarah.netlify.app",
+    "customDomainPending": "sarah.ziricai.com"
+  },
+  "netlifyAppRestore": {
+    "note": "Accidental users deploy to ziricai-app was reverted",
+    "deployId": "6aeb392fe13b0bfc69b09cd3",
+    "url": "https://app.ziricai.com"
+  },
+  "manualRemaining": [
+    "Firebase Console: authorized domain sarah.ziricai.com + ziricai-sarah.netlify.app",
+    "firebase deploy --only firestore:rules",
+    "Netlify ziricai-sarah: add domain alias sarah.ziricai.com + DNS CNAME"
+  ]
+}

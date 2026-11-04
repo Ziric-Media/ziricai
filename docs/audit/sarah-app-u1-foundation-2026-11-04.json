@@ -1,0 +1,22 @@
+{
+  "phase": "U1",
+  "startedAt": "2026-11-04",
+  "u0Approved": true,
+  "delivered": [
+    "Consumer API: POST /api/users/bootstrap, GET/PATCH /api/users/profile",
+    "requireConsumerScope + consumerProfileService",
+    "Firestore rules userProfiles + userPreferences",
+    "Sarah App PWA shell (auth, 5-tab nav, placeholders)",
+    "prepare-sites users + users/netlify.toml (not deployed)"
+  ],
+  "notDeployed": [
+    "sarah.ziricai.com DNS",
+    "Netlify Sarah site",
+    "Firebase authorized domain",
+    "firestore.rules to production Firebase"
+  ],
+  "nextManual": [
+    "Deploy firestore.rules",
+    "Create Netlify site + Firebase authorized domain + DNS after first green build"
+  ]
+}

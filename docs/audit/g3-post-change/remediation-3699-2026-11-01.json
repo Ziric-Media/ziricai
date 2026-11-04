@@ -1,0 +1,89 @@
+{
+  "phase": "execute",
+  "authorization": "G3",
+  "snapshotPath": "C:\\Users\\cash\\OneDrive\\DOCUMENTS\\PROJECTS\\ziricai\\.g2-1-wt\\docs\\audit\\g3-pre-change\\snapshots-3699-2026-11-01.json",
+  "reportBefore": {
+    "summary": {
+      "phoneIdsInReport": 1,
+      "duplicateActivePhoneIds": 1,
+      "registryMisaligned": 1
+    },
+    "activeIntegrationCount": 4
+  },
+  "steps": [
+    {
+      "action": "deactivate",
+      "companyId": "p0-2-final-muaguvq8-usmg",
+      "integrationDocId": "6r1ETG9GdBaQkYixZGkt",
+      "previousStatus": "connected",
+      "newStatus": "disconnected"
+    },
+    {
+      "action": "deactivate",
+      "companyId": "p0-2-final-muagwqwu-wnn1",
+      "integrationDocId": "gJcnoaoB6LdohKGfHQm0",
+      "previousStatus": "connected",
+      "newStatus": "disconnected"
+    },
+    {
+      "action": "deactivate",
+      "companyId": "p0-2c-live-muag3zbz-3vzt",
+      "integrationDocId": "QQqrFemgCc38vnTJronN",
+      "previousStatus": "connected",
+      "newStatus": "disconnected"
+    },
+    {
+      "action": "verify_post_deactivate",
+      "activeIntegrationCount": 1,
+      "companyId": "central-motors-rtb"
+    },
+    {
+      "action": "registry_assign",
+      "success": true,
+      "number": {
+        "id": "wa-env-1209265748933699",
+        "label": "Ziric Meta sandbox (env)",
+        "displayPhoneNumber": null,
+        "phoneNumberId": "1209265748933699",
+        "wabaId": null,
+        "businessAccountId": null,
+        "metaBusinessId": null,
+        "connectionMethod": "managed",
+        "registrationStatus": "registered",
+        "allocationStatus": "assigned",
+        "status": "in_use",
+        "assignedCompanyId": "central-motors-rtb",
+        "assignedSarahId": null,
+        "assignedAt": "2026-11-01T00:13:22.541Z",
+        "releasedAt": null,
+        "registeredAt": "2026-09-30T22:46:44.038Z",
+        "credentialsSource": "env",
+        "kind": "test",
+        "notes": "Auto-seeded from PHONE_NUMBER_ID. Assign explicitly — never auto-leased on company create.",
+        "leaseId": "811eabbda41a",
+        "createdAt": "2026-09-30T22:46:44.038Z",
+        "updatedAt": "2026-11-01T00:13:22.541Z",
+        "allocationHistoryCount": 1,
+        "lastAllocationEvent": {
+          "at": "2026-11-01T00:13:22.541Z",
+          "action": "assigned",
+          "companyId": "central-motors-rtb",
+          "operatorId": "g3-execute-3699-remediation",
+          "reason": "G3 authorized duplicate 3699 remediation (2026-11-01)",
+          "leaseId": "811eabbda41a"
+        }
+      }
+    }
+  ],
+  "reportAfter": {
+    "summary": {
+      "phoneIdsInReport": 1,
+      "duplicateActivePhoneIds": 0,
+      "registryMisaligned": 0
+    },
+    "activeIntegrationCount": 1,
+    "registryVsTenantsAligned": true,
+    "registryAssigned": true
+  },
+  "success": true
+}

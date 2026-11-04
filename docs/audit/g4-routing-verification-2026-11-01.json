@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2026-11-01T00:22:28.633Z",
+  "routingMode": "primary",
+  "railwayVariable": "WHATSAPP_GATEWAY_REGISTRY_ROUTING=primary",
+  "deployCommit": "05e7533",
+  "allOk": true,
+  "results": [
+    {
+      "case": "managed_backbone_3699",
+      "phoneNumberIdMasked": "***3699",
+      "registryCompanyId": "central-motors-rtb",
+      "inboundCompanyId": "central-motors-rtb",
+      "inboundVia": "registry",
+      "ok": true
+    },
+    {
+      "case": "client_zero_byo",
+      "phoneNumberIdMasked": "***6157",
+      "inboundCompanyId": "ziricai",
+      "inboundVia": "legacy_unregistered_managed",
+      "ok": true,
+      "note": "No registry row; legacy integration fallback (Client Zero frozen)"
+    }
+  ]
+}
