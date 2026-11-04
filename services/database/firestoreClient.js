@@ -182,6 +182,46 @@ export function globalUserRef(uid) {
     return doc(db, ROOT.USERS, uid);
 }
 
+export function userProfileRef(uid) {
+    const path = `${ROOT.USER_PROFILES}/${uid}`;
+    if (useAdminBackend()) {
+        return { __path: path, __admin: getAdminFirestore().doc(path), id: uid };
+    }
+    return doc(db, ROOT.USER_PROFILES, uid);
+}
+
+export function userPreferencesRef(uid) {
+    const path = `${ROOT.USER_PREFERENCES}/${uid}`;
+    if (useAdminBackend()) {
+        return { __path: path, __admin: getAdminFirestore().doc(path), id: uid };
+    }
+    return doc(db, ROOT.USER_PREFERENCES, uid);
+}
+
+export function personalSarahDocRef(uid, subcollection, docId) {
+    const path = `${ROOT.PERSONAL_SARAH}/${uid}/${subcollection}/${docId}`;
+    if (useAdminBackend()) {
+        return { __path: path, __admin: getAdminFirestore().doc(path), id: docId };
+    }
+    return doc(db, ROOT.PERSONAL_SARAH, uid, subcollection, docId);
+}
+
+export function personalSarahCollectionRef(uid, subcollection) {
+    const path = `${ROOT.PERSONAL_SARAH}/${uid}/${subcollection}`;
+    if (useAdminBackend()) {
+        return { __path: path, __adminCol: getAdminFirestore().collection(path) };
+    }
+    return collection(db, ROOT.PERSONAL_SARAH, uid, subcollection);
+}
+
+export function personalKnowledgeSectionRef(uid, sectionKey) {
+    const path = `${ROOT.PERSONAL_KNOWLEDGE}/${uid}/sections/${sectionKey}`;
+    if (useAdminBackend()) {
+        return { __path: path, __admin: getAdminFirestore().doc(path), id: sectionKey };
+    }
+    return doc(db, ROOT.PERSONAL_KNOWLEDGE, uid, "sections", sectionKey);
+}
+
 export async function getDoc(ref) {
     if (ref?.__admin) {
         return normalizeSnap(await ref.__admin.get());
