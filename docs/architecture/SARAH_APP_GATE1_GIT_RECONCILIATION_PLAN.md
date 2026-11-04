@@ -324,7 +324,7 @@ Execute **AP-1** only, then **AP-2** with commit groups — still **no deploy** 
 
 | Step | Status | Evidence |
 |------|--------|----------|
-| **AP-1** | Done | Filesystem backup: `C:\Users\cash\OneDrive\DOCUMENTS\PROJECTS\ziricai-backup-pre-gate1b-20261104` (robocopy, `node_modules` excluded). Tag `backup/pre-gate1b-2026-11-04` on `7b9ddb6`. |
+| **AP-1** | Done | Filesystem backup: `C:\Users\cash\OneDrive\DOCUMENTS\PROJECTS\ziricai-backup-pre-gate1b-20261104` (robocopy, `node_modules` excluded; **refreshed** on stakeholder AP-1+2+3 authorisation). Tag `backup/pre-gate1b-2026-11-04` on `7b9ddb6`. |
 | **AP-2** | Done | Branch **`programme/sarah-u1-u5-r0`**: C1 docs → C5 revenue → C2 U1 → C3 U2–U3 → C4 U4–U5 → C6 API → C7 tests (8 commits on branch before merge). |
 | **AP-3** | Done | Merged **`origin/main`** (`3d0e132`); `api/app.js` = origin G1–G6 gateway + Sarah mounts; gateway spec from origin. Follow-up commit **`5618d0a`** adds consumer Firestore path helpers omitted from staged set. |
 | **AP-4** | Pending | Portal/finance/admin/marketing WIP in stash **`gate1b-ap4-wip pre-merge`** — not restored. |
