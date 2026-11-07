@@ -5,6 +5,10 @@ import OpenAI from "openai";
 import { bootstrapEnv } from "../../env/startupEnv.js";
 import { buildPersonalSarahContext, buildPersonalSarahSystemPrompt } from "./personalSarahContext.js";
 import {
+    buildFounderCompanyIdentityFullReferenceBlock,
+    userExplicitlyAsksFounderDetail,
+} from "../knowledge/founderCompanyIdentity.js";
+import {
     getOrCreatePersonalSarahSession,
     getPersonalSarahSessionHistory,
     appendPersonalSarahMessage,
@@ -74,7 +78,10 @@ export async function handlePersonalSarahChat(auth, input) {
     }
 
     const history = getPersonalSarahSessionHistory(session);
-    const systemPrompt = buildPersonalSarahSystemPrompt(ctx);
+    let systemPrompt = buildPersonalSarahSystemPrompt(ctx);
+    if (userExplicitlyAsksFounderDetail(message)) {
+        systemPrompt += `\n\n${buildFounderCompanyIdentityFullReferenceBlock()}`;
+    }
     const messages = [{ role: "system", content: systemPrompt }];
     for (const turn of history) {
         messages.push({ role: turn.role === "assistant" ? "assistant" : "user", content: turn.content });

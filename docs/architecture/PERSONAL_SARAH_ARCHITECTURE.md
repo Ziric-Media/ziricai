@@ -8,6 +8,8 @@
 
 Personal Sarah is a **distinct AI employee type**, not a Company Sarah prompt swap.
 
+**Founder & company identity:** Approved ZiricAI / Spencer Gore facts are injected via [`founderCompanyIdentity.js`](../../services/sarah/knowledge/founderCompanyIdentity.js) in [`personalSarahContext.js`](../../services/sarah/personal/personalSarahContext.js) — see [`docs/knowledge/ZIRICAI_FOUNDER_COMPANY_IDENTITY_PROFILE.md`](../knowledge/ZIRICAI_FOUNDER_COMPANY_IDENTITY_PROFILE.md).
+
 | Dimension | Personal Sarah | Company Sarah (portal) |
 |-----------|----------------|-------------------------|
 | Owner | User | Tenant |

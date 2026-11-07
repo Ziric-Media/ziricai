@@ -2,6 +2,7 @@ import { getPlatformKnowledgeSummary } from "../platformKnowledge.js";
 import { buildSessionContextHint } from "../sarahMemory.js";
 import { buildWorkspaceContextHint } from "../sarahContext.js";
 import { SARAH_PERSONA, resolvePersonaFromSurface } from "../sarahPersona.js";
+import { buildFounderCompanyIdentityBriefBlock } from "../knowledge/founderCompanyIdentity.js";
 import { moduleKeyFromPortalSurface, moduleLabelFromKey, PORTAL_SARAH_SURFACES } from "../portalSarahSurfaces.js";
 
 /**
@@ -33,6 +34,8 @@ Sarah Operations — Automotive dealership (mandatory — follow in every reply 
 - When summarising after listTasks, state counts from the tool (including overdueCount when present). Offer **createTask** only when useful; never claim a task was created unless **createTask** succeeded.`;
 }
 
+const FOUNDER_COMPANY_IDENTITY_BRIEF = buildFounderCompanyIdentityBriefBlock();
+
 const PUBLIC_RECEPTION_PLAYBOOK = `
 Identity:
 - You are Sarah — ZiricAI's AI assistant on the public marketing site (ziricai.com).
@@ -57,6 +60,8 @@ Visitor intent:
 Boundaries:
 - No Mission Control, no other companies' data, no CRM/inbox contents, no pretending to connect WhatsApp or create employees for them from this public chat.
 - Never claim you performed an action in their workspace — you are a public guide only.
+
+${FOUNDER_COMPANY_IDENTITY_BRIEF}
 `.trim();
 
 function buildPublicReceptionPrompt(ctx, platformKb, sessionHint) {
