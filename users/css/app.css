@@ -1810,11 +1810,12 @@
   min-height: 0;
   height: 100%;
   align-self: stretch;
-  padding: 10px 12px;
+  padding: 12px;
   gap: 6px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
+  align-content: center;
   box-sizing: border-box;
   min-width: 0;
 }
@@ -1833,8 +1834,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
 }
 
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-sub {
@@ -1887,8 +1887,9 @@
   }
 
   .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-card {
-    padding: 8px 10px;
+    padding: 10px;
     gap: 4px;
+    justify-content: center;
   }
 
   .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-title {
