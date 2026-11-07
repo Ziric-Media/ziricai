@@ -6,6 +6,15 @@ import { saveInboundMessage, saveOutboundMessage } from "../conversationService.
 import { getTenantConversationHistory } from "../storage/tenantStorage.js";
 import { getBusinessDirectoryEntry } from "./businessDirectoryService.js";
 import { getPortalCompanyAsync } from "../portal/portalDemo.js";
+import {
+    buildConsumerConversationId,
+    personIdFromUserId,
+} from "./identityContracts.js";
+import {
+    upsertConversation,
+    upsertMessage as upsertFirestoreMessage,
+} from "./userConversationFirestoreStore.js";
+import { useAdminBackend } from "../database/firestoreClient.js";
 
 const CHANNEL = "sarah_app";
 
@@ -18,8 +27,42 @@ function conversationKey(userId, companyId) {
     return `${companyId}::${userId}`;
 }
 
-function buildConversationId(userId, companyId) {
-    return `uc_${companyId}_${userId}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 180);
+function resolveUserConversationsBackend() {
+    const raw = String(process.env.USER_CONVERSATIONS_BACKEND || "memory").trim().toLowerCase();
+    if (raw === "dual" || raw === "firestore") return raw;
+    return "memory";
+}
+
+/** @returns {"memory"|"dual"|"firestore"} */
+export function getUserConversationsBackend() {
+    return resolveUserConversationsBackend();
+}
+
+function shouldMirrorToFirestore() {
+    const mode = resolveUserConversationsBackend();
+    return (mode === "dual" || mode === "firestore") && useAdminBackend();
+}
+
+async function mirrorConversationToFirestore(conv) {
+    if (!shouldMirrorToFirestore() || !conv) return;
+    try {
+        await upsertConversation(conv);
+    } catch (err) {
+        console.warn("[userConversationService] Firestore conversation upsert failed:", err.message);
+    }
+}
+
+async function mirrorMessageToFirestore(conv, entry) {
+    if (!shouldMirrorToFirestore() || !conv?.id || !entry?.id) return;
+    try {
+        await upsertFirestoreMessage(conv.id, entry, {
+            lastMessageAt: conv.lastMessageAt,
+            preview: conv.preview,
+            tenantConversationId: conv.tenantConversationId ?? null,
+        });
+    } catch (err) {
+        console.warn("[userConversationService] Firestore message upsert failed:", err.message);
+    }
 }
 
 async function resolveCompanyDisplayName(companyId) {
@@ -38,9 +81,11 @@ export async function openUserConversation(userId, companyId, meta = {}) {
     const key = conversationKey(userId, companyId);
     let conv = conversations.get(key);
     if (!conv) {
+        const personId = personIdFromUserId(userId);
         const companyName = await resolveCompanyDisplayName(companyId);
         conv = {
-            id: buildConversationId(userId, companyId),
+            id: buildConsumerConversationId(personId, companyId),
+            personId,
             userId,
             companyId,
             companyName,
@@ -53,6 +98,7 @@ export async function openUserConversation(userId, companyId, meta = {}) {
         };
         conversations.set(key, conv);
         messagesByConversation.set(conv.id, []);
+        await mirrorConversationToFirestore(conv);
     }
     return conv;
 }
@@ -81,12 +127,12 @@ export function getUserConversationMessages(conversationId) {
 
 /**
  * @param {object} conv
- * @param {{ role: string, content: string, source?: string }} message
+ * @param {{ role: string, content: string, source?: string, id?: string }} message
  */
 export async function appendUserConversationMessage(conv, message) {
     const list = messagesByConversation.get(conv.id) || [];
     const entry = {
-        id: randomUUID(),
+        id: message.id && String(message.id) ? String(message.id) : randomUUID(),
         role: message.role,
         content: String(message.content || ""),
         source: message.source || null,
@@ -123,6 +169,9 @@ export async function appendUserConversationMessage(conv, message) {
         });
     }
 
+    await mirrorMessageToFirestore(conv, entry);
+    await mirrorConversationToFirestore(conv);
+
     return entry;
 }
 
@@ -146,6 +195,7 @@ export async function syncMessagesFromTenant(conv, max = 50) {
         const last = mapped[mapped.length - 1];
         conv.preview = last.content.slice(0, 160);
         conv.lastMessageAt = last.createdAt;
+        await mirrorConversationToFirestore(conv);
     }
     return mapped;
 }

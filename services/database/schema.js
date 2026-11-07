@@ -20,6 +20,8 @@ export const PERSONAL_SARAH_COLLECTIONS = {
     SESSIONS: "sessions",
     TASKS: "tasks",
     MEMORIES: "memories",
+    /** Daily RS02 chat usage counters (personalSarah/{uid}/usage/{dayKey}). */
+    USAGE: "usage",
 };
 
 /** Subcollections under companies/{companyId} */
@@ -128,6 +130,39 @@ export const SARAH_NETWORK = {
 
 export function sarahNetworkRequestPath(requestId) {
     return `${SARAH_NETWORK.ROOT}/${SARAH_NETWORK.REQUESTS}/${requestId}`;
+}
+
+/** Sarah App consumer chat index (server writes only in C1). */
+export const USER_CONVERSATIONS = {
+    ROOT: "userConversations",
+    MESSAGES: "messages",
+};
+
+/** Published discover snapshot (U6; constants only in C1). */
+export const BUSINESS_DIRECTORY = {
+    ROOT: "businessDirectory",
+    SECTIONS: "sections",
+};
+
+/** Optional future platform person link index. */
+export const PERSON_LINKS = {
+    ROOT: "personLinks",
+};
+
+export function userConversationPath(conversationId) {
+    return `${USER_CONVERSATIONS.ROOT}/${conversationId}`;
+}
+
+export function userConversationMessagesCollectionPath(conversationId) {
+    return `${userConversationPath(conversationId)}/${USER_CONVERSATIONS.MESSAGES}`;
+}
+
+export function userConversationMessagePath(conversationId, messageId) {
+    return `${userConversationMessagesCollectionPath(conversationId)}/${messageId}`;
+}
+
+export function businessDirectoryPath(companyId) {
+    return `${BUSINESS_DIRECTORY.ROOT}/${companyId}`;
 }
 
 /** Legacy root-level collections (Phase 1 migration — superadmin / server only) */
@@ -432,6 +467,24 @@ export const INDEX_DEFINITIONS = [
             { fieldPath: "knowledgeBaseId", order: "ASCENDING" },
             { fieldPath: "updatedAt", order: "DESCENDING" },
         ],
+    },
+    {
+        collectionGroup: "userConversations",
+        fields: [
+            { fieldPath: "userId", order: "ASCENDING" },
+            { fieldPath: "lastMessageAt", order: "DESCENDING" },
+        ],
+    },
+    {
+        collectionGroup: "userConversations",
+        fields: [
+            { fieldPath: "personId", order: "ASCENDING" },
+            { fieldPath: "companyId", order: "ASCENDING" },
+        ],
+    },
+    {
+        collectionGroup: "messages",
+        fields: [{ fieldPath: "createdAt", order: "ASCENDING" }],
     },
 ];
 
