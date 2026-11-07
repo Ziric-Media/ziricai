@@ -3821,6 +3821,12 @@
   color: var(--color-text);
 }
 
+.ms-knowledge-input::placeholder,
+.ms-knowledge-textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
 .ms-knowledge-textarea {
   resize: vertical;
   min-height: 72px;

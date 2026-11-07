@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#5b21b6" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <style>
+    html,
+    body {
+      background: #ffffff;
+    }
+    /* Critical: splash must cover the viewport before app.css loads (stale SW cache otherwise shows branding in-flow at top). */
+    #appBootSplash.app-boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 24px 24px calc(24px + env(safe-area-inset-bottom, 0));
+      margin: 0;
+      background: #ffffff;
+      box-sizing: border-box;
+    }
+    #appBootSplash.app-boot-splash.is-hidden,
+    #appBootSplash.app-boot-splash[hidden] {
+      display: none !important;
+    }
+    #appBootSplash .app-boot-splash__brand {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 500;
+      color: #64748b;
+      letter-spacing: 0.02em;
+      font-family: Roboto, system-ui, sans-serif;
+      opacity: 1;
+      visibility: visible;
+      position: relative;
+      z-index: 2;
+      flex-shrink: 0;
+    }
+    #appBootSplash .app-boot-splash__logo {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 104px;
+      height: 104px;
+      object-fit: contain;
+    }
+  </style>
+  <meta name="apple-mobile-web-app-title" content="Sarah" />
+  <title>Sarah</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="assets/favicon.png?v=f8622d07173c-9d33bc3c" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=4" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/design-system.css?v=f8622d07173c-9d33bc3c" />
+  <link rel="stylesheet" href="css/icons.css?v=f8622d07173c-9d33bc3c" />
+  <link rel="stylesheet" href="css/app.css?v=f8622d07173c-9d33bc3c" />
+  <script src="js/boot-inline.js?v=f8622d07173c-9d33bc3c"></script>
+<script src="js/site-config.js?v=f8622d07173c-9d33bc3c"></script>
+</head>
+<body>
+  <div id="appBootSplash" class="app-boot-splash" role="status" aria-live="polite" aria-busy="true" aria-label="Loading Sarah">
+    <img class="app-boot-splash__logo sarah-brand-img" src="assets/sarah-avatar.svg?v=f8622d07173c-9d33bc3c" alt="Sarah" width="104" height="104" decoding="async" />
+    <p class="app-boot-splash__brand">Powered by ZiricAI</p>
+  </div>
+  <div class="app-frame">
+    <!-- Welcome -->
+    <section class="view is-active" data-view="welcome">
+      <div class="welcome-hero">
+        <div class="logo-ring"><img class="sarah-brand-img" src="assets/sarah-avatar.svg?v=f8622d07173c-9d33bc3c" alt="Sarah" width="72" height="72" /></div>
+        <h1>Sarah</h1>
+        <p>Your personal AI world — discover businesses, stay in control.</p>
+        <div class="welcome-features">
+          <div class="card">
+            <div class="icon">💬</div>
+            <div>
+              <strong>My Sarah</strong>
+              <p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">Private assistant and your knowledge, never shared without consent.</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="icon">🧭</div>
+            <div>
+              <strong>Discover &amp; connect</strong>
+              <p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">Find companies and talk to Company Sarah on your terms.</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="icon">🏠</div>
+            <div>
+              <strong>Home feed</strong>
+              <p style="margin:4px 0 0;font-size:13px;color:var(--color-text-secondary)">Follow creators and businesses on your Home feed.</p>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary" id="btnWelcomeContinue" style="width:100%" onclick="window.sarahNavigate('auth')">Get started</button>
+        <button type="button" class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="window.sarahNavigate('auth')">I already have an account</button>
+      </div>
+    </section>
+
+    <!-- Auth -->
+    <section class="view" data-view="auth">
+      <div class="top-bar">
+        <button type="button" class="ui-back-btn" onclick="location.hash='welcome'" aria-label="Back">
+          <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        </button>
+        <h1>Welcome</h1>
+        <span style="width:48px"></span>
+      </div>
+      <div class="screen-body">
+        <div class="auth-tabs">
+          <button type="button" class="is-active" data-auth-tab="signin">Sign in</button>
+          <button type="button" data-auth-tab="signup">Create account</button>
+        </div>
+        <p class="auth-live-hint" id="authLiveHint">Sign in with your Sarah account when live API is enabled (serve over http, not file://).</p>
+        <p class="auth-status" id="authStatus" role="status"></p>
+        <form id="signInPanel" class="auth-form">
+          <label><span>Email</span><input class="input" name="email" type="email" placeholder="you@example.com" autocomplete="email" required /></label>
+          <label><span>Password</span><input class="input" name="password" type="password" autocomplete="current-password" required /></label>
+          <button type="submit" class="btn btn-primary" style="width:100%">Sign in</button>
+        </form>
+        <form id="signUpPanel" class="auth-form hidden">
+          <label><span>First name</span><input class="input" name="firstName" type="text" placeholder="Alex" autocomplete="given-name" required /></label>
+          <label><span>Email</span><input class="input" name="email" type="email" autocomplete="email" required /></label>
+          <label><span>Password</span><input class="input" name="password" type="password" minlength="6" autocomplete="new-password" required /></label>
+          <label class="consent-row">
+            <input type="checkbox" name="popia" required />
+            <span>I agree to Sarah’s privacy terms and POPIA-oriented processing.</span>
+          </label>
+          <button type="submit" class="btn btn-primary" style="width:100%">Create account</button>
+        </form>
+        <button type="button" class="btn btn-ghost btn-auth-skip hidden" id="authMockContinue" style="width:100%;margin-top:8px">Continue with mock data only</button>
+      </div>
+    </section>
+
+    <!-- Home placeholder Wave 2 -->
+    <section class="view view--status" data-view="status">
+      <div class="home-top proto-home-header">
+        <header class="home-header home-header--status">
+          <div class="home-brand">
+            <img class="sarah-brand-img" src="assets/sarah-avatar.svg?v=f8622d07173c-9d33bc3c" alt="" width="36" height="36" />
+            <div class="home-brand-stack">
+              <span class="home-brand-text">Sarah</span>
+              <span class="home-brand-tagline">Your AI Assistant</span>
+            </div>
+          </div>
+          <div class="home-header-actions">
+            <button type="button" class="home-icon-btn home-tool-btn" id="statusSearchBtn" aria-label="Search Status">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+            </button>
+            <button type="button" class="home-icon-btn home-tool-btn" id="statusNotifBtn" aria-label="Notifications">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 01-3.46 0"/>
+              </svg>
+              <span class="home-notif-badge" id="statusNotifBadge">3</span>
+            </button>
+            <button type="button" class="home-icon-btn home-profile-btn" onclick="location.hash='profile'" aria-label="Profile">
+              <img class="avatar avatar-sm" data-user-avatar src="" alt="" width="36" height="36" />
+            </button>
+          </div>
+        </header>
+        <div class="home-intro">
+          <h5 class="home-greeting" id="homeGreeting">Good evening, Spencer</h5>
+        </div>
+      </div>
+      <div class="feed-tabs-wrap">
+        <div class="feed-tabs" id="feedTabs" role="tablist"></div>
+      </div>
+      <section class="feed-composer-section" aria-label="Create post">
+        <div class="feed-composer">
+          <img class="avatar avatar-sm feed-composer-avatar" data-user-avatar src="" alt="" width="40" height="40" />
+          <button type="button" class="feed-composer-input" data-create-post-open>Share an update on Status…</button>
+        </div>
+        <div class="feed-composer-actions">
+          <button type="button" class="feed-composer-action" onclick="location.hash='home'">
+            <img class="composer-sarah-mini sarah-brand-img" src="assets/sarah-avatar.svg?v=f8622d07173c-9d33bc3c" alt="" width="18" height="18" />
+            My Sarah
+          </button>
+          <button type="button" class="feed-composer-action" data-create-post-open>Post</button>
+          <button type="button" class="feed-composer-action">Photo</button>
+        </div>
+      </section>
+      <div class="feed-list" id="feedList"></div>
+    </section>
+
+    <!-- Discover — business directory -->
+    <section class="view discover-view" data-view="discover">
+      <header class="discover-top">
+        <span class="discover-top-spacer" aria-hidden="true"></span>
+        <h1 class="discover-top-title">Discover</h1>
+        <span class="discover-top-spacer" aria-hidden="true"></span>
+      </header>
+      <div class="discover-cats-wrap">
+        <div class="discover-cats" id="discoverCats" role="tablist"></div>
+      </div>
+      <div class="discover-grid" id="discoverGrid"></div>
+    </section>
+
+    <section class="view discover-company-view" data-view="discover-company">
+      <div id="companyDetailRoot"></div>
+    </section>
+
+    <!-- My Sarah -->
+    <section class="view my-sarah-view" data-view="home" data-ms-panel="home" data-ms-mode="chat">
+      <div class="ms-drawer-backdrop hidden" id="msDrawerBackdrop" aria-hidden="true"></div>
+      <aside class="ms-drawer hidden" id="msDrawer" aria-label="Personal Sarah menu" aria-hidden="true">
+        <header class="ms-drawer-head">
+          <button type="button" class="ms-drawer-brand" id="msDrawerBrand">
+            Personal Sarah
+            <svg class="icon-svg icon-svg--xs" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <button type="button" class="ms-drawer-icon-btn" id="msDrawerClose" aria-label="Close menu">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9 4v16" stroke="currentColor" stroke-width="1.5"/></svg>
+          </button>
+        </header>
+        <nav class="ms-drawer-nav" aria-label="Shortcuts">
+          <button type="button" class="ms-drawer-link" id="msDrawerNewChat">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+            New chat
+          </button>
+          <button type="button" class="ms-drawer-link" data-ms-drawer-panel="knowledge">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4.5A2.5 2.5 0 016.5 2H14l6 6v9.5A2.5 2.5 0 0117.5 20H6.5A2.5 2.5 0 014 17.5v-13z"/></svg>
+            My Knowledge
+          </button>
+          <button type="button" class="ms-drawer-link" data-ms-drawer-panel="billing">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+            Billing &amp; plan
+          </button>
+          <button type="button" class="ms-drawer-link" data-ms-drawer-panel="organisations">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.5 9.5-8 10-4.5-.5-8-5-8-10V6l8-4z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+            My Organisations
+          </button>
+          <button type="button" class="ms-drawer-link" data-ms-drawer-panel="wallet">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M16 12h2"/><path d="M2 10h20"/><path d="M6 6V4a2 2 0 012-2h8a2 2 0 012 2v2"/></svg>
+            My Wallet
+          </button>
+          <button type="button" class="ms-drawer-link" data-ms-drawer-panel="pay">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11V5a2 2 0 012-2h6l9 8-5 5-4-3-5 5-3-8z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M14 7h7M14 7v7" stroke="currentColor" stroke-width="1.5"/></svg>
+            Sarah Pay
+          </button>
+          <button type="button" class="ms-drawer-link" id="msDrawerCompanyChats">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"/></svg>
+            Company chats
+          </button>
+        </nav>
+        <section class="ms-drawer-recents" aria-label="Recent chats">
+          <header class="ms-drawer-recents-head">
+            <h2>Recents</h2>
+            <button type="button" class="ms-drawer-icon-btn ms-drawer-icon-btn--ghost" id="msDrawerNewChatSmall" aria-label="New chat">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+            </button>
+          </header>
+          <div class="ms-drawer-recents-list" id="msDrawerRecents"></div>
+        </section>
+        <footer class="ms-drawer-foot">
+          <img class="ms-drawer-user-avatar" data-user-avatar src="" alt="" width="36" height="36" />
+          <div class="ms-drawer-user-meta">
+            <span class="ms-drawer-user-name" data-profile-name>Spencer</span>
+            <span class="ms-drawer-user-plan">Sarah Free</span>
+          </div>
+        </footer>
+      </aside>
+
+      <header class="ms-top ms-top--hub" id="msTopHub">
+        <button type="button" class="ms-submodule-back" id="msSubmoduleBack" aria-label="Back to My Sarah home">
+          <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Home</span>
+        </button>
+        <h1 class="ms-submodule-title" id="msSubmoduleTitle"></h1>
+        <button type="button" class="ms-sidebar-toggle" id="msDrawerOpen" aria-label="Open menu" aria-expanded="false" aria-controls="msDrawer">
+          <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9 4v16" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+        <div class="ms-segment" role="tablist" aria-label="Chat or Work">
+          <button type="button" class="ms-segment-btn is-active" role="tab" id="msSegmentChat" data-ms-mode="chat" aria-selected="true">Chat</button>
+          <button type="button" class="ms-segment-btn" role="tab" id="msSegmentWork" data-ms-mode="work" aria-selected="false">Work</button>
+        </div>
+        <button type="button" class="ms-icon-tool" id="homeChatSearchBtn" aria-label="Search chats">
+          <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+        </button>
+      </header>
+      <p class="ms-live-status hidden" id="msLiveStatus" role="status"></p>
+
+      <div class="my-sarah-scroll">
+        <div class="ms-panel is-active" data-ms-panel="home" role="tabpanel">
+          <section class="ms-chat-zone" id="msChatZone" aria-label="Talk with Sarah">
+            <div class="ms-avatar-stage">
+              <span class="ms-ring ms-ring--outer" aria-hidden="true"></span>
+              <span class="ms-ring ms-ring--mid" aria-hidden="true"></span>
+              <span class="ms-ring ms-ring--inner" aria-hidden="true"></span>
+              <img class="ms-avatar-main sarah-brand-img" src="assets/sarah-avatar.svg?v=f8622d07173c-9d33bc3c" alt="Personal Sarah" width="120" height="120" />
+            </div>
+            <p class="ms-greeting-bubble">Hi, I'm Sarah! How can I assist you today?</p>
+            <div class="ms-quick-grid" id="msQuickGrid"></div>
+          </section>
+        </div>
+
+        <div class="ms-panel" data-ms-panel="tasks" role="tabpanel" hidden>
+          <h5 class="ms-headline">Tell Sarah what to get done</h5>
+          <p class="ms-work-lead">Work mode is for tasks — reminders, follow-ups, and actions Sarah runs on your behalf (prototype).</p>
+
+          <div class="ms-action-grid">
+            <article class="ms-card ms-card--primary">
+              <h3 class="ms-card-title">Run a task with Sarah</h3>
+              <p class="ms-card-desc">Describe the outcome — approve a booking, nudge a business, or plan your week.</p>
+              <button type="button" class="ms-pill-btn" id="msStartWorkTask">
+                New work item
+                <svg class="icon-svg icon-svg--xs" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </button>
+            </article>
+            <div class="ms-card-stack">
+              <button type="button" class="ms-card ms-card--mini" data-ms-work-prompt="Approve my SmileMore booking and remind me if they don't reply.">
+                <span class="ms-mini-icon" aria-hidden="true">
+                  <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><path d="M9 12l2 2 4-4"/></svg>
+                </span>
+                <span class="ms-mini-label">Approve booking</span>
+                <span class="ms-mini-arrow" aria-hidden="true">
+                  <svg class="icon-svg icon-svg--xs" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H9M17 7v8"/></svg>
+                </span>
+              </button>
+              <button type="button" class="ms-card ms-card--mini" data-ms-work-prompt="Follow up with Central Motors about my test drive request.">
+                <span class="ms-mini-icon" aria-hidden="true">
+                  <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/></svg>
+                </span>
+                <span class="ms-mini-label">Follow up</span>
+                <span class="ms-mini-arrow" aria-hidden="true">
+                  <svg class="icon-svg icon-svg--xs" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H9M17 7v8"/></svg>
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <section class="ms-reminder" aria-label="Reminder">
+            <div class="ms-reminder-copy">
+              <span class="ms-reminder-label">Don't forget</span>
+              <p class="ms-reminder-text" id="msReminderText"></p>
+            </div>
+            <img class="ms-reminder-art sarah-brand-img" src="assets/sarah-avatar.svg?v=f8622d07173c-9d33bc3c" alt="" width="56" height="56" />
+          </section>
+
+          <section class="ms-history">
+            <header class="ms-section-head">
+              <h3>Recent work</h3>
+              <button type="button" class="ms-link-btn" data-ms-mode="chat">Open Chat</button>
+            </header>
+            <div class="ms-history-list" id="msHistoryList"></div>
+          </section>
+        </div>
+
+        <div class="ms-panel" data-ms-panel="knowledge" role="tabpanel" hidden>
+          <div id="mkHomeRoot" class="ms-knowledge-shell">
+            <header class="ms-knowledge-hero">
+              <h5 class="ms-knowledge-title">My Knowledge</h5>
+              <p class="ms-knowledge-lead">
+                Everything Sarah knows about you, under your control — built from what you add, what you upload, and what you approve from conversation.
+              </p>
+            </header>
+
+            <div class="ms-knowledge-toolbar">
+              <div class="search-bar search-bar--icon ms-knowledge-search">
+                <span class="search-bar-icon" aria-hidden="true">
+                  <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+                </span>
+                <input type="search" id="mkSearchInput" placeholder="Search My Knowledge" autocomplete="off" aria-label="Search My Knowledge" />
+              </div>
+              <div class="ms-knowledge-toolbar-actions">
+                <button type="button" class="ms-knowledge-tool-btn" id="mkBtnAdd" data-mk-action="add">
+                  <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                  Add
+                </button>
+                <button type="button" class="ms-knowledge-tool-btn" id="mkBtnUpload" data-mk-action="upload">
+                  <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                  Upload
+                </button>
+                <button type="button" class="ms-knowledge-tool-btn" id="mkBtnReview" data-mk-action="review">
+                  <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Review
+                </button>
+              </div>
+            </div>
+
+            <nav class="ms-knowledge-areas" id="mkAreasNav" aria-label="Knowledge areas"></nav>
+
+            <section class="ms-knowledge-section" aria-labelledby="mkUnderstandingHeading">
+              <div class="ms-knowledge-section-head">
+                <h3 class="ms-knowledge-section-title" id="mkUnderstandingHeading">Sarah's Understanding</h3>
+                <p class="ms-knowledge-section-desc">Approved memories Sarah can use — with source and confidence, not silent guesses.</p>
+              </div>
+              <div class="ms-knowledge-understanding" id="mkUnderstanding"></div>
+            </section>
+
+            <section class="ms-knowledge-section" aria-labelledby="mkActivityHeading">
+              <div class="ms-knowledge-section-head">
+                <h3 class="ms-knowledge-section-title" id="mkActivityHeading">Activity</h3>
+              </div>
+              <div class="ms-knowledge-activity" id="mkActivity"></div>
+            </section>
+
+            <section class="ms-knowledge-section" aria-labelledby="mkUploadHeading">
+              <div class="ms-knowledge-section-head">
+                <h3 class="ms-knowledge-section-title" id="mkUploadHeading">Uploaded files (MK‑04)</h3>
+                <p class="ms-knowledge-section-desc">
+                  Reference documents you picked from this device — only <strong>metadata</strong> is kept here until the API indexes content. Use <strong>Upload</strong> in the toolbar to add more.
+                </p>
+              </div>
+              <div class="ms-knowledge-upload-list" id="mkUploadList"></div>
+            </section>
+
+            <section class="ms-knowledge-section" aria-labelledby="mkCategoriesHeading">
+              <div class="ms-knowledge-section-head">
+                <h3 class="ms-knowledge-section-title" id="mkCategoriesHeading">Categories</h3>
+                <p class="ms-knowledge-section-desc">
+                  Each category has its own fields, permissions, and learning rules. Sensitive areas stay off until you opt in — structured editing ships category by category (MK‑02).
+                </p>
+              </div>
+              <p class="ms-knowledge-footnote" id="mkSearchEmpty" hidden>No categories match your search.</p>
+              <div class="ms-knowledge-grid" id="mkCategoryGrid"></div>
+            </section>
+
+            <footer class="ms-knowledge-proto-note">
+              <strong>Prototype.</strong> MK‑04 stores upload metadata in this browser; the server will ingest and index files later. MK‑05 stores memory approvals and edits in <code>sarah.prototype.myKnowledge.sarahUnderstanding.v1</code>.
+            </footer>
+          </div>
+          <div id="mkCategoryRoot" class="ms-knowledge-detail hidden" aria-live="polite"></div>
+
+          <div id="mkUploadModal" class="ms-knowledge-upload-modal hidden" role="dialog" aria-modal="true" aria-labelledby="mkUploadModalTitle" aria-hidden="true">
+            <div class="ms-knowledge-upload-modal-backdrop" data-mk-upload-close tabindex="-1"></div>
+            <div class="ms-knowledge-upload-modal-panel">
+              <header class="ms-knowledge-upload-modal-head">
+                <h4 class="ms-knowledge-upload-modal-title" id="mkUploadModalTitle">Upload to My Knowledge</h4>
+                <button type="button" class="ms-knowledge-upload-modal-close" data-mk-upload-close aria-label="Close">&times;</button>
+              </header>
+              <p class="ms-knowledge-upload-modal-lead">
+                This prototype records file name, size, type, and optional link to a category — not file bytes on a server.
+              </p>
+              <div class="ms-knowledge-field-row">
+                <label class="ms-knowledge-label" for="mkUploadCategory">Link to category <span class="ms-knowledge-optional">(optional)</span></label>
+                <select class="ms-knowledge-input" id="mkUploadCategory"></select>
+              </div>
+              <div class="ms-knowledge-field-row">
+                <label class="ms-knowledge-label" for="mkUploadNote">Note <span class="ms-knowledge-optional">(optional)</span></label>
+                <textarea class="ms-knowledge-textarea" id="mkUploadNote" rows="2" placeholder="Why you’re adding this file…"></textarea>
+              </div>
+              <div class="ms-knowledge-upload-modal-actions">
+                <input type="file" id="mkUploadInput" class="ms-knowledge-upload-input" multiple />
+                <button type="button" class="btn btn-primary" id="mkUploadPick">Choose files</button>
+                <button type="button" class="btn btn-secondary" data-mk-upload-close>Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="mkSuggestionModal" class="ms-knowledge-upload-modal hidden" role="dialog" aria-modal="true" aria-labelledby="mkSuggestionModalTitle" aria-hidden="true">
+            <div class="ms-knowledge-upload-modal-backdrop" data-mk-suggestion-close tabindex="-1"></div>
+            <div class="ms-knowledge-upload-modal-panel">
+              <header class="ms-knowledge-upload-modal-head">
+                <h4 class="ms-knowledge-upload-modal-title" id="mkSuggestionModalTitle">Review suggestion</h4>
+                <button type="button" class="ms-knowledge-upload-modal-close" data-mk-suggestion-close aria-label="Close">&times;</button>
+              </header>
+              <p class="ms-knowledge-upload-modal-lead" id="mkSuggestionModalLead">Approve as-is, tweak the text, or remove it from Sarah&apos;s Understanding.</p>
+              <input type="hidden" id="mkSuggestionMemoryId" value="" />
+              <div class="ms-knowledge-field-row">
+                <label class="ms-knowledge-label" for="mkSuggestionType">Type</label>
+                <input class="ms-knowledge-input" id="mkSuggestionType" type="text" autocomplete="off" placeholder="e.g. Preferences, Goals" />
+              </div>
+              <div class="ms-knowledge-field-row">
+                <label class="ms-knowledge-label" for="mkSuggestionTitle">Title</label>
+                <input class="ms-knowledge-input" id="mkSuggestionTitle" type="text" autocomplete="off" placeholder="Short summary Sarah can use" />
+              </div>
+              <div class="ms-knowledge-field-row">
+                <label class="ms-knowledge-label" for="mkSuggestionSnippet">Detail</label>
+                <textarea class="ms-knowledge-textarea" id="mkSuggestionSnippet" rows="3" placeholder="Approve, edit, or remove — what Sarah remembered"></textarea>
+              </div>
+              <div class="ms-knowledge-field-row" id="mkSuggestionSourceRow">
+                <label class="ms-knowledge-label" for="mkSuggestionSource">Source note</label>
+                <input class="ms-knowledge-input" id="mkSuggestionSource" type="text" autocomplete="off" placeholder="Where this came from (chat, upload, suggestion)" />
+              </div>
+              <div class="ms-knowledge-suggestion-modal-actions" id="mkSuggestionModalActions">
+                <button type="button" class="btn btn-primary" id="mkSuggestionApprove">Approve &amp; save</button>
+                <button type="button" class="btn btn-secondary" id="mkSuggestionSaveEdit">Save changes</button>
+                <button type="button" class="btn btn-secondary" id="mkSuggestionNotNow">Not now</button>
+                <button type="button" class="ms-knowledge-chip-btn ms-knowledge-chip-btn--danger" id="mkSuggestionRemove">Remove</button>
+                <button type="button" class="btn btn-secondary" data-mk-suggestion-close>Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ms-panel" data-ms-panel="billing" role="tabpanel" hidden>
+          <h5 class="ms-headline">Sarah subscription</h5>
+          <p class="ms-billing-lead">RS02 consumer tiers (R0 catalogue — checkout inactive until Gate 6).</p>
+          <div class="ms-billing-tiers" id="msBillingTiers"></div>
+        </div>
+
+        <div class="ms-panel" data-ms-panel="organisations" role="tabpanel" hidden>
+          <div class="ms-organisations-shell" id="msOrganisationsRoot"></div>
+        </div>
+
+        <div class="ms-panel" data-ms-panel="wallet" role="tabpanel" hidden>
+          <div class="ms-organisations-shell" id="msWalletRoot"></div>
+        </div>
+
+        <div class="ms-panel" data-ms-panel="pay" role="tabpanel" hidden>
+          <div class="ms-organisations-shell" id="msSarahPayRoot"></div>
+        </div>
+      </div>
+
+      <form id="personalChatForm" class="ms-compose">
+        <button type="button" class="ms-compose-icon" aria-label="Add attachment">
+          <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <input type="text" id="personalChatInput" placeholder="Ask Sarah anything…" autocomplete="off" />
+        <button type="button" class="ms-compose-icon" aria-label="Voice input">
+          <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 00-3 3v6a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 11a7 7 0 01-14 0"/><path d="M12 18v3"/></svg>
+        </button>
+        <button type="submit" class="ms-send-btn" aria-label="Send">
+          <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+      </form>
+    </section>
+
+    <div id="sub01RegisterModal" class="ms-knowledge-upload-modal hidden" role="dialog" aria-modal="true" aria-labelledby="sub01RegisterTitle" aria-hidden="true">
+      <div class="ms-knowledge-upload-modal-backdrop" data-sub01-register-close tabindex="-1"></div>
+      <div class="ms-knowledge-upload-modal-panel">
+        <header class="ms-knowledge-upload-modal-head">
+          <h4 class="ms-knowledge-upload-modal-title" id="sub01RegisterTitle">Subscribe to organisation</h4>
+          <button type="button" class="ms-knowledge-upload-modal-close" data-sub01-register-close aria-label="Close">&times;</button>
+        </header>
+        <p class="ms-knowledge-upload-modal-lead" id="sub01RegisterLead">Link your existing relationship and choose how Sarah may deliver messages. Payment and debit permissions stay separate.</p>
+        <p class="sub01-register-org" id="sub01RegisterOrgName"></p>
+        <input type="hidden" id="sub01RegisterCompanyId" value="" />
+        <div class="ms-knowledge-field-row sub01-account-choice">
+          <span class="ms-knowledge-label">Do you already have an account with this organisation?</span>
+          <div class="sub01-radio-row">
+            <label class="sub01-radio"><input type="radio" name="sub01Account" id="sub01AccountYes" value="yes" checked /> Yes</label>
+            <label class="sub01-radio"><input type="radio" name="sub01Account" id="sub01AccountNo" value="no" /> No</label>
+          </div>
+        </div>
+        <div class="ms-knowledge-field-row">
+          <label class="ms-knowledge-label" for="sub01Reference">Account / membership / reference <span class="ms-knowledge-optional">(optional in prototype)</span></label>
+          <input class="ms-knowledge-input" id="sub01Reference" type="text" autocomplete="off" placeholder="Policy number, parent ref, patient file…" />
+        </div>
+        <div class="ms-knowledge-field-row">
+          <span class="ms-knowledge-label">Communication preferences</span>
+          <ul class="sub01-pref-list" role="list">
+            <li><label class="sub01-check"><input type="checkbox" id="sub01PrefNotify" checked /> General notifications</label></li>
+            <li><label class="sub01-check"><input type="checkbox" id="sub01PrefAnnounce" checked /> Announcements</label></li>
+            <li><label class="sub01-check"><input type="checkbox" id="sub01PrefRemind" checked /> Reminders</label></li>
+          </ul>
+        </div>
+        <p class="sub01-register-foot">SUB-01B · Verification is simulated here; production uses Company Portal + Sarah Network.</p>
+        <div class="ms-knowledge-upload-modal-actions sub01-register-actions">
+          <button type="button" class="btn btn-primary" id="sub01RegisterSubmit">Save subscription</button>
+          <button type="button" class="btn btn-secondary hidden" id="sub01RegisterRemove">Remove subscription</button>
+          <button type="button" class="btn btn-secondary" data-sub01-register-close>Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chats -->
+    <section class="view" data-view="chats">
+      <div class="top-bar"><h1>Chats</h1></div>
+      <div class="screen-body" style="padding:0">
+        <div style="padding:12px 16px">
+          <div class="search-bar search-bar--icon">
+            <span class="search-bar-icon" aria-hidden="true"><svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg></span>
+            <input type="search" id="chatsTabSearchInput" placeholder="Search chats" />
+          </div>
+        </div>
+        <div id="chatsList"></div>
+      </div>
+    </section>
+
+    <!-- Thread -->
+    <section class="view" data-view="chat-thread">
+      <div class="thread-header">
+        <button type="button" class="ui-back-btn" id="btnThreadBack" aria-label="Back">
+          <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        </button>
+        <div class="info">
+          <h2 class="thread-title" id="threadTitle">SmileMore Dental</h2>
+          <p id="threadSubtitle">Company Sarah · Active now</p>
+        </div>
+      </div>
+      <div class="screen-body thread-screen-body">
+        <div class="chat-log thread-chat-log" id="threadLog"></div>
+        <form class="compose-bar thread-compose" id="threadComposeForm">
+          <input type="text" id="threadComposeInput" placeholder="Ask Sarah anything…" autocomplete="off" />
+          <button type="submit" class="ms-send-btn thread-send-btn" aria-label="Send">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          </button>
+        </form>
+        <p class="thread-footnote" id="threadFootnote">Booking approvals &amp; Sarah Network consent — Wave 2 screens</p>
+      </div>
+    </section>
+
+    <!-- Profile — Persona (personal) vs Business (BP-01A): distinct environments -->
+    <section class="view profile-view" data-view="profile" data-profile-panel="public" data-profile-kind="persona">
+      <div class="profile-kind-toolbar" role="tablist" aria-label="Profile type">
+        <button type="button" class="profile-kind-btn is-active" id="profileKindPersona" data-profile-kind-set="persona" role="tab" aria-selected="true">Persona</button>
+        <button type="button" class="profile-kind-btn" id="profileKindBusiness" data-profile-kind-set="business" role="tab" aria-selected="false">Business</button>
+      </div>
+
+      <div class="profile-persona-panels" id="profilePersonaPanels">
+        <div class="profile-panel" id="profilePersonaPublicPanel">
+          <div class="profile-cover-wrap">
+            <img class="profile-cover" id="profileCover" src="assets/profile/spencer-cover.jpg" alt="" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/discover/green-haven-hero.jpg';}" />
+            <span class="profile-cover-shade" aria-hidden="true"></span>
+            <button type="button" class="profile-cover-btn">Cover photo</button>
+          </div>
+          <div class="profile-identity">
+            <img class="profile-avatar" data-profile-avatar data-profile-kind="persona" src="assets/profile/spencer-avatar.jpg" alt="" width="88" height="88" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/discover/green-haven-fallback.svg';}" />
+            <div class="profile-identity-row">
+              <div class="profile-name-block">
+                <h1 class="profile-name" data-profile-name data-profile-kind="persona">Spencer</h1>
+                <p class="profile-handle" id="profileHandle">@spencer · Joined 2026</p>
+              </div>
+              <div class="profile-identity-actions">
+                <span class="profile-verified" id="profileVerifiedBadge"></span>
+                <button type="button" class="profile-gear-btn" id="profileOpenAccount" aria-label="Account and privacy">
+                  <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+                </button>
+              </div>
+            </div>
+            <p class="profile-bio" id="profileBio"></p>
+            <p class="profile-meta" id="profileMeta"></p>
+            <div class="profile-stats" id="profileStats"></div>
+            <div class="profile-cta-row">
+              <button type="button" class="profile-btn profile-btn--primary" data-create-post-open>Create post</button>
+              <button type="button" class="profile-btn profile-btn--secondary">Edit profile</button>
+              <button type="button" class="profile-btn profile-btn--secondary profile-btn--icon">
+                <svg class="icon-svg icon-svg--xs" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v8h16v-8M12 16V4M8 8l4-4 4 4"/></svg>
+                Share
+              </button>
+            </div>
+          </div>
+          <div class="profile-sections-head">
+            <h2>Profile sections</h2>
+            <p class="profile-sections-hint">What others see on your public profile</p>
+          </div>
+          <div class="profile-social-tabs" role="tablist" id="profileSocialTabs">
+            <button type="button" class="profile-social-tab is-active" data-profile-tab="posts" role="tab">Posts</button>
+            <button type="button" class="profile-social-tab" data-profile-tab="photos" role="tab">Photos</button>
+            <button type="button" class="profile-social-tab" data-profile-tab="videos" role="tab">Videos</button>
+            <button type="button" class="profile-social-tab" data-profile-tab="saved" role="tab">Saved</button>
+          </div>
+          <div class="profile-social-body" id="profileSocialBody"></div>
+          <section class="profile-activity" aria-label="Recent activity">
+            <header class="profile-activity-head">
+              <h3>Recent activity</h3>
+              <button type="button" class="ms-link-btn">See all</button>
+            </header>
+            <div class="profile-activity-list" id="profileActivityList"></div>
+          </section>
+          <p class="profile-private-hint">
+            <button type="button" class="profile-link-btn" id="profileOpenAccountBottom">Account, Personal Sarah &amp; billing</button>
+            — private area, not shown publicly.
+          </p>
+        </div>
+
+        <div class="profile-panel profile-panel--account hidden" id="profilePersonaAccountPanel">
+          <header class="profile-account-top">
+            <button type="button" class="ui-back-btn ui-back-btn--plain" id="profileBackPublic" aria-label="Back to public profile">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <div>
+              <h1>Account</h1>
+              <p class="profile-account-sub">Private — only you can see this</p>
+            </div>
+          </header>
+          <div class="profile-split-callout">
+            <strong>Public vs private</strong>
+            <p>Your photo, bio, posts, and followers are public. Personal information, security, subscription, and My Knowledge live here.</p>
+          </div>
+          <div class="profile-account-sections" id="profileAccountSections"></div>
+        </div>
+      </div>
+
+      <div class="profile-business-panels hidden" id="profileBusinessPanels">
+        <div class="profile-panel hidden" id="profileBusinessPublicPanel">
+          <div class="profile-cover-wrap profile-cover-wrap--business">
+            <img class="profile-cover" id="profileBusinessCover" src="assets/profile/spencer-cover.jpg" alt="" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/discover/green-haven-hero.jpg';}" />
+            <span class="profile-cover-shade" aria-hidden="true"></span>
+            <span class="profile-business-badge" id="profileBusinessBadge">Business Profile · BP-01</span>
+          </div>
+          <div class="profile-identity">
+            <img class="profile-avatar" data-profile-avatar data-profile-kind="business" src="assets/profile/spencer-avatar.jpg" alt="" width="88" height="88" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/discover/green-haven-fallback.svg';}" />
+            <div class="profile-identity-row">
+              <div class="profile-name-block">
+                <h1 class="profile-name" data-profile-name data-profile-kind="business">Professional name</h1>
+                <p class="profile-handle" id="profileBusinessHandle">@handle · Business</p>
+              </div>
+              <div class="profile-identity-actions">
+                <span class="profile-verified" id="profileBusinessVerifiedBadge"></span>
+                <button type="button" class="profile-gear-btn" id="profileBusinessOpenAccount" aria-label="Business account and settings">
+                  <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+                </button>
+              </div>
+            </div>
+            <p class="profile-bio profile-bio--headline" id="profileBusinessHeadline"></p>
+            <p class="profile-bio" id="profileBusinessBio"></p>
+            <p class="profile-meta" id="profileBusinessMeta"></p>
+            <div class="profile-stats" id="profileBusinessStats"></div>
+          </div>
+          <div class="profile-sections-head">
+            <h2>Professional visibility</h2>
+            <p class="profile-sections-hint">What others see on your public Business Profile</p>
+          </div>
+          <div class="profile-social-tabs" role="tablist" id="profileBusinessSocialTabs">
+            <button type="button" class="profile-social-tab is-active" data-profile-biz-tab="posts" role="tab">Updates</button>
+            <button type="button" class="profile-social-tab" data-profile-biz-tab="about" role="tab">About</button>
+          </div>
+          <div class="profile-social-body" id="profileBusinessSocialBody"></div>
+          <section class="profile-activity" aria-label="Recent professional activity">
+            <header class="profile-activity-head">
+              <h3>Professional activity</h3>
+            </header>
+            <div class="profile-activity-list" id="profileBusinessActivityList"></div>
+          </section>
+          <p class="profile-private-hint">
+            <button type="button" class="profile-link-btn" id="profileBusinessOpenAccountBottom">Business account &amp; Business Sarah</button>
+            — private workspace, not shown publicly.
+          </p>
+        </div>
+
+        <div class="profile-panel profile-panel--account hidden" id="profileBusinessAccountPanel">
+          <header class="profile-account-top">
+            <button type="button" class="ui-back-btn ui-back-btn--plain" id="profileBusinessBackPublic" aria-label="Back to public business profile">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <div>
+              <h1>Business account</h1>
+              <p class="profile-account-sub">Professional · separate from Persona</p>
+            </div>
+          </header>
+          <div class="profile-split-callout">
+            <strong>BP-01</strong>
+            <p>Business Profile is a dedicated environment. Personal My Knowledge and Business My Knowledge stay separate. Company data follows Company Portal permissions.</p>
+          </div>
+          <div class="profile-account-sections" id="profileBusinessAccountSections"></div>
+        </div>
+      </div>
+    </section>
+    <div class="proto-sheet hidden" id="protoSearchSheet" role="dialog" aria-labelledby="protoSearchTitle" aria-hidden="true">
+      <div class="proto-sheet-backdrop" data-proto-sheet-close="search"></div>
+      <div class="proto-sheet-panel proto-sheet-panel--search">
+        <header class="proto-sheet-head">
+          <h2 id="protoSearchTitle">Search</h2>
+          <button type="button" class="ui-back-btn ui-back-btn--plain" data-proto-sheet-close="search" aria-label="Close">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </header>
+        <div class="search-bar search-bar--icon proto-search-input-wrap">
+          <span class="search-bar-icon" aria-hidden="true"><svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg></span>
+          <input type="search" id="protoSearchInput" placeholder="Search" autocomplete="off" />
+        </div>
+        <div class="proto-search-results" id="protoSearchResults"></div>
+      </div>
+    </div>
+
+    <div class="proto-sheet hidden" id="protoNotifSheet" role="dialog" aria-labelledby="protoNotifTitle" aria-hidden="true">
+      <div class="proto-sheet-backdrop" data-proto-sheet-close="notif"></div>
+      <div class="proto-sheet-panel">
+        <header class="proto-sheet-head">
+          <h2 id="protoNotifTitle">Notifications</h2>
+          <button type="button" class="ui-back-btn ui-back-btn--plain" data-proto-sheet-close="notif" aria-label="Close">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </header>
+        <div class="proto-notif-list" id="protoNotifList"></div>
+      </div>
+    </div>
+
+    <div class="proto-toast hidden" id="protoToast" role="status" aria-live="polite"></div>
+
+    <div class="create-post-sheet hidden" id="createPostSheet" role="dialog" aria-labelledby="createPostTitle" aria-hidden="true">
+      <div class="create-post-backdrop" data-create-post-close tabindex="-1"></div>
+      <div class="create-post-panel">
+        <header class="create-post-head">
+          <button type="button" class="ui-back-btn ui-back-btn--plain" data-create-post-close aria-label="Close">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+          <h2 id="createPostTitle">Create post</h2>
+          <button type="button" class="create-post-submit" id="createPostSubmit" disabled>Post</button>
+        </header>
+        <div class="create-post-body">
+          <img class="avatar avatar-sm create-post-avatar" data-user-avatar src="" alt="" width="40" height="40" />
+          <textarea id="createPostInput" class="create-post-input" rows="5" maxlength="500" placeholder="What's on your mind? Your post appears on Status and your profile."></textarea>
+        </div>
+        <p class="create-post-hint">Prototype — text posts only. Photos and links in a later wave.</p>
+      </div>
+    </div>
+
+    <div id="galleryLightbox" class="gallery-lightbox hidden" role="dialog" aria-label="Photo viewer" aria-hidden="true">
+      <div class="gallery-lightbox-backdrop" data-gallery-close tabindex="-1"></div>
+      <button type="button" class="gallery-lightbox-close" data-gallery-close aria-label="Close">&times;</button>
+      <button type="button" class="gallery-lightbox-nav gallery-lightbox-prev" id="galleryPrev" aria-label="Previous photo">&lsaquo;</button>
+      <div class="gallery-lightbox-stage" id="galleryStage">
+        <img id="galleryLightboxImg" alt="" />
+        <div class="gallery-lightbox-bar">
+          <button type="button" class="gallery-lightbox-like" id="galleryLightboxLike" aria-label="Like photo">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-4.2-8.8-7.4C1.5 11 2.6 7.5 5.8 6.4c1.8-.7 3.7-.2 5 1.3 1.3-1.5 3.2-2 5-1.3 3.2 1.1 4.3 4.6 2.6 7.2C18.5 16.8 12 21 12 21z"/></svg>
+            <span id="galleryLikeCount">0</span>
+          </button>
+          <span id="galleryLightboxCounter">1 / 1</span>
+        </div>
+      </div>
+      <button type="button" class="gallery-lightbox-nav gallery-lightbox-next" id="galleryNext" aria-label="Next photo">&rsaquo;</button>
+    </div>
+  </div>
+
+  <nav class="bottom-nav hidden" aria-label="Primary">
+    <button type="button" class="text-nav-label" data-route="home">
+      <span class="nav-icon"><svg class="icon-svg icon-svg--nav" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/></svg></span>
+      My Sarah
+    </button>
+    <button type="button" class="text-nav-label" data-route="status">
+      <span class="nav-icon"><svg class="icon-svg icon-svg--nav" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
+      Status
+    </button>
+    <button type="button" class="text-nav-label" data-route="discover">
+      <span class="nav-icon"><svg class="icon-svg icon-svg--nav" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="3"/></svg></span>
+      Discover
+    </button>
+    <button type="button" class="text-nav-label" data-route="chats">
+      <span class="nav-icon"><svg class="icon-svg icon-svg--nav" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"/></svg></span>
+      Chats
+    </button>
+    <button type="button" class="text-nav-label" data-route="profile">
+      <span class="nav-icon"><svg class="icon-svg icon-svg--nav" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></span>
+      Profile
+    </button>
+  </nav>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js",
+        "firebase/storage": "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js"
+      }
+    }
+    </script>
+  <script src="js/ziricai-config.js?v=f8622d07173c-9d33bc3c"></script>
+  <script type="module" src="js/live-bridge.mjs?v=f8622d07173c-9d33bc3c"></script>
+  <!-- Classic scripts (mock UI works on file://; live Sarah needs http + API) -->
+  <script src="js/icons.js?v=f8622d07173c-9d33bc3c"></script>
+  <script src="js/mock-data.js?v=f8622d07173c-9d33bc3c"></script>
+  <script src="js/thread-rich-text.js?v=f8622d07173c-9d33bc3c"></script>
+  <script src="js/app.js?v=f8622d07173c-9d33bc3c"></script>
+  <script defer>
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+      var ok =
+        window.isSecureContext ||
+        location.protocol === 'https:' ||
+        location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1';
+      if (!ok) return;
+      var refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function (err) {
+          console.warn('Service worker registration failed', err);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

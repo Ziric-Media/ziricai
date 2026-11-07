@@ -635,217 +635,71 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
      * MK-02: default "Personal identity" fields (merged with local edits in the prototype).
      */
     personalIdentity: {
-      fullName: 'Spencer Example',
-      preferredName: 'Spencer',
+      fullName: '',
+      preferredName: '',
       dateOfBirth: '',
-      preferredLanguage: 'English',
-      country: 'South Africa',
-      city: 'Johannesburg',
+      preferredLanguage: '',
+      country: '',
+      city: '',
       locationNote: '',
       nationalityBackground: '',
-      educationQualifications:
-        'Bachelor of Commerce (Information Systems). Short courses in product design and UX research.',
-      personalBiography:
-        'Product and design lead focusing on calmer consumer AI and local business tools. Building with Sarah day to day.',
-      importantLifeExperiences:
-        'Moved cities for a career pivot; regularly mentors junior designers through a local community programme.',
-      skillsExpertise:
-        'Product discovery, UX research, prototyping, stakeholder workshops, lightweight analytics.',
-      interestsHobbies: 'Running, speciality coffee, AI tooling, local independent businesses.',
-      enjoysDislikes:
-        'Enjoys: morning focus blocks, clear agendas, concise summaries.\nDislikes: vague meeting invites, endless notification noise.',
-      communicationPreferences:
-        'Prefer direct, structured replies. OK with occasional humour when the task is light.',
+      educationQualifications: '',
+      personalBiography: '',
+      importantLifeExperiences: '',
+      skillsExpertise: '',
+      interestsHobbies: '',
+      enjoysDislikes: '',
+      communicationPreferences: '',
       responseStyle: 'detailed',
-      personalValues:
-        'Honesty, respect for people’s time, and transparency about limits (especially for health and money topics).',
-      strengthsImprove:
-        'Strengths: clarifying messy problems, staying user-centred.\nImproving: saying no earlier to protect focus time.',
+      personalValues: '',
+      strengthsImprove: '',
     },
 
     /**
      * MK-02: Family & relationships — people rows (merged with local edits in the prototype).
      */
     familyRelationships: {
-      people: [
-        {
-          id: 'fam-1',
-          name: 'Alex Example',
-          relationship: 'spouse_partner',
-          birthday: '1988-03-15',
-          details: 'Prefers planning family trips a few months ahead; vegetarian meals when we host.',
-          reminders: 'Anniversary in September — usually plan something low-key.',
-        },
-        {
-          id: 'fam-2',
-          name: 'Jordan Example',
-          relationship: 'children',
-          birthday: '2016-11-02',
-          details: 'School pickup weekdays ~15:30 unless I say otherwise.',
-          reminders: '',
-        },
-      ],
+      people: [],
     },
 
     /**
      * MK-02: Goals & ambitions — goal rows (merged with local edits in the prototype).
      */
     goalsAmbitions: {
-      goals: [
-        {
-          id: 'goal-1',
-          title: 'Ship Sarah App My Knowledge to production path',
-          description: 'Structured knowledge + Personal Sarah integration on the programme branch.',
-          whyItMatters: 'Gives users a real long-term memory surface under their control.',
-          targetDate: '2026-06-30',
-          priority: 'high',
-          progress: 'MK-02 category editors live; API and graph next.',
-          milestones: 'MK-02 field editors\nMK-03 search CRUD\nMK-05 approvals',
-          challenges: 'Scope vs timeline; keeping privacy defaults strict.',
-          resources: 'Design spec, Firebase/Railway stubs, QA time.',
-          relatedAssignments: 'MS-01 chat sessions; documentation in docs/architecture.',
-          status: 'active',
-          goalKind: 'career',
-        },
-        {
-          id: 'goal-2',
-          title: 'Run a half-marathon',
-          description: 'Build volume safely with two strength days per week.',
-          whyItMatters: 'Energy and focus for work and family.',
-          targetDate: '2026-09-15',
-          priority: 'medium',
-          progress: 'Base running 3x/week.',
-          milestones: '10K comfortable by March\n16K long run by July',
-          challenges: 'Travel weeks — need flexible plan.',
-          resources: 'Local club; physio if niggles.',
-          relatedAssignments: '',
-          status: 'active',
-          goalKind: 'health_fitness',
-        },
-      ],
+      goals: [],
     },
 
     /**
      * MK-02: Work & professional life — employment roles (merged with local edits in the prototype).
      */
     workProfessional: {
-      roles: [
-        {
-          id: 'work-1',
-          slot: 'current',
-          jobTitle: 'Principal Product Designer',
-          employer: 'Ziricai (example)',
-          startDate: '2022-04-01',
-          endDate: '',
-          responsibilities:
-            'Own Sarah App consumer UX; partner with eng on MS milestones; run design reviews and proto handoff to users/ builds.',
-          qualifications: 'BCom IS; continuous learning in AI product patterns.',
-          skillsExpertise: 'Product discovery, design systems, prototyping, stakeholder alignment.',
-          projectsAssignments: 'My Knowledge MK-02; MS-01 Personal Sarah sessions.',
-          workingHoursRoutines: 'Deep work mornings; stand-ups mid-morning Tue/Thu.',
-          workplacePreferences: 'Async-first updates; prefers short video Loom over long meetings.',
-          professionalContacts: 'Design lead at partner org — intro via Sarah Network when relevant.',
-          experienceHighlights: 'Scaled a design workflow from ad-hoc Figma to shared library + proto pipeline.',
-          careerAmbitions: 'Grow consumer trust surface (My Knowledge, consent) without bloating the core chat.',
-          documentsNotes: 'CV PDF on laptop; portfolio case studies — not uploaded in prototype.',
-        },
-        {
-          id: 'work-2',
-          slot: 'previous',
-          jobTitle: 'Senior UX Designer',
-          employer: 'Earlier Co. (example)',
-          startDate: '2018-02-01',
-          endDate: '2022-03-15',
-          responsibilities: 'Led checkout redesign; mentored two mid-level designers.',
-          qualifications: '',
-          skillsExpertise: 'ResearchOps-lite, usability testing, design QA with engineering.',
-          projectsAssignments: 'Checkout conversion programme.',
-          workingHoursRoutines: '',
-          workplacePreferences: '',
-          professionalContacts: '',
-          experienceHighlights: 'Reduced checkout drop-off in pilot market.',
-          careerAmbitions: '',
-          documentsNotes: '',
-        },
-      ],
+      roles: [],
     },
 
     /**
      * MK-02: Business & entrepreneurship — separate venture profiles (merged with local edits in the prototype).
      */
     businessEntrepreneurship: {
-      ventures: [
-        {
-          id: 'biz-1',
-          businessName: 'Green Haven Cafe (side project)',
-          industry: 'Hospitality — speciality coffee',
-          userRole: 'Co-owner & ops design',
-          description:
-            'Neighbourhood cafe focused on oat-forward drinks and local bakery partnership. Exploring second location after Sarah App workload eases.',
-          productsServices: 'Espresso, filter coffee, pastry pairings, small retail beans.',
-          currentStage: 'Operating single site; evaluating expansion.',
-          objectives: 'Stabilise margins; hire assistant manager by Q3.',
-          keyContacts: 'Roaster rep — reorder Thursdays; landlord — lease renewal 2027.',
-          relatedDocuments: 'Lease PDF in Drive/Business/GreenHaven (not uploaded in prototype).',
-          currentProjects: 'Menu refresh for winter; supplier review.',
-          confidentialityLevel: 'confidential',
-        },
-        {
-          id: 'biz-2',
-          businessName: 'Studio prototype (idea)',
-          industry: 'Product design consulting',
-          userRole: 'Founder (not yet launched)',
-          description: 'Lightweight design advisory for local SMBs — on hold until My Knowledge ships.',
-          productsServices: 'Design audits, 2-week sprint workshops.',
-          currentStage: 'Ideation / pause',
-          objectives: 'Validate pricing with 3 pilots.',
-          keyContacts: '',
-          relatedDocuments: '',
-          currentProjects: '',
-          confidentialityLevel: 'internal',
-        },
-      ],
+      ventures: [],
     },
 
     /**
      * MK-02: Education & learning — formal programs, courses/certs, and ongoing learning context.
      */
     educationLearning: {
-      formalPrograms: [
-        {
-          id: 'edu-f1',
-          institution: 'University of Example',
-          qualification: 'BCom Information Systems',
-          studyArea: 'Information systems & design',
-          startDate: '2010-02',
-          endDate: '2013-12',
-          status: 'completed',
-          highlights: 'Dean’s list (year 2); capstone on mobile usability in retail.',
-          documentsNote: 'Transcript PDF in personal folder (not uploaded in prototype).',
-        },
-      ],
-      coursesAndCerts: [
-        {
-          id: 'edu-c1',
-          name: 'AI product patterns for consumer apps',
-          provider: 'Self-paced course (example)',
-          completedDate: '2025-06',
-          credential: 'Certificate of completion',
-          link: '',
-          notes: 'Modules on evaluation, safety framing, and progressive disclosure.',
-        },
-      ],
+      formalPrograms: [],
+      coursesAndCerts: [],
       learningContext: {
         currentStudies: '',
-        subjectsOfInterest: 'Consumer AI, trust & consent UX, local commerce, design systems.',
-        learningGoals: 'Deepen understanding of memory/knowledge graphs for My Knowledge MK-08.',
-        skillsDeveloping: 'Rapid prototyping with static sites; clearer API contract reviews.',
-        studySchedule: 'Saturday mornings ~2h; occasional weekday lunch sessions.',
-        learningPreferences: 'Prefer short modules with exercises; likes spaced repetition for facts.',
-        researchTopics: 'Long-term personal memory systems; SME adoption of AI assistants.',
-        readingList: 'Trustworthy AI (draft chapters); Regional restaurant tech reports.',
-        educationalDocumentsNote: 'Certificates folder on laptop; see MK‑04 for uploads.',
-      },
+        subjectsOfInterest: '',
+        learningGoals: '',
+        skillsDeveloping: '',
+        studySchedule: '',
+        learningPreferences: '',
+        researchTopics: '',
+        readingList: '',
+        educationalDocumentsNote: '',
+      }
     },
 
     /**
@@ -853,7 +707,7 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
      * Sarah must not treat chat as medical fact; medication decisions stay with you and your clinician.
      */
     healthWellbeing: {
-      generalNotes: 'Example (delete if you prefer): routine dental cleaning roughly every six months.',
+      generalNotes: '',
       conditionsDiagnoses: '',
       allergies: '',
       medications: '',
@@ -866,7 +720,7 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
       nutritionPreferences: '',
       sleepRoutines: '',
       wellbeingGoals: '',
-      healthReminders: '',
+      healthReminders: ''
     },
 
     /**
@@ -874,8 +728,7 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
      * Never store credentials, card numbers, or full account identifiers here.
      */
     financialLife: {
-      generalNotes:
-        'Example (delete if you prefer): prefers round-number household budgets; uses one primary everyday bank for day-to-day spend.',
+      generalNotes: '',
       incomeSources: '',
       monthlyBudgetOverview: '',
       expensesRecurring: '',
@@ -886,14 +739,14 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
       financialGoals: '',
       accountsInstitutionsNote: '',
       documentsRecordsNote: '',
-      financialReminders: '',
+      financialReminders: ''
     },
 
     /**
      * MK-02: Lifestyle & preferences — how you live, eat, travel, and spend downtime (merged with local edits).
      */
     lifestylePreferences: {
-      generalNotes: 'Example (delete if you prefer): prefers quiet weekday evenings, one longer outing on weekends, and tries new cuisines when dining out.',
+      generalNotes: '',
       dailyWeeklyRhythm: '',
       homeEnvironment: '',
       foodDiningPreferences: '',
@@ -903,7 +756,7 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
       socialLife: '',
       shoppingPreferences: '',
       petsHobbies: '',
-      lifestyleReminders: '',
+      lifestyleReminders: ''
     },
 
     /**
@@ -911,19 +764,7 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
      */
     importantDatesEvents: {
       generalNotes: '',
-      events: [
-        {
-          id: 'date-ex-1',
-          title: 'Example: passport renewal',
-          kind: 'renewal',
-          primaryDate: '',
-          endDate: '',
-          recurrenceNote: 'Roughly every 10 years — replace with your real date.',
-          remindPreference: 'Prefer a reminder 2–3 months before expiry.',
-          relatedPeople: '',
-          notes: 'Delete this row or edit when you add your own entries.',
-        },
-      ],
+      events: []
     },
 
     /**
@@ -931,27 +772,14 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
      */
     documentsRecords: {
       generalNotes: '',
-      records: [
-        {
-          id: 'doc-ex-1',
-          title: 'Example: passport copy',
-          kind: 'identity',
-          storageLocation: 'Personal folder “IDs” on laptop — not uploaded in prototype.',
-          issueDate: '',
-          expiryOrReviewDate: '',
-          relatedCategory: 'identity',
-          sensitivity: 'confidential',
-          notes: 'Replace with your real entries; MK‑04 will add secure uploads and indexing.',
-        },
-      ],
+      records: []
     },
 
     /**
      * MK-02: Routines & daily life — schedules, habits, recurring commitments (merged with local edits).
      */
     routinesDailyLife: {
-      generalNotes:
-        'Example (delete if you prefer): prefers deep work before noon when possible; keeps evenings lower intensity.',
+      generalNotes: '',
       typicalWeekday: '',
       typicalWeekend: '',
       morningRoutine: '',
@@ -960,7 +788,7 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
       householdErrands: '',
       habitsTracking: '',
       interruptionsConstraints: '',
-      routineReminders: '',
+      routineReminders: ''
     },
 
     /**
@@ -968,19 +796,7 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
      */
     propertyAssets: {
       generalNotes: '',
-      items: [
-        {
-          id: 'prop-ex-1',
-          label: 'Example: primary vehicle',
-          kind: 'vehicle',
-          description: 'Compact hatchback — replace with your make/model.',
-          location: '',
-          status: 'owned',
-          renewalsServices: 'Annual licence renewal; service roughly every 12 months.',
-          documentsNote: 'Registration papers in Documents when you add them.',
-          notes: 'Delete this row or edit with your real assets.',
-        },
-      ],
+      items: []
     },
 
     /**
@@ -989,35 +805,21 @@ Reply with the slot you prefer and I will hold it pending your confirmation.
     travelPlaces: {
       generalNotes: '',
       favoritePlaces: '',
-      trips: [
-        {
-          id: 'trip-ex-1',
-          title: 'Example: regional getaway',
-          kind: 'leisure',
-          destination: 'Example coast or winelands — replace with a place you care about.',
-          startDate: '',
-          endDate: '',
-          status: 'planned',
-          companions: '',
-          passportVisaNote: 'Check passport validity before booking (see Documents for scans).',
-          notes: 'Delete or edit this row when you add your own trips.',
-        },
-      ],
+      trips: []
     },
 
     /**
      * MK-02: Values & principles — private by default; optional mock line only (merged with local edits).
      */
     valuesPrinciples: {
-      coreValuesPrinciples:
-        'Example (delete if you prefer): honesty, kindness under pressure, and respect for people’s autonomy.',
+      coreValuesPrinciples: '',
       ethicalBoundaries: '',
       faithPhilosophy: '',
       causesCommunities: '',
       politicalCivicNote: '',
       relationshipConsentBoundaries: '',
       topicsToAvoid: '',
-      howSarahShouldWeigh: '',
+      howSarahShouldWeigh: ''
     },
     categories: [
       {

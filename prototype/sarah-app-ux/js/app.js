@@ -2238,7 +2238,7 @@ function renderMkFamilyForm(data) {
           <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
             <div>
               <label class="ms-knowledge-label" for="fam_name_${id}">Name</label>
-              <input class="ms-knowledge-input" id="fam_name_${id}" data-fam-field="name" type="text" value="${escapeHtml(p.name || '')}" autocomplete="name" />
+              <input class="ms-knowledge-input" id="fam_name_${id}" data-fam-field="name" type="text" placeholder="Full name" value="${escapeHtml(p.name || '')}" autocomplete="name" />
             </div>
             <div>
               <label class="ms-knowledge-label" for="fam_rel_${id}">Relationship</label>
@@ -2374,15 +2374,15 @@ function renderMkGoalsForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="goal_title_${id}">Title</label>
-            <input class="ms-knowledge-input" id="goal_title_${id}" data-goal-field="title" type="text" value="${escapeHtml(g.title || '')}" />
+            <input class="ms-knowledge-input" id="goal_title_${id}" data-goal-field="title" type="text" placeholder="Short title for this goal" value="${escapeHtml(g.title || '')}" />
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="goal_desc_${id}">Description</label>
-            <textarea class="ms-knowledge-textarea" id="goal_desc_${id}" data-goal-field="description" rows="2">${escapeHtml(g.description || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="goal_desc_${id}" data-goal-field="description" rows="2" placeholder="What you want to achieve">${escapeHtml(g.description || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="goal_why_${id}">Why it matters</label>
-            <textarea class="ms-knowledge-textarea" id="goal_why_${id}" data-goal-field="whyItMatters" rows="2">${escapeHtml(g.whyItMatters || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="goal_why_${id}" data-goal-field="whyItMatters" rows="2" placeholder="Why this matters to you">${escapeHtml(g.whyItMatters || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
             <div>
@@ -2396,23 +2396,23 @@ function renderMkGoalsForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="goal_prog_${id}">Current progress</label>
-            <textarea class="ms-knowledge-textarea" id="goal_prog_${id}" data-goal-field="progress" rows="2">${escapeHtml(g.progress || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="goal_prog_${id}" data-goal-field="progress" rows="2" placeholder="Latest progress or status">${escapeHtml(g.progress || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="goal_mile_${id}">Milestones <span class="ms-knowledge-optional">(one per line)</span></label>
-            <textarea class="ms-knowledge-textarea" id="goal_mile_${id}" data-goal-field="milestones" rows="3">${escapeHtml(g.milestones || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="goal_mile_${id}" data-goal-field="milestones" rows="3" placeholder="Key milestones — one per line">${escapeHtml(g.milestones || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="goal_chal_${id}">Challenges</label>
-            <textarea class="ms-knowledge-textarea" id="goal_chal_${id}" data-goal-field="challenges" rows="2">${escapeHtml(g.challenges || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="goal_chal_${id}" data-goal-field="challenges" rows="2" placeholder="What might get in the way">${escapeHtml(g.challenges || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="goal_res_${id}">Required resources</label>
-            <textarea class="ms-knowledge-textarea" id="goal_res_${id}" data-goal-field="resources" rows="2">${escapeHtml(g.resources || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="goal_res_${id}" data-goal-field="resources" rows="2" placeholder="People, budget, tools that help">${escapeHtml(g.resources || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="goal_rel_${id}">Related assignments <span class="ms-knowledge-optional">(optional)</span></label>
-            <textarea class="ms-knowledge-textarea" id="goal_rel_${id}" data-goal-field="relatedAssignments" rows="2">${escapeHtml(g.relatedAssignments || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="goal_rel_${id}" data-goal-field="relatedAssignments" rows="2" placeholder="Linked tasks, projects, or chats">${escapeHtml(g.relatedAssignments || '')}</textarea>
           </div>
         </article>`;
         })
@@ -2531,12 +2531,12 @@ function renderMkWorkForm(data) {
             </div>
             <div>
               <label class="ms-knowledge-label" for="work_title_${id}">Job title</label>
-              <input class="ms-knowledge-input" id="work_title_${id}" data-work-field="jobTitle" type="text" value="${escapeHtml(r.jobTitle || '')}" />
+              <input class="ms-knowledge-input" id="work_title_${id}" data-work-field="jobTitle" type="text" placeholder="Job title" value="${escapeHtml(r.jobTitle || '')}" />
             </div>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_emp_${id}">Employer / organisation</label>
-            <input class="ms-knowledge-input" id="work_emp_${id}" data-work-field="employer" type="text" value="${escapeHtml(r.employer || '')}" />
+            <input class="ms-knowledge-input" id="work_emp_${id}" data-work-field="employer" type="text" placeholder="Employer or client name" value="${escapeHtml(r.employer || '')}" />
           </div>
           <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
             <div>
@@ -2550,39 +2550,39 @@ function renderMkWorkForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_resp_${id}">Role &amp; responsibilities</label>
-            <textarea class="ms-knowledge-textarea" id="work_resp_${id}" data-work-field="responsibilities" rows="3">${escapeHtml(r.responsibilities || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="work_resp_${id}" data-work-field="responsibilities" rows="3" placeholder="Main responsibilities and scope">${escapeHtml(r.responsibilities || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_qual_${id}">Professional qualifications <span class="ms-knowledge-optional">(optional)</span></label>
-            <textarea class="ms-knowledge-textarea" id="work_qual_${id}" data-work-field="qualifications" rows="2">${escapeHtml(r.qualifications || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="work_qual_${id}" data-work-field="qualifications" rows="2" placeholder="Degrees, certs, licences relevant to this role">${escapeHtml(r.qualifications || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_skills_${id}">Skills &amp; expertise</label>
-            <textarea class="ms-knowledge-textarea" id="work_skills_${id}" data-work-field="skillsExpertise" rows="2">${escapeHtml(r.skillsExpertise || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="work_skills_${id}" data-work-field="skillsExpertise" rows="2" placeholder="Skills Sarah can reference for work help">${escapeHtml(r.skillsExpertise || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_proj_${id}">Projects &amp; assignments <span class="ms-knowledge-optional">(optional)</span></label>
-            <textarea class="ms-knowledge-textarea" id="work_proj_${id}" data-work-field="projectsAssignments" rows="2">${escapeHtml(r.projectsAssignments || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="work_proj_${id}" data-work-field="projectsAssignments" rows="2" placeholder="Active projects or assignments">${escapeHtml(r.projectsAssignments || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_hours_${id}">Working hours &amp; routines <span class="ms-knowledge-optional">(optional)</span></label>
-            <textarea class="ms-knowledge-textarea" id="work_hours_${id}" data-work-field="workingHoursRoutines" rows="2">${escapeHtml(r.workingHoursRoutines || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="work_hours_${id}" data-work-field="workingHoursRoutines" rows="2" placeholder="Typical hours, deep-work blocks, time zones">${escapeHtml(r.workingHoursRoutines || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_pref_${id}">Workplace preferences <span class="ms-knowledge-optional">(optional)</span></label>
-            <textarea class="ms-knowledge-textarea" id="work_pref_${id}" data-work-field="workplacePreferences" rows="2">${escapeHtml(r.workplacePreferences || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="work_pref_${id}" data-work-field="workplacePreferences" rows="2" placeholder="Remote/hybrid, meeting style, tools">${escapeHtml(r.workplacePreferences || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_contacts_${id}">Professional contacts <span class="ms-knowledge-optional">(optional)</span></label>
-            <textarea class="ms-knowledge-textarea" id="work_contacts_${id}" data-work-field="professionalContacts" rows="2">${escapeHtml(r.professionalContacts || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="work_contacts_${id}" data-work-field="professionalContacts" rows="2" placeholder="Key colleagues — names and context only">${escapeHtml(r.professionalContacts || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_exp_${id}">Work experience highlights</label>
-            <textarea class="ms-knowledge-textarea" id="work_exp_${id}" data-work-field="experienceHighlights" rows="2">${escapeHtml(r.experienceHighlights || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="work_exp_${id}" data-work-field="experienceHighlights" rows="2" placeholder="Standout wins or experiences">${escapeHtml(r.experienceHighlights || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_career_${id}">Career ambitions <span class="ms-knowledge-optional">(optional)</span></label>
-            <textarea class="ms-knowledge-textarea" id="work_career_${id}" data-work-field="careerAmbitions" rows="2">${escapeHtml(r.careerAmbitions || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="work_career_${id}" data-work-field="careerAmbitions" rows="2" placeholder="Where you want your career to go">${escapeHtml(r.careerAmbitions || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="work_docs_${id}">Professional documents / CV notes <span class="ms-knowledge-optional">(optional)</span></label>
@@ -2705,17 +2705,17 @@ function renderMkBusinessForm(data) {
           <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
             <div>
               <label class="ms-knowledge-label" for="biz_name_${id}">Business name</label>
-              <input class="ms-knowledge-input" id="biz_name_${id}" data-biz-field="businessName" type="text" value="${escapeHtml(v.businessName || '')}" />
+              <input class="ms-knowledge-input" id="biz_name_${id}" data-biz-field="businessName" type="text" placeholder="Legal or trading name" value="${escapeHtml(v.businessName || '')}" />
             </div>
             <div>
               <label class="ms-knowledge-label" for="biz_ind_${id}">Industry</label>
-              <input class="ms-knowledge-input" id="biz_ind_${id}" data-biz-field="industry" type="text" value="${escapeHtml(v.industry || '')}" />
+              <input class="ms-knowledge-input" id="biz_ind_${id}" data-biz-field="industry" type="text" placeholder="Industry or sector" value="${escapeHtml(v.industry || '')}" />
             </div>
           </div>
           <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
             <div>
               <label class="ms-knowledge-label" for="biz_role_${id}">Your role</label>
-              <input class="ms-knowledge-input" id="biz_role_${id}" data-biz-field="userRole" type="text" value="${escapeHtml(v.userRole || '')}" />
+              <input class="ms-knowledge-input" id="biz_role_${id}" data-biz-field="userRole" type="text" placeholder="Your role in this venture" value="${escapeHtml(v.userRole || '')}" />
             </div>
             <div>
               <label class="ms-knowledge-label" for="biz_conf_${id}">Confidentiality level</label>
@@ -2724,19 +2724,19 @@ function renderMkBusinessForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="biz_desc_${id}">Description</label>
-            <textarea class="ms-knowledge-textarea" id="biz_desc_${id}" data-biz-field="description" rows="3">${escapeHtml(v.description || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="biz_desc_${id}" data-biz-field="description" rows="3" placeholder="What this business does — in your words">${escapeHtml(v.description || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="biz_prod_${id}">Products &amp; services</label>
-            <textarea class="ms-knowledge-textarea" id="biz_prod_${id}" data-biz-field="productsServices" rows="2">${escapeHtml(v.productsServices || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="biz_prod_${id}" data-biz-field="productsServices" rows="2" placeholder="Products or services you offer">${escapeHtml(v.productsServices || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="biz_stage_${id}">Current stage</label>
-            <textarea class="ms-knowledge-textarea" id="biz_stage_${id}" data-biz-field="currentStage" rows="2">${escapeHtml(v.currentStage || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="biz_stage_${id}" data-biz-field="currentStage" rows="2" placeholder="Idea, launch, growth, pause…">${escapeHtml(v.currentStage || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="biz_obj_${id}">Objectives</label>
-            <textarea class="ms-knowledge-textarea" id="biz_obj_${id}" data-biz-field="objectives" rows="2">${escapeHtml(v.objectives || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="biz_obj_${id}" data-biz-field="objectives" rows="2" placeholder="Near-term business objectives">${escapeHtml(v.objectives || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="biz_contacts_${id}">Key contacts</label>
@@ -2744,11 +2744,11 @@ function renderMkBusinessForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="biz_docs_${id}">Related documents <span class="ms-knowledge-optional">(paths or notes until MK‑04)</span></label>
-            <textarea class="ms-knowledge-textarea" id="biz_docs_${id}" data-biz-field="relatedDocuments" rows="2">${escapeHtml(v.relatedDocuments || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="biz_docs_${id}" data-biz-field="relatedDocuments" rows="2" placeholder="Where contracts or filings live — not credentials">${escapeHtml(v.relatedDocuments || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="biz_proj_${id}">Current projects</label>
-            <textarea class="ms-knowledge-textarea" id="biz_proj_${id}" data-biz-field="currentProjects" rows="2">${escapeHtml(v.currentProjects || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="biz_proj_${id}" data-biz-field="currentProjects" rows="2" placeholder="What you are working on now">${escapeHtml(v.currentProjects || '')}</textarea>
           </div>
           <p class="ms-knowledge-biz-footnote">Sarah keeps each venture separate — nothing is merged with your employer profile unless you connect it (MK‑06).</p>
         </article>`;
@@ -2879,16 +2879,16 @@ function renderMkEducationForm(data) {
           </header>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="edu_sch_${id}">School / institution</label>
-            <input class="ms-knowledge-input" id="edu_sch_${id}" data-edu-formal-field="institution" type="text" value="${escapeHtml(p.institution || '')}" />
+            <input class="ms-knowledge-input" id="edu_sch_${id}" data-edu-formal-field="institution" type="text" placeholder="School, university, or provider" value="${escapeHtml(p.institution || '')}" />
           </div>
           <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
             <div>
               <label class="ms-knowledge-label" for="edu_qual_${id}">Qualification</label>
-              <input class="ms-knowledge-input" id="edu_qual_${id}" data-edu-formal-field="qualification" type="text" value="${escapeHtml(p.qualification || '')}" />
+              <input class="ms-knowledge-input" id="edu_qual_${id}" data-edu-formal-field="qualification" type="text" placeholder="Degree, diploma, or qualification name" value="${escapeHtml(p.qualification || '')}" />
             </div>
             <div>
               <label class="ms-knowledge-label" for="edu_area_${id}">Study area</label>
-              <input class="ms-knowledge-input" id="edu_area_${id}" data-edu-formal-field="studyArea" type="text" value="${escapeHtml(p.studyArea || '')}" />
+              <input class="ms-knowledge-input" id="edu_area_${id}" data-edu-formal-field="studyArea" type="text" placeholder="Field of study" value="${escapeHtml(p.studyArea || '')}" />
             </div>
           </div>
           <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
@@ -2907,11 +2907,11 @@ function renderMkEducationForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="edu_hi_${id}">Highlights</label>
-            <textarea class="ms-knowledge-textarea" id="edu_hi_${id}" data-edu-formal-field="highlights" rows="2">${escapeHtml(p.highlights || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="edu_hi_${id}" data-edu-formal-field="highlights" rows="2" placeholder="Honours, thesis topic, standout modules">${escapeHtml(p.highlights || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="edu_doc_${id}">Documents <span class="ms-knowledge-optional">(notes until MK‑04)</span></label>
-            <textarea class="ms-knowledge-textarea" id="edu_doc_${id}" data-edu-formal-field="documentsNote" rows="2">${escapeHtml(p.documentsNote || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="edu_doc_${id}" data-edu-formal-field="documentsNote" rows="2" placeholder="Where transcripts or certs live — see MK‑04 for uploads">${escapeHtml(p.documentsNote || '')}</textarea>
           </div>
         </article>`;
         })
@@ -2931,11 +2931,11 @@ function renderMkEducationForm(data) {
           <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
             <div>
               <label class="ms-knowledge-label" for="ec_name_${id}">Name</label>
-              <input class="ms-knowledge-input" id="ec_name_${id}" data-edu-course-field="name" type="text" value="${escapeHtml(c.name || '')}" />
+              <input class="ms-knowledge-input" id="ec_name_${id}" data-edu-course-field="name" type="text" placeholder="Course or certification name" value="${escapeHtml(c.name || '')}" />
             </div>
             <div>
               <label class="ms-knowledge-label" for="ec_prov_${id}">Provider</label>
-              <input class="ms-knowledge-input" id="ec_prov_${id}" data-edu-course-field="provider" type="text" value="${escapeHtml(c.provider || '')}" />
+              <input class="ms-knowledge-input" id="ec_prov_${id}" data-edu-course-field="provider" type="text" placeholder="Provider or platform" value="${escapeHtml(c.provider || '')}" />
             </div>
           </div>
           <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
@@ -2954,7 +2954,7 @@ function renderMkEducationForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="ec_notes_${id}">Notes</label>
-            <textarea class="ms-knowledge-textarea" id="ec_notes_${id}" data-edu-course-field="notes" rows="2">${escapeHtml(c.notes || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="ec_notes_${id}" data-edu-course-field="notes" rows="2" placeholder="What you learned or how you use it">${escapeHtml(c.notes || '')}</textarea>
           </div>
         </article>`;
         })
@@ -2987,39 +2987,39 @@ function renderMkEducationForm(data) {
         <legend class="ms-knowledge-legend">Learning now &amp; interests</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="lc_currentStudies">Current studies</label>
-          <textarea class="ms-knowledge-textarea" id="lc_currentStudies" name="lc_currentStudies" rows="2">${escapeHtml(lc.currentStudies || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="lc_currentStudies" name="lc_currentStudies" rows="2" placeholder="Formal study you are in now, if any">${escapeHtml(lc.currentStudies || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="lc_subjectsOfInterest">Subjects of interest</label>
-          <textarea class="ms-knowledge-textarea" id="lc_subjectsOfInterest" name="lc_subjectsOfInterest" rows="2">${escapeHtml(lc.subjectsOfInterest || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="lc_subjectsOfInterest" name="lc_subjectsOfInterest" rows="2" placeholder="Topics you want to explore">${escapeHtml(lc.subjectsOfInterest || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="lc_learningGoals">Learning goals</label>
-          <textarea class="ms-knowledge-textarea" id="lc_learningGoals" name="lc_learningGoals" rows="2">${escapeHtml(lc.learningGoals || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="lc_learningGoals" name="lc_learningGoals" rows="2" placeholder="Skills or knowledge you are building toward">${escapeHtml(lc.learningGoals || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="lc_skillsDeveloping">Skills being developed</label>
-          <textarea class="ms-knowledge-textarea" id="lc_skillsDeveloping" name="lc_skillsDeveloping" rows="2">${escapeHtml(lc.skillsDeveloping || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="lc_skillsDeveloping" name="lc_skillsDeveloping" rows="2" placeholder="Skills you are practising now">${escapeHtml(lc.skillsDeveloping || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="lc_studySchedule">Study schedule</label>
-          <textarea class="ms-knowledge-textarea" id="lc_studySchedule" name="lc_studySchedule" rows="2">${escapeHtml(lc.studySchedule || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="lc_studySchedule" name="lc_studySchedule" rows="2" placeholder="When you usually study or practise">${escapeHtml(lc.studySchedule || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="lc_learningPreferences">Learning preferences</label>
-          <textarea class="ms-knowledge-textarea" id="lc_learningPreferences" name="lc_learningPreferences" rows="2">${escapeHtml(lc.learningPreferences || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="lc_learningPreferences" name="lc_learningPreferences" rows="2" placeholder="Video vs reading, pace, format preferences">${escapeHtml(lc.learningPreferences || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="lc_researchTopics">Research topics</label>
-          <textarea class="ms-knowledge-textarea" id="lc_researchTopics" name="lc_researchTopics" rows="2">${escapeHtml(lc.researchTopics || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="lc_researchTopics" name="lc_researchTopics" rows="2" placeholder="Areas you dig into for work or curiosity">${escapeHtml(lc.researchTopics || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="lc_readingList">Reading list</label>
-          <textarea class="ms-knowledge-textarea" id="lc_readingList" name="lc_readingList" rows="2">${escapeHtml(lc.readingList || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="lc_readingList" name="lc_readingList" rows="2" placeholder="Books, articles, or papers on your list">${escapeHtml(lc.readingList || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="lc_educationalDocumentsNote">Educational documents <span class="ms-knowledge-optional">(notes until MK‑04)</span></label>
-          <textarea class="ms-knowledge-textarea" id="lc_educationalDocumentsNote" name="lc_educationalDocumentsNote" rows="2">${escapeHtml(lc.educationalDocumentsNote || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="lc_educationalDocumentsNote" name="lc_educationalDocumentsNote" rows="2" placeholder="Where certificates or notes live">${escapeHtml(lc.educationalDocumentsNote || '')}</textarea>
         </div>
       </fieldset>
 
@@ -3142,16 +3142,16 @@ function renderMkHealthForm(data) {
         <legend class="ms-knowledge-legend">General &amp; clinical notes</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_generalNotes">General health notes</label>
-          <textarea class="ms-knowledge-textarea" id="hl_generalNotes" name="generalNotes" rows="2">${escapeHtml(h.generalNotes || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_generalNotes" name="generalNotes" rows="2" placeholder="Overall health context Sarah may remember — optional">${escapeHtml(h.generalNotes || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_conditions">Medical conditions &amp; diagnoses <span class="ms-knowledge-optional">(optional)</span></label>
-          <textarea class="ms-knowledge-textarea" id="hl_conditions" name="conditionsDiagnoses" rows="2">${escapeHtml(h.conditionsDiagnoses || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_conditions" name="conditionsDiagnoses" rows="2" placeholder="Conditions or diagnoses you choose to share">${escapeHtml(h.conditionsDiagnoses || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
           <div>
             <label class="ms-knowledge-label" for="hl_allergies">Allergies</label>
-            <textarea class="ms-knowledge-textarea" id="hl_allergies" name="allergies" rows="2">${escapeHtml(h.allergies || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="hl_allergies" name="allergies" rows="2" placeholder="Allergies or intolerances">${escapeHtml(h.allergies || '')}</textarea>
           </div>
           <div>
             <label class="ms-knowledge-label" for="hl_meds">Medications</label>
@@ -3160,49 +3160,49 @@ function renderMkHealthForm(data) {
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_history">Medical history</label>
-          <textarea class="ms-knowledge-textarea" id="hl_history" name="medicalHistory" rows="2">${escapeHtml(h.medicalHistory || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_history" name="medicalHistory" rows="2" placeholder="Relevant history — not a substitute for records">${escapeHtml(h.medicalHistory || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_providers">Healthcare providers</label>
-          <textarea class="ms-knowledge-textarea" id="hl_providers" name="healthcareProviders" rows="2">${escapeHtml(h.healthcareProviders || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_providers" name="healthcareProviders" rows="2" placeholder="Clinicians or practices — names only">${escapeHtml(h.healthcareProviders || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_appts">Appointments</label>
-          <textarea class="ms-knowledge-textarea" id="hl_appts" name="appointments" rows="2">${escapeHtml(h.appointments || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_appts" name="appointments" rows="2" placeholder="Upcoming or recurring appointments">${escapeHtml(h.appointments || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_tests">Test results &amp; medical documents <span class="ms-knowledge-optional">(notes until MK‑04)</span></label>
-          <textarea class="ms-knowledge-textarea" id="hl_tests" name="testResultsDocuments" rows="2">${escapeHtml(h.testResultsDocuments || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_tests" name="testResultsDocuments" rows="2" placeholder="Where results live — not clinical advice">${escapeHtml(h.testResultsDocuments || '')}</textarea>
         </div>
       </fieldset>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Fitness, nutrition &amp; sleep</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_fitnessGoals">Fitness goals</label>
-          <textarea class="ms-knowledge-textarea" id="hl_fitnessGoals" name="fitnessGoals" rows="2">${escapeHtml(h.fitnessGoals || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_fitnessGoals" name="fitnessGoals" rows="2" placeholder="Fitness goals Sarah can support (not prescribe)">${escapeHtml(h.fitnessGoals || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_exercise">Exercise routines</label>
-          <textarea class="ms-knowledge-textarea" id="hl_exercise" name="exerciseRoutines" rows="2">${escapeHtml(h.exerciseRoutines || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_exercise" name="exerciseRoutines" rows="2" placeholder="Typical exercise week">${escapeHtml(h.exerciseRoutines || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_nutrition">Nutrition preferences</label>
-          <textarea class="ms-knowledge-textarea" id="hl_nutrition" name="nutritionPreferences" rows="2">${escapeHtml(h.nutritionPreferences || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_nutrition" name="nutritionPreferences" rows="2" placeholder="Diet preferences — not medical nutrition therapy">${escapeHtml(h.nutritionPreferences || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_sleep">Sleep routines</label>
-          <textarea class="ms-knowledge-textarea" id="hl_sleep" name="sleepRoutines" rows="2">${escapeHtml(h.sleepRoutines || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_sleep" name="sleepRoutines" rows="2" placeholder="Sleep patterns or goals">${escapeHtml(h.sleepRoutines || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_wellbeing">Wellbeing goals</label>
-          <textarea class="ms-knowledge-textarea" id="hl_wellbeing" name="wellbeingGoals" rows="2">${escapeHtml(h.wellbeingGoals || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_wellbeing" name="wellbeingGoals" rows="2" placeholder="Stress, energy, mental wellbeing goals">${escapeHtml(h.wellbeingGoals || '')}</textarea>
         </div>
       </fieldset>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Reminders</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="hl_reminders">Health-related reminders</label>
-          <textarea class="ms-knowledge-textarea" id="hl_reminders" name="healthReminders" rows="2">${escapeHtml(h.healthReminders || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="hl_reminders" name="healthReminders" rows="2" placeholder="Check-ups, scripts, follow-ups to remember">${escapeHtml(h.healthReminders || '')}</textarea>
         </div>
       </fieldset>
       <div class="ms-knowledge-form-actions">
@@ -3288,59 +3288,59 @@ function renderMkFinancialForm(data) {
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_income">Income sources <span class="ms-knowledge-optional">(descriptions only)</span></label>
-          <textarea class="ms-knowledge-textarea" id="fn_income" name="incomeSources" rows="2">${escapeHtml(f.incomeSources || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_income" name="incomeSources" rows="2" placeholder="Salary, business, side income — no account numbers">${escapeHtml(f.incomeSources || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_budget">Budget &amp; cashflow overview</label>
-          <textarea class="ms-knowledge-textarea" id="fn_budget" name="monthlyBudgetOverview" rows="2">${escapeHtml(f.monthlyBudgetOverview || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_budget" name="monthlyBudgetOverview" rows="2" placeholder="How you think about monthly cash flow">${escapeHtml(f.monthlyBudgetOverview || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_expenses">Recurring expenses &amp; subscriptions</label>
-          <textarea class="ms-knowledge-textarea" id="fn_expenses" name="expensesRecurring" rows="2">${escapeHtml(f.expensesRecurring || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_expenses" name="expensesRecurring" rows="2" placeholder="Rent, subscriptions, regular bills — rounded amounts OK">${escapeHtml(f.expensesRecurring || '')}</textarea>
         </div>
       </fieldset>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Debts, savings &amp; goals</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_debts">Debts &amp; loans <span class="ms-knowledge-optional">(no account numbers)</span></label>
-          <textarea class="ms-knowledge-textarea" id="fn_debts" name="debtsLoans" rows="2">${escapeHtml(f.debtsLoans || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_debts" name="debtsLoans" rows="2" placeholder="Loans or credit — types and goals, not full numbers">${escapeHtml(f.debtsLoans || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_savings">Savings &amp; investments <span class="ms-knowledge-optional">(types &amp; goals, not login details)</span></label>
-          <textarea class="ms-knowledge-textarea" id="fn_savings" name="savingsInvestments" rows="2">${escapeHtml(f.savingsInvestments || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_savings" name="savingsInvestments" rows="2" placeholder="Savings pots, investment approach — no credentials">${escapeHtml(f.savingsInvestments || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_fingoals">Financial goals &amp; milestones</label>
-          <textarea class="ms-knowledge-textarea" id="fn_fingoals" name="financialGoals" rows="2">${escapeHtml(f.financialGoals || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_fingoals" name="financialGoals" rows="2" placeholder="What you are saving or planning for">${escapeHtml(f.financialGoals || '')}</textarea>
         </div>
       </fieldset>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Insurance &amp; tax</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_insurance">Insurance policies <span class="ms-knowledge-optional">(provider &amp; type)</span></label>
-          <textarea class="ms-knowledge-textarea" id="fn_insurance" name="insurancePolicies" rows="2">${escapeHtml(f.insurancePolicies || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_insurance" name="insurancePolicies" rows="2" placeholder="Policy types and renewal rhythm — not policy numbers">${escapeHtml(f.insurancePolicies || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_tax">Tax &amp; compliance notes</label>
-          <textarea class="ms-knowledge-textarea" id="fn_tax" name="taxesCompliance" rows="2">${escapeHtml(f.taxesCompliance || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_tax" name="taxesCompliance" rows="2" placeholder="Filing cadence, accountant contact — not tax IDs">${escapeHtml(f.taxesCompliance || '')}</textarea>
         </div>
       </fieldset>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Institutions &amp; documents</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_accounts">Banks &amp; institutions <span class="ms-knowledge-optional">(names only — never passwords)</span></label>
-          <textarea class="ms-knowledge-textarea" id="fn_accounts" name="accountsInstitutionsNote" rows="2">${escapeHtml(f.accountsInstitutionsNote || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_accounts" name="accountsInstitutionsNote" rows="2" placeholder="Which institutions you use — never passwords or card numbers">${escapeHtml(f.accountsInstitutionsNote || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_docs">Statements &amp; records <span class="ms-knowledge-optional">(notes until MK‑04)</span></label>
-          <textarea class="ms-knowledge-textarea" id="fn_docs" name="documentsRecordsNote" rows="2">${escapeHtml(f.documentsRecordsNote || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_docs" name="documentsRecordsNote" rows="2" placeholder="Where financial documents live">${escapeHtml(f.documentsRecordsNote || '')}</textarea>
         </div>
       </fieldset>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Reminders</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_reminders">Money-related reminders</label>
-          <textarea class="ms-knowledge-textarea" id="fn_reminders" name="financialReminders" rows="2">${escapeHtml(f.financialReminders || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="fn_reminders" name="financialReminders" rows="2" placeholder="Payment dates, reviews, renewals">${escapeHtml(f.financialReminders || '')}</textarea>
         </div>
       </fieldset>
       <div class="ms-knowledge-form-actions">
@@ -3596,7 +3596,7 @@ function renderMkImportantDatesForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="date_notes_${id}">Notes</label>
-            <textarea class="ms-knowledge-textarea" id="date_notes_${id}" data-date-field="notes" rows="2">${escapeHtml(ev.notes || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="date_notes_${id}" data-date-field="notes" rows="2" placeholder="Extra context for this event">${escapeHtml(ev.notes || '')}</textarea>
           </div>
         </article>`;
         })
@@ -3754,7 +3754,7 @@ function renderMkDocumentsForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="doc_notes_${id}">Notes</label>
-            <textarea class="ms-knowledge-textarea" id="doc_notes_${id}" data-doc-field="notes" rows="2">${escapeHtml(rec.notes || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="doc_notes_${id}" data-doc-field="notes" rows="2" placeholder="Notes about this record">${escapeHtml(rec.notes || '')}</textarea>
           </div>
         </article>`;
         })
@@ -3872,15 +3872,15 @@ function renderMkRoutinesForm(data) {
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="rt_weekend">Typical weekend</label>
-          <textarea class="ms-knowledge-textarea" id="rt_weekend" name="typicalWeekend" rows="3">${escapeHtml(r.typicalWeekend || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="rt_weekend" name="typicalWeekend" rows="3" placeholder="How Saturdays and Sundays usually look">${escapeHtml(r.typicalWeekend || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="rt_morning">Morning routine</label>
-          <textarea class="ms-knowledge-textarea" id="rt_morning" name="morningRoutine" rows="2">${escapeHtml(r.morningRoutine || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="rt_morning" name="morningRoutine" rows="2" placeholder="First hour or two of your day">${escapeHtml(r.morningRoutine || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="rt_evening">Evening &amp; wind-down</label>
-          <textarea class="ms-knowledge-textarea" id="rt_evening" name="eveningWindDown" rows="2">${escapeHtml(r.eveningWindDown || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="rt_evening" name="eveningWindDown" rows="2" placeholder="How you wind down before sleep">${escapeHtml(r.eveningWindDown || '')}</textarea>
         </div>
       </fieldset>
       <fieldset class="ms-knowledge-fieldset">
@@ -3891,7 +3891,7 @@ function renderMkRoutinesForm(data) {
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="rt_chores">Household &amp; errands</label>
-          <textarea class="ms-knowledge-textarea" id="rt_chores" name="householdErrands" rows="2">${escapeHtml(r.householdErrands || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="rt_chores" name="householdErrands" rows="2" placeholder="Groceries, school runs, admin blocks">${escapeHtml(r.householdErrands || '')}</textarea>
         </div>
       </fieldset>
       <fieldset class="ms-knowledge-fieldset">
@@ -3909,7 +3909,7 @@ function renderMkRoutinesForm(data) {
         <legend class="ms-knowledge-legend">Reminders</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="rt_reminders">Routine reminders</label>
-          <textarea class="ms-knowledge-textarea" id="rt_reminders" name="routineReminders" rows="2">${escapeHtml(r.routineReminders || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="rt_reminders" name="routineReminders" rows="2" placeholder="Recurring nudges tied to your routine">${escapeHtml(r.routineReminders || '')}</textarea>
         </div>
       </fieldset>
       <div class="ms-knowledge-form-actions">
@@ -4014,7 +4014,7 @@ function renderMkPropertyForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="prop_desc_${id}">Description <span class="ms-knowledge-optional">(make/model, size)</span></label>
-            <textarea class="ms-knowledge-textarea" id="prop_desc_${id}" data-prop-field="description" rows="2">${escapeHtml(it.description || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="prop_desc_${id}" data-prop-field="description" rows="2" placeholder="Make, model, size — whatever helps Sarah">${escapeHtml(it.description || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
             <div>
@@ -4028,7 +4028,7 @@ function renderMkPropertyForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="prop_renew_${id}">Renewals &amp; service <span class="ms-knowledge-optional">(licence, insurance, MOT)</span></label>
-            <textarea class="ms-knowledge-textarea" id="prop_renew_${id}" data-prop-field="renewalsServices" rows="2">${escapeHtml(it.renewalsServices || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="prop_renew_${id}" data-prop-field="renewalsServices" rows="2" placeholder="Licence, service, insurance renewals">${escapeHtml(it.renewalsServices || '')}</textarea>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="prop_docs_${id}">Records &amp; documents <span class="ms-knowledge-optional">(notes until MK‑04)</span></label>
@@ -4036,7 +4036,7 @@ function renderMkPropertyForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="prop_notes_${id}">Notes</label>
-            <textarea class="ms-knowledge-textarea" id="prop_notes_${id}" data-prop-field="notes" rows="2">${escapeHtml(it.notes || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="prop_notes_${id}" data-prop-field="notes" rows="2" placeholder="Anything else about this asset">${escapeHtml(it.notes || '')}</textarea>
           </div>
         </article>`;
         })
@@ -4196,7 +4196,7 @@ function renderMkTravelForm(data) {
             </div>
             <div>
               <label class="ms-knowledge-label" for="tv_companions_${id}">Travel companions <span class="ms-knowledge-optional">(optional)</span></label>
-              <input class="ms-knowledge-input" id="tv_companions_${id}" data-travel-field="companions" type="text" value="${escapeHtml(trip.companions || '')}" />
+              <input class="ms-knowledge-input" id="tv_companions_${id}" data-travel-field="companions" type="text" placeholder="Who is travelling with you" value="${escapeHtml(trip.companions || '')}" />
             </div>
           </div>
           <div class="ms-knowledge-field-row">
@@ -4205,7 +4205,7 @@ function renderMkTravelForm(data) {
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="tv_notes_${id}">Notes</label>
-            <textarea class="ms-knowledge-textarea" id="tv_notes_${id}" data-travel-field="notes" rows="2">${escapeHtml(trip.notes || '')}</textarea>
+            <textarea class="ms-knowledge-textarea" id="tv_notes_${id}" data-travel-field="notes" rows="2" placeholder="Plans, bookings, things to remember">${escapeHtml(trip.notes || '')}</textarea>
           </div>
         </article>`;
         })
@@ -4334,7 +4334,7 @@ function renderMkValuesForm(data) {
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="val_causes">Causes &amp; communities you care about</label>
-          <textarea class="ms-knowledge-textarea" id="val_causes" name="causesCommunities" rows="2">${escapeHtml(v.causesCommunities || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="val_causes" name="causesCommunities" rows="2" placeholder="Causes or communities you care about">${escapeHtml(v.causesCommunities || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="val_civic">Political or civic stance <span class="ms-knowledge-optional">(high level)</span></label>
@@ -4349,7 +4349,7 @@ function renderMkValuesForm(data) {
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="val_avoid">Topics to avoid or minimise</label>
-          <textarea class="ms-knowledge-textarea" id="val_avoid" name="topicsToAvoid" rows="2">${escapeHtml(v.topicsToAvoid || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="val_avoid" name="topicsToAvoid" rows="2" placeholder="Topics Sarah should not bring up unless you do">${escapeHtml(v.topicsToAvoid || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="val_how">How Sarah should use this when advising</label>
@@ -4411,11 +4411,11 @@ function renderMkPersonalIdentityForm(data) {
         <legend class="ms-knowledge-legend">Identity & location</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_fullName">Full name</label>
-          <input class="ms-knowledge-input" id="mk_fullName" name="fullName" type="text" value="${escapeHtml(d.fullName || '')}" />
+          <input class="ms-knowledge-input" id="mk_fullName" name="fullName" type="text" placeholder="Legal or full name" value="${escapeHtml(d.fullName || '')}" />
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_preferredName">Preferred name</label>
-          <input class="ms-knowledge-input" id="mk_preferredName" name="preferredName" type="text" value="${escapeHtml(d.preferredName || '')}" />
+          <input class="ms-knowledge-input" id="mk_preferredName" name="preferredName" type="text" placeholder="What Sarah should call you" value="${escapeHtml(d.preferredName || '')}" />
         </div>
         <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
           <div>
@@ -4424,17 +4424,17 @@ function renderMkPersonalIdentityForm(data) {
           </div>
           <div>
             <label class="ms-knowledge-label" for="mk_preferredLanguage">Preferred language</label>
-            <input class="ms-knowledge-input" id="mk_preferredLanguage" name="preferredLanguage" type="text" value="${escapeHtml(d.preferredLanguage || '')}" />
+            <input class="ms-knowledge-input" id="mk_preferredLanguage" name="preferredLanguage" type="text" placeholder="e.g. English, isiZulu" value="${escapeHtml(d.preferredLanguage || '')}" />
           </div>
         </div>
         <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
           <div>
             <label class="ms-knowledge-label" for="mk_country">Country</label>
-            <input class="ms-knowledge-input" id="mk_country" name="country" type="text" value="${escapeHtml(d.country || '')}" />
+            <input class="ms-knowledge-input" id="mk_country" name="country" type="text" placeholder="Country you live in" value="${escapeHtml(d.country || '')}" />
           </div>
           <div>
             <label class="ms-knowledge-label" for="mk_city">City / area</label>
-            <input class="ms-knowledge-input" id="mk_city" name="city" type="text" value="${escapeHtml(d.city || '')}" />
+            <input class="ms-knowledge-input" id="mk_city" name="city" type="text" placeholder="City or main area" value="${escapeHtml(d.city || '')}" />
           </div>
         </div>
         <div class="ms-knowledge-field-row">
@@ -4443,7 +4443,7 @@ function renderMkPersonalIdentityForm(data) {
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_nationalityBackground">Nationality or background <span class="ms-knowledge-optional">(optional)</span></label>
-          <textarea class="ms-knowledge-textarea" id="mk_nationalityBackground" name="nationalityBackground" rows="2">${escapeHtml(d.nationalityBackground || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="mk_nationalityBackground" name="nationalityBackground" rows="2" placeholder="Nationality, culture, or background — optional">${escapeHtml(d.nationalityBackground || '')}</textarea>
         </div>
       </fieldset>
 
@@ -4451,27 +4451,27 @@ function renderMkPersonalIdentityForm(data) {
         <legend class="ms-knowledge-legend">Story & expertise</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_educationQualifications">Education & qualifications</label>
-          <textarea class="ms-knowledge-textarea" id="mk_educationQualifications" name="educationQualifications" rows="3">${escapeHtml(d.educationQualifications || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="mk_educationQualifications" name="educationQualifications" rows="3" placeholder="Degrees, certs, training">${escapeHtml(d.educationQualifications || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_personalBiography">Personal biography</label>
-          <textarea class="ms-knowledge-textarea" id="mk_personalBiography" name="personalBiography" rows="4">${escapeHtml(d.personalBiography || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="mk_personalBiography" name="personalBiography" rows="4" placeholder="Short bio in your words">${escapeHtml(d.personalBiography || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_importantLifeExperiences">Important life experiences</label>
-          <textarea class="ms-knowledge-textarea" id="mk_importantLifeExperiences" name="importantLifeExperiences" rows="3">${escapeHtml(d.importantLifeExperiences || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="mk_importantLifeExperiences" name="importantLifeExperiences" rows="3" placeholder="Milestones or experiences that shaped you">${escapeHtml(d.importantLifeExperiences || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_skillsExpertise">Skills, talents & areas of expertise</label>
-          <textarea class="ms-knowledge-textarea" id="mk_skillsExpertise" name="skillsExpertise" rows="3">${escapeHtml(d.skillsExpertise || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="mk_skillsExpertise" name="skillsExpertise" rows="3" placeholder="Skills, talents, areas of expertise">${escapeHtml(d.skillsExpertise || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_interestsHobbies">Interests & hobbies</label>
-          <textarea class="ms-knowledge-textarea" id="mk_interestsHobbies" name="interestsHobbies" rows="2">${escapeHtml(d.interestsHobbies || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="mk_interestsHobbies" name="interestsHobbies" rows="2" placeholder="Hobbies and interests for casual context">${escapeHtml(d.interestsHobbies || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_enjoysDislikes">Things you enjoy & dislike</label>
-          <textarea class="ms-knowledge-textarea" id="mk_enjoysDislikes" name="enjoysDislikes" rows="3">${escapeHtml(d.enjoysDislikes || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="mk_enjoysDislikes" name="enjoysDislikes" rows="3" placeholder="Likes and dislikes — one line each is fine">${escapeHtml(d.enjoysDislikes || '')}</textarea>
         </div>
       </fieldset>
 
@@ -4479,7 +4479,7 @@ function renderMkPersonalIdentityForm(data) {
         <legend class="ms-knowledge-legend">How Sarah should respond</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_communicationPreferences">Communication preferences</label>
-          <textarea class="ms-knowledge-textarea" id="mk_communicationPreferences" name="communicationPreferences" rows="3">${escapeHtml(d.communicationPreferences || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="mk_communicationPreferences" name="communicationPreferences" rows="3" placeholder="Tone, length, when to be direct">${escapeHtml(d.communicationPreferences || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_responseStyle">Preferred response style</label>
@@ -4491,11 +4491,11 @@ function renderMkPersonalIdentityForm(data) {
         <legend class="ms-knowledge-legend">Values & growth</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_personalValues">Important values & principles</label>
-          <textarea class="ms-knowledge-textarea" id="mk_personalValues" name="personalValues" rows="3">${escapeHtml(d.personalValues || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="mk_personalValues" name="personalValues" rows="3" placeholder="Values that matter in how Sarah helps you">${escapeHtml(d.personalValues || '')}</textarea>
         </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_strengthsImprove">Strengths & areas to improve</label>
-          <textarea class="ms-knowledge-textarea" id="mk_strengthsImprove" name="strengthsImprove" rows="3">${escapeHtml(d.strengthsImprove || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="mk_strengthsImprove" name="strengthsImprove" rows="3" placeholder="Strengths and areas you are working on">${escapeHtml(d.strengthsImprove || '')}</textarea>
         </div>
       </fieldset>
 
