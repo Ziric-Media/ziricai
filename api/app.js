@@ -341,6 +341,8 @@ app.use((req, res, next) => {
         'https://ziricai-production.up.railway.app',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
+        'https://sarah.ziricai.com',
+        'https://ziricai-sarah.netlify.app',
     ].filter(Boolean);
     const origin = req.get('origin');
     if (origin && (allowed.some((o) => origin.startsWith(o.replace(/\/$/, ''))) || process.env.NODE_ENV !== 'production')) {
