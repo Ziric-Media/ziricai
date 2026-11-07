@@ -405,6 +405,21 @@ function bindProtoSearchAndNotif() {
 
   document.getElementById('chatsTabSearchInput')?.addEventListener('input', () => renderChatsList());
 
+  const discoverSearchEl = document.getElementById('discoverSearchInput');
+  discoverSearchEl?.addEventListener('input', (e) => {
+    const next = (e.target.value || '').trim();
+    if (discoverSearchDebounceTimer) clearTimeout(discoverSearchDebounceTimer);
+    discoverSearchDebounceTimer = setTimeout(() => {
+      discoverSearchQuery = next;
+      renderDiscover();
+    }, 180);
+  });
+  discoverSearchEl?.addEventListener('search', (e) => {
+    if (discoverSearchDebounceTimer) clearTimeout(discoverSearchDebounceTimer);
+    discoverSearchQuery = (e.target.value || '').trim();
+    renderDiscover();
+  });
+
   document.querySelectorAll('[data-proto-sheet-close]').forEach((el) => {
     el.addEventListener('click', () => {
       const which = el.getAttribute('data-proto-sheet-close');
@@ -424,6 +439,9 @@ function bindProtoSearchAndNotif() {
 
 let activeFeedTab = 'for-you';
 let activeDiscoverCategory = 'all';
+let discoverSearchQuery = '';
+let discoverSearchDebounceTimer = null;
+let pendingDiscoverSearchFromOrg = '';
 let activeProfileSocialTab = 'posts';
 /** BP-01: 'posts' | 'about' for Business Profile public tab */
 let activeProfileBusinessSocialTab = 'posts';
@@ -6094,6 +6112,9 @@ function renderMyOrganisationsPanel() {
     document.getElementById('msOrganisationsRoot')?.addEventListener('keydown', (e) => {
       if (e.target.id === 'msOrgSearchInput' && e.key === 'Enter') {
         e.preventDefault();
+        const q = (e.target.value || '').trim();
+        discoverSearchQuery = q;
+        pendingDiscoverSearchFromOrg = q;
         setRoute('discover');
       }
     });
@@ -7144,10 +7165,87 @@ function openDiscoverCompany(id) {
   location.hash = `discover/${id}`;
 }
 
+/** D0: client-side only until GET /api/discover/companies returns full U6 listing cards. */
+function discoverCompaniesSource() {
+  return MOCK_DISCOVER_COMPANIES || [];
+}
+
+const DISCOVER_NL_KEYWORDS = {
+  dentist: ['dental', 'dentist', 'teeth', 'orthodont', 'smile'],
+  dental: ['dental', 'dentist', 'teeth'],
+  plumber: ['plumb', 'pipe', 'drain', 'leak', 'geyser'],
+  plumbing: ['plumb', 'pipe', 'drain', 'leak'],
+  restaurant: ['restaurant', 'bistro', 'dining', 'brunch', 'eatery'],
+  cafe: ['cafe', 'coffee', 'espresso', 'latte'],
+  coffee: ['coffee', 'cafe', 'espresso'],
+  gym: ['fitness', 'hiit', 'yoga', 'strength', 'studio'],
+  fitness: ['fitness', 'hiit', 'yoga', 'gym'],
+  spa: ['spa', 'massage', 'wellness', 'facial'],
+  vegan: ['vegan', 'plant-based', 'plant based'],
+  car: ['auto', 'motor', 'vehicle', 'dealership', 'test-drive', 'test drive'],
+  groceries: ['market', 'grocery', 'groceries', 'produce', 'pantry'],
+};
+
+function discoverListingHaystack(company) {
+  const parts = [
+    company.name,
+    company.categoryLabel,
+    company.description,
+    company.address,
+    ...(company.categories || []),
+    ...(company.tags || []),
+    ...((company.products || []).flatMap((p) => [p.name, p.description].filter(Boolean))),
+  ];
+  return parts
+    .join(' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function discoverSearchTerms(rawQuery) {
+  const q = (rawQuery || '').trim().toLowerCase();
+  if (!q) return [];
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const terms = new Set(tokens);
+  tokens.forEach((tok) => {
+    const related = DISCOVER_NL_KEYWORDS[tok];
+    if (related) related.forEach((r) => terms.add(r));
+  });
+  return [...terms];
+}
+
+function discoverMatchesSearch(company, rawQuery) {
+  const terms = discoverSearchTerms(rawQuery);
+  if (!terms.length) return true;
+  const haystack = discoverListingHaystack(company);
+  const phrase = (rawQuery || '').trim().toLowerCase();
+  if (phrase.length >= 2 && haystack.includes(phrase)) return true;
+  return terms.some((t) => t.length >= 2 && haystack.includes(t));
+}
+
+function filterDiscoverListings(companies, categoryId, rawQuery) {
+  return companies.filter((c) => {
+    const catOk = categoryId === 'all' || (c.categories || []).includes(categoryId);
+    if (!catOk) return false;
+    return discoverMatchesSearch(c, rawQuery);
+  });
+}
+
 function renderDiscover() {
   const catsHost = document.getElementById('discoverCats');
   const gridHost = document.getElementById('discoverGrid');
   if (!catsHost || !gridHost) return;
+
+  const searchInput = document.getElementById('discoverSearchInput');
+  if (searchInput) {
+    if (pendingDiscoverSearchFromOrg) {
+      searchInput.value = pendingDiscoverSearchFromOrg;
+      discoverSearchQuery = pendingDiscoverSearchFromOrg;
+      pendingDiscoverSearchFromOrg = '';
+    } else if (searchInput.value !== discoverSearchQuery) {
+      searchInput.value = discoverSearchQuery;
+    }
+  }
 
   catsHost.innerHTML = MOCK_DISCOVER_CATEGORIES.map(
     (cat) => `
@@ -7163,10 +7261,15 @@ function renderDiscover() {
     });
   });
 
-  const list = MOCK_DISCOVER_COMPANIES.filter((c) => {
-    if (activeDiscoverCategory === 'all') return true;
-    return c.categories.includes(activeDiscoverCategory);
-  });
+  const list = filterDiscoverListings(discoverCompaniesSource(), activeDiscoverCategory, discoverSearchQuery);
+
+  if (!list.length) {
+    const hasQuery = Boolean((discoverSearchQuery || '').trim());
+    gridHost.innerHTML = hasQuery
+      ? '<p class="feed-empty-search">No businesses match your search. Try another keyword or clear the field.</p>'
+      : '<p class="feed-empty-search">No businesses in this category yet.</p>';
+    return;
+  }
 
   gridHost.innerHTML = list
     .map(

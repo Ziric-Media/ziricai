@@ -814,6 +814,11 @@
   width: 40px;
 }
 
+.discover-search-wrap {
+  padding: 0 16px 12px;
+  background: #f3f5f9;
+}
+
 .discover-cats-wrap {
   overflow-x: auto;
   padding: 0 16px 14px;
