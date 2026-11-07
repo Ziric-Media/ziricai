@@ -15,6 +15,12 @@ import {
     upsertMessage as upsertFirestoreMessage,
 } from "./userConversationFirestoreStore.js";
 import { useAdminBackend } from "../database/firestoreClient.js";
+import {
+    buildSarahAppConversationOpenedEvent,
+    buildSarahAppMessageIntegrationEvent,
+    isSarahAppIntegrationEventsEnabled,
+    publishIntegrationEvent,
+} from "../events/publishIntegrationEvent.js";
 
 const CHANNEL = "sarah_app";
 
@@ -49,6 +55,15 @@ async function mirrorConversationToFirestore(conv) {
         await upsertConversation(conv);
     } catch (err) {
         console.warn("[userConversationService] Firestore conversation upsert failed:", err.message);
+    }
+}
+
+async function emitSarahAppIntegrationEvent(envelope) {
+    if (!isSarahAppIntegrationEventsEnabled()) return;
+    try {
+        await publishIntegrationEvent(envelope);
+    } catch (err) {
+        console.warn("[userConversationService] integration event publish failed:", err.message);
     }
 }
 
@@ -99,6 +114,7 @@ export async function openUserConversation(userId, companyId, meta = {}) {
         conversations.set(key, conv);
         messagesByConversation.set(conv.id, []);
         await mirrorConversationToFirestore(conv);
+        await emitSarahAppIntegrationEvent(buildSarahAppConversationOpenedEvent(conv));
     }
     return conv;
 }
@@ -171,6 +187,8 @@ export async function appendUserConversationMessage(conv, message) {
 
     await mirrorMessageToFirestore(conv, entry);
     await mirrorConversationToFirestore(conv);
+
+    await emitSarahAppIntegrationEvent(buildSarahAppMessageIntegrationEvent(conv, entry));
 
     return entry;
 }

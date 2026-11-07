@@ -46,6 +46,8 @@ export const TENANT_COLLECTIONS = {
     FINANCE_CATEGORIES: "financeCategories",
     /** Server-only dedupe ledger for retry-safe financial writes (doc id = hash(scope,key)). */
     FINANCE_IDEMPOTENCY_KEYS: "financeIdempotencyKeys",
+    /** C1 — integration envelope publish dedupe (doc id = hash of idempotencyKey). */
+    INTEGRATION_IDEMPOTENCY_KEYS: "integrationIdempotencyKeys",
     /** SF-02 F3b — tenant chart of accounts + manual journal entries */
     FINANCE_GL_ACCOUNTS: "financeGlAccounts",
     FINANCE_JOURNAL_ENTRIES: "financeJournalEntries",
@@ -130,6 +132,10 @@ export const SARAH_NETWORK = {
 
 export function sarahNetworkRequestPath(requestId) {
     return `${SARAH_NETWORK.ROOT}/${SARAH_NETWORK.REQUESTS}/${requestId}`;
+}
+
+export function sarahNetworkAuditPath(eventId) {
+    return `${SARAH_NETWORK.ROOT}/${SARAH_NETWORK.AUDIT}/${eventId}`;
 }
 
 /** Sarah App consumer chat index (server writes only in C1). */
