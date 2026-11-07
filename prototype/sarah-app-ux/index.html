@@ -606,22 +606,22 @@
       </div>
     </section>
 
-    <!-- Profile — Persona (personal) vs Business (BP-01A): distinct environments -->
+    <!-- Profile (single public environment — Business BP-01A shell retained in markup only) -->
     <section class="view profile-view" data-view="profile" data-profile-panel="public" data-profile-kind="persona">
-      <div class="profile-kind-toolbar" role="tablist" aria-label="Profile type">
-        <button type="button" class="profile-kind-btn is-active" id="profileKindPersona" data-profile-kind-set="persona" role="tab" aria-selected="true">Persona</button>
-        <button type="button" class="profile-kind-btn" id="profileKindBusiness" data-profile-kind-set="business" role="tab" aria-selected="false">Business</button>
-      </div>
+      <input type="file" id="profileCoverInput" class="profile-media-input" accept="image/*" hidden />
+      <input type="file" id="profileAvatarInput" class="profile-media-input" accept="image/*" hidden />
 
       <div class="profile-persona-panels" id="profilePersonaPanels">
         <div class="profile-panel" id="profilePersonaPublicPanel">
           <div class="profile-cover-wrap">
             <img class="profile-cover" id="profileCover" src="assets/profile/spencer-cover.jpg" alt="" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/discover/green-haven-hero.jpg';}" />
             <span class="profile-cover-shade" aria-hidden="true"></span>
-            <button type="button" class="profile-cover-btn">Cover photo</button>
+            <button type="button" class="profile-cover-btn" id="profileCoverPick">Cover photo</button>
           </div>
           <div class="profile-identity">
-            <img class="profile-avatar" data-profile-avatar data-profile-kind="persona" src="assets/profile/spencer-avatar.jpg" alt="" width="88" height="88" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/discover/green-haven-fallback.svg';}" />
+            <button type="button" class="profile-avatar-btn" id="profileAvatarPick" aria-label="Change profile photo">
+              <img class="profile-avatar" data-profile-avatar data-profile-kind="persona" src="assets/profile/spencer-avatar.jpg" alt="" width="88" height="88" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/discover/green-haven-fallback.svg';}" />
+            </button>
             <div class="profile-identity-row">
               <div class="profile-name-block">
                 <h1 class="profile-name" data-profile-name data-profile-kind="persona">Spencer</h1>
@@ -799,7 +799,14 @@
           <img class="avatar avatar-sm create-post-avatar" data-user-avatar src="" alt="" width="40" height="40" />
           <textarea id="createPostInput" class="create-post-input" rows="5" maxlength="500" placeholder="What's on your mind? Your post appears on Status and your profile."></textarea>
         </div>
-        <p class="create-post-hint">Prototype — text posts only. Photos and links in a later wave.</p>
+        <div class="create-post-preview hidden" id="createPostPreview" aria-live="polite"></div>
+        <div class="create-post-toolbar" role="group" aria-label="Add media">
+          <button type="button" class="create-post-media-btn" id="createPostPickImage">Photo</button>
+          <button type="button" class="create-post-media-btn" id="createPostPickVideo">Video</button>
+          <button type="button" class="create-post-media-btn create-post-media-btn--clear hidden" id="createPostClearMedia">Remove</button>
+          <input type="file" id="createPostMediaInput" accept="image/*,video/*" hidden />
+        </div>
+        <p class="create-post-hint">Add text, a photo, or a video — your post shows on Status and your profile.</p>
       </div>
     </div>
 

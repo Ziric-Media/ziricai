@@ -195,9 +195,18 @@ function renderFeedCard(item) {
   const avatarSrc = escapeHtml(prototypeAsset(resolveItemAvatar(item)));
   const counts = feedEngagementCounts(item);
   const postId = item.id || `post-${escapeHtml(item.author)}-${escapeHtml(item.time)}`;
-  const img = item.image
-    ? `<div class="feed-media"><img src="${escapeHtml(prototypeAsset(item.image))}" alt="" loading="lazy" referrerpolicy="no-referrer" ${profileImgOnError(item.imageFallback || '')} /></div>`
-    : '';
+  const mediaSrc = item.video || item.image;
+  let media = '';
+  if (item.video) {
+    media = `<div class="feed-media feed-media--video"><video src="${escapeHtml(prototypeAsset(item.video))}" controls playsinline preload="metadata"></video></div>`;
+  } else if (item.image) {
+    media = `<div class="feed-media"><img src="${escapeHtml(prototypeAsset(item.image))}" alt="" loading="lazy" referrerpolicy="no-referrer" ${profileImgOnError(item.imageFallback || '')} /></div>`;
+  }
+  const bodyBlock = item.body
+    ? `<p class="feed-card-body text-post">${escapeHtml(item.body)}</p>`
+    : mediaSrc && !item.body
+      ? ''
+      : `<p class="feed-card-body text-post">${escapeHtml(item.body || '')}</p>`;
   const likeLabel = counts.liked ? 'Liked' : 'Like';
   return `
       <article class="feed-card" data-feed-post-id="${escapeHtml(postId)}">
@@ -209,8 +218,8 @@ function renderFeedCard(item) {
           </div>
           <button type="button" class="feed-card-more" aria-label="More options">⋯</button>
         </header>
-        <p class="feed-card-body text-post">${escapeHtml(item.body)}</p>
-        ${img}
+        ${bodyBlock}
+        ${media}
         ${renderFeedStatsRow(counts)}
         <footer class="feed-engage text-action">
           ${feedEngageButton('iconHeart', likeLabel, postId, 'like', counts.liked)}
@@ -449,6 +458,13 @@ let activeProfilePanel = 'public';
 /** BP-01A: persona vs business profile environment */
 let activeProfileKind = 'persona';
 const PROFILE_KIND_STORAGE_KEY = 'sarah.prototype.profile.activeKind.v1';
+const PROFILE_AVATAR_STORAGE_KEY = 'sarah.prototype.profile.avatar.v1';
+const PROFILE_COVER_STORAGE_KEY = 'sarah.prototype.profile.cover.v1';
+const PROFILE_UPLOAD_MAX_BYTES = 2_500_000;
+const CREATE_POST_IMAGE_MAX_BYTES = 5_000_000;
+const CREATE_POST_VIDEO_MAX_BYTES = 12_000_000;
+let createPostPendingMedia = null;
+let createPostMediaPick = 'image';
 
 const VIEWS = [
   'welcome',
@@ -1025,17 +1041,18 @@ function getUserCreatedPosts() {
   return getSarahRuntime().userPosts;
 }
 
-function buildUserFeedPost(body) {
+function buildUserFeedPost(body, media) {
   return {
     id: `user-${Date.now()}`,
     tab: 'for-you',
     author: MOCK_USER.name,
     authorType: 'creator',
     verified: MOCK_PROFILE?.verified,
-    avatar: MOCK_USER.avatar,
+    avatar: getEffectiveUserAvatar(),
     time: 'Just now',
-    body,
-    image: null,
+    body: body || '',
+    image: media?.type === 'image' ? media.dataUrl : null,
+    video: media?.type === 'video' ? media.dataUrl : null,
     likes: 0,
     comments: 0,
     sponsored: false,
@@ -1046,24 +1063,171 @@ function userPostVisibleOnFeedTab(post, tabId) {
   if (tabId === 'for-you' || tabId === 'following') return true;
   if (tabId === 'creators') return post.authorType === 'creator';
   if (tabId === 'companies') return false;
-  if (tabId === 'videos') return Boolean(post.image);
+  if (tabId === 'videos') return Boolean(post.video || post.image);
   return true;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadStoredProfileDataUrl(key) {
+  try {
+    const v = localStorage.getItem(key);
+    return v && v.startsWith('data:') ? v : '';
+  } catch {
+    return '';
+  }
+}
+
+function saveStoredProfileDataUrl(key, dataUrl) {
+  try {
+    if (!dataUrl) localStorage.removeItem(key);
+    else localStorage.setItem(key, dataUrl);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getEffectiveUserAvatar() {
+  return loadStoredProfileDataUrl(PROFILE_AVATAR_STORAGE_KEY) || MOCK_USER.avatar;
+}
+
+function getEffectiveProfileCover() {
+  return loadStoredProfileDataUrl(PROFILE_COVER_STORAGE_KEY) || MOCK_PROFILE?.cover || 'assets/profile/spencer-cover.jpg';
+}
+
+function updateCreatePostSubmitState() {
+  const input = document.getElementById('createPostInput');
+  const submit = document.getElementById('createPostSubmit');
+  const text = input?.value.trim() || '';
+  if (submit) submit.disabled = !text && !createPostPendingMedia;
+}
+
+function renderCreatePostPreview() {
+  const host = document.getElementById('createPostPreview');
+  const clearBtn = document.getElementById('createPostClearMedia');
+  if (!host) return;
+  if (!createPostPendingMedia?.dataUrl) {
+    host.classList.add('hidden');
+    host.innerHTML = '';
+    clearBtn?.classList.add('hidden');
+    return;
+  }
+  host.classList.remove('hidden');
+  clearBtn?.classList.remove('hidden');
+  if (createPostPendingMedia.type === 'video') {
+    host.innerHTML = `<video src="${escapeHtml(createPostPendingMedia.dataUrl)}" controls playsinline preload="metadata"></video>`;
+  } else {
+    host.innerHTML = `<img src="${escapeHtml(createPostPendingMedia.dataUrl)}" alt="Attached photo" />`;
+  }
+}
+
+function clearCreatePostMedia() {
+  createPostPendingMedia = null;
+  const input = document.getElementById('createPostMediaInput');
+  if (input) input.value = '';
+  renderCreatePostPreview();
+  updateCreatePostSubmitState();
+}
+
+async function attachCreatePostMediaFile(file) {
+  if (!file) return;
+  const isVideo = (file.type || '').startsWith('video/');
+  const isImage = (file.type || '').startsWith('image/');
+  if (!isVideo && !isImage) {
+    showProtoToast('Choose a photo or video file.');
+    return;
+  }
+  const limit = isVideo ? CREATE_POST_VIDEO_MAX_BYTES : CREATE_POST_IMAGE_MAX_BYTES;
+  if (file.size > limit) {
+    showProtoToast(`File is too large for the prototype (max ${Math.round(limit / 1_000_000)} MB).`);
+    return;
+  }
+  try {
+    const dataUrl = await readFileAsDataUrl(file);
+    createPostPendingMedia = { type: isVideo ? 'video' : 'image', dataUrl, name: file.name };
+    renderCreatePostPreview();
+    updateCreatePostSubmitState();
+  } catch {
+    showProtoToast('Could not attach that file.');
+  }
+}
+
+async function saveProfileImageFile(file, kind) {
+  if (!file || !(file.type || '').startsWith('image/')) {
+    showProtoToast('Choose an image file.');
+    return;
+  }
+  if (file.size > PROFILE_UPLOAD_MAX_BYTES) {
+    showProtoToast('Image is too large — try under 2.5 MB.');
+    return;
+  }
+  let dataUrl = '';
+  try {
+    dataUrl = await readFileAsDataUrl(file);
+  } catch {
+    showProtoToast('Could not read that image.');
+    return;
+  }
+  const key = kind === 'cover' ? PROFILE_COVER_STORAGE_KEY : PROFILE_AVATAR_STORAGE_KEY;
+  if (!saveStoredProfileDataUrl(key, dataUrl)) {
+    showProtoToast('Could not save — browser storage may be full.');
+    return;
+  }
+  applyStoredProfileMedia();
+  syncUserAvatars();
+  const { route } = parseLocationHash();
+  if (route === 'profile') renderProfile(activeProfilePanel, 'persona');
+  showProtoToast(kind === 'cover' ? 'Cover photo updated.' : 'Profile photo updated.');
+}
+
+function applyStoredProfileMedia() {
+  const cover = document.getElementById('profileCover');
+  const coverSrc = getEffectiveProfileCover();
+  if (cover) {
+    cover.removeAttribute('data-fb');
+    cover.src = prototypeAsset(coverSrc);
+    if (!/^data:/i.test(coverSrc)) {
+      cover.onerror = function onCoverErr() {
+        if (this.dataset.fb) return;
+        this.dataset.fb = '1';
+        this.src = prototypeAsset(MOCK_PROFILE?.coverFallback || 'assets/discover/green-haven-hero.jpg');
+      };
+    }
+  }
+  document.querySelectorAll('.profile-avatar[data-profile-kind="persona"]').forEach((img) => {
+    const av = getEffectiveUserAvatar();
+    img.removeAttribute('data-fb');
+    img.src = prototypeAsset(av);
+    img.onerror = function onAvatarErr() {
+      if (this.dataset.fb) return;
+      this.dataset.fb = '1';
+      this.src = prototypeAsset(MOCK_PROFILE?.avatarFallback || 'assets/discover/green-haven-fallback.svg');
+    };
+  });
 }
 
 function openCreatePostSheet() {
   const sheet = document.getElementById('createPostSheet');
   if (!sheet) return;
   syncUserAvatars();
+  clearCreatePostMedia();
   sheet.classList.remove('hidden');
   sheet.setAttribute('aria-hidden', 'false');
   document.body.classList.add('is-create-post-open');
   const input = document.getElementById('createPostInput');
-  const submit = document.getElementById('createPostSubmit');
   if (input) {
     input.value = '';
     requestAnimationFrame(() => input.focus({ preventScroll: true }));
   }
-  if (submit) submit.disabled = true;
+  updateCreatePostSubmitState();
 }
 
 function closeCreatePostSheet() {
@@ -1072,17 +1236,20 @@ function closeCreatePostSheet() {
   sheet.classList.add('hidden');
   sheet.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('is-create-post-open');
+  clearCreatePostMedia();
 }
 
 function submitCreatePost() {
   const input = document.getElementById('createPostInput');
-  const text = input?.value.trim();
-  if (!text) return;
-  getUserCreatedPosts().unshift(buildUserFeedPost(text));
+  const text = input?.value.trim() || '';
+  if (!text && !createPostPendingMedia) return;
+  const media = createPostPendingMedia ? { ...createPostPendingMedia } : null;
+  getUserCreatedPosts().unshift(buildUserFeedPost(text, media));
   closeCreatePostSheet();
   const { route } = parseLocationHash();
-  if (route === 'status') renderHome();
+  if (route === 'status' || route === 'home') renderHome();
   if (route === 'profile') renderProfile(activeProfilePanel, activeProfileKind);
+  showProtoToast('Posted to Status.');
 }
 
 function bindCreatePostUi() {
@@ -1097,10 +1264,7 @@ function bindCreatePostUi() {
   });
 
   document.getElementById('createPostSubmit')?.addEventListener('click', submitCreatePost);
-  document.getElementById('createPostInput')?.addEventListener('input', (e) => {
-    const submit = document.getElementById('createPostSubmit');
-    if (submit) submit.disabled = !e.target.value.trim();
-  });
+  document.getElementById('createPostInput')?.addEventListener('input', () => updateCreatePostSubmitState());
   document.getElementById('createPostInput')?.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
@@ -1108,8 +1272,54 @@ function bindCreatePostUi() {
     }
   });
 
+  document.getElementById('createPostPickImage')?.addEventListener('click', () => {
+    createPostMediaPick = 'image';
+    const input = document.getElementById('createPostMediaInput');
+    if (!input) return;
+    input.accept = 'image/*';
+    input.click();
+  });
+  document.getElementById('createPostPickVideo')?.addEventListener('click', () => {
+    createPostMediaPick = 'video';
+    const input = document.getElementById('createPostMediaInput');
+    if (!input) return;
+    input.accept = 'video/*';
+    input.click();
+  });
+  document.getElementById('createPostMediaInput')?.addEventListener('change', (e) => {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement) || !input.files?.length) return;
+    attachCreatePostMediaFile(input.files[0]);
+    input.value = '';
+  });
+  document.getElementById('createPostClearMedia')?.addEventListener('click', () => clearCreatePostMedia());
+
   document.querySelectorAll('[data-create-post-close]').forEach((el) => {
     el.addEventListener('click', closeCreatePostSheet);
+  });
+}
+
+function bindProfileMediaUiOnce() {
+  if (window.__profileMediaBound) return;
+  window.__profileMediaBound = true;
+
+  document.getElementById('profileCoverPick')?.addEventListener('click', () => {
+    document.getElementById('profileCoverInput')?.click();
+  });
+  document.getElementById('profileAvatarPick')?.addEventListener('click', () => {
+    document.getElementById('profileAvatarInput')?.click();
+  });
+  document.getElementById('profileCoverInput')?.addEventListener('change', (e) => {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement) || !input.files?.length) return;
+    saveProfileImageFile(input.files[0], 'cover');
+    input.value = '';
+  });
+  document.getElementById('profileAvatarInput')?.addEventListener('change', (e) => {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement) || !input.files?.length) return;
+    saveProfileImageFile(input.files[0], 'avatar');
+    input.value = '';
   });
 }
 
@@ -6714,12 +6924,13 @@ function renderProfileSocialTab() {
         renderFeedCard({
           id: post.id,
           author: MOCK_USER.name,
-          avatar: MOCK_USER.avatar,
+          avatar: getEffectiveUserAvatar(),
           verified: MOCK_PROFILE.verified,
           time: post.time,
           authorType: post.authorType || 'creator',
           body: post.body,
           image: post.image,
+          video: post.video,
           imageFallback: MOCK_PROFILE.coverFallback,
           likes: post.likes,
           comments: post.comments,
@@ -6967,24 +7178,19 @@ function renderProfilePersona(profilePanel) {
   const p = MOCK_PROFILE || {};
   syncUserAvatars();
   const cover = document.getElementById('profileCover');
+  const coverSrc = getEffectiveProfileCover();
   if (cover) {
     cover.removeAttribute('data-fb');
-    cover.src = prototypeAsset(p.cover || 'assets/profile/spencer-cover.jpg');
-    cover.onerror = function onCoverErr() {
-      if (this.dataset.fb) return;
-      this.dataset.fb = '1';
-      this.src = prototypeAsset(p.coverFallback || 'assets/discover/green-haven-hero.jpg');
-    };
+    cover.src = prototypeAsset(coverSrc);
+    if (!/^data:/i.test(coverSrc)) {
+      cover.onerror = function onCoverErr() {
+        if (this.dataset.fb) return;
+        this.dataset.fb = '1';
+        this.src = prototypeAsset(p.coverFallback || 'assets/discover/green-haven-hero.jpg');
+      };
+    }
   }
-  document.querySelectorAll('.profile-avatar[data-profile-kind="persona"]').forEach((img) => {
-    img.removeAttribute('data-fb');
-    img.src = prototypeAsset(MOCK_USER.avatar);
-    img.onerror = function onAvatarErr() {
-      if (this.dataset.fb) return;
-      this.dataset.fb = '1';
-      this.src = prototypeAsset(p.avatarFallback || 'assets/discover/green-haven-fallback.svg');
-    };
-  });
+  applyStoredProfileMedia();
   document.querySelectorAll('[data-profile-name][data-profile-kind="persona"]').forEach((el) => {
     el.textContent = MOCK_USER.name;
   });
@@ -7545,15 +7751,18 @@ function renderCompanyDetail(companyId) {
 }
 
 function syncUserAvatars() {
+  const av = getEffectiveUserAvatar();
   document.querySelectorAll('[data-user-avatar]').forEach((img) => {
     img.removeAttribute('data-fb');
-    img.src = prototypeAsset(MOCK_USER.avatar);
+    img.src = prototypeAsset(av);
     img.alt = MOCK_USER.name;
-    img.onerror = function onUserAvatarErr() {
-      if (this.dataset.fb) return;
-      this.dataset.fb = '1';
-      this.src = prototypeAsset(MOCK_PROFILE?.avatarFallback || 'assets/discover/green-haven-fallback.svg');
-    };
+    if (!/^data:/i.test(av)) {
+      img.onerror = function onUserAvatarErr() {
+        if (this.dataset.fb) return;
+        this.dataset.fb = '1';
+        this.src = prototypeAsset(MOCK_PROFILE?.avatarFallback || 'assets/discover/green-haven-fallback.svg');
+      };
+    }
   });
 }
 
@@ -7593,7 +7802,7 @@ function renderHome() {
     if (activeFeedTab === 'following') return p.tab === 'following';
     if (activeFeedTab === 'companies') return p.authorType === 'company';
     if (activeFeedTab === 'creators') return p.authorType === 'creator';
-    if (activeFeedTab === 'videos') return Boolean(p.image);
+    if (activeFeedTab === 'videos') return Boolean(p.image || p.video);
     return true;
   });
   const display = items.length ? items : MOCK_FEED.filter((p) => p.tab === 'for-you');
@@ -7736,6 +7945,7 @@ function init() {
   initAuthTabs();
   bindGalleryLightbox();
   bindCreatePostUi();
+  bindProfileMediaUiOnce();
   bindProtoSearchAndNotif();
 
   window.addEventListener('hashchange', () => activateView());
