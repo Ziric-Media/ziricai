@@ -1831,17 +1831,29 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  padding-inline-start: 1em;
   display: flex;
   flex-direction: column;
   gap: 2px;
   flex: 0 0 auto;
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-sub {
+  display: list-item;
+  list-style-type: disc;
+  list-style-position: outside;
   font-size: 10px;
   line-height: 1.3;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-sub::marker {
+  color: var(--color-text-secondary);
+  font-size: 0.85em;
 }
 
 /* Narrow phones — keep grid but tighten rhythm so nothing collides with compose + nav */
@@ -1894,6 +1906,10 @@
 
   .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-title {
     font-size: 12px;
+  }
+
+  .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-statements {
+    padding-inline-start: 0.85em;
   }
 
   .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-sub {
@@ -4734,15 +4750,24 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  padding-inline-start: 1em;
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
 
 .ms-quick-sub {
+  display: list-item;
+  list-style-type: disc;
+  list-style-position: outside;
   font-size: 11px;
   line-height: 1.35;
   color: var(--color-text-secondary);
+}
+
+.ms-quick-sub::marker {
+  color: var(--color-text-secondary);
+  font-size: 0.85em;
 }
 
 .ms-chat-log {
