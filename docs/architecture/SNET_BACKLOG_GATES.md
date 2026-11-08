@@ -30,3 +30,17 @@ Status: `done` · `partial` · `skipped` (reason given) · `planned`.
 | Server-side block of test/demo tenants from the public directory | **done** | `isHardBlockedFromPublicDirectory` (`networkEligibility.js`): DEMO/SHOWCASE, TEST and ACCEPTANCE classes are filtered out of `listDiscoverCards` and fail `assertCompanyDiscoverable` (so also company chat entry) **even if a stored/seeded directory entry says public**; operator allow-list (`SARAH_NETWORK_PILOT_COMPANY_IDS`) wins; UNKNOWN is still gated at publish time only (not blocked at read, so existing tests/entries keep working); Client Zero and pilots are never blocked. Tests: `test/gate5-network-crumbs.test.mjs`. |
 
 Tests: `test/gate5-network-crumbs.test.mjs` (5 tests) in `test:snet-programme`.
+
+## Deploy log (2026-11-08, from clean worktree at `ba66c17`)
+
+| Target | Id / result |
+|---|---|
+| Railway production | `5c9861a3-560a-40cd-b1af-3a93e476e61c` (SUCCESS; `bf0d7e51` was the first deploy of `ba66c17`) |
+| Netlify sarah (`sarah.ziricai.com`) | `6af0d8942351f05da7ca7425` |
+| Netlify app (`app.ziricai.com`) | `6af0d8b276383f8c20c4f8c6` |
+| Netlify admin (`admin.ziricai.com`) | `6af0d912f923bb7514191c45` |
+
+Railway env set: `SARAH_NETWORK_PILOT_COMPANY_IDS=smilemore-demo,central-motors-rtb` (Gate 4). Discover returns 2 companies; Central Motors is `verified:false`.
+Rollback: set the variable back to `smilemore-demo` and redeploy.
+Caveat: a variable-change redeploy (`b8e7993f`) FAILED with ERR_MODULE_NOT_FOUND for `services/tenants/teamMemberService.js` (a tracked file, present in the clean tree). Always follow variable changes with `railway up` from a clean worktree.
+Gate 1: `USER_CONVERSATIONS_BACKEND` was not changed. See `docs/deployment/SARAH_CHAT_FIRESTORE_PRODUCTION.md` for the manual step.
