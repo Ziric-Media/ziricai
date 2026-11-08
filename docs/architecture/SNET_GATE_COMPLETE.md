@@ -87,13 +87,13 @@ Run after the release; results are recorded in the deploy log. No credentials ar
 | `GET /api/health` | 200 |
 | `GET /api/discover/companies` (anonymous) | 200; ≥ 2 listed companies, none verified by code, no demo/fixture ids |
 | `GET /api/network/v1/my-updates` (anonymous) | 401 (consumer auth enforced) |
-| `POST /api/network/v1/orgs/<companyId>/verification/evidence-uploads` (anonymous) | 401/403 (tenant auth enforced) |
+| `POST/PUT /api/network/v1/orgs/<companyId>/verification/evidence-uploads[/:uploadId]` (anonymous) | 401/403 (tenant auth enforced; path is under `/orgs/`, not `/companies/` — the latter is 404 by design) |
 | `GET /api/platform/network/v1/stats` (anonymous) | 401/403 |
 | `https://sarah.ziricai.com`, `https://app.ziricai.com`, `https://admin.ziricai.com` | 200, serve the new build |
 
 ## 4. Manual verification still required (cannot be asserted in tests)
 
-1. **Company Portal → Sarah Network** (owner/manager and a non-manager): edit profile, publish, attach evidence with and without a file; non-managers read-only. *Not exercised in a real browser in this run.*
+1. **Company Portal → Sarah Network** (owner/manager and a non-manager): edit profile, publish, attach evidence with and without a file; non-managers read-only. For file evidence, DevTools should show token + upload on `POST` / `PUT /api/network/v1/orgs/<companyId>/verification/evidence-uploads[/:uploadId]` (tenant auth), then attach via `POST …/verification/evidence` with `uploadId` — not `/api/companies/…` (workspace routes only; verification upload there is 404). *Not exercised in a real browser in this run.*
 2. **Mission Control → Sarah Network**: Overview / Entities / Verification queue (evidence shows file name, size, checksum) / Moderation render without console errors.
 3. **Sarah App (signed in, live mode)**: Discover shows both pilots; Follow / Subscribe; My Organisations shows *Updates* after a business records an announcement; Central Motors chat opens once and appears in Chats.
 4. **Central Motors in MC**: `central-motors-rtb` is `listed`, PILOT, unverified, no open verification case.
