@@ -1,10 +1,10 @@
 /**
  * SNET-05 — Network search API (v1).
- *   GET /api/network/v1/directory/search?q&category&verified=1&limit&cursor   (consumer)
- *   GET /api/network/v1/directory/suggest?q=                                  (consumer)
+ *   GET /api/network/v1/directory/search?q&category&verified=1&limit&cursor   (public read of listed entries, per-IP rate limit)
+ *   GET /api/network/v1/directory/suggest?q=                                  (public read, per-IP rate limit)
  *   GET /api/network/v1/health                                                (public, non-sensitive)
  */
-import { requireConsumerScope } from "../auth/consumerAuth.js";
+import { publicReadRateLimit } from "../auth/authRateLimiter.js";
 import { getSearchProvider } from "../network/networkSearchService.js";
 
 function fail(res, err, fallbackCode) {
@@ -16,10 +16,10 @@ function fail(res, err, fallbackCode) {
 
 /**
  * @param {import('express').Express} app
- * @param {{ consumerGuard?: Function }} [deps]
+ * @param {{ discoverGuard?: Function }} [deps]
  */
 export function mountNetworkSearchRoutes(app, deps = {}) {
-    const guard = deps.consumerGuard || requireConsumerScope();
+    const guard = deps.discoverGuard || publicReadRateLimit();
 
     app.get("/api/network/v1/directory/search", guard, async (req, res) => {
         try {

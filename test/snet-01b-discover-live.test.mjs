@@ -27,6 +27,7 @@ import {
 import { isValidSnId } from "../services/network/snId.js";
 import { deriveCategories } from "../services/network/networkTaxonomy.js";
 import { mountUserConversationRoutes } from "../services/api/userConversationRoutes.js";
+import { resetAuthRateLimits } from "../services/auth/authRateLimiter.js";
 
 function reset() {
     clearNetworkEntitiesForTests();
@@ -99,12 +100,86 @@ test("taxonomy derives categories from industry text; explicit categories win", 
     assert.deepEqual(deriveCategories({ industry: "Quantum cheese" }), []);
 });
 
-test("discover route requires consumer auth", async () => {
+test("public Discover: anonymous read returns listed entries only (no restricted/private fields)", async () => {
+    reset();
+    resetAuthRateLimits();
+    upsertBusinessDirectoryEntry("acme-motors-1a2b", {
+        discoverability: "public",
+        displayName: "Acme Motors",
+        industry: "Automotive dealership",
+        shortDescription: "New and used cars",
+        location: "Pretoria, South Africa",
+        restricted: { legalName: "Acme Motors (Pty) Ltd", registrationNumber: "2020/123456/07" },
+    });
+    upsertBusinessDirectoryEntry("hidden-co", { discoverability: "hidden", displayName: "Hidden Co" });
+    await tick();
     const app = express();
     mountUserConversationRoutes(app);
     const server = app.listen(0);
     try {
-        const res = await fetch(`http://127.0.0.1:${server.address().port}/api/discover/companies?q=dentist`);
+        const base = `http://127.0.0.1:${server.address().port}`;
+        const res = await fetch(`${base}/api/discover/companies`);
+        assert.equal(res.status, 200, "no Authorization header needed");
+        const body = await res.json();
+        const ids = body.companies.map((c) => c.companyId);
+        assert.ok(ids.includes("acme-motors-1a2b"));
+        assert.ok(ids.includes(SMILEMORE_DEMO_COMPANY_ID));
+        assert.ok(!ids.includes("hidden-co"), "unlisted entries never leak to anonymous callers");
+        assert.ok(body.companies.every((c) => isValidSnId(c.snId)));
+        assert.ok(!JSON.stringify(body).includes("2020/123456"), "restricted evidence is never public");
+        const q = await (await fetch(`${base}/api/discover/companies?q=dentist`)).json();
+        assert.ok(q.companies.length >= 1);
+    } finally {
+        server.close();
+    }
+});
+
+test("public Discover: suspended entries are not served to anonymous callers", async () => {
+    reset();
+    resetAuthRateLimits();
+    await ensureOrgEntity(SMILEMORE_DEMO_COMPANY_ID, { displayName: "SmileMore Dentists" });
+    await setOrgEntityStatus(SMILEMORE_DEMO_COMPANY_ID, "suspended", { reason: "test", actor: "mc" });
+    invalidateDirectoryEntity(SMILEMORE_DEMO_COMPANY_ID);
+    const app = express();
+    mountUserConversationRoutes(app);
+    const server = app.listen(0);
+    try {
+        const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/discover/companies`)).json();
+        assert.ok(!body.companies.some((c) => c.companyId === SMILEMORE_DEMO_COMPANY_ID));
+    } finally {
+        server.close();
+    }
+});
+
+test("public Discover is rate limited per client (429 + Retry-After); clients are isolated", async () => {
+    reset();
+    resetAuthRateLimits();
+    const app = express();
+    mountUserConversationRoutes(app);
+    const server = app.listen(0);
+    try {
+        const url = `http://127.0.0.1:${server.address().port}/api/discover/companies?limit=1`;
+        const hit = (ip) => fetch(url, { headers: { "x-forwarded-for": ip } });
+        let last;
+        for (let i = 0; i < 61; i += 1) last = await hit("203.0.113.9");
+        assert.equal(last.status, 429);
+        assert.ok(Number(last.headers.get("retry-after")) >= 1);
+        assert.equal((await last.json()).code, "RATE_LIMITED");
+        assert.equal((await hit("203.0.113.10")).status, 200, "another client is unaffected");
+        // The left-most X-Forwarded-For hop is client-controlled and must not reset the bucket.
+        assert.equal((await hit("198.51.100.1, 203.0.113.9")).status, 429);
+    } finally {
+        server.close();
+        resetAuthRateLimits();
+    }
+});
+
+test("user-scoped Discover siblings still require consumer auth (chat list)", async () => {
+    const app = express();
+    mountUserConversationRoutes(app);
+    const server = app.listen(0);
+    try {
+        const res = await fetch(`http://127.0.0.1:${server.address().port}/api/user-conversations`);
         assert.ok([401, 403].includes(res.status), `status ${res.status}`);
     } finally {
         server.close();
@@ -121,4 +196,10 @@ test("Sarah App source: live Discover never merges fixtures", () => {
     const bridge = readFileSync(new URL("../prototype/sarah-app-ux/js/live-bridge.mjs", import.meta.url), "utf8");
     assert.match(bridge, /\/api\/discover\/companies/);
     assert.match(bridge, /fetchDiscoverCompanies,/);
+    // Public Discover: browsing must not require sign-in (no auth gate inside the fetch).
+    const fetchFn = bridge.slice(bridge.indexOf("export async function fetchDiscoverCompanies"));
+    const fetchBody = fetchFn.split(/\r?\n\}\r?\n/)[0];
+    assert.ok(fetchBody.includes("/api/discover/companies"), "sliced the right function");
+    assert.ok(!/signedInUser|AUTH_REQUIRED|ensureConsumerProfile/.test(fetchBody), "fetchDiscoverCompanies must work signed out");
+    assert.match(src, /function discoverLiveActive\(\) \{\s*return Boolean\(window\.SarahLive\?\.isLiveEnabled\?\.\(\)\);/);
 });

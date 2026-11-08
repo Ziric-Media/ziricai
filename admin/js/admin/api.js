@@ -404,7 +404,12 @@ export async function fetchNetworkVerificationQueue(status = '') {
   return request(`/api/platform/network/v1/verification${qs}`, { silent: true });
 }
 
-/** body: { action: 'start_review' | 'verify' | 'reject' | 'restrict', note?, checks? } */
+/** Case detail incl. attached evidence references (`evidenceRefs`). */
+export async function fetchNetworkVerificationCase(caseId) {
+  return request(`/api/platform/network/v1/verification/${encodeURIComponent(caseId)}`, { silent: true });
+}
+
+/** body: { action: 'start_review' | 'request_info' | 'verify' (alias approve) | 'reject' | 'restrict', note?, checks? } */
 export async function decideNetworkVerification(caseId, body) {
   return request(`/api/platform/network/v1/verification/${encodeURIComponent(caseId)}/decision`, {
     method: 'POST',

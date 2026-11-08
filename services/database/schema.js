@@ -203,6 +203,8 @@ export const NETWORK_COLLECTIONS = {
     REQUEST_AUDIT: "networkRequestAudit",
     RATE_EVENTS: "networkRateEvents",
     VERIFICATION_CASES: "networkVerificationCases",
+    /** SNET-04 — evidence metadata (https URL / external reference) per verification case; no file storage. */
+    VERIFICATION_EVIDENCE: "networkVerificationEvidence",
     AGENTS: "networkAgents",
     CONNECTIONS: "networkConnections",
     MODERATION_CASES: "networkModerationCases",

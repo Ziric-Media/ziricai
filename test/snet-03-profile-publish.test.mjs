@@ -207,3 +207,57 @@ test("API: default guards reject unauthenticated callers", async () => {
         server.close();
     }
 });
+
+/* ---------- SNET-03 portal UI: GET shape for the editor + wiring checks ---------- */
+
+test("API: GET listing carries category options and canEdit (managers edit, viewers read-only)", async () => {
+    reset();
+    let role = "viewer";
+    const app = express();
+    app.use(express.json());
+    mountNetworkListingRoutes(app, {
+        listingDeps: deps,
+        authorize: async (req, companyId) => {
+            req.tenant = { companyId, uid: "uid-1", role };
+            return req.tenant;
+        },
+    });
+    const server = app.listen(0);
+    try {
+        const url = `http://127.0.0.1:${server.address().port}/api/network/v1/orgs/${PROD.id}/listing`;
+        let body = await (await fetch(url)).json();
+        assert.equal(body.data.canEdit, false);
+        assert.ok(body.data.categoryOptions.some((c) => c.id === "auto" && c.label === "Auto"));
+        assert.deepEqual(Object.keys(body.data.categoryOptions[0]).sort(), ["id", "label"]);
+        role = "owner";
+        body = await (await fetch(url)).json();
+        assert.equal(body.data.canEdit, true);
+    } finally {
+        server.close();
+    }
+});
+
+test("Company Portal: Sarah Network section is registered, permission-gated and calls the listing/verification APIs", async () => {
+    const { readFileSync } = await import("node:fs");
+    const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+    assert.match(read("js/portal/core/lazyLoader.js"), /'network',/);
+    assert.match(read("js/portal/core/lazyLoader.js"), /network: 'renderNetwork'/);
+    assert.match(read("js/portal/core/appShell.js"), /id: 'network', label: 'Sarah Network'/);
+    // same key the server enforces on the listing writes — no matrix drift
+    assert.match(read("js/portal/permissions.js"), /network: 'canManageWorkspace'/);
+    assert.match(read("services/api/networkListingRoutes.js"), /hasPermission\(req\.tenant\.role, "canManageWorkspace"\)/);
+
+    const api = read("js/portal/api.js");
+    for (const frag of ["/listing`", "/listing/publish`", "/listing/unpublish`", "/verification`", "/verification/evidence`"]) {
+        assert.ok(api.includes(frag), `portal api.js is missing ${frag}`);
+    }
+    const mod = read("js/portal/modules/network.js");
+    assert.match(mod, /export async function renderNetwork/);
+    for (const fn of ["saveNetworkListingDraft", "publishNetworkListing", "unpublishNetworkListing", "submitNetworkVerification", "addNetworkVerificationEvidence"]) {
+        assert.ok(mod.includes(fn), `network.js must use ${fn}`);
+    }
+    assert.ok(!/window\.prompt/.test(mod));
+    // generated app/ is rebuilt by prepare-sites; the source of truth is js/portal
+    assert.equal(hasPermission("manager", "canManageWorkspace"), true);
+    assert.equal(hasPermission("support", "canManageWorkspace"), false);
+});

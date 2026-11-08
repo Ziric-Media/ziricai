@@ -609,12 +609,20 @@ function removeSub01Record(companyId) {
 }
 
 function isOrgSubscribedSub01(companyId) {
+  const live = liveRelationState(companyId);
+  if (live !== null) return live === 'subscribed';
   return Boolean(getSub01Record(companyId));
 }
 
-/** Legacy helper — subscribed id list for suggestions */
+/** Subscribed id list: local prototype subscriptions + live subscriptions (from the connections API) seen on Discover. */
 function loadSub01SubscribedIds() {
-  return Object.keys(loadSub01SubscribersMap());
+  const ids = new Set(Object.keys(loadSub01SubscribersMap()));
+  if (discoverLiveActive()) {
+    liveDiscover.byId.forEach((card, companyId) => {
+      if (card.snId && liveConnections.bySnId.get(card.snId)?.state === 'subscribed') ids.add(companyId);
+    });
+  }
+  return [...ids];
 }
 
 function sub01RefreshSurfaces() {
@@ -645,10 +653,20 @@ function bindSub01RegisterModalOnce() {
     }
   });
 
-  document.getElementById('sub01RegisterSubmit')?.addEventListener('click', () => {
+  document.getElementById('sub01RegisterSubmit')?.addEventListener('click', async () => {
     const idEl = document.getElementById('sub01RegisterCompanyId');
     const companyId = idEl && 'value' in idEl ? String(idEl.value || '').trim() : '';
     if (!companyId) return;
+    if (discoverFind(companyId)?.live) {
+      // SNET-11: live businesses subscribe through the connections API (consent grant + subscribe).
+      const submitBtn = document.getElementById('sub01RegisterSubmit');
+      if (submitBtn) submitBtn.disabled = true;
+      const already = isOrgSubscribedSub01(companyId);
+      const ok = already ? true : await handleLiveSubscribe(companyId);
+      if (submitBtn) submitBtn.disabled = false;
+      if (ok) close();
+      return;
+    }
     const hasExisting = Boolean(document.getElementById('sub01AccountYes')?.checked);
     const refEl = document.getElementById('sub01Reference');
     const reference = refEl && 'value' in refEl ? String(refEl.value || '').trim() : '';
@@ -671,10 +689,14 @@ function bindSub01RegisterModalOnce() {
     sub01RefreshSurfaces();
   });
 
-  document.getElementById('sub01RegisterRemove')?.addEventListener('click', () => {
+  document.getElementById('sub01RegisterRemove')?.addEventListener('click', async () => {
     const idEl = document.getElementById('sub01RegisterCompanyId');
     const companyId = idEl && 'value' in idEl ? String(idEl.value || '').trim() : '';
     if (!companyId) return;
+    if (discoverFind(companyId)?.live) {
+      if (await handleLiveUnsubscribe(companyId)) close();
+      return;
+    }
     removeSub01Record(companyId);
     close();
     showProtoToast('Subscription removed');
@@ -716,7 +738,25 @@ function openSub01RegisterModal(companyId, opts) {
   document.getElementById('sub01PrefAnnounce').checked = rec?.prefs?.announcements !== false;
   document.getElementById('sub01PrefRemind').checked = rec?.prefs?.reminders !== false;
 
-  document.getElementById('sub01RegisterRemove')?.classList.toggle('hidden', !rec);
+  document.getElementById('sub01RegisterRemove')?.classList.toggle('hidden', !rec && !isOrgSubscribedSub01(id));
+
+  // SNET-11: live businesses use real consent + the connections API; the prototype-only fields do not apply.
+  const live = Boolean(company.live);
+  modal.querySelectorAll('.ms-knowledge-field-row').forEach((row) => row.classList.toggle('hidden', live));
+  const leadEl = document.getElementById('sub01RegisterLead');
+  if (leadEl) {
+    if (leadEl.dataset.protoLead === undefined) leadEl.dataset.protoLead = leadEl.textContent || '';
+    leadEl.textContent = live
+      ? `Subscribing records your consent for ${company.name} to send you updates. No personal details are shared. You can unsubscribe any time.`
+      : leadEl.dataset.protoLead;
+  }
+  const footEl = modal.querySelector('.sub01-register-foot');
+  if (footEl) {
+    if (footEl.dataset.protoFoot === undefined) footEl.dataset.protoFoot = footEl.textContent || '';
+    footEl.textContent = live ? 'Sarah Network · consent-linked subscription' : footEl.dataset.protoFoot;
+  }
+  const submitEl = document.getElementById('sub01RegisterSubmit');
+  if (submitEl) submitEl.textContent = live ? (isOrgSubscribedSub01(id) ? 'Subscribed' : 'Subscribe') : 'Save subscription';
 
   modal.classList.remove('hidden');
   modal.setAttribute('aria-hidden', 'false');
@@ -726,6 +766,7 @@ function openSub01RegisterModal(companyId, opts) {
 function sub01OpenSubscribeFlow(companyId) {
   const id = String(companyId || '').trim();
   if (!id) return;
+  if (discoverFind(id)?.live && !requireLiveSignIn('subscribe to businesses')) return;
   openSub01RegisterModal(id, { edit: isOrgSubscribedSub01(id) });
 }
 
@@ -1612,6 +1653,7 @@ function mapFederatedConversationToChatRow(c) {
     online: false,
     avatarKey: isBusiness ? guessCompanyAvatarKey(companyId, c.displayLabel) : null,
     company: isBusiness,
+    snId: c.snId || null,
     api: true,
   };
 }
@@ -1660,6 +1702,7 @@ async function loadCompanyThreadFromApiIfNeeded() {
     kind: 'company',
     name,
     companyId,
+    snId: payload.conversation?.snId || chat?.snId || discoverCo?.snId || null,
     verified: true,
     api: true,
     messages,
@@ -2146,6 +2189,8 @@ function companyAvatarUrl(company) {
 }
 
 function isCompanyFollowed(companyId) {
+  const live = liveRelationState(companyId);
+  if (live !== null) return LIVE_FOLLOWING_STATES.has(live);
   return Boolean(getSarahRuntime().followed[companyId]);
 }
 
@@ -2247,6 +2292,8 @@ async function openCompanySarahChat(companyId) {
     name: id,
     verified: true,
   };
+  // Public Discover can be browsed signed out; chatting with Company Sarah needs an account.
+  if (company.live && !requireLiveSignIn('chat with this business')) return;
   const rt = getSarahRuntime();
   const threadId = company.id;
   rt.activeThreadId = threadId;
@@ -6416,6 +6463,8 @@ function renderMyOrganisationsPanel() {
   bindSub01RegisterModalOnce();
   const root = document.getElementById('msOrganisationsRoot');
   if (!root) return;
+  ensureLiveDiscoverFresh();
+  ensureLiveConnectionsFresh();
 
   const subscribedIds = loadSub01SubscribedIds();
   const byId = (id) => discoverFind(id);
@@ -6424,6 +6473,7 @@ function renderMyOrganisationsPanel() {
   const suggested = suggestedIds.map((id) => byId(id)).filter(Boolean);
 
   const orgStatusLine = (companyId) => {
+    if (discoverFind(companyId)?.live) return isOrgSubscribedSub01(companyId) ? 'Subscribed on Sarah Network' : '';
     const rec = getSub01Record(companyId);
     if (!rec) return '';
     const v =
@@ -6512,6 +6562,10 @@ function renderMyOrganisationsPanel() {
       e.preventDefault();
       const id = btn.getAttribute('data-sub01-unsub');
       if (!id) return;
+      if (discoverFind(id)?.live) {
+        void handleLiveUnsubscribe(id).then(() => renderMyOrganisationsPanel());
+        return;
+      }
       removeSub01Record(id);
       showProtoToast('Unsubscribed');
       renderMyOrganisationsPanel();
@@ -7591,9 +7645,146 @@ function openDiscoverCompany(id) {
   location.hash = `discover/${id}`;
 }
 
-/** SNET-01b: live mode = signed-in Sarah Network directory; otherwise sample fixtures (never merged). */
+/**
+ * SNET-01b + public Discover: live mode = the Sarah Network directory (public listed businesses, readable signed
+ * out); sample fixtures only render when live mode is unavailable (file://, no Firebase config). Never merged.
+ */
 function discoverLiveActive() {
-  return consumerChatLiveActive();
+  return Boolean(window.SarahLive?.isLiveEnabled?.());
+}
+
+/* ---------- SNET-11: follow / subscribe wired to /api/network/v1/connections (keyed by snId) ---------- */
+
+const LIVE_FOLLOWING_STATES = new Set(['following', 'subscribed', 'connect_requested', 'connected']);
+
+/** snId → { state, grantId } for the signed-in user (empty when signed out). */
+const liveConnections = { loaded: false, loading: false, bySnId: new Map() };
+
+function liveSnIdForCompany(companyId) {
+  if (!discoverLiveActive()) return null;
+  return liveDiscover.byId.get(String(companyId || ''))?.snId || null;
+}
+
+/** Server relationship state for a live Discover company, or null when the company is a fixture / has no snId. */
+function liveRelationState(companyId) {
+  const snId = liveSnIdForCompany(companyId);
+  if (!snId) return null;
+  return liveConnections.bySnId.get(snId)?.state || 'none';
+}
+
+function applyLiveConnection(connection) {
+  if (!connection?.snId) return;
+  if (!connection.state || connection.state === 'none' || connection.state === 'discovered') {
+    liveConnections.bySnId.delete(connection.snId);
+  } else {
+    liveConnections.bySnId.set(connection.snId, {
+      state: connection.state,
+      grantId: connection.consent?.grantId || null,
+    });
+  }
+}
+
+async function refreshLiveConnections() {
+  if (!discoverLiveActive() || !window.SarahLive?.isSignedIn?.() || liveConnections.loading) return;
+  liveConnections.loading = true;
+  const res = await window.SarahLive.fetchConnections();
+  liveConnections.loading = false;
+  liveConnections.loaded = true;
+  if (res.error) return;
+  liveConnections.bySnId.clear();
+  (res.connections || []).forEach(applyLiveConnection);
+  sub01RefreshSurfaces();
+}
+
+/** Load relationships once per sign-in (kicked from Discover / detail / My Organisations renders). */
+function ensureLiveConnectionsFresh() {
+  if (liveConnections.loaded || liveConnections.loading) return;
+  if (!discoverLiveActive() || !window.SarahLive?.isSignedIn?.()) return;
+  void refreshLiveConnections();
+}
+
+function resetLiveConnections() {
+  liveConnections.loaded = false;
+  liveConnections.loading = false;
+  liveConnections.bySnId.clear();
+}
+
+function requireLiveSignIn(actionLabel) {
+  if (window.SarahLive?.isSignedIn?.()) return true;
+  showProtoToast(`Sign in to ${actionLabel}`);
+  setRoute('auth');
+  return false;
+}
+
+/** Follow / unfollow. Live companies call the connections API by snId; fixtures keep the local toggle. */
+async function handleFollowToggle(btn, companyId) {
+  const company = discoverFind(companyId);
+  if (!company?.live) {
+    const on = toggleCompanyFollow(companyId);
+    btn.classList.toggle('is-active', on);
+    btn.textContent = on ? 'Following' : 'Follow';
+    return;
+  }
+  if (!company.snId) {
+    showProtoToast('This business is not on Sarah Network yet');
+    return;
+  }
+  if (!requireLiveSignIn('follow businesses')) return;
+  const wasFollowing = isCompanyFollowed(companyId);
+  const wasSubscribed = liveRelationState(companyId) === 'subscribed';
+  btn.disabled = true;
+  let res;
+  if (wasSubscribed) {
+    // Unfollowing a subscription first ends the subscription (consent is revoked), then the follow.
+    const prev = liveConnections.bySnId.get(company.snId);
+    res = await window.SarahLive.unsubscribeFromEntity(company.snId, prev?.grantId || null);
+    if (!res.error) res = await window.SarahLive.setEntityRelationship(company.snId, 'unfollow');
+  } else {
+    res = await window.SarahLive.setEntityRelationship(company.snId, wasFollowing ? 'unfollow' : 'follow');
+  }
+  btn.disabled = false;
+  if (res.error) {
+    showProtoToast(res.error);
+    return;
+  }
+  applyLiveConnection(res.connection);
+  if (!res.connection?.state || res.connection.state === 'discovered') liveConnections.bySnId.delete(company.snId);
+  showProtoToast(wasFollowing ? `Unfollowed ${company.name}` : `Following ${company.name}`);
+  sub01RefreshSurfaces();
+}
+
+/** Live subscribe: records a standing consent grant for this entity, then subscribes. */
+async function handleLiveSubscribe(companyId) {
+  const company = discoverFind(companyId);
+  if (!company?.snId) {
+    showProtoToast('This business is not on Sarah Network yet');
+    return false;
+  }
+  if (!requireLiveSignIn('subscribe to businesses')) return false;
+  const res = await window.SarahLive.subscribeToEntity(company.snId);
+  if (res.error) {
+    showProtoToast(res.error);
+    return false;
+  }
+  applyLiveConnection(res.connection);
+  showProtoToast(`Subscribed to ${company.name}`);
+  sub01RefreshSurfaces();
+  return true;
+}
+
+async function handleLiveUnsubscribe(companyId) {
+  const company = discoverFind(companyId);
+  if (!company?.snId) return false;
+  const prev = liveConnections.bySnId.get(company.snId);
+  const res = await window.SarahLive.unsubscribeFromEntity(company.snId, prev?.grantId || null);
+  if (res.error) {
+    showProtoToast(res.error);
+    return false;
+  }
+  applyLiveConnection(res.connection);
+  showProtoToast(`Unsubscribed from ${company.name}`);
+  sub01RefreshSurfaces();
+  return true;
 }
 
 /** Map a /api/discover/companies card into the shape the Discover/detail renderers expect. */
@@ -7759,6 +7950,7 @@ function renderDiscover() {
 
   const live = discoverLiveActive();
   ensureLiveDiscoverFresh();
+  ensureLiveConnectionsFresh();
 
   catsHost.innerHTML = discoverCategoriesSource().map(
     (cat) => `
@@ -7868,9 +8060,7 @@ function renderDiscover() {
       e.stopPropagation();
       const id = btn.getAttribute('data-follow-company');
       if (!id) return;
-      const on = toggleCompanyFollow(id);
-      btn.classList.toggle('is-active', on);
-      btn.textContent = on ? 'Following' : 'Follow';
+      void handleFollowToggle(btn, id);
     });
   });
 
@@ -7943,6 +8133,7 @@ function renderCompanyDetail(companyId) {
     })
     .join('');
 
+  ensureLiveConnectionsFresh();
   const following = isCompanyFollowed(company.id);
   const subbed = isOrgSubscribedSub01(company.id);
 
@@ -8042,9 +8233,7 @@ function renderCompanyDetail(companyId) {
     const btn = e.currentTarget;
     const id = btn.getAttribute('data-follow-company');
     if (!id) return;
-    const on = toggleCompanyFollow(id);
-    btn.classList.toggle('is-active', on);
-    btn.textContent = on ? 'Following' : 'Follow';
+    void handleFollowToggle(btn, id);
   });
 
   root.querySelector('[data-chat-company]')?.addEventListener('click', (e) => {
@@ -8240,6 +8429,9 @@ function bindSarahLiveAuth() {
   window.SarahLive.onAuthChange(async (user, profile) => {
     if (user && profile) applyConsumerProfileToUi(profile);
     if (!user) clearLivePersonalSarahState();
+    resetLiveConnections();
+    if (user) ensureLiveConnectionsFresh();
+    else sub01RefreshSurfaces();
     updatePersonalSarahLiveUi();
     if (user) {
       await syncPersonalSarahSessionsFromServer();

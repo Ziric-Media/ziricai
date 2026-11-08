@@ -687,3 +687,58 @@ export async function patchSupportCase(companyId, caseId, body) {
     body: JSON.stringify(body),
   });
 }
+
+/* ---------- SNET-03 / SNET-04 — Sarah Network listing + verification (tenant) ---------- */
+
+/** v1 envelope errors are `{ code, message, fields? }` — flatten to `{ error: string, code, fields }` for the portal. */
+async function networkRequest(path, options = {}) {
+  const res = await request(path, { silent: true, ...options });
+  if (!res.error) return { data: res.data?.data ?? res.data };
+  const e = res.error;
+  const isObj = typeof e === 'object' && e !== null;
+  return {
+    error: isObj ? e.message || e.code || 'Request failed' : e,
+    code: (isObj && e.code) || res.code,
+    fields: isObj ? e.fields : undefined,
+    missing: isObj ? e.missing : undefined,
+    status: res.status,
+  };
+}
+
+const jsonBody = (method, body) => ({
+  method,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body || {}),
+});
+
+const networkOrg = (companyId) => `/api/network/v1/orgs/${encodeURIComponent(companyId)}`;
+
+export async function fetchNetworkListing(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/listing`);
+}
+
+export async function saveNetworkListingDraft(companyId, patch) {
+  return networkRequest(`${networkOrg(companyId)}/listing`, jsonBody('PUT', patch));
+}
+
+export async function publishNetworkListing(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/listing/publish`, jsonBody('POST'));
+}
+
+export async function unpublishNetworkListing(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/listing/unpublish`, jsonBody('POST'));
+}
+
+export async function fetchNetworkVerification(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/verification`);
+}
+
+/** body: { evidence?: [{ kind, label, url?|ref? }] } */
+export async function submitNetworkVerification(companyId, body = {}) {
+  return networkRequest(`${networkOrg(companyId)}/verification`, jsonBody('POST', body));
+}
+
+/** body: { items: [{ kind, label, url?|ref? }] } */
+export async function addNetworkVerificationEvidence(companyId, items) {
+  return networkRequest(`${networkOrg(companyId)}/verification/evidence`, jsonBody('POST', { items }));
+}

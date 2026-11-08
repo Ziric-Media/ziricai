@@ -196,10 +196,11 @@ export const ROUTE_CATALOG = [
 
     // SNET-04 — Verification
     { method: "GET", path: "/api/network/v1/orgs/:companyId/verification", domain: "network", tenantScoped: true, description: "Tenant verification status" },
-    { method: "POST", path: "/api/network/v1/orgs/:companyId/verification", domain: "network", tenantScoped: true, description: "Submit for verification" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/verification", domain: "network", tenantScoped: true, description: "Submit for verification (optional evidence refs)" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/verification/evidence", domain: "network", tenantScoped: true, description: "Attach evidence references (https URL / external ref) to the open verification case" },
     { method: "GET", path: "/api/platform/network/v1/verification", domain: "platform", tenantScoped: false, description: "Verification queue (platform)" },
     { method: "GET", path: "/api/platform/network/v1/verification/:caseId", domain: "platform", tenantScoped: false, description: "Verification case (platform)" },
-    { method: "POST", path: "/api/platform/network/v1/verification/:caseId/decision", domain: "platform", tenantScoped: false, description: "Decide verification case (audited)" },
+    { method: "POST", path: "/api/platform/network/v1/verification/:caseId/decision", domain: "platform", tenantScoped: false, description: "Decide verification case: start_review, request_info, verify/approve, reject, restrict (audited)" },
 
     // SNET-09 — Mission Control (platform)
     { method: "GET", path: "/api/platform/network/v1/stats", domain: "platform", tenantScoped: false, description: "Sarah Network overview numbers" },
@@ -215,8 +216,8 @@ export const ROUTE_CATALOG = [
     { method: "POST", path: "/api/platform/network/v1/moderation/:caseId/decision", domain: "platform", tenantScoped: false, description: "start_review | dismiss | suspend_entity (audited)" },
 
     // SNET-05 — Search
-    { method: "GET", path: "/api/network/v1/directory/search", domain: "consumer", tenantScoped: false, description: "Ranked directory search (q, category, verified, cursor)" },
-    { method: "GET", path: "/api/network/v1/directory/suggest", domain: "consumer", tenantScoped: false, description: "Search autocomplete" },
+    { method: "GET", path: "/api/network/v1/directory/search", domain: "consumer", tenantScoped: false, description: "Ranked directory search (q, category, verified, cursor); anonymous read of listed entries, per-IP rate limited" },
+    { method: "GET", path: "/api/network/v1/directory/suggest", domain: "consumer", tenantScoped: false, description: "Search autocomplete; anonymous read of listed entries, per-IP rate limited" },
     { method: "GET", path: "/api/network/v1/health", domain: "network", tenantScoped: false, description: "Network health (public, non-sensitive)" },
 
     // SNET-06 — Agent registry
@@ -238,7 +239,7 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/chat/conversations/:companyId/handover", domain: "consumer", tenantScoped: false, description: "Handover ownership sync" },
 
     // U5 — Company conversations
-    { method: "GET", path: "/api/discover/companies", domain: "consumer", tenantScoped: false, description: "Discover list: ranked search over the durable directory (q, category, limit, cursor); fixtures never merged" },
+    { method: "GET", path: "/api/discover/companies", domain: "consumer", tenantScoped: false, description: "Discover list: ranked search over the durable directory (q, category, limit, cursor); anonymous read of listed entries only (per-IP rate limit); fixtures never merged" },
     { method: "GET", path: "/api/user-conversations", domain: "consumer", tenantScoped: false, description: "User chat list" },
     { method: "GET", path: "/api/user-conversations/:companyId/messages", domain: "consumer", tenantScoped: false, description: "Company chat history" },
     { method: "GET", path: "/api/user-conversations/id/:conversationId/messages", domain: "consumer", tenantScoped: false, description: "Company chat history by conversation id" },

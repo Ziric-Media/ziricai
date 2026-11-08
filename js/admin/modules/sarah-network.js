@@ -1,6 +1,6 @@
 /**
  * Mission Control — Sarah Network (SNET-09).
- * Overview · Entities · Verification queue (skeleton: list + officer decisions via prompts).
+ * Overview · Entities · Verification queue · Moderation (list + audited decisions through a form modal).
  * Reads/writes only the platform APIs under /api/platform/network/v1 (superadmin / platform key).
  */
 import { escapeHtml, formatDate, formatNumber, pageHeader, showToast, statusBadge } from '../ui.js';
@@ -12,6 +12,7 @@ import {
   fetchNetworkEntity,
   fetchNetworkModeration,
   fetchNetworkStats,
+  fetchNetworkVerificationCase,
   fetchNetworkVerificationQueue,
 } from '../api.js';
 
@@ -53,6 +54,104 @@ function verificationBadge(state) {
   const s = String(state || 'unverified');
   const cls = s === 'verified' ? 'active' : s === 'restricted' || s === 'rejected' ? 'suspended' : 'pending';
   return `<span class="status-badge ${cls}">${escapeHtml(s.replace(/_/g, ' '))}</span>`;
+}
+
+/* ---------- Decision modal (form dialog; replaces browser prompt boxes) ---------- */
+
+/** One evidence reference → safe markup (links only for https URLs). */
+function evidenceItemHtml(ev) {
+  const href = typeof ev.url === 'string' && /^https:\/\//i.test(ev.url) ? ev.url : '';
+  const target = href
+    ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(ev.label)}</a>`
+    : escapeHtml(ev.label);
+  return `<li>${target} <span class="panel-hint">${escapeHtml(String(ev.kind || '').replace(/_/g, ' '))}${
+    ev.ref ? ` · ref ${escapeHtml(ev.ref)}` : ''
+  }</span></li>`;
+}
+
+/**
+ * Small accessible form modal for audited decisions.
+ * Resolves `{ note, checks }` on confirm or `null` when cancelled.
+ * @param {{ title: string, lead?: string, noteLabel?: string, noteRequired?: boolean, minNote?: number,
+ *           checks?: string[]|null, evidence?: object[]|null, confirmLabel?: string, danger?: boolean }} opts
+ */
+function openDecisionModal({
+  title,
+  lead = '',
+  noteLabel = 'Decision note (audited)',
+  noteRequired = true,
+  minNote = 1,
+  checks = null,
+  evidence = null,
+  confirmLabel = 'Confirm',
+  danger = false,
+}) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay open';
+    overlay.setAttribute('data-snet-modal', '');
+    const checksHtml = checks
+      ? `<div class="form-group"><label>Checks performed (at least one to verify)</label>${checks
+          .map(
+            (c) =>
+              `<label style="display:block;font-weight:400;"><input type="checkbox" name="snetCheck" value="${escapeHtml(c)}"> ${escapeHtml(c.replace(/_/g, ' '))}</label>`
+          )
+          .join('')}</div>`
+      : '';
+    const evidenceHtml = Array.isArray(evidence)
+      ? `<div class="form-group"><label>Evidence references (${formatNumber(evidence.length)})</label>${
+          evidence.length
+            ? `<ul>${evidence.map(evidenceItemHtml).join('')}</ul>`
+            : '<div class="panel-hint">None attached. You can ask the business for more with “Request info”.</div>'
+        }</div>`
+      : '';
+    overlay.innerHTML = `
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="snetModalTitle">
+        <h3 id="snetModalTitle">${escapeHtml(title)}</h3>
+        ${lead ? `<div class="panel-hint" style="margin-bottom:12px;">${escapeHtml(lead)}</div>` : ''}
+        ${evidenceHtml}
+        ${checksHtml}
+        <div class="form-group">
+          <label for="snetModalNote">${escapeHtml(noteLabel)}${noteRequired ? '' : ' (optional)'}</label>
+          <textarea id="snetModalNote" rows="3" maxlength="1000"></textarea>
+        </div>
+        <div class="panel-hint" id="snetModalError" role="alert" style="color:var(--danger);min-height:1.2em;"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary btn-sm" data-snet-modal-cancel>Cancel</button>
+          <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-primary'} btn-sm" data-snet-modal-confirm>${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const noteEl = overlay.querySelector('#snetModalNote');
+    const errEl = overlay.querySelector('#snetModalError');
+    const done = (value) => {
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+      resolve(value);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') done(null);
+    };
+    document.addEventListener('keydown', onKey);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) done(null);
+    });
+    overlay.querySelector('[data-snet-modal-cancel]').onclick = () => done(null);
+    overlay.querySelector('[data-snet-modal-confirm]').onclick = () => {
+      const note = noteEl.value.trim();
+      const picked = [...overlay.querySelectorAll('input[name="snetCheck"]:checked')].map((i) => i.value);
+      if (noteRequired && note.length < minNote) {
+        errEl.textContent = minNote > 1 ? `Enter at least ${minNote} characters.` : 'A note is required.';
+        return noteEl.focus();
+      }
+      if (checks && !picked.length) {
+        errEl.textContent = 'Select at least one check that was performed.';
+        return;
+      }
+      done({ note, checks: picked });
+    };
+    noteEl.focus();
+  });
 }
 
 /* ---------- Overview ---------- */
@@ -138,15 +237,16 @@ async function verificationHtml() {
     .map((c) => {
       const actions = [];
       if (c.status === 'submitted') actions.push(['start_review', 'Start review']);
-      if (c.status === 'submitted' || c.status === 'under_review') {
-        actions.push(['verify', 'Verify'], ['reject', 'Reject']);
+      if (c.status === 'submitted' || c.status === 'under_review') actions.push(['request_info', 'Request info']);
+      if (c.status === 'submitted' || c.status === 'under_review' || c.status === 'info_requested') {
+        actions.push(['verify', 'Approve'], ['reject', 'Reject']);
       }
       if (c.status === 'under_review' || c.status === 'verified') actions.push(['restrict', 'Restrict']);
       return `
       <tr>
         <td><strong>${escapeHtml(c.evidence?.legalName || c.companyId)}</strong><span class="panel-hint">${escapeHtml(c.snId)}</span></td>
         <td>${escapeHtml(c.evidence?.registrationNumber || '—')}</td>
-        <td>${verificationBadge(c.status)}</td>
+        <td>${verificationBadge(c.status)}<span class="panel-hint">${formatNumber(c.evidenceCount || 0)} evidence ref(s)</span></td>
         <td>${escapeHtml(formatDate(c.submittedAt))}</td>
         <td>${actions
           .map(
@@ -162,7 +262,7 @@ async function verificationHtml() {
       <div class="table-toolbar">
         <div class="panel-hint">Officer decisions are audited. Verifying requires recorded checks and a note.</div>
         <select id="snetVerificationStatus">
-          ${['submitted', 'under_review', 'verified', 'rejected', 'restricted', '']
+          ${['submitted', 'under_review', 'info_requested', 'verified', 'rejected', 'restricted', '']
             .map((v) => `<option value="${v}" ${verificationFilter === v ? 'selected' : ''}>${v ? v.replace(/_/g, ' ') : 'All'}</option>`)
             .join('')}
         </select>
@@ -174,7 +274,7 @@ async function verificationHtml() {
     </div>`;
 }
 
-/* ---------- Moderation queue (stub: list + decisions via prompts) ---------- */
+/* ---------- Moderation queue (list + decisions through the form modal) ---------- */
 async function moderationHtml() {
   const res = await fetchNetworkModeration(moderationFilter);
   if (res.error) return errorBlock(errText(res));
@@ -288,9 +388,16 @@ function bind(container) {
       const action = btn.dataset.snetModerate;
       const payload = { action };
       if (action !== 'start_review') {
-        const note = window.prompt(`Decision note for "${action.replace(/_/g, ' ')}" (required, audited):`);
-        if (note === null) return;
-        payload.note = note;
+        const result = await openDecisionModal({
+          title: `Report: ${action.replace(/_/g, ' ')}`,
+          lead: 'Decisions are written to the audit trail with your identity.',
+          noteLabel: 'Decision note (audited, min 5 characters)',
+          minNote: 5,
+          confirmLabel: 'Confirm',
+          danger: action === 'suspend_entity',
+        });
+        if (!result) return;
+        payload.note = result.note;
       }
       const res = await decideNetworkModeration(btn.dataset.caseId, payload);
       if (res.error) return showToast(errText(res), 'error');
@@ -302,9 +409,19 @@ function bind(container) {
   container.querySelectorAll('[data-snet-status]').forEach((btn) => {
     btn.onclick = async () => {
       const action = btn.dataset.snetStatus;
-      const reason = window.prompt(`Reason to ${action} this entity (min 5 characters, audited):`);
-      if (reason === null) return;
-      const res = await changeNetworkEntityStatus(btn.dataset.snId, { action, reason });
+      const result = await openDecisionModal({
+        title: action === 'suspend' ? 'Suspend entity' : 'Reinstate entity',
+        lead:
+          action === 'suspend'
+            ? 'The entity is removed from Discover, search and new relationships immediately.'
+            : 'The entity becomes eligible for Discover again if it is listed.',
+        noteLabel: 'Reason (audited, min 5 characters)',
+        minNote: 5,
+        confirmLabel: action === 'suspend' ? 'Suspend' : 'Reinstate',
+        danger: action === 'suspend',
+      });
+      if (!result) return;
+      const res = await changeNetworkEntityStatus(btn.dataset.snId, { action, reason: result.note });
       if (res.error) return showToast(errText(res), 'error');
       showToast(action === 'suspend' ? 'Entity suspended' : 'Entity reinstated', 'success');
       paint(container);
@@ -341,15 +458,28 @@ function bind(container) {
       const action = btn.dataset.snetDecide;
       const payload = { action };
       if (action !== 'start_review') {
-        const note = window.prompt(`Decision note for "${action}" (required, audited):`);
-        if (note === null) return;
-        payload.note = note;
-      }
-      if (action === 'verify') {
+        // Show the evidence references the business attached (best effort) next to the decision form.
+        const detail = await fetchNetworkVerificationCase(btn.dataset.caseId);
+        const evidence = detail?.error ? null : body(detail)?.case?.evidenceRefs || [];
         const known = (btn.closest('[data-snet-checks]')?.dataset.snetChecks || '').split(',').filter(Boolean);
-        const raw = window.prompt(`Checks performed (comma separated). Allowed:\n${known.join('\n')}`);
-        if (raw === null) return;
-        payload.checks = raw.split(',').map((s) => s.trim()).filter(Boolean);
+        const labels = {
+          verify: ['Approve verification', 'Approve', 'Approval note (audited)'],
+          reject: ['Reject verification', 'Reject', 'Reason for rejection (shown to the business)'],
+          request_info: ['Request more information', 'Send request', 'What should the business provide? (shown to the business)'],
+          restrict: ['Restrict business', 'Restrict', 'Reason for restriction (audited)'],
+        }[action] || [`Decision: ${action}`, 'Confirm', 'Decision note (audited)'];
+        const result = await openDecisionModal({
+          title: labels[0],
+          lead: 'Decisions are written to the audit trail with your identity.',
+          confirmLabel: labels[1],
+          noteLabel: labels[2],
+          evidence,
+          checks: action === 'verify' ? known : null,
+          danger: action === 'reject' || action === 'restrict',
+        });
+        if (!result) return;
+        payload.note = result.note;
+        if (action === 'verify') payload.checks = result.checks;
       }
       const res = await decideNetworkVerification(btn.dataset.caseId, payload);
       if (res.error) return showToast(errText(res), 'error');

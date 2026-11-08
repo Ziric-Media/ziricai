@@ -2,7 +2,7 @@
  * U5 — User ↔ Company Sarah conversations (Sarah App).
  */
 import { requireConsumerScope } from "../auth/consumerAuth.js";
-import { authRateLimit } from "../auth/authRateLimiter.js";
+import { authRateLimit, publicReadRateLimit } from "../auth/authRateLimiter.js";
 import { listUserConversations, getUserConversationById } from "../users/userConversationService.js";
 import {
     sendCompanySarahMessage,
@@ -22,7 +22,9 @@ function profileFromReq(req) {
  */
 export function mountUserConversationRoutes(app, deps = {}) {
     const guard = deps.consumerGuard || requireConsumerScope();
-    app.get("/api/discover/companies", guard, async (req, res) => {
+    /** Public Discover: anonymous read of listed, non-suspended entries only (per-IP rate limit). */
+    const publicDiscoverGuard = deps.discoverGuard || publicReadRateLimit();
+    app.get("/api/discover/companies", publicDiscoverGuard, async (req, res) => {
         try {
             const result = await searchDiscoverCompanies({
                 q: String(req.query?.q || "").slice(0, 120),

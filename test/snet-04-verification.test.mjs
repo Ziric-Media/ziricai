@@ -18,7 +18,9 @@ import { clearNetworkEntitiesForTests, getOrgEntityByCompanyId } from "../servic
 import { publishListing, saveListingDraft } from "../services/network/networkProfileService.js";
 import {
     clearVerificationCasesForTests,
+    addVerificationEvidence,
     decideVerification,
+    getVerificationCase,
     getVerificationStatus,
     listVerificationCases,
     submitVerification,
@@ -200,6 +202,7 @@ test("API: default guards reject unauthenticated callers", async () => {
         for (const [method, path] of [
             ["GET", "/api/network/v1/orgs/acme/verification"],
             ["POST", "/api/network/v1/orgs/acme/verification"],
+            ["POST", "/api/network/v1/orgs/acme/verification/evidence"],
             ["GET", "/api/platform/network/v1/verification"],
             ["POST", "/api/platform/network/v1/verification/vc_1/decision"],
         ]) {
@@ -209,4 +212,146 @@ test("API: default guards reject unauthenticated callers", async () => {
     } finally {
         server.close();
     }
+});
+
+/* ---------- SNET-04 MVP+: evidence references, request-info, approve alias ---------- */
+
+test("evidence refs: https URL / external ref only; attached to the open case; platform sees them, public never", async () => {
+    reset();
+    await listed();
+    await assert.rejects(() => addVerificationEvidence(PROD.id, [{ kind: "other", label: "x", url: "https://a.example/x" }], "o"), { code: "NO_OPEN_CASE" });
+
+    const kase = await submitVerification(PROD.id, "owner-1", {
+        evidence: [{ kind: "registration_certificate", label: "CIPC certificate", url: "https://files.example.com/cipc.pdf" }],
+    });
+    assert.equal(kase.evidenceCount, 1);
+
+    for (const bad of [
+        { kind: "other", label: "http link", url: "http://insecure.example/x" },
+        { kind: "other", label: "js", url: "javascript:alert(1)" },
+        { kind: "other", label: "creds", url: "https://user:pw@example.com/x" },
+        { kind: "bogus", label: "kind", url: "https://ok.example/x" },
+        { kind: "other", label: "", url: "https://ok.example/x" },
+        { kind: "other", label: "nothing" },
+    ]) {
+        await assert.rejects(() => addVerificationEvidence(PROD.id, [bad], "o"), { code: "EVIDENCE_INVALID" }, JSON.stringify(bad));
+    }
+
+    const added = await addVerificationEvidence(PROD.id, [{ kind: "proof_of_address", label: "Utility bill", ref: "DRIVE:utility-2026-10" }], "owner-1");
+    assert.equal(added.evidence.length, 1);
+    assert.equal(added.status, "submitted");
+
+    const status = await getVerificationStatus(PROD.id);
+    assert.equal(status.latestCase.evidence.length, 2);
+    assert.ok(!JSON.stringify(status).includes("2020/123456"), "restricted registration number is never echoed to the tenant");
+
+    const detail = await getVerificationCase(kase.caseId);
+    assert.equal(detail.evidenceRefs.length, 2);
+    assert.equal(detail.evidenceCount, 2);
+    assert.ok(!JSON.stringify(await searchDiscoverCompanies({ q: "acme" })).includes("files.example.com"), "evidence is never public");
+    assert.ok((await listVerificationCases()).every((c) => c.evidenceRefs === undefined), "queue rows stay light");
+});
+
+test("evidence: capped at 10 per case", async () => {
+    reset();
+    await listed();
+    await submitVerification(PROD.id, "o");
+    const ten = Array.from({ length: 10 }, (_, i) => ({ kind: "other", label: `Doc ${i}`, url: `https://x.example/${i}` }));
+    await addVerificationEvidence(PROD.id, ten, "o");
+    await assert.rejects(() => addVerificationEvidence(PROD.id, [ten[0]], "o"), { code: "EVIDENCE_LIMIT" });
+});
+
+test("request_info asks the tenant for more; adding evidence returns the case to review; approve = verify", async () => {
+    reset();
+    await listed();
+    const kase = await submitVerification(PROD.id, "o");
+    await assert.rejects(() => decideVerification(kase.caseId, { action: "request_info" }, "mc-1"), { code: "NOTE_REQUIRED" });
+
+    const asked = await decideVerification(kase.caseId, { action: "request_info", note: "Please attach the CIPC certificate" }, "mc-1");
+    assert.equal(asked.status, "info_requested");
+    assert.equal(asked.decidedAt, null, "asking for info is not a final decision");
+    let status = await getVerificationStatus(PROD.id);
+    assert.equal(status.state, "info_requested");
+    assert.equal(status.latestCase.decisionNote, "Please attach the CIPC certificate");
+    await assert.rejects(() => submitVerification(PROD.id, "o"), { code: "VERIFICATION_IN_PROGRESS" });
+    assert.equal((await searchDiscoverCompanies({ q: "acme" })).companies[0].verified, false);
+
+    const back = await addVerificationEvidence(PROD.id, [{ kind: "registration_certificate", label: "CIPC", url: "https://files.example.com/c.pdf" }], "o");
+    assert.equal(back.status, "under_review");
+    assert.equal((await getVerificationStatus(PROD.id)).state, "under_review");
+
+    const done = await decideVerification(kase.caseId, { action: "approve", note: "CIPC matches", checks: ["registration_number_matches_registry"] }, "mc-1");
+    assert.equal(done.status, "verified");
+    const audit = await listNetworkAdminAudit({ snId: kase.snId });
+    assert.ok(audit.some((a) => a.action === "verification.verify"), "alias is audited as the canonical action");
+    assert.ok(audit.some((a) => a.action === "verification.request_info"));
+});
+
+test("API: evidence submit + MC detail with evidence; request_info/approve over HTTP", async () => {
+    reset();
+    await listed();
+    const app = express();
+    app.use(express.json());
+    mountNetworkVerificationRoutes(app, {
+        authorize: async (req, companyId) => {
+            req.tenant = { companyId, uid: "uid-9", role: "owner" };
+            return req.tenant;
+        },
+        platformGuard: (req, _res, next) => {
+            req.platformAuth = { via: "superadmin", uid: "sa-1" };
+            next();
+        },
+    });
+    const server = app.listen(0);
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const call = async (path, method = "GET", body) => {
+        const res = await fetch(base + path, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+        return { status: res.status, body: await res.json() };
+    };
+    const V = `/api/network/v1/orgs/${PROD.id}/verification`;
+    try {
+        assert.equal((await call(`${V}/evidence`, "POST", { items: [{ kind: "other", label: "a", url: "https://a.example/a" }] })).status, 409);
+        let r = await call(V, "POST", { evidence: [{ kind: "website", label: "Company site", url: "https://acme.example.com" }] });
+        assert.equal(r.status, 201);
+        assert.equal(r.body.data.evidenceCount, 1);
+        const { caseId } = r.body.data;
+
+        r = await call(`${V}/evidence`, "POST", { items: [{ kind: "other", label: "bad", url: "http://nope.example" }] });
+        assert.equal(r.status, 422);
+        assert.equal(r.body.error.code, "EVIDENCE_INVALID");
+        assert.ok(r.body.error.fields.url);
+
+        r = await call(`${V}/evidence`, "POST", { kind: "ownership_proof", label: "Share certificate", ref: "DOC-77" });
+        assert.equal(r.status, 201);
+
+        r = await call(V);
+        assert.equal(r.body.data.latestCase.evidence.length, 2);
+        assert.ok(r.body.data.evidenceKinds.includes("registration_certificate"));
+
+        r = await call(`/api/platform/network/v1/verification/${caseId}`);
+        assert.equal(r.body.data.case.evidenceRefs.length, 2);
+
+        r = await call(`/api/platform/network/v1/verification/${caseId}/decision`, "POST", { action: "request_info", note: "Need CIPC" });
+        assert.equal(r.body.data.case.status, "info_requested");
+        r = await call(`/api/platform/network/v1/verification?status=info_requested`);
+        assert.equal(r.body.data.cases.length, 1);
+        r = await call(`/api/platform/network/v1/verification/${caseId}/decision`, "POST", { action: "approve", note: "ok", checks: ["ownership_confirmed"] });
+        assert.equal(r.body.data.case.status, "verified");
+    } finally {
+        server.close();
+    }
+});
+
+test("Mission Control: verification decisions use a form modal (no window.prompt), show evidence refs, offer request-info", async () => {
+    const { readFileSync } = await import("node:fs");
+    const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+    const mod = read("js/admin/modules/sarah-network.js");
+    assert.ok(!/window\.prompt/.test(mod), "no window.prompt left in the Sarah Network page");
+    assert.match(mod, /function openDecisionModal\(/);
+    assert.match(mod, /fetchNetworkVerificationCase\(btn\.dataset\.caseId\)/);
+    assert.match(mod, /\['request_info', 'Request info'\]/);
+    assert.match(mod, /'info_requested'/);
+    assert.match(read("js/admin/api.js"), /export async function fetchNetworkVerificationCase/);
+    // evidence links are only rendered for https URLs
+    assert.match(mod, /\^https:\\\/\\\//);
 });

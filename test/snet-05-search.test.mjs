@@ -20,6 +20,7 @@ import { parseQuery, rankCards, stem } from "../services/network/networkSearchSc
 import { getSearchStats, resetSearchStatsForTests } from "../services/network/networkSearchStats.js";
 import { directoryProvider, getSearchProvider, setSearchProvider } from "../services/network/networkSearchService.js";
 import { mountNetworkSearchRoutes } from "../services/api/networkSearchRoutes.js";
+import { resetAuthRateLimits } from "../services/auth/authRateLimiter.js";
 
 const tick = () => new Promise((r) => setImmediate(r));
 
@@ -167,7 +168,8 @@ test("provider interface: suggest/health, swappable provider, API envelope", asy
     }
 });
 
-test("search routes require consumer auth by default; health is public", async () => {
+test("search routes are public (anonymous, listed only, rate limited); health is public", async () => {
+    resetAuthRateLimits();
     const app = express();
     mountNetworkSearchRoutes(app);
     const server = app.listen(0);
@@ -175,9 +177,14 @@ test("search routes require consumer auth by default; health is public", async (
         const base = `http://127.0.0.1:${server.address().port}`;
         for (const path of ["/api/network/v1/directory/search?q=a", "/api/network/v1/directory/suggest?q=ab"]) {
             const res = await fetch(base + path);
-            assert.ok([401, 403].includes(res.status), `${path} → ${res.status}`);
+            assert.equal(res.status, 200, `${path} → ${res.status}`);
         }
         assert.equal((await fetch(`${base}/api/network/v1/health`)).status, 200);
+        // per-client rate limit
+        let last;
+        for (let i = 0; i < 61; i += 1) last = await fetch(`${base}/api/network/v1/directory/search?q=a`, { headers: { "x-forwarded-for": "192.0.2.77" } });
+        assert.equal(last.status, 429);
+        resetAuthRateLimits();
     } finally {
         server.close();
     }

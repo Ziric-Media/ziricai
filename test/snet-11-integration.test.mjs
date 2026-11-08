@@ -186,3 +186,91 @@ test("Discover cards (SNET-01b) and chat rows use the same snId for the same com
     });
     clearBusinessDirectoryForTests();
 });
+
+/* ---------- SNET-11 close-out: Sarah App Follow/Subscribe wired to the connections API (keyed by snId) ---------- */
+
+test("consumer flow used by the Sarah App bridge: follow → subscribe (grant by snId) → unsubscribe → unfollow", async () => {
+    const { mountSarahNetworkRoutes } = await import("../services/api/sarahNetworkRoutes.js");
+    const { mountNetworkConnectionRoutes } = await import("../services/api/networkConnectionRoutes.js");
+    reset();
+    const entity = await ensureOrgEntity(SMILEMORE_DEMO_COMPANY_ID);
+    const app = express();
+    app.use(express.json());
+    const consumerGuard = (req, _res, next) => {
+        req.consumerAuth = { uid: String(req.headers["x-uid"] || uid), profile: {} };
+        next();
+    };
+    mountSarahNetworkRoutes(app, { consumerGuard });
+    mountNetworkConnectionRoutes(app, { consumerGuard });
+    const server = app.listen(0);
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const call = async (path, method = "GET", body) => {
+        const res = await fetch(base + path, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+        return { status: res.status, body: await res.json() };
+    };
+    const act = (action, extra = {}) => call("/api/network/v1/connections", "POST", { snId: entity.snId, action, ...extra });
+    try {
+        assert.equal((await call("/api/network/v1/connections")).body.data.connections.length, 0);
+
+        let r = await act("follow");
+        assert.equal(r.status, 200);
+        assert.equal(r.body.data.connection.state, "following");
+
+        // subscribe needs a standing entity-scoped grant — requested by snId, never by companyId
+        r = await act("subscribe");
+        assert.equal(r.status, 403);
+        assert.equal(r.body.error.code, "GRANT_REQUIRED");
+        r = await call("/api/sarah-network/grants", "POST", { snId: entity.snId, scope: "sarah_network_subscription", disclosedFields: [] });
+        assert.equal(r.status, 201);
+        const grantId = r.body.grant.grantId;
+        r = await act("subscribe", { grantId });
+        assert.equal(r.body.data.connection.state, "subscribed");
+        assert.equal(r.body.data.connection.consent.grantId, grantId);
+        assert.equal(r.body.data.connection.snId, entity.snId);
+
+        let list = (await call("/api/network/v1/connections")).body.data.connections;
+        assert.deepEqual(list.map((c) => [c.snId, c.state]), [[entity.snId, "subscribed"]]);
+
+        r = await act("unsubscribe");
+        assert.equal(r.body.data.connection.state, "following");
+        assert.equal((await call(`/api/sarah-network/grants/${grantId}/revoke`, "POST")).status, 200);
+        r = await act("unfollow");
+        assert.equal(r.body.data.connection.state, "discovered");
+
+        // another user is unaffected
+        const other = await (await fetch(`${base}/api/network/v1/connections`, { headers: { "x-uid": "someone-else" } })).json();
+        assert.equal(other.data.connections.length, 0);
+    } finally {
+        server.close();
+    }
+});
+
+test("Sarah App source: Follow/Subscribe call the connections API by snId; chat rows and threads keep snId", async () => {
+    const { readFileSync } = await import("node:fs");
+    const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+    const bridge = read("prototype/sarah-app-ux/js/live-bridge.mjs");
+    assert.match(bridge, /\/api\/network\/v1\/connections/);
+    assert.match(bridge, /\/api\/sarah-network\/grants/);
+    assert.match(bridge, /sarah_network_subscription/);
+    for (const fn of ["fetchConnections", "setEntityRelationship", "subscribeToEntity", "unsubscribeFromEntity"]) {
+        assert.match(bridge, new RegExp(`export async function ${fn}\\(`));
+        assert.match(bridge, new RegExp(`\\n\\s+${fn},`), `${fn} must be exposed on window.SarahLive`);
+    }
+    // consumers never send companyId for relationship authorisation
+    const rel = bridge.slice(bridge.indexOf("export async function setEntityRelationship"), bridge.indexOf("export async function subscribeToEntity"));
+    assert.ok(!/companyId/.test(rel), "relationship calls are keyed by snId only");
+
+    const app = read("prototype/sarah-app-ux/js/app.js");
+    assert.match(app, /async function handleFollowToggle\(/);
+    assert.match(app, /SarahLive\.setEntityRelationship\(company\.snId/);
+    assert.match(app, /SarahLive\.subscribeToEntity\(company\.snId/);
+    assert.match(app, /SarahLive\.unsubscribeFromEntity\(company\.snId/);
+    // both Discover cards and the company profile use it (no raw local toggle left on the click paths)
+    assert.equal((app.match(/void handleFollowToggle\(btn, id\)/g) || []).length, 2);
+    assert.ok(!/const on = toggleCompanyFollow\(id\);/.test(app), "click handlers must go through handleFollowToggle");
+    // snId survives into chat rows and thread state
+    assert.match(app, /snId: c\.snId \|\| null,/);
+    assert.match(app, /snId: payload\.conversation\?\.snId \|\| chat\?\.snId \|\| discoverCo\?\.snId \|\| null,/);
+    // chatting with a live business needs an account (public Discover is browse-only when signed out)
+    assert.match(app, /company\.live && !requireLiveSignIn\('chat with this business'\)/);
+});

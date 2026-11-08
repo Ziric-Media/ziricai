@@ -158,6 +158,12 @@ export const MODULE_PERMISSIONS = {
   /** Sarah HR — people-management workspace (preview-first). */
   hr: 'canViewHr',
 
+  /**
+   * Sarah Network listing (SNET-03). Deliberately reuses canManageWorkspace — the same key the server enforces on
+   * /api/network/v1/orgs/:companyId/listing — so the portal, server and Sarah matrices cannot drift.
+   */
+  network: 'canManageWorkspace',
+
 };
 
 

@@ -13,6 +13,7 @@ import { resolveTenantContext, assertAuthenticatedTenantMemberAccess } from "../
 import { hasPermission } from "../auth/permissionsService.js";
 import { requireConsumerScope } from "../auth/consumerAuth.js";
 import { auditLog } from "../audit/auditLog.js";
+import { DISCOVER_CATEGORIES } from "../network/networkTaxonomy.js";
 import {
     getListing,
     saveListingDraft,
@@ -69,7 +70,12 @@ export function mountNetworkListingRoutes(app, deps = {}) {
         });
     };
 
-    tenantRoute("get", "/api/network/v1/orgs/:companyId/listing", false, (companyId) => getListing(companyId, listingDeps));
+    tenantRoute("get", "/api/network/v1/orgs/:companyId/listing", false, async (companyId, _req, ctx) => ({
+        ...(await getListing(companyId, listingDeps)),
+        // Lets the Company Portal editor offer the real taxonomy without hard-coding drift, and show read-only for non-managers.
+        categoryOptions: DISCOVER_CATEGORIES.map(({ id, label }) => ({ id, label })),
+        canEdit: Boolean(ctx?.role) && hasPermission(ctx.role, "canManageWorkspace"),
+    }));
 
     tenantRoute("put", "/api/network/v1/orgs/:companyId/listing", true, async (companyId, req, ctx) => {
         const result = await saveListingDraft(companyId, req.body || {}, ctx?.uid || null, listingDeps);

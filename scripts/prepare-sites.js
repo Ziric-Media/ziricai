@@ -111,7 +111,8 @@ function resolveAssetVersion() {
   }
 }
 
-function siteConfigBlock(site) {
+/** Shared shape for window.__ZIRICAI_CONFIG__ (also written to users/js/site-config.js for CSP-friendly loading). */
+function buildSiteConfig(site) {
   const apiBase =
     process.env.API_BASE_URL !== undefined
       ? process.env.API_BASE_URL
@@ -123,13 +124,27 @@ function siteConfigBlock(site) {
   const app = process.env.APP_BASE_URL || 'https://app.ziricai.com';
   const admin = process.env.ADMIN_BASE_URL || 'https://admin.ziricai.com';
   const sarah = process.env.SARAH_APP_BASE_URL || 'https://sarah.ziricai.com';
-  return `<script>window.__ZIRICAI_CONFIG__=${JSON.stringify({
+  const config = {
     apiBase,
     assetVersion: resolveAssetVersion(),
     sites: { marketing, publicWeb, app, admin, sarah, api: apiBase || PRODUCTION_API_URL },
     landingSarahCompanyId: process.env.LANDING_SARAH_COMPANY_ID || 'ziricai',
     firebase: firebaseConfigFromEnv(),
-  })};</script>`;
+  };
+  if (site === 'users') {
+    config.prototypeLive = true;
+  }
+  return config;
+}
+
+function siteConfigBlock(site) {
+  // Sarah App: external script only — strict CSP (e.g. script-src without unsafe-inline) blocks inline config injection.
+  if (site === 'users') {
+    const v = resolveAssetVersion();
+    return `<script src="js/site-config.js?v=${v}"></script>`;
+  }
+  const config = buildSiteConfig(site);
+  return `<script>window.__ZIRICAI_CONFIG__=${JSON.stringify(config)};</script>`;
 }
 
 function rmDir(dir) {
@@ -434,13 +449,37 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
 
   if (site === 'users') {
     const assetVersion = resolveAssetVersion();
+    for (const css of ['design-system.css', 'icons.css', 'app.css', 'sarah-app.css']) {
+      out = out.replace(
+        new RegExp(`href="css/${css}"`, 'g'),
+        `href="css/${css}?v=${assetVersion}"`
+      );
+    }
+    for (const js of [
+      'boot-inline.js',
+      'site-config.js',
+      'ziricai-config.js',
+      'icons.js',
+      'mock-data.js',
+      'thread-rich-text.js',
+      'app.js',
+    ]) {
+      out = out.replace(
+        new RegExp(`src="js/${js.replace('.', '\\.')}"`, 'g'),
+        `src="js/${js}?v=${assetVersion}"`
+      );
+    }
     out = out.replace(
-      /href="css\/sarah-app\.css"/,
-      `href="css/sarah-app.css?v=${assetVersion}"`
+      /src="js\/live-bridge\.mjs"/,
+      `src="js/live-bridge.mjs?v=${assetVersion}"`
     );
     out = out.replace(
       /src="js\/users\/main\.js"/,
       `src="js/users/main.js?v=${assetVersion}"`
+    );
+    out = out.replace(
+      /<title>Sarah — UX Prototype<\/title>/,
+      '<title>Sarah</title>'
     );
   }
 
@@ -670,24 +709,55 @@ function prepareApp() {
 
 function prepareUsers() {
   const dir = path.join(ROOT, 'users');
+  const prototypeDir = path.join(ROOT, 'prototype/sarah-app-ux');
+  if (!fs.existsSync(path.join(prototypeDir, 'index.html'))) {
+    throw new Error('prototype/sarah-app-ux missing — cannot prepare Sarah App');
+  }
+
   rmDir(path.join(dir, 'css'));
   rmDir(path.join(dir, 'js'));
   rmDir(path.join(dir, 'assets'));
 
-  const shell = fs.existsSync(path.join(ROOT, 'sarah-app-shell.html'))
-    ? readText('sarah-app-shell.html')
-    : '<!DOCTYPE html><html><body>Sarah App shell missing</body></html>';
-  writeText('users/index.html', patchHtml(shell, { site: 'users', importmapMode: 'cdn' }));
-
-  copyDir(path.join(ROOT, 'js/users'), path.join(dir, 'js/users'));
-  copyDir(path.join(ROOT, 'js/shared'), path.join(dir, 'js/shared'));
-  for (const f of ['auth.js', 'firebase-config.js', 'firebase.js', 'users.js']) {
-    copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
+  copyDir(prototypeDir, dir);
+  if (fs.existsSync(path.join(dir, 'README.md'))) {
+    fs.unlinkSync(path.join(dir, 'README.md'));
   }
-  copyFile(path.join(ROOT, 'css/sarah-app.css'), path.join(dir, 'css/sarah-app.css'));
-  copyFile(path.join(ROOT, 'users/manifest.webmanifest'), path.join(dir, 'manifest.webmanifest'));
-  copyFile(path.join(ROOT, 'js/users/sw.js'), path.join(dir, 'sw.js'));
-  copyPlatformBrandAssets(dir, []);
+
+  const indexPath = path.join(dir, 'index.html');
+  let html = fs.readFileSync(indexPath, 'utf8');
+  html = patchHtml(html, { site: 'users', importmapMode: 'cdn' });
+  fs.writeFileSync(indexPath, html, 'utf8');
+
+  const siteConfigJs = path.join(dir, 'js/site-config.js');
+  fs.mkdirSync(path.dirname(siteConfigJs), { recursive: true });
+  fs.writeFileSync(
+    siteConfigJs,
+    `window.__ZIRICAI_CONFIG__=${JSON.stringify(buildSiteConfig('users'))};\n`,
+    'utf8'
+  );
+
+  const manifestFromPrototype = path.join(prototypeDir, 'manifest.webmanifest');
+  if (fs.existsSync(manifestFromPrototype)) {
+    copyFile(manifestFromPrototype, path.join(dir, 'manifest.webmanifest'));
+  } else if (fs.existsSync(path.join(ROOT, 'users/manifest.webmanifest'))) {
+    copyFile(path.join(ROOT, 'users/manifest.webmanifest'), path.join(dir, 'manifest.webmanifest'));
+  }
+  if (fs.existsSync(path.join(ROOT, 'js/users/sw.js'))) {
+    copyFile(path.join(ROOT, 'js/users/sw.js'), path.join(dir, 'sw.js'));
+  }
+  copyPlatformBrandAssets(dir, [
+    'icon-192.png',
+    'icon-512.png',
+    'icon-maskable-512.png',
+    'apple-touch-icon.png',
+  ]);
+
+  const apiTarget = PRODUCTION_API_URL;
+  fs.writeFileSync(
+    path.join(dir, '_redirects'),
+    `# Generated by prepare-sites.js — API proxy when netlify.toml is not picked up on deploy\n/api/*  ${apiTarget}/api/:splat  200!\n/node_modules/*  /404.html  404!\n/*  /index.html  200\n`,
+    'utf8'
+  );
 }
 
 function prepareAdmin() {

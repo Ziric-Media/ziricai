@@ -56,7 +56,7 @@ export async function getNetworkStats() {
         byVerification[r.verification] = (byVerification[r.verification] || 0) + 1;
     }
     const cases = await listVerificationCases({ limit: 500 });
-    const openCases = cases.filter((c) => c.status === "submitted" || c.status === "under_review").length;
+    const openCases = cases.filter((c) => c.status === "submitted" || c.status === "under_review" || c.status === "info_requested").length;
     const agents = await listAllAgentsForPlatform({ limit: 2000 });
     const connections = await countConnectionsByState();
     const search = getSearchStats();
