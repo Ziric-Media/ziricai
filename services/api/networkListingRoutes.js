@@ -34,7 +34,7 @@ function fail(res, err, fallbackCode) {
 }
 
 /** Default tenant authorization: authenticated member of the company; mutations need owner/manager (or superadmin). */
-async function defaultAuthorize(req, companyId, { write = false } = {}) {
+export async function defaultAuthorize(req, companyId, { write = false } = {}) {
     const ctx = await resolveTenantContext(req);
     req.tenant = { ...ctx, companyId };
     await assertAuthenticatedTenantMemberAccess(req.tenant, { auditSurface: "network_listing" });

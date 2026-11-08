@@ -134,6 +134,21 @@ export function listPublicBusinessDirectoryEntries() {
         .sort((a, b) => String(a.displayName || a.companyId).localeCompare(String(b.displayName || b.companyId)));
 }
 
+/**
+ * What the badge means: state + what was actually checked (spec §12 — a badge must explain itself).
+ * Legacy entries marked `verified` without a case are shown as operator-attested pilots, never as "registry checked".
+ */
+export function verificationBadge(entry) {
+    if (entry.verificationSummary?.state) {
+        const s = entry.verificationSummary;
+        return { state: s.state, checks: s.checks || [], source: s.source || "verification_case", verifiedAt: s.verifiedAt || null };
+    }
+    if (entry.verified) {
+        return { state: "verified", checks: ["operator_attestation"], source: "operator_pilot_attestation", verifiedAt: null };
+    }
+    return { state: "unverified", checks: [], source: null, verifiedAt: null };
+}
+
 /** Public card shape for Discover (never includes restricted/private fields). */
 export function toDiscoverCard(entry, entity) {
     return {
@@ -143,6 +158,7 @@ export function toDiscoverCard(entry, entity) {
         industry: entry.industry || null,
         location: entry.location || null,
         verified: Boolean(entry.verified),
+        verification: verificationBadge(entry),
         shortDescription:
             entry.shortDescription || "Chat with this business using Company Sarah on Sarah App.",
         categories: deriveCategories(entry),

@@ -238,6 +238,7 @@ import { mountPlatformRevenueRoutes } from "../services/api/platformRevenueRoute
 import { mountSarahNetworkRoutes } from "../services/api/sarahNetworkRoutes.js";
 import { mountNetworkEntityRoutes } from "../services/api/networkEntityRoutes.js";
 import { mountNetworkListingRoutes } from "../services/api/networkListingRoutes.js";
+import { mountNetworkVerificationRoutes } from "../services/api/networkVerificationRoutes.js";
 import { mountUserConversationRoutes } from "../services/api/userConversationRoutes.js";
 import { mountChatPersonRoutes } from "../services/api/chatPersonRoutes.js";
 import { mountChatGroupRoutes } from "../services/api/chatGroupRoutes.js";
@@ -2728,6 +2729,7 @@ mountPlatformRevenueRoutes(app);
 mountSarahNetworkRoutes(app);
 mountNetworkEntityRoutes(app);
 mountNetworkListingRoutes(app);
+mountNetworkVerificationRoutes(app);
 mountUserConversationRoutes(app);
 mountChatPersonRoutes(app);
 mountChatGroupRoutes(app);

@@ -15,6 +15,7 @@ import {
     hydrateBusinessDirectory,
     invalidateDirectoryEntity,
     saveBusinessDirectoryEntry,
+    verificationBadge,
 } from "../users/businessDirectoryService.js";
 import { getCompany } from "../tenants/companyService.js";
 
@@ -255,6 +256,7 @@ export async function getPublicProfileBySnId(snId) {
         displayName: entry.displayName || companyId,
         categories: deriveCategories(entry),
         verified: Boolean(entry.verified),
+        verification: verificationBadge(entry),
         hasCompanySarah: true,
     };
 }

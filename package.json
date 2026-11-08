@@ -30,6 +30,7 @@
         "test:sarah-ch6": "node --test test/ch6-handover.test.mjs",
         "test:sarah-ch8": "node --test test/ch8-work-links.test.mjs",
         "test:sarah-ch9": "node --test test/ch9-chat-acceptance.test.mjs",
+        "test:snet-04": "node --test test/snet-04-verification.test.mjs",
         "test:snet-03": "node --test test/snet-03-profile-publish.test.mjs",
         "test:snet-02": "node --test test/snet-02-registry-durability.test.mjs",
         "network:backfill:dry": "node scripts/network-backfill-entities.mjs",

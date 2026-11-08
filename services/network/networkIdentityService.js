@@ -174,6 +174,24 @@ export async function setOrgEntityStatus(companyId, status, meta = {}) {
 }
 
 /**
+ * Mirror the verification summary on the entity (`verification.state` etc.). The case record in
+ * `networkVerificationCases` stays the system of record; this is the denormalised badge state.
+ * @param {string} companyId
+ * @param {{ state: string, caseId?: string|null, level?: string|null, checked?: string[], verifiedAt?: string|null }} verification
+ */
+export async function setOrgEntityVerification(companyId, verification) {
+    const current = await ensureOrgEntity(companyId);
+    const next = {
+        ...current,
+        verification: { ...verification },
+        version: (current.version || 1) + 1,
+        updatedAt: nowIso(),
+    };
+    await store().putEntity(next);
+    return next;
+}
+
+/**
  * All org entities (memory: everything; Firestore: capped scan). Used by platform stats / backfill reports.
  * @param {{ limit?: number }} [opts]
  */

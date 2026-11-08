@@ -28,6 +28,10 @@ export function buildPilotSeedEntries() {
             tags: smile ? ["dentist", "dental", "teeth", "orthodontics", "paediatric"] : [],
             industryPresetId: null,
             verified: smile,
+            // Honest provenance: pilot "verified" is an operator attestation, not a registry check.
+            verificationSummary: smile
+                ? { state: "verified", level: "operator_attestation", checks: ["operator_attestation"], source: "operator_pilot_attestation" }
+                : { state: "unverified", checks: [], source: null },
             seeded: true,
         };
     });
