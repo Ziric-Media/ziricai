@@ -20,4 +20,31 @@ export function mountChatWorkRoutes(app) {
             res.status(500).json({ error: err.message || "Failed to create work link" });
         }
     });
+
+    app.post("/api/chat/conversations/:conversationId/booking-link", requireConsumerScope(), async (req, res) => {
+        const link = createChatWorkLink(req.params.conversationId, {
+            ...req.body,
+            linkType: "booking",
+            label: req.body?.label || "Booking linked from chat",
+        });
+        res.status(201).json({ link });
+    });
+
+    app.post("/api/chat/conversations/:conversationId/order-link", requireConsumerScope(), async (req, res) => {
+        const link = createChatWorkLink(req.params.conversationId, {
+            ...req.body,
+            linkType: "order",
+            label: req.body?.label || "Order linked from chat",
+        });
+        res.status(201).json({ link });
+    });
+
+    app.post("/api/chat/conversations/:conversationId/payment-link", requireConsumerScope(), async (req, res) => {
+        const link = createChatWorkLink(req.params.conversationId, {
+            ...req.body,
+            linkType: "payment",
+            label: req.body?.label || "Sarah Pay link from chat",
+        });
+        res.status(201).json({ link });
+    });
 }

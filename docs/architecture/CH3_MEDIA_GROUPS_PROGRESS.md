@@ -9,8 +9,13 @@
 - `chatGroupRoutes.js` — CRUD-style group API
 - `test/ch3-media-groups.test.mjs`
 
+## Delivered (post-MVP 2026-11-08)
+
+- Signed upload token path `POST /api/chat/media/uploads` + `PUT /api/chat/media/:uploadId`
+- Organisation groups `POST /api/group-conversations/organisation` (consent required)
+- Personal Sarah invite routes (group + P2P)
+
 ## Not in CH3
 
-- Binary upload pipeline / signed URLs (metadata-only MVP)
-- Organisation consent-gated groups (`group_organisation`)
-- Sarah orchestration reading group threads
+- Object storage backend (GCS/S3) for media blobs
+- Sarah orchestration reading group threads end-to-end

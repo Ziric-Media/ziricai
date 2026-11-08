@@ -17,6 +17,10 @@ export function createChatWorkLink(conversationId, payload = {}) {
         workItemId: payload.workItemId ? String(payload.workItemId) : null,
         bookingId: payload.bookingId ? String(payload.bookingId) : null,
         orderId: payload.orderId ? String(payload.orderId) : null,
+        paymentId: payload.paymentId ? String(payload.paymentId) : null,
+        appointmentId: payload.appointmentId ? String(payload.appointmentId) : null,
+        linkType: payload.linkType ? String(payload.linkType) : "work",
+        deepLink: payload.deepLink ? String(payload.deepLink).slice(0, 500) : null,
         label: payload.label ? String(payload.label).slice(0, 200) : "Linked work item",
         createdAt: new Date().toISOString(),
     };

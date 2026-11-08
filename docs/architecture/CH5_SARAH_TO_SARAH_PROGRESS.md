@@ -6,4 +6,6 @@
 - `sarahNetworkService` links completed requests to Chat index
 - Listed under `sarahs` filter in federated index
 
-**Remaining:** Full in-thread transcript polling; consent UI surfacing in Chats module.
+**Delivered (post-MVP):** Network messages polling via `?since=`; `consentScope` on network thread payload; transcript append helper for follow-ups.
+
+**Remaining:** Live websocket push; full consent editor UI.

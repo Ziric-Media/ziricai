@@ -7,4 +7,6 @@
 - Portal APIs: `assign`, `internal-note` on conversation routes
 - `js/portal/api.js` client helpers
 
-**Remaining:** Transfer/escalate UI, accept queue, Sarah summary payload, full RBAC per assignment.
+**Delivered (post-MVP):** Portal inbox handover toolbar (assign/accept/transfer/escalate/summary); APIs on `customerOpsRoutes`; return-to-Sarah via takeover button when human.
+
+**Remaining:** Full RBAC per assignment; notifications on accept queue.

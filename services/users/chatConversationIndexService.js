@@ -45,7 +45,10 @@ export function listFederatedChatConversations(userId, options = {}) {
                 ...c,
                 listKey: `group:${c.id}`,
                 displayLabel: c.title || "Group",
-                conversationKind: CONVERSATION_TYPES.GROUP_PERSONAL,
+                conversationKind:
+                    c.type === CONVERSATION_TYPES.GROUP_ORGANISATION
+                        ? CONVERSATION_TYPES.GROUP_ORGANISATION
+                        : CONVERSATION_TYPES.GROUP_PERSONAL,
             });
         }
     }

@@ -367,6 +367,56 @@ export async function fetchCompanyMessages(companyId) {
   return apiRequest(`/api/user-conversations/${encodeURIComponent(id)}/messages`);
 }
 
+export async function fetchPersonMessages(conversationId) {
+  return apiRequest(`/api/person-conversations/${encodeURIComponent(conversationId)}/messages`);
+}
+
+export async function sendPersonMessage(conversationId, message) {
+  return apiRequest(`/api/person-conversations/${encodeURIComponent(conversationId)}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+}
+
+export async function fetchGroupMessages(groupId) {
+  return apiRequest(`/api/group-conversations/${encodeURIComponent(groupId)}/messages`);
+}
+
+export async function sendGroupMessage(groupId, message) {
+  return apiRequest(`/api/group-conversations/${encodeURIComponent(groupId)}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+}
+
+export async function fetchNetworkMessages(conversationId, since = null) {
+  const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+  return apiRequest(`/api/network-conversations/${encodeURIComponent(conversationId)}/messages${qs}`);
+}
+
+export async function searchChatThreads(query) {
+  const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+  return apiRequest(`/api/chat/search${qs}`);
+}
+
+export async function patchChatPreferences(conversationId, patch) {
+  return apiRequest(`/api/chat/conversations/${encodeURIComponent(conversationId)}/preferences`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch || {}),
+  });
+}
+
+export async function requestHumanHandover(companyId) {
+  return apiRequest(`/api/user-conversations/${encodeURIComponent(companyId)}/request-human`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+}
+
 export async function sendCompanyMessage(companyId, message) {
   const text = String(message || '').trim();
   if (!text) return { error: 'Message is empty' };
@@ -426,6 +476,14 @@ function mountPublicApi() {
     fetchChatConversations,
     fetchCompanyMessages,
     sendCompanyMessage,
+    fetchPersonMessages,
+    sendPersonMessage,
+    fetchGroupMessages,
+    sendGroupMessage,
+    fetchNetworkMessages,
+    searchChatThreads,
+    patchChatPreferences,
+    requestHumanHandover,
   };
 }
 

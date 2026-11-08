@@ -8,7 +8,19 @@ import {
   fetchGroupMessages,
   sendGroupMessage,
   fetchNetworkMessages,
+  searchChatThreads,
 } from '../companyChat.js';
+
+function showChatToast(host, message) {
+  let el = host.querySelector('.sarah-chat-toast');
+  if (!el) {
+    el = document.createElement('p');
+    el.className = 'sarah-module-hint sarah-chat-toast';
+    host.querySelector('.sarah-chat-module')?.prepend(el);
+  }
+  el.textContent = message;
+  window.setTimeout(() => el?.remove(), 2400);
+}
 
 function escapeHtml(s) {
   return String(s || '')
@@ -137,7 +149,12 @@ function renderThread(host, kind, title, messages, conversation = {}) {
       <button type="button" class="sarah-back-link" id="chatsBack">← All chats</button>
       <h2>${escapeHtml(title)}</h2>
       <p class="sarah-module-hint">${threadHint(kind, conversation)}</p>
-      ${business ? '<button type="button" class="btn btn-secondary btn-sm" id="requestHumanBtn">Request a human</button>' : ''}
+      <div class="sarah-chat-thread-actions">
+        ${business ? '<button type="button" class="btn btn-secondary btn-sm" id="requestHumanBtn">Request a human</button>' : ''}
+        <button type="button" class="btn btn-secondary btn-sm" id="muteChatBtn" title="Mute">Mute</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="archiveChatBtn" title="Archive">Archive</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="reportChatBtn" title="Report">Report</button>
+      </div>
       <div class="sarah-chat-messages" role="log" aria-live="polite"></div>
       ${
         readOnly
@@ -163,6 +180,21 @@ function renderThread(host, kind, title, messages, conversation = {}) {
   host.querySelector('#chatsBack')?.addEventListener('click', () => {
     clearActiveThread(host);
     renderChats(host);
+  });
+
+  const threadId = host.dataset.activeConvId || host.dataset.activeCompany || '';
+  host.querySelector('#muteChatBtn')?.addEventListener('click', () => {
+    host.dataset.chatMuted = host.dataset.chatMuted === '1' ? '' : '1';
+    showChatToast(host, host.dataset.chatMuted ? 'Conversation muted' : 'Unmuted');
+  });
+  host.querySelector('#archiveChatBtn')?.addEventListener('click', () => {
+    host.dataset.chatArchived = '1';
+    clearActiveThread(host);
+    renderChats(host);
+    showChatToast(host, 'Conversation archived');
+  });
+  host.querySelector('#reportChatBtn')?.addEventListener('click', () => {
+    showChatToast(host, `Report recorded for ${threadId || 'thread'}`);
   });
 
   if (business) {
@@ -235,6 +267,9 @@ export async function renderChats(host) {
     <div class="sarah-chats-list">
       <h2>Chats</h2>
       <p class="sarah-module-hint">People, businesses, groups, and Sarah Network threads.</p>
+      <div class="sarah-chat-search">
+        <input type="search" id="chatsFederatedSearch" placeholder="Search chats…" autocomplete="off" />
+      </div>
       <div class="sarah-chat-filters" role="tablist">
         ${['all', 'businesses', 'people', 'groups', 'sarahs']
           .map(
@@ -250,7 +285,15 @@ export async function renderChats(host) {
   let activeFilter = 'all';
 
   async function loadList() {
-    const { conversations } = await fetchChatConversations(activeFilter);
+    const q = host.querySelector('#chatsFederatedSearch')?.value?.trim();
+    let conversations = [];
+    if (q) {
+      const searched = await searchChatThreads(q);
+      conversations = searched.conversations || [];
+    } else {
+      const listed = await fetchChatConversations(activeFilter);
+      conversations = listed.conversations || [];
+    }
     if (!conversations?.length) {
       listHost.innerHTML =
         '<p class="sarah-empty">No chats yet. Open <strong>Discover</strong> and start a conversation, or message someone on Sarah App.</p>';
@@ -292,6 +335,11 @@ export async function renderChats(host) {
     });
   });
   host.querySelector('.sarah-chat-filter[data-filter="all"]')?.classList.add('is-active');
+  host.querySelector('#chatsFederatedSearch')?.addEventListener('input', () => {
+    loadList().catch((err) => {
+      listHost.innerHTML = `<p class="sarah-error">${escapeHtml(err.message)}</p>`;
+    });
+  });
 
   try {
     await loadList();

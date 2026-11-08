@@ -7,4 +7,6 @@
 - Consumer `chats.js` filters + handover hint on business threads
 - `companyChat.js` — `fetchChatConversations`, `requestHumanHandover` client
 
-**Remaining:** Open non-business thread types in UI (list-only parity today); org profile CTAs beyond Discover pilot.
+**Delivered (post-MVP):** Live prototype Chats open P2P/group/network threads; federated search `GET /api/chat/search`; mute/archive/report UI hooks in `js/users/modules/chats.js`.
+
+**Remaining:** Full Discover Firestore directory parity on every org profile.

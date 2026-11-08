@@ -59,6 +59,28 @@ export async function sendGroupMessage(groupId, message) {
   });
 }
 
-export async function fetchNetworkMessages(conversationId) {
-  return apiRequest(`/api/network-conversations/${encodeURIComponent(conversationId)}/messages`);
+export async function fetchNetworkMessages(conversationId, since = null) {
+  const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+  return apiRequest(`/api/network-conversations/${encodeURIComponent(conversationId)}/messages${qs}`);
+}
+
+export async function searchChatThreads(query) {
+  const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+  return apiRequest(`/api/chat/search${qs}`);
+}
+
+export async function patchChatPreferences(conversationId, patch) {
+  return apiRequest(`/api/chat/conversations/${encodeURIComponent(conversationId)}/preferences`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(patch || {}),
+  });
+}
+
+export async function createChatMediaUpload(meta) {
+  return apiRequest('/api/chat/media/uploads', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(meta || {}),
+  });
 }

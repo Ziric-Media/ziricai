@@ -8,4 +8,6 @@
 - `POST /api/user-conversations/:companyId/request-human`
 - Consumer system messages on state transitions
 
-**Remaining:** Full assignment queue, escalation rules (D3), all §3.3 states beyond MVP subset.
+**Delivered (post-MVP):** `sarahInboxHandoverService` — assign, accept, transfer, escalate, return-to-Sarah; accept queue API; consumer ownership sync.
+
+**Remaining:** D3 rules engine per-tenant config UI; durable queue store (Firestore).

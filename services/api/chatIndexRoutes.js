@@ -27,7 +27,13 @@ export function mountChatIndexRoutes(app) {
     app.get("/api/network-conversations/:conversationId/messages", requireConsumerScope(), async (req, res) => {
         try {
             const conv = getNetworkLinkedConversation(req.consumerAuth.uid, req.params.conversationId);
-            res.json({ conversation: conv, messages: getNetworkChatMessages(conv.id) });
+            const since = req.query?.since || null;
+            res.json({
+                conversation: conv,
+                messages: getNetworkChatMessages(conv.id, { since }),
+                consentScope: conv.networkConsentScope || "network_enquiry",
+                polledAt: new Date().toISOString(),
+            });
         } catch (err) {
             res.status(err.status || 500).json({
                 error: err.message || "Failed to load network thread",

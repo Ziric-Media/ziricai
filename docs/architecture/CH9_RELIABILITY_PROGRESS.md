@@ -1,8 +1,10 @@
 # CH9 — Reliability & acceptance
 
-**Status:** MVP subset
+**Status:** API acceptance MVP
 
-- `test/ch9-chat-acceptance.test.mjs` — partial §17 coverage (#1, #3, #6)
-- `npm run test:sarah-chat-ch2-ch9` — CH1–CH9 regression bundle
+- `test/ch9-chat-acceptance.test.mjs` — §17 scenarios (#1–#15 API-level)
+- `test/ch10-chat-ux-handover.test.mjs` — UX + portal handover regression
+- `docs/architecture/CHAT_E2E_HARNESS.md` — manual + future Playwright
+- `chatRetentionService.js` — retention/audit hooks
 
-**Remaining:** Full 15 acceptance tests, E2E App↔Portal playwright, retention/audit policies.
+**Remaining:** Playwright CI harness with Firebase test users.

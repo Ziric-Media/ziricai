@@ -121,8 +121,39 @@ export function listNetworkLinkedConversations(userId) {
         .sort((a, b) => String(b.lastMessageAt).localeCompare(String(a.lastMessageAt)));
 }
 
-export function getNetworkChatMessages(conversationId) {
-    return messagesByConversation.get(conversationId) || [];
+export function getNetworkChatMessages(conversationId, { since } = {}) {
+    const all = messagesByConversation.get(conversationId) || [];
+    if (!since) return all;
+    const ts = new Date(since).getTime();
+    if (Number.isNaN(ts)) return all;
+    return all.filter((m) => new Date(m.createdAt).getTime() > ts);
+}
+
+/**
+ * Append follow-up transcript line (polling / network completion).
+ */
+export async function appendNetworkTranscriptLine(conversationId, line) {
+    const conv = conversations.get(conversationId);
+    if (!conv) return null;
+    const content = String(line?.content || "").trim();
+    if (!content) return conv;
+    const entry = {
+        id: randomUUID(),
+        role: line.role === "user" ? MESSAGE_ROLES.USER : MESSAGE_ROLES.ASSISTANT,
+        content,
+        source: "ai_to_ai",
+        authorParticipantId: line.authorParticipantId || "system",
+        consentScope: line.consentScope || "network_enquiry",
+        createdAt: new Date().toISOString(),
+    };
+    const list = messagesByConversation.get(conversationId) || [];
+    list.push(entry);
+    messagesByConversation.set(conversationId, list);
+    conv.lastMessageAt = entry.createdAt;
+    conv.preview = content.slice(0, 160);
+    conv.networkConsentScope = line.consentScope || conv.networkConsentScope || "network_enquiry";
+    await persist(conv, entry);
+    return conv;
 }
 
 /**

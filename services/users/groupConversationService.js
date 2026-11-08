@@ -159,18 +159,75 @@ export async function invitePersonalSarahToGroup(userId, groupId, { consentGrant
     return conv;
 }
 
+/**
+ * Consent-gated organisation group (MVP).
+ * @param {string} userId
+ * @param {object} input
+ */
+export async function createOrganisationGroup(userId, input = {}) {
+    if (!input.organisationId) {
+        throw Object.assign(new Error("organisationId is required"), { status: 400, code: "ORG_ID_REQUIRED" });
+    }
+    if (!Boolean(input.consentGranted)) {
+        throw Object.assign(new Error("Organisation group requires consentGranted"), {
+            status: 400,
+            code: "ORG_CONSENT_REQUIRED",
+        });
+    }
+    const ownerId = personIdFromUserId(userId);
+    const id = buildGroupId();
+    const conv = {
+        id,
+        userId: ownerId,
+        personId: ownerId,
+        organisationId: String(input.organisationId),
+        channel: "sarah_app",
+        type: CONVERSATION_TYPES.GROUP_ORGANISATION,
+        title: String(input.title || "Organisation group").slice(0, 120),
+        ownerId,
+        participants: [
+            {
+                id: ownerId,
+                kind: "person",
+                displayName: input.ownerDisplayName || null,
+                invited: false,
+                consentGranted: true,
+                sarahAgentId: null,
+                employeeId: null,
+            },
+        ],
+        ownershipState: "ai_active",
+        orgConsentGranted: true,
+        lastMessageAt: new Date().toISOString(),
+        preview: "",
+        createdAt: new Date().toISOString(),
+    };
+    conversations.set(id, conv);
+    messagesByConversation.set(id, []);
+    registerMembers(conv);
+    await mirrorConversation(conv);
+    return conv;
+}
+
 export function listGroupConversations(userId) {
     const personId = personIdFromUserId(userId);
     const ids = indexByPerson.get(personId) || [];
     return ids
         .map((id) => conversations.get(id))
-        .filter((c) => c && c.type === CONVERSATION_TYPES.GROUP_PERSONAL)
+        .filter(
+            (c) =>
+                c &&
+                (c.type === CONVERSATION_TYPES.GROUP_PERSONAL || c.type === CONVERSATION_TYPES.GROUP_ORGANISATION)
+        )
         .sort((a, b) => String(b.lastMessageAt).localeCompare(String(a.lastMessageAt)));
 }
 
 export function getGroupConversation(userId, groupId) {
     const conv = conversations.get(groupId);
-    if (!conv || conv.type !== CONVERSATION_TYPES.GROUP_PERSONAL) {
+    if (
+        !conv ||
+        (conv.type !== CONVERSATION_TYPES.GROUP_PERSONAL && conv.type !== CONVERSATION_TYPES.GROUP_ORGANISATION)
+    ) {
         throw Object.assign(new Error("Group not found."), { status: 404, code: "GROUP_NOT_FOUND" });
     }
     const personId = personIdFromUserId(userId);

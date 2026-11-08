@@ -189,6 +189,32 @@ export function normalizeAttachments(attachments) {
         .slice(0, 8);
 }
 
+/**
+ * D1 — invite Personal Sarah into a P2P thread.
+ */
+export async function invitePersonalSarahToP2p(userId, conversationId, { consentGranted = false } = {}) {
+    const conv = getPersonToPersonConversation(userId, conversationId);
+    const personId = personIdFromUserId(userId);
+    const sarahId = `personal_sarah:${personId}`;
+    const existing = conv.participants.find((p) => p.id === sarahId);
+    if (existing) {
+        existing.invited = true;
+        existing.consentGranted = Boolean(consentGranted);
+    } else {
+        conv.participants.push({
+            id: sarahId,
+            kind: "personal_sarah",
+            displayName: "Personal Sarah",
+            invited: true,
+            consentGranted: Boolean(consentGranted),
+            sarahAgentId: sarahId,
+            employeeId: null,
+        });
+    }
+    await mirrorConversation(conv);
+    return conv;
+}
+
 export function clearPersonToPersonConversationsForTests() {
     conversations.clear();
     indexByPerson.clear();

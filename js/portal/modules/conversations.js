@@ -7,6 +7,12 @@ import {
   sendConversationReply,
   setConversationTakeover,
   markConversationRead,
+  assignConversation,
+  acceptConversation,
+  transferConversation,
+  escalateConversation,
+  returnConversationToSarah,
+  fetchHandoverSummary,
 } from '../api.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
 import { invalidateHub } from '../core/dataService.js';
@@ -299,9 +305,11 @@ export async function renderConversations(container) {
     container.querySelector('#takeoverBtn')?.addEventListener('click', async () => {
       if (!selected) return;
       const human = isHumanControlled(selected);
-      const res = await setConversationTakeover(companyId, selected.id || selected.phone, {
-        enabled: !human,
-      });
+      const convId = selected.id || selected.phone;
+      const res =
+        human && selected.channel === 'sarah_app'
+          ? await returnConversationToSarah(companyId, convId, {})
+          : await setConversationTakeover(companyId, convId, { enabled: !human });
       if (res.error) {
         threadError = res.error;
         paint();
@@ -312,6 +320,64 @@ export async function renderConversations(container) {
       const key = conversationKey(selected);
       const updated = conversations.find((c) => conversationKey(c) === key) || selected;
       await loadThread({ ...updated, humanTakeover: !human, mode: human ? 'ai' : 'human' });
+    });
+
+    container.querySelector('#assignBtn')?.addEventListener('click', async () => {
+      if (!selected) return;
+      const employeeId = state.profile?.uid || 'staff';
+      const res = await assignConversation(companyId, selected.id || selected.phone, { employeeId });
+      threadError = res.error || null;
+      if (!res.error) await loadThread(selected);
+      else paint();
+    });
+
+    container.querySelector('#acceptBtn')?.addEventListener('click', async () => {
+      if (!selected) return;
+      const res = await acceptConversation(companyId, selected.id || selected.phone, {
+        employeeId: state.profile?.uid,
+      });
+      threadError = res.error || null;
+      if (!res.error) await loadThread(selected);
+      else paint();
+    });
+
+    container.querySelector('#transferBtn')?.addEventListener('click', async () => {
+      if (!selected) return;
+      const target = window.prompt('Transfer to employee id / name');
+      if (!target) return;
+      const res = await transferConversation(companyId, selected.id || selected.phone, {
+        targetEmployeeId: target,
+        humanAgent: target,
+      });
+      threadError = res.error || null;
+      if (!res.error) await loadThread(selected);
+      else paint();
+    });
+
+    container.querySelector('#escalateBtn')?.addEventListener('click', async () => {
+      if (!selected) return;
+      const res = await escalateConversation(companyId, selected.id || selected.phone, {
+        reason: 'Portal escalation',
+        level: 1,
+      });
+      threadError = res.error || null;
+      if (!res.error) await loadThread(selected);
+      else paint();
+    });
+
+    container.querySelector('#handoverSummaryBtn')?.addEventListener('click', async () => {
+      if (!selected) return;
+      const res = await fetchHandoverSummary(companyId, selected.id || selected.phone);
+      const panel = container.querySelector('#handoverSummaryPanel');
+      if (!panel) return;
+      if (res.error) {
+        panel.classList.remove('hidden');
+        panel.textContent = res.error;
+        return;
+      }
+      const summary = res.data?.summary || {};
+      panel.classList.remove('hidden');
+      panel.innerHTML = `<strong>Handover summary</strong><p>${summary.recentTranscript || summary.lastPreview || '—'}</p>`;
     });
 
     container.querySelector('#retryContextBtn')?.addEventListener('click', () => {

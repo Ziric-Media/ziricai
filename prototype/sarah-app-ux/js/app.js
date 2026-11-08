@@ -1650,12 +1650,48 @@ async function loadCompanyThreadFromApiIfNeeded() {
 
 let chatsListLoadGen = 0;
 
+async function loadNonCompanyThreadFromApi(convId, kind) {
+  if (!consumerChatLiveActive() || !convId) return false;
+  const rt = getSarahRuntime();
+  const k = String(kind || '').toLowerCase();
+  let res;
+  if (k === 'person_to_person') res = await window.SarahLive.fetchPersonMessages(convId);
+  else if (k === 'group_personal' || k === 'group_organisation') {
+    res = await window.SarahLive.fetchGroupMessages(convId);
+  } else if (k === 'ai_to_ai') res = await window.SarahLive.fetchNetworkMessages(convId);
+  else return false;
+  if (res?.error) {
+    showProtoToast(res.error);
+    return false;
+  }
+  const payload = res.data || {};
+  const title =
+    payload.conversation?.peerDisplayName ||
+    payload.conversation?.title ||
+    payload.conversation?.companyName ||
+    convId;
+  rt.threads[convId] = {
+    kind: k,
+    convId,
+    name: title,
+    api: true,
+    readOnly: k === 'ai_to_ai',
+    consentScope: payload.consentScope || payload.conversation?.networkConsentScope,
+    messages: mapApiMessagesToThread(payload.messages || []),
+  };
+  rt.activeThreadId = convId;
+  return true;
+}
+
 async function openChatFromList(chatId, rowEl) {
   const rt = getSarahRuntime();
-  rt.activeThreadId = chatId || 'smilemore-demo';
+  const kind = rowEl?.dataset?.kind || '';
+  const convId = rowEl?.dataset?.convId || chatId;
   const isCompany = rowEl?.dataset?.company !== '0';
-  if (consumerChatLiveActive() && isCompany) {
-    await loadCompanyThreadFromApiIfNeeded();
+  rt.activeThreadId = isCompany ? chatId || 'smilemore-demo' : convId;
+  if (consumerChatLiveActive()) {
+    if (isCompany) await loadCompanyThreadFromApiIfNeeded();
+    else await loadNonCompanyThreadFromApi(convId, kind);
   }
   setRoute('chat-thread');
 }
@@ -8122,6 +8158,31 @@ function init() {
           rt.threads[companyId].messages = mapApiMessagesToThread(payload.messages);
         } else {
           await loadCompanyThreadFromApiIfNeeded();
+        }
+        if (input) input.value = '';
+        renderThread();
+      } finally {
+        setPersonalSarahComposeBusy(false);
+      }
+      return;
+    }
+    const p2pKinds = new Set(['person_to_person', 'group_personal', 'group_organisation']);
+    if (p2pKinds.has(ctx.kind) && ctx.api && ctx.convId && consumerChatLiveActive() && !ctx.readOnly) {
+      setPersonalSarahComposeBusy(true);
+      try {
+        const send =
+          ctx.kind === 'person_to_person'
+            ? window.SarahLive.sendPersonMessage
+            : window.SarahLive.sendGroupMessage;
+        const res = await send(ctx.convId, text);
+        if (res.error) {
+          showProtoToast(res.error);
+          return;
+        }
+        const payload = res.data || {};
+        const rt = getSarahRuntime();
+        if (payload.messages && rt.threads[ctx.convId]) {
+          rt.threads[ctx.convId].messages = mapApiMessagesToThread(payload.messages);
         }
         if (input) input.value = '';
         renderThread();

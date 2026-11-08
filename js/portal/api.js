@@ -189,6 +189,60 @@ export async function assignConversation(companyId, conversationId, payload = {}
   );
 }
 
+export async function acceptConversation(companyId, conversationId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/accept`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function transferConversation(companyId, conversationId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/transfer`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function escalateConversation(companyId, conversationId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/escalate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function returnConversationToSarah(companyId, conversationId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/return-to-sarah`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function fetchHandoverSummary(companyId, conversationId) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/handover-summary`
+  );
+}
+
+export async function fetchAcceptQueue(companyId) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/conversations/accept-queue`);
+}
+
 export async function saveInternalNote(companyId, conversationId, text, channel = 'sarah_app') {
   return request(
     `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/internal-note`,

@@ -216,15 +216,27 @@ export function renderInboxThread(conversation, messages, { canReply, aiEmployee
         </div>
       </div>
       <div class="thread-messages" id="threadMessages">${msgHtml}</div>
+      ${
+        conversation.channel === 'sarah_app'
+          ? `<div class="thread-handover-ops" id="handoverOpsBar">
+        <button class="btn btn-secondary btn-sm" type="button" id="assignBtn" title="Assign employee">Assign</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="acceptBtn" title="Accept into queue">Accept</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="transferBtn" title="Transfer">Transfer</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="escalateBtn" title="Escalate">Escalate</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="handoverSummaryBtn" title="Sarah handover summary">Summary</button>
+      </div>`
+          : ''
+      }
       ${canReply ? `
         <div class="thread-compose portal-inbox-compose">
           <input type="text" id="replyInput" placeholder="Type a message..." autocomplete="off" />
-          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">${human ? 'Release to AI' : 'Take over'}</button>
+          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">${human ? 'Return to Sarah' : 'Take over'}</button>
           <button class="btn btn-primary btn-sm" type="button" id="sendReplyBtn">
             <i class="fa-solid fa-paper-plane"></i> Send
           </button>
         </div>
       ` : ''}
+      <div class="inbox-handover-summary hidden" id="handoverSummaryPanel"></div>
     </div>
   `;
 }
