@@ -188,6 +188,155 @@ export function buildPersonToBusinessConversationMeta(personId, companyId, optio
  * @param {object} conv
  * @param {object} [options]
  */
+/**
+ * Stable P2P thread id for two personIds (order-independent).
+ * @param {PersonId} personA
+ * @param {PersonId} personB
+ */
+export function buildPersonToPersonConversationId(personA, personB) {
+    const [a, b] = [String(personA), String(personB)].sort();
+    const raw = `uc_p2p_${a}_${b}`;
+    return raw.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 180);
+}
+
+/**
+ * @param {PersonId} personA
+ * @param {PersonId} personB
+ * @param {object} [options]
+ */
+export function buildPersonToPersonParticipants(personA, personB, options = {}) {
+    const names = options.displayNames || {};
+    /** @type {ChatParticipant[]} */
+    const participants = [
+        {
+            id: personA,
+            kind: PARTICIPANT_KINDS.PERSON,
+            displayName: names[personA] ?? null,
+            invited: false,
+            consentGranted: true,
+            sarahAgentId: null,
+            employeeId: null,
+        },
+        {
+            id: personB,
+            kind: PARTICIPANT_KINDS.PERSON,
+            displayName: names[personB] ?? null,
+            invited: false,
+            consentGranted: true,
+            sarahAgentId: null,
+            employeeId: null,
+        },
+    ];
+    return normalizeParticipants(participants);
+}
+
+/**
+ * @param {PersonId} personA
+ * @param {PersonId} personB
+ * @param {object} [options]
+ */
+export function buildPersonToPersonConversationMeta(personA, personB, options = {}) {
+    return {
+        schemaVersion: CHAT_SCHEMA_VERSION,
+        type: CONVERSATION_TYPES.PERSON_TO_PERSON,
+        participants: buildPersonToPersonParticipants(personA, personB, options),
+        ownershipState: HANDOVER_STATES.AI_ACTIVE,
+        assignedEmployeeId: null,
+        companySarahAgentId: null,
+        peerPersonId: personA === options.viewerPersonId ? personB : personA,
+    };
+}
+
+/**
+ * @param {string} title
+ * @param {PersonId} ownerId
+ * @param {PersonId[]} memberIds
+ * @param {object} [options]
+ */
+export function buildGroupPersonalConversationMeta(title, ownerId, memberIds, options = {}) {
+    const unique = [...new Set([ownerId, ...memberIds].filter(Boolean))];
+    /** @type {ChatParticipant[]} */
+    const participants = unique.map((id) => ({
+        id,
+        kind: PARTICIPANT_KINDS.PERSON,
+        displayName: options.displayNames?.[id] ?? null,
+        invited: id !== ownerId,
+        consentGranted: true,
+        sarahAgentId: null,
+        employeeId: null,
+    }));
+    if (options.personalSarahInvited) {
+        participants.push({
+            id: `personal_sarah:${ownerId}`,
+            kind: PARTICIPANT_KINDS.PERSONAL_SARAH,
+            displayName: "Personal Sarah",
+            invited: true,
+            consentGranted: Boolean(options.personalSarahConsent),
+            sarahAgentId: `personal_sarah:${ownerId}`,
+            employeeId: null,
+        });
+    }
+    return {
+        schemaVersion: CHAT_SCHEMA_VERSION,
+        type: CONVERSATION_TYPES.GROUP_PERSONAL,
+        title: String(title || "Group").slice(0, 120),
+        participants: normalizeParticipants(participants),
+        ownershipState: HANDOVER_STATES.AI_ACTIVE,
+        assignedEmployeeId: null,
+        companySarahAgentId: null,
+        ownerId,
+    };
+}
+
+/**
+ * Sarah Network AI-to-AI enquiry thread (consumer-visible).
+ * @param {PersonId} personId
+ * @param {string} companyId
+ * @param {string} networkRequestId
+ * @param {object} [options]
+ */
+export function buildAiToAiConversationMeta(personId, companyId, networkRequestId, options = {}) {
+    const sarahAgentId = options.sarahAgentId || `company_sarah:${companyId}`;
+    return {
+        schemaVersion: CHAT_SCHEMA_VERSION,
+        type: CONVERSATION_TYPES.AI_TO_AI,
+        networkRequestId,
+        companyId,
+        participants: normalizeParticipants([
+            {
+                id: personId,
+                kind: PARTICIPANT_KINDS.PERSON,
+                displayName: options.personDisplayName ?? null,
+                invited: false,
+                consentGranted: true,
+                sarahAgentId: null,
+                employeeId: null,
+            },
+            {
+                id: `personal_sarah:${personId}`,
+                kind: PARTICIPANT_KINDS.PERSONAL_SARAH,
+                displayName: "Personal Sarah",
+                invited: false,
+                consentGranted: true,
+                sarahAgentId: `personal_sarah:${personId}`,
+                employeeId: null,
+            },
+            {
+                id: sarahAgentId,
+                kind: PARTICIPANT_KINDS.COMPANY_SARAH,
+                displayName: options.companyDisplayName ? `${options.companyDisplayName} Sarah` : "Company Sarah",
+                invited: false,
+                consentGranted: true,
+                sarahAgentId,
+                employeeId: null,
+            },
+        ]),
+        ownershipState: HANDOVER_STATES.AI_ACTIVE,
+        assignedEmployeeId: null,
+        companySarahAgentId: sarahAgentId,
+    };
+}
+
 export function ensureConversationMessagingFoundation(conv, options = {}) {
     const personId = conv.personId || conv.userId;
     const companyId = conv.companyId;
