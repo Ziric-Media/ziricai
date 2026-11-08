@@ -7,6 +7,8 @@
  */
 import { buildPilotSeedEntries } from "../network/pilotListings.js";
 import { deriveCategories, DISCOVER_CATEGORIES } from "../network/networkTaxonomy.js";
+import { rankCards } from "../network/networkSearchScoring.js";
+import { recordSearch } from "../network/networkSearchStats.js";
 import {
     useAdminBackend,
     getDocs,
@@ -169,19 +171,12 @@ export function toDiscoverCard(entry, entity) {
     };
 }
 
-function cardHaystack(card) {
-    return [card.displayName, card.industry, card.location, card.shortDescription, ...card.categories, ...card.tags]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-}
-
 /**
- * `GET /api/discover/companies` payload — durable directory (SmileMore stays seeded by default).
- * Suspended entities are never listed. SNET-05 replaces the plain matcher with the scored search provider.
- * @param {{ q?: string, category?: string, limit?: number }} [opts]
+ * Every listed, non-suspended directory entry as a Discover card (the Stage-A "index": hydrated from Firestore,
+ * scored in-process — SNET-00 §6.2).
+ * @returns {Promise<object[]>}
  */
-export async function listDiscoverCompanies({ q = "", category = "", limit = 50 } = {}) {
+export async function listDiscoverCards() {
     await hydrateBusinessDirectory();
     const cards = [];
     for (const entry of listPublicBusinessDirectoryEntries()) {
@@ -189,34 +184,51 @@ export async function listDiscoverCompanies({ q = "", category = "", limit = 50 
         if (entity?.status === "suspended") continue;
         cards.push(toDiscoverCard(entry, entity));
     }
-    const terms = String(q || "")
-        .toLowerCase()
-        .split(/\s+/)
-        .filter((t) => t.length >= 2);
-    const cat = String(category || "").toLowerCase();
-    const max = Math.min(Math.max(Number(limit) || 50, 1), 100);
-    return cards
-        .filter((c) => !cat || cat === "all" || c.categories.includes(cat))
-        .filter((c) => !terms.length || terms.some((t) => cardHaystack(c).includes(t)))
-        .slice(0, max);
+    return cards;
+}
+
+function encodeCursor(offset) {
+    return Buffer.from(JSON.stringify({ o: offset })).toString("base64url");
+}
+
+function decodeCursor(cursor) {
+    if (!cursor) return 0;
+    try {
+        const o = Number(JSON.parse(Buffer.from(String(cursor), "base64url").toString("utf8")).o);
+        return Number.isFinite(o) && o >= 0 ? o : 0;
+    } catch {
+        return 0;
+    }
 }
 
 /**
- * Discover query result with facets computed over the text-matched set (before the category filter),
- * so the tab bar can show where results exist.
- * @param {{ q?: string, category?: string, limit?: number }} [opts]
+ * Ranked Discover search (SNET-05): name/category/keyword/location scoring with synonyms, verified boost,
+ * cursor pagination. Facets are computed over the text-matched set (before category/verified filters).
+ * @param {{ q?: string, category?: string, verifiedOnly?: boolean, limit?: number, cursor?: string }} [opts]
  */
-export async function searchDiscoverCompanies({ q = "", category = "", limit = 50 } = {}) {
-    const matched = await listDiscoverCompanies({ q, limit: 100 });
+export async function searchDiscoverCompanies({ q = "", category = "", verifiedOnly = false, limit = 50, cursor = "" } = {}) {
+    const cards = await listDiscoverCards();
+    const ranked = rankCards(cards, q);
     const cat = String(category || "").toLowerCase();
-    const filtered = !cat || cat === "all" ? matched : matched.filter((c) => c.categories.includes(cat));
+    const filtered = ranked
+        .filter((r) => !cat || cat === "all" || r.card.categories.includes(cat))
+        .filter((r) => !verifiedOnly || r.card.verified);
     const max = Math.min(Math.max(Number(limit) || 50, 1), 100);
+    const offset = decodeCursor(cursor);
+    const page = filtered.slice(offset, offset + max);
+    recordSearch({ q, category: cat === "all" ? "" : cat, resultCount: filtered.length });
     return {
-        companies: filtered.slice(0, max),
+        companies: page.map((r) => ({ ...r.card, matchedOn: r.matchedOn })),
         total: filtered.length,
-        facets: discoverCategoryFacets(matched),
+        nextCursor: offset + max < filtered.length ? encodeCursor(offset + max) : null,
+        facets: discoverCategoryFacets(ranked.map((r) => r.card)),
         query: String(q || ""),
     };
+}
+
+/** Back-compat list helper (U6): ranked cards only. */
+export async function listDiscoverCompanies(opts = {}) {
+    return (await searchDiscoverCompanies(opts)).companies;
 }
 
 /** Category facets (id/label/count) over the currently listed cards. */

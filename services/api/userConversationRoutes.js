@@ -26,10 +26,12 @@ export function mountUserConversationRoutes(app) {
                 q: String(req.query?.q || "").slice(0, 120),
                 category: String(req.query?.category || "").slice(0, 40),
                 limit: req.query?.limit,
+                cursor: String(req.query?.cursor || "").slice(0, 200),
             });
             res.json({
                 companies: result.companies,
                 total: result.total,
+                nextCursor: result.nextCursor,
                 facets: result.facets,
                 query: result.query,
             });
