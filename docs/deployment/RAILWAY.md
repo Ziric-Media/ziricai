@@ -242,3 +242,31 @@ $env:NETLIFY='true'; $env:API_BASE_URL=''; node scripts/prepare-sites.js app
 ```
 
 See also: [NETLIFY.md](./NETLIFY.md)
+
+## 8. Deploy hygiene (clean worktree, stray projects, `.railwayignore`)
+
+- **Target:** production is Railway project `independent-trust`, environment `production`, service `ziricai`. Check with `railway status` before every `railway up`.
+- **Deploy from a clean worktree at the commit, never from the main working tree.** The working tree accumulates untracked release/staging directories (`.*-wt/`, `.*-prestage/`, `.*-release/`, `.*-audit/`, `.*-impl/`) and generated, uncommitted site copies; `railway up` uploads whatever is on disk, so a dirty upload ships unreviewed files.
+
+  ```powershell
+  git worktree add ..\ziricai-deploy-<sha> <sha>
+  cd ..\ziricai-deploy-<sha>
+  npm ci
+  railway link   # select independent-trust / production / ziricai (do NOT run `railway init`)
+  railway up --detach
+  ```
+
+  Never run `railway init` / `railway up` without a link from a worktree: that creates a new account-level project (this is how `ziricai-deploy-*`, `ziricai-railway-*` and `ziricai-baseline-*` projects appeared).
+- **Stray projects:** list with `railway list`; anything other than `independent-trust` that is named `ziricai-*` was created by a worktree deploy. Delete them in the Railway dashboard only after checking they own no data, variables or domains (deletion is irreversible; it is a manual, owner-confirmed step).
+- **Variable changes redeploy the last build** and can fail on a stale image (see the Gate 5 deploy log in `docs/architecture/SNET_BACKLOG_GATES.md`); follow variable changes with a `railway up` from a clean worktree.
+- **`.railwayignore` (optional):** the repo has none. If you ever deploy from the main tree anyway, a `.railwayignore` with the patterns below keeps the clutter out of the upload. It has not been verified against this CLI version, so the clean worktree remains the real control.
+
+  ```
+  .*-wt/
+  .*-prestage/
+  .*-release/
+  .*-audit/
+  .*-impl/
+  .netlify/
+  test-results/
+  ```
