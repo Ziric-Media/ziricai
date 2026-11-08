@@ -16,6 +16,7 @@ import {
     blockPerson,
     unblockPerson,
     listBlocksForPerson,
+    hydratePersonBlocks,
 } from "../users/personBlockService.js";
 import { personIdFromUserId } from "../users/identityContracts.js";
 
@@ -99,6 +100,7 @@ export function mountChatPersonRoutes(app) {
 
     app.get("/api/person-blocks", requireConsumerScope(), async (req, res) => {
         const personId = personIdFromUserId(req.consumerAuth.uid);
+        await hydratePersonBlocks(personId); // restart-safe (no-op in memory mode)
         res.json({ blocks: listBlocksForPerson(personId) });
     });
 

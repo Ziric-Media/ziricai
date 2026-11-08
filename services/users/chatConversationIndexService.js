@@ -5,7 +5,14 @@ import { listUserConversations, getUserConversationByCompany, seedUserConversati
 import { listPersonToPersonConversations, seedPersonToPersonFromStore } from "./personToPersonConversationService.js";
 import { listGroupConversations, seedGroupFromStore } from "./groupConversationService.js";
 import { listNetworkLinkedConversations, seedNetworkConversationFromStore } from "./sarahNetworkChatLinkService.js";
-import { listConversationsByUserId, listConversationsByParticipant, listMessages } from "./userConversationFirestoreStore.js";
+import {
+    listConversationsByUserId,
+    listConversationsByParticipant,
+    listMessages,
+    backfillParticipantIndex,
+} from "./userConversationFirestoreStore.js";
+import { hydratePersonBlocks } from "./personBlockService.js";
+import { personIdFromUserId } from "./identityContracts.js";
 import { useAdminBackend } from "../database/firestoreClient.js";
 import { CONVERSATION_TYPES } from "./messagingContracts.js";
 
@@ -69,6 +76,14 @@ export function listFederatedChatConversations(userId, options = {}) {
     return items.sort((a, b) => String(b.lastMessageAt || "").localeCompare(String(a.lastMessageAt || "")));
 }
 
+function isPeerOrGroup(conv) {
+    return (
+        conv?.type === CONVERSATION_TYPES.PERSON_TO_PERSON ||
+        conv?.type === CONVERSATION_TYPES.GROUP_PERSONAL ||
+        conv?.type === CONVERSATION_TYPES.GROUP_ORGANISATION
+    );
+}
+
 const HYDRATE_TTL_MS = 30_000;
 const HYDRATE_MAX_THREADS = 50;
 /** @type {Map<string, number>} */
@@ -85,7 +100,8 @@ function hydrationEnabled() {
  * Only runs when USER_CONVERSATIONS_BACKEND is dual|firestore and Firebase Admin is available; otherwise a no-op.
  *
  * Scope: person_to_business, ai_to_ai, person_to_person and group threads (Gate 1). Threads are found by creator
- * (`userId`) and by participant (`participantPersonIds`); P2P/group threads written before Gate 1 are only found by creator.
+ * (`userId`) and by participant (`participantPersonIds`); P2P/group threads written before Gate 1 are only found by
+ * creator until the creator's hydrate backfills their participant index (Gate 6). Block lists are rehydrated too.
  * @param {string} userId
  * @param {{ enabled?: boolean, force?: boolean, store?: { listConversationsByUserId: Function, listConversationsByParticipant?: Function, listMessages: Function } }} [deps] test seams
  * @returns {Promise<{ hydrated: number, skipped?: string, error?: string }>}
@@ -93,10 +109,17 @@ function hydrationEnabled() {
 export async function hydrateFederatedChatIndex(userId, deps = {}) {
     const enabled = deps.enabled ?? hydrationEnabled();
     if (!enabled || !userId) return { hydrated: 0, skipped: "disabled" };
+    // Gate 6: block lists first (own short TTL) so a restart never lifts a block before the thread is usable.
+    await hydratePersonBlocks(personIdFromUserId(userId), { enabled: true, force: deps.force, store: deps.blockStore });
     const last = lastHydratedAt.get(userId);
     if (!deps.force && last && Date.now() - last < HYDRATE_TTL_MS) return { hydrated: 0, skipped: "fresh" };
 
-    const store = deps.store || { listConversationsByUserId, listConversationsByParticipant, listMessages };
+    const store = deps.store || {
+        listConversationsByUserId,
+        listConversationsByParticipant,
+        listMessages,
+        backfillParticipantIndex,
+    };
     let stored;
     try {
         stored = await store.listConversationsByUserId(userId);
@@ -119,8 +142,17 @@ export async function hydrateFederatedChatIndex(userId, deps = {}) {
 
     const knownNetwork = new Set(listNetworkLinkedConversations(userId).map((c) => c.id));
     let hydrated = 0;
-    for (const conv of stored.slice(0, HYDRATE_MAX_THREADS)) {
+    for (const storedConv of stored.slice(0, HYDRATE_MAX_THREADS)) {
+        // `participantIndexed` is store metadata, not part of the thread: keep it out of the process caches / API payloads.
+        const { participantIndexed, ...conv } = storedConv;
         try {
+            // Gate 6: P2P/group threads written before Gate 1 have no participant index, so peers could not find them.
+            // The creator's hydrate repairs it (best effort, once per thread) so the other members see the thread too.
+            if (isPeerOrGroup(conv) && participantIndexed === false && typeof store.backfillParticipantIndex === "function") {
+                await store.backfillParticipantIndex(conv).catch((err) => {
+                    console.warn("[chatConversationIndex] participant backfill failed:", err.message);
+                });
+            }
             if (conv.type === CONVERSATION_TYPES.AI_TO_AI) {
                 if (knownNetwork.has(conv.id)) continue;
                 // Threads written before SNET-08 lack `networkRequestId`; it is the suffix of the id.

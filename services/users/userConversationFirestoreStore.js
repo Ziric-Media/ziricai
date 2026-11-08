@@ -51,7 +51,25 @@ function normalizeConversation(docId, raw) {
         if (raw[key]) base[key] = raw[key];
     }
     if (raw.orgConsentGranted) base.orgConsentGranted = true;
+    // Gate 6: false = a P2P/group thread written before the participant index existed (see backfillParticipantIndex).
+    base.participantIndexed = Array.isArray(raw.participantPersonIds);
     return ensureConversationMessagingFoundation(base);
+}
+
+/** Person ids of a thread's person participants (the `array-contains` index). */
+function personParticipantIds(conv) {
+    return (conv?.participants || []).filter((p) => p?.kind === "person" && p.id).map((p) => String(p.id));
+}
+
+/**
+ * Gate 6: repair a legacy P2P/group thread so non-creator members can find it (writes only the index field).
+ * @param {{ id: string, participants?: object[] }} conv
+ */
+export async function backfillParticipantIndex(conv) {
+    if (!firestoreUserConversationStoreEnabled() || !conv?.id) return;
+    const ids = personParticipantIds(conv);
+    if (!ids.length) return;
+    await setDoc(userConversationRef(conv.id), { participantPersonIds: ids }, { merge: true });
 }
 
 /**
@@ -111,9 +129,7 @@ export async function upsertConversation(conv) {
         organisationId: enriched.organisationId ?? null,
         orgConsentGranted: enriched.orgConsentGranted ?? null,
         // Lets non-creator members (P2P peer, group members) find the thread with a single array-contains query.
-        participantPersonIds: (enriched.participants || [])
-            .filter((p) => p?.kind === "person" && p.id)
-            .map((p) => String(p.id)),
+        participantPersonIds: personParticipantIds(enriched),
     };
     await setDoc(userConversationRef(conv.id), payload, { merge: true });
 }
