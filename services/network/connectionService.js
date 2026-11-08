@@ -330,6 +330,14 @@ export async function applyBusinessAction(companyId, connectionId, action, actor
     return toBusinessView(await save(next));
 }
 
+/** Platform stats: relationship counts by state (no uids). Capped scan. */
+export async function countConnectionsByState({ limit = 5000 } = {}) {
+    const rows = await col.list({ limit });
+    const byState = {};
+    for (const r of rows) byState[r.state] = (byState[r.state] || 0) + 1;
+    return { total: rows.length, byState, truncated: rows.length >= limit };
+}
+
 /** True when the business has blocked this user. Used by the enquiry path. */
 export async function isBlockedByBusiness(uid, companyId) {
     const entity = await getOrgEntityByCompanyId(companyId);

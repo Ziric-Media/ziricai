@@ -31,6 +31,7 @@ import { mountNetworkVerificationRoutes } from "../services/api/networkVerificat
 import { mountNetworkSearchRoutes } from "../services/api/networkSearchRoutes.js";
 import { mountNetworkAgentRoutes } from "../services/api/networkAgentRoutes.js";
 import { mountNetworkConnectionRoutes } from "../services/api/networkConnectionRoutes.js";
+import { mountNetworkPlatformRoutes } from "../services/api/networkPlatformRoutes.js";
 import { mountSarahNetworkRoutes } from "../services/api/sarahNetworkRoutes.js";
 import { mountChatIndexRoutes } from "../services/api/chatIndexRoutes.js";
 import { mountUserConversationRoutes } from "../services/api/userConversationRoutes.js";
@@ -179,6 +180,7 @@ test("route catalog documents every mounted network / consumer-chat route (and n
     mountNetworkSearchRoutes(app, { consumerGuard: pass });
     mountNetworkAgentRoutes(app, { consumerGuard: pass });
     mountNetworkConnectionRoutes(app, { consumerGuard: pass });
+    mountNetworkPlatformRoutes(app, { platformGuard: pass });
     mountSarahNetworkRoutes(app, { consumerGuard: pass });
     mountChatIndexRoutes(app);
     mountUserConversationRoutes(app);

@@ -18,6 +18,7 @@ import { renderSupportOperations } from './modules/support-operations.js';
 import { renderSupportAttention } from './modules/support-attention.js';
 import { renderAgents } from './modules/agents.js';
 import { renderMarketplace } from './modules/marketplace.js';
+import { renderSarahNetwork } from './modules/sarah-network.js';
 import { renderKnowledge } from './modules/knowledge.js';
 import { renderSettings } from './modules/settings.js';
 
@@ -43,6 +44,7 @@ const RENDERERS = {
   supportAttention: renderSupportAttention,
   agents: renderAgents,
   marketplace: renderMarketplace,
+  sarahNetwork: renderSarahNetwork,
   knowledge: renderKnowledge,
   settings: renderSettings,
 };

@@ -371,3 +371,45 @@ export async function fetchSupervisorReviews(companyId, limit = 10) {
   const qs = limit ? `?limit=${limit}` : '';
   return request(`/api/supervisor/reviews/${encodeURIComponent(companyId)}${qs}`);
 }
+
+/* ---------- Sarah Network (SNET-09) — platform APIs ---------- */
+export async function fetchNetworkStats() {
+  return request('/api/platform/network/v1/stats', { silent: true });
+}
+
+export async function fetchNetworkEntities({ q = '', status = '' } = {}) {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (status) params.set('status', status);
+  const qs = params.toString();
+  return request(`/api/platform/network/v1/entities${qs ? `?${qs}` : ''}`, { silent: true });
+}
+
+export async function fetchNetworkEntity(snId) {
+  return request(`/api/platform/network/v1/entities/${encodeURIComponent(snId)}`, { silent: true });
+}
+
+/** body: { action: 'suspend' | 'reinstate', reason } */
+export async function changeNetworkEntityStatus(snId, body) {
+  return request(`/api/platform/network/v1/entities/${encodeURIComponent(snId)}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    silent: true,
+  });
+}
+
+export async function fetchNetworkVerificationQueue(status = '') {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request(`/api/platform/network/v1/verification${qs}`, { silent: true });
+}
+
+/** body: { action: 'start_review' | 'verify' | 'reject' | 'restrict', note?, checks? } */
+export async function decideNetworkVerification(caseId, body) {
+  return request(`/api/platform/network/v1/verification/${encodeURIComponent(caseId)}/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    silent: true,
+  });
+}

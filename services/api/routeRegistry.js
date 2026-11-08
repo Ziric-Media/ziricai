@@ -201,6 +201,12 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/platform/network/v1/verification/:caseId", domain: "platform", tenantScoped: false, description: "Verification case (platform)" },
     { method: "POST", path: "/api/platform/network/v1/verification/:caseId/decision", domain: "platform", tenantScoped: false, description: "Decide verification case (audited)" },
 
+    // SNET-09 — Mission Control (platform)
+    { method: "GET", path: "/api/platform/network/v1/stats", domain: "platform", tenantScoped: false, description: "Sarah Network overview numbers" },
+    { method: "GET", path: "/api/platform/network/v1/entities", domain: "platform", tenantScoped: false, description: "Network entities list (?status=&q=)" },
+    { method: "GET", path: "/api/platform/network/v1/entities/:snId", domain: "platform", tenantScoped: false, description: "Entity detail + audit trail" },
+    { method: "POST", path: "/api/platform/network/v1/entities/:snId/status", domain: "platform", tenantScoped: false, description: "Suspend / reinstate entity (reason required, audited)" },
+
     // SNET-05 — Search
     { method: "GET", path: "/api/network/v1/directory/search", domain: "consumer", tenantScoped: false, description: "Ranked directory search (q, category, verified, cursor)" },
     { method: "GET", path: "/api/network/v1/directory/suggest", domain: "consumer", tenantScoped: false, description: "Search autocomplete" },
