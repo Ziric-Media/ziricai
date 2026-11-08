@@ -42,6 +42,13 @@ import { updateMyOrganisationPreferences } from "../services/network/myOrganisat
 import { clearSubscriberEventsForTests, recordSubscriberEvent } from "../services/network/subscriberEventService.js";
 import { listUpdatesForUser } from "../services/network/subscriberUpdatesService.js";
 import { mountNetworkConnectionRoutes } from "../services/api/networkConnectionRoutes.js";
+import { CENTRAL_MOTORS_RTB_COMPANY_ID } from "../services/inventory/adapters/centralMotorsRtbAdapter.js";
+import { ensureCompanyChatThread } from "../services/sarah/company/companyReceptionChatService.js";
+import { clearUserConversationsForTests } from "../services/users/userConversationService.js";
+import { buildConsumerConversationId } from "../services/users/identityContracts.js";
+import { listFederatedChatConversations } from "../services/users/chatConversationIndexService.js";
+import { attachSnIds } from "../services/network/networkIntegration.js";
+import { searchDiscoverCompanies, assertCompanyDiscoverableAsync } from "../services/users/businessDirectoryService.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
@@ -365,4 +372,50 @@ test("Sarah App: live bridge exposes fetchMyUpdates and My Organisations renders
     assert.match(app, /window\.SarahLive\.fetchMyUpdates/);
     assert.match(app, /id="msOrgUpdates"/);
     assert.ok(!/window\.prompt/.test(app.slice(app.indexOf("Gate 2: My Organisations backed"))));
+});
+/* ------------------------------------------------------------------ 5. Central Motors chat id alignment */
+
+test("Central Motors (central-motors-rtb): Discover id, company chat id, chat-list row and snId all align (allow-listed)", async () => {
+    const KEY = "SARAH_NETWORK_PILOT_COMPANY_IDS";
+    const saved = process.env[KEY];
+    process.env[KEY] = `smilemore-demo,${CENTRAL_MOTORS_RTB_COMPANY_ID}`;
+    setBusinessDirectoryStoreForTests(null);
+    clearNetworkEntitiesForTests();
+    clearBusinessDirectoryForTests();
+    clearUserConversationsForTests();
+    try {
+        const { companies } = await searchDiscoverCompanies({ q: "central motors" });
+        const card = companies.find((c) => c.companyId === CENTRAL_MOTORS_RTB_COMPANY_ID);
+        assert.ok(card, "listed in Discover");
+        assert.equal(card.verified, false);
+        await assertCompanyDiscoverableAsync(CENTRAL_MOTORS_RTB_COMPANY_ID);
+
+        const uid = "g6-cm-user";
+        const { conversation, messages } = await ensureCompanyChatThread(uid, CENTRAL_MOTORS_RTB_COMPANY_ID, { firstName: "Thandi" });
+        // the thread is keyed by the Discover card's companyId, deterministically, and carries the directory name
+        assert.equal(conversation.companyId, card.companyId);
+        assert.equal(conversation.id, buildConsumerConversationId(uid, CENTRAL_MOTORS_RTB_COMPANY_ID));
+        assert.equal(conversation.companyName, "Central Motors Rustenburg");
+        assert.ok(messages.length >= 1, "greeting present");
+        // opening again returns the same thread (no duplicate chat for the same company)
+        const again = await ensureCompanyChatThread(uid, CENTRAL_MOTORS_RTB_COMPANY_ID, {});
+        assert.equal(again.conversation.id, conversation.id);
+
+        const rows = listFederatedChatConversations(uid, { filter: "businesses" });
+        assert.equal(rows.length, 1);
+        assert.equal(rows[0].listKey, `business:${CENTRAL_MOTORS_RTB_COMPANY_ID}`);
+        const [withSn] = await attachSnIds(rows);
+        assert.equal(withSn.snId, card.snId, "chat row snId equals the Discover card snId");
+
+        // the fixture id still never produces a thread
+        await assert.rejects(() => ensureCompanyChatThread(uid, "central-motors", {}), { code: "COMPANY_NOT_DISCOVERABLE" });
+        assert.equal(listFederatedChatConversations(uid, { filter: "businesses" }).length, 1);
+    } finally {
+        if (saved === undefined) delete process.env[KEY];
+        else process.env[KEY] = saved;
+        setBusinessDirectoryStoreForTests(null);
+        clearNetworkEntitiesForTests();
+        clearBusinessDirectoryForTests();
+        clearUserConversationsForTests();
+    }
 });
