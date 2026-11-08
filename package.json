@@ -21,6 +21,7 @@
         "migrate:tenants:dry": "node scripts/migrate-demo-to-tenants.js --dry-run",
         "backfill:user-conversations": "node scripts/backfill-user-conversations-from-tenant.mjs",
         "backfill:user-conversations:dry": "node scripts/backfill-user-conversations-from-tenant.mjs --dry-run",
+        "test:sarah-c1": "node --test test/c1-user-conversations-wp1.test.mjs test/c1-integration-events-wp4.test.mjs test/c1-user-conversations-wp5.test.mjs test/user-conversations-persistence.test.mjs test/user-conversations-u5.test.mjs",
         "verify:sprint1": "node scripts/verify-sprint1-flow.js",
         "verify:journey": "node scripts/verify-customer-journey.js",
         "verify:firestore": "node scripts/verify-firestore.js",

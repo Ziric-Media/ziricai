@@ -13,6 +13,8 @@ import {
 import {
     upsertConversation,
     upsertMessage as upsertFirestoreMessage,
+    getConversationByPersonAndCompany,
+    listMessages as listFirestoreMessages,
 } from "./userConversationFirestoreStore.js";
 import { useAdminBackend } from "../database/firestoreClient.js";
 import {
@@ -47,6 +49,33 @@ export function getUserConversationsBackend() {
 function shouldMirrorToFirestore() {
     const mode = resolveUserConversationsBackend();
     return (mode === "dual" || mode === "firestore") && useAdminBackend();
+}
+
+function shouldReadFirestoreIndex() {
+    const mode = resolveUserConversationsBackend();
+    return mode === "dual" || mode === "firestore";
+}
+
+/**
+ * Dual/firestore: hydrate process cache from Firestore after restart (memory empty).
+ * @param {string} userId
+ * @param {string} companyId
+ */
+async function tryHydrateConversationFromFirestore(userId, companyId) {
+    if (!shouldReadFirestoreIndex() || !useAdminBackend()) return null;
+    try {
+        const personId = personIdFromUserId(userId);
+        const conv = await getConversationByPersonAndCompany(personId, companyId);
+        if (!conv) return null;
+        const key = conversationKey(userId, companyId);
+        conversations.set(key, conv);
+        const msgs = await listFirestoreMessages(conv.id);
+        messagesByConversation.set(conv.id, msgs.length ? msgs : []);
+        return conv;
+    } catch (err) {
+        console.warn("[userConversationService] Firestore hydrate failed:", err.message);
+        return null;
+    }
 }
 
 async function mirrorConversationToFirestore(conv) {
@@ -95,6 +124,9 @@ async function resolveCompanyDisplayName(companyId) {
 export async function openUserConversation(userId, companyId, meta = {}) {
     const key = conversationKey(userId, companyId);
     let conv = conversations.get(key);
+    if (!conv) {
+        conv = await tryHydrateConversationFromFirestore(userId, companyId);
+    }
     if (!conv) {
         const personId = personIdFromUserId(userId);
         const companyName = await resolveCompanyDisplayName(companyId);
@@ -154,6 +186,10 @@ export async function appendUserConversationMessage(conv, message) {
         source: message.source || null,
         createdAt: new Date().toISOString(),
     };
+    const existing = list.find((m) => m.id === entry.id);
+    if (existing) {
+        return existing;
+    }
     list.push(entry);
     messagesByConversation.set(conv.id, list);
 
@@ -174,6 +210,7 @@ export async function appendUserConversationMessage(conv, message) {
             companyId: conv.companyId,
             ...tenantOpts,
             source: "customer",
+            externalId: entry.id,
         });
         conv.tenantConversationId = saved.conversationId || conv.tenantConversationId;
     } else if (message.role === "assistant") {
@@ -182,6 +219,7 @@ export async function appendUserConversationMessage(conv, message) {
             ...tenantOpts,
             source: "ai",
             senderName: conv.companyName ? `${conv.companyName} Sarah` : "Company Sarah",
+            externalId: entry.id,
         });
     }
 
