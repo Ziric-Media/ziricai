@@ -6465,6 +6465,10 @@ function renderMyOrganisationsPanel() {
   if (!root) return;
   ensureLiveDiscoverFresh();
   ensureLiveConnectionsFresh();
+  if (discoverLiveActive()) {
+    renderLiveMyOrganisations(root);
+    return;
+  }
 
   const subscribedIds = loadSub01SubscribedIds();
   const byId = (id) => discoverFind(id);
@@ -7672,8 +7676,159 @@ function liveRelationState(companyId) {
   return liveConnections.bySnId.get(snId)?.state || 'none';
 }
 
+/* ---------- Gate 2: My Organisations backed by GET /api/network/v1/my-organisations ---------- */
+
+const liveMyOrgs = { loaded: false, loading: false, error: '', organisations: [] };
+
+function resetLiveMyOrgs() {
+  liveMyOrgs.loaded = false;
+  liveMyOrgs.loading = false;
+  liveMyOrgs.error = '';
+  liveMyOrgs.organisations = [];
+}
+
+async function refreshLiveMyOrgs() {
+  if (!discoverLiveActive() || !window.SarahLive?.isSignedIn?.() || liveMyOrgs.loading) return;
+  liveMyOrgs.loading = true;
+  const res = await window.SarahLive.fetchMyOrganisations();
+  liveMyOrgs.loading = false;
+  liveMyOrgs.loaded = true;
+  liveMyOrgs.error = res.error || '';
+  liveMyOrgs.organisations = res.error ? [] : res.organisations || [];
+  const { route, msPanel } = parseLocationHash();
+  if (route === 'home' && msPanel === 'organisations') renderMyOrganisationsPanel();
+}
+
+function ensureLiveMyOrgsFresh() {
+  if (liveMyOrgs.loaded || liveMyOrgs.loading) return;
+  if (!discoverLiveActive() || !window.SarahLive?.isSignedIn?.()) return;
+  void refreshLiveMyOrgs();
+}
+
+const LIVE_MY_ORG_SECTIONS = [
+  { id: 'subscriptions', title: 'My subscriptions', empty: 'No subscriptions yet — use Subscribe on Discover.' },
+  { id: 'connections', title: 'Connected', empty: '' },
+  { id: 'pending', title: 'Connection requests', empty: '' },
+  { id: 'following', title: 'Following', empty: 'You are not following any organisations yet.' },
+  { id: 'unavailable', title: 'No longer available', empty: '' },
+];
+
+function renderLiveMyOrganisations(root) {
+  const signedIn = Boolean(window.SarahLive?.isSignedIn?.());
+  const fallbackImg = prototypeAsset(MOCK_PROFILE.avatarFallback || 'assets/discover/green-haven-fallback.svg');
+  const header = `
+    <header class="ms-organisations-hero">
+      <h5 class="ms-headline">My Organisations</h5>
+      <p class="ms-organisations-lead">The organisations you follow and subscribe to on Sarah Network. Subscribing shares nothing by default; you can change what each organisation may send you.</p>
+    </header>`;
+  if (!signedIn) {
+    root.innerHTML = `${header}<section class="ms-org-section"><p class="ms-org-empty">Sign in to see your organisations.</p><button type="button" class="btn btn-secondary" id="msOrgSignIn">Sign in</button></section>`;
+    root.querySelector('#msOrgSignIn')?.addEventListener('click', () => setRoute('auth'));
+    return;
+  }
+  ensureLiveMyOrgsFresh();
+  if (!liveMyOrgs.loaded) {
+    root.innerHTML = `${header}<section class="ms-org-section"><p class="ms-org-empty">Loading your organisations…</p></section>`;
+    return;
+  }
+  if (liveMyOrgs.error) {
+    root.innerHTML = `${header}<section class="ms-org-section"><p class="ms-org-empty">${escapeHtml(liveMyOrgs.error)}</p><button type="button" class="btn btn-secondary" id="msOrgRetry">Retry</button></section>`;
+    root.querySelector('#msOrgRetry')?.addEventListener('click', () => {
+      resetLiveMyOrgs();
+      renderMyOrganisationsPanel();
+    });
+    return;
+  }
+
+  const prefRow = (o, key, label) =>
+    `<label class="ms-org-pref"><input type="checkbox" data-live-org-pref="${escapeHtml(o.snId)}" data-pref-key="${key}" ${o.prefs?.[key] ? 'checked' : ''} /> ${label}</label>`;
+  const row = (o) => {
+    const org = o.organisation;
+    const name = org?.displayName || 'Organisation no longer available';
+    const meta = [org?.industry, org?.verified ? 'Verified' : ''].filter(Boolean).join(' · ');
+    const img = org?.logoUrl ? org.logoUrl : fallbackImg;
+    const canView = o.available && org?.companyId;
+    const actions = [];
+    if (canView) actions.push(`<button type="button" class="ms-org-btn ms-org-btn--ghost" data-live-org-view="${escapeHtml(org.companyId)}">View</button>`);
+    if (o.state === 'subscribed') actions.push(`<button type="button" class="ms-org-btn ms-org-btn--danger" data-live-org-unsub="${escapeHtml(o.snId)}">Unsubscribe</button>`);
+    else if (o.state === 'following' || o.state === 'unavailable') actions.push(`<button type="button" class="ms-org-btn ms-org-btn--ghost" data-live-org-unfollow="${escapeHtml(o.snId)}">Unfollow</button>`);
+    const prefs =
+      o.available && ['subscribed', 'following', 'connected'].includes(o.state)
+        ? `<details class="ms-org-manage"><summary>Manage</summary>
+            <div class="ms-org-prefs">${prefRow(o, 'notifications', 'Notifications')}${prefRow(o, 'announcements', 'Announcements')}${prefRow(o, 'reminders', 'Reminders')}</div>
+          </details>`
+        : '';
+    return `<li class="ms-org-row" data-org-sn-id="${escapeHtml(o.snId)}">
+      <img class="ms-org-row-img" src="${escapeHtml(img)}" alt="" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='${escapeHtml(fallbackImg)}';}" />
+      <div class="ms-org-row-body">
+        <strong class="ms-org-row-name">${escapeHtml(name)}</strong>
+        <span class="ms-org-row-meta">${escapeHtml(meta)}</span>
+        ${prefs}
+      </div>
+      <div class="ms-org-row-actions">${actions.join('')}</div>
+    </li>`;
+  };
+
+  const sections = LIVE_MY_ORG_SECTIONS.map((s) => {
+    const rows = liveMyOrgs.organisations.filter((o) => o.section === s.id);
+    if (!rows.length && !s.empty) return '';
+    return `<section class="ms-org-section"><h3 class="ms-org-section-title">${escapeHtml(s.title)}</h3>
+      ${rows.length ? `<ul class="ms-org-list" role="list">${rows.map(row).join('')}</ul>` : `<p class="ms-org-empty">${escapeHtml(s.empty)}</p>`}</section>`;
+  }).join('');
+
+  root.innerHTML = `${header}${sections}
+    <footer class="ms-organisations-foot"><button type="button" class="btn btn-secondary" id="msOrgOpenDiscover">Open Discover</button></footer>`;
+
+  root.querySelector('#msOrgOpenDiscover')?.addEventListener('click', () => setRoute('discover'));
+  root.querySelectorAll('[data-live-org-view]').forEach((btn) =>
+    btn.addEventListener('click', () => openDiscoverCompany(btn.getAttribute('data-live-org-view')))
+  );
+  const act = async (snId, fn, toast) => {
+    const res = await fn();
+    if (res?.error) {
+      showProtoToast(res.error);
+      return;
+    }
+    if (res?.connection) applyLiveConnection(res.connection);
+    showProtoToast(toast);
+    liveMyOrgs.loaded = false;
+    void refreshLiveMyOrgs();
+    sub01RefreshSurfaces();
+  };
+  root.querySelectorAll('[data-live-org-unsub]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const snId = btn.getAttribute('data-live-org-unsub');
+      const prev = liveConnections.bySnId.get(snId);
+      void act(snId, () => window.SarahLive.unsubscribeFromEntity(snId, prev?.grantId || null), 'Unsubscribed');
+    })
+  );
+  root.querySelectorAll('[data-live-org-unfollow]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const snId = btn.getAttribute('data-live-org-unfollow');
+      void act(snId, () => window.SarahLive.setEntityRelationship(snId, 'unfollow'), 'Unfollowed');
+    })
+  );
+  root.querySelectorAll('[data-live-org-pref]').forEach((box) =>
+    box.addEventListener('change', async () => {
+      const snId = box.getAttribute('data-live-org-pref');
+      const key = box.getAttribute('data-pref-key');
+      const res = await window.SarahLive.updateOrganisationPreferences(snId, { [key]: box.checked });
+      if (res.error) {
+        box.checked = !box.checked;
+        showProtoToast(res.error);
+        return;
+      }
+      const o = liveMyOrgs.organisations.find((x) => x.snId === snId);
+      if (o) o.prefs = res.prefs || o.prefs;
+      showProtoToast('Preferences saved');
+    })
+  );
+}
+
 function applyLiveConnection(connection) {
   if (!connection?.snId) return;
+  // Any relationship change makes the My Organisations view stale.
+  liveMyOrgs.loaded = false;
   if (!connection.state || connection.state === 'none' || connection.state === 'discovered') {
     liveConnections.bySnId.delete(connection.snId);
   } else {
@@ -7692,7 +7847,9 @@ async function refreshLiveConnections() {
   liveConnections.loaded = true;
   if (res.error) return;
   liveConnections.bySnId.clear();
+  const myOrgsFresh = liveMyOrgs.loaded; // a bulk reload is not a relationship change
   (res.connections || []).forEach(applyLiveConnection);
+  liveMyOrgs.loaded = myOrgsFresh;
   sub01RefreshSurfaces();
 }
 
@@ -7704,6 +7861,7 @@ function ensureLiveConnectionsFresh() {
 }
 
 function resetLiveConnections() {
+  resetLiveMyOrgs();
   liveConnections.loaded = false;
   liveConnections.loading = false;
   liveConnections.bySnId.clear();

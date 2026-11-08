@@ -6528,3 +6528,9 @@ body.is-create-post-open {
   color: var(--color-text-secondary);
   font-size: 18px;
 }
+
+/* Gate 2: My Organisations live preferences */
+.ms-org-manage { margin-top: 6px; font-size: 0.85rem; }
+.ms-org-manage summary { cursor: pointer; color: var(--accent, #2563eb); }
+.ms-org-prefs { display: flex; flex-wrap: wrap; gap: 10px 16px; padding: 8px 0; }
+.ms-org-pref { display: inline-flex; align-items: center; gap: 6px; }

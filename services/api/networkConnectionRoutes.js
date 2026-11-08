@@ -6,6 +6,8 @@
  *     POST /api/network/v1/connections   { snId, action, grantId? }
  *          action: discover | follow | unfollow | subscribe | unsubscribe | request_connection |
  *                  cancel_request | disconnect | block | unblock
+ *     GET  /api/network/v1/my-organisations                   → { organisations[], counts }   (Gate 2)
+ *     PUT  /api/network/v1/my-organisations/:snId/preferences { prefs: { notifications, announcements, reminders } }
  *   Tenant (member; writes owner/manager) — pseudonymous:
  *     GET  /api/network/v1/orgs/:companyId/connections?state=
  *     POST /api/network/v1/orgs/:companyId/connections/:connectionId/:action   accept | decline | disconnect | block | unblock
@@ -21,6 +23,7 @@ import {
     listConnectionsForOrg,
     listConnectionsForUser,
 } from "../network/connectionService.js";
+import { listMyOrganisations, updateMyOrganisationPreferences } from "../network/myOrganisationsService.js";
 
 function fail(res, err, fallbackCode) {
     res.status(err.status || 500).json({
@@ -69,6 +72,24 @@ export function mountNetworkConnectionRoutes(app, deps = {}) {
             res.json({ ok: true, data: { connection } });
         } catch (err) {
             fail(res, err, "CONNECTION_ACTION_FAILED");
+        }
+    });
+
+    // Gate 2 — My Organisations (SUB-01): relationships joined to public directory cards + channel preferences.
+    app.get("/api/network/v1/my-organisations", consumerGuard, async (req, res) => {
+        try {
+            res.json({ ok: true, data: await listMyOrganisations(req.consumerAuth.uid) });
+        } catch (err) {
+            fail(res, err, "MY_ORGANISATIONS_FAILED");
+        }
+    });
+
+    app.put("/api/network/v1/my-organisations/:snId/preferences", consumerGuard, async (req, res) => {
+        try {
+            const data = await updateMyOrganisationPreferences(req.consumerAuth.uid, String(req.params.snId || ""), req.body?.prefs || {});
+            res.json({ ok: true, data });
+        } catch (err) {
+            fail(res, err, "MY_ORGANISATIONS_PREFS_FAILED");
         }
     });
 

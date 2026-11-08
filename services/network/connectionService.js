@@ -268,6 +268,57 @@ export async function listConnectionsForUser(uid, { state = "", limit = 100 } = 
     return out.slice(0, Math.min(Math.max(Number(limit) || 100, 1), 200));
 }
 
+export const ORG_PREF_KEYS = Object.freeze(["notifications", "announcements", "reminders"]);
+
+/** Effective My Organisations preferences (all channels on until the user turns one off). */
+export function effectivePrefs(conn) {
+    const stored = conn?.prefs && typeof conn.prefs === "object" ? conn.prefs : {};
+    return Object.fromEntries(ORG_PREF_KEYS.map((k) => [k, stored[k] === undefined ? true : Boolean(stored[k])]));
+}
+
+/**
+ * Gate 2 — server-internal rows for My Organisations (includes `companyId`; never return these to a business).
+ * Consent-reconciled; business-side blocks are masked as `unavailable`; pure `discovered` rows are not "mine".
+ * @param {string} uid
+ */
+export async function listMyOrganisationConnections(uid, { limit = 200 } = {}) {
+    const rows = (await col.list({ where: [["uid", "==", uid]], limit: 500 })).map(strip);
+    const out = [];
+    for (const row of rows) {
+        const conn = await reconcileConsent(row);
+        if (conn.state === S.DISCOVERED) continue;
+        out.push({ conn, view: toConsumerView(conn) });
+    }
+    out.sort((a, b) => String(b.conn.updatedAt).localeCompare(String(a.conn.updatedAt)));
+    return out.slice(0, Math.min(Math.max(Number(limit) || 200, 1), 200));
+}
+
+/**
+ * Gate 2 — channel preferences for an existing relationship (My Organisations → Manage).
+ * Preferences are the user's own and do not change consent; delivery (SNET-07 gap) honours them when it ships.
+ * @param {string} uid
+ * @param {string} snId
+ * @param {Record<string, unknown>} patch subset of ORG_PREF_KEYS (booleans)
+ */
+export async function setConnectionPreferences(uid, snId, patch = {}) {
+    if (!uid) throw err(401, "AUTH_REQUIRED", "Sign in required.");
+    if (!isValidSnId(snId) || snIdKind(snId) !== "org") throw err(400, "SN_ID_INVALID", "A valid organisation snId is required.");
+    const unknown = Object.keys(patch || {}).filter((k) => !ORG_PREF_KEYS.includes(k));
+    if (unknown.length) throw err(422, "PREFS_INVALID", `Unknown preference: ${unknown.join(", ")}`);
+    for (const k of Object.keys(patch)) {
+        if (typeof patch[k] !== "boolean") throw err(422, "PREFS_INVALID", `Preference "${k}" must be true or false.`);
+    }
+    const conn = await load(uid, snId);
+    if (!conn || conn.state === S.DISCOVERED) throw err(404, "CONNECTION_NOT_FOUND", "You have no relationship with this organisation.");
+    if (conn.state === S.BLOCKED) {
+        throw err(conn.blockedBy === "business" ? 403 : 409, conn.blockedBy === "business" ? "CONNECTION_UNAVAILABLE" : "CONNECTION_BLOCKED",
+            conn.blockedBy === "business" ? "This business is not available to you." : "You have blocked this business.");
+    }
+    const next = { ...conn, prefs: { ...effectivePrefs(conn), ...patch }, updatedAt: nowIso() };
+    await save(next);
+    return { snId, prefs: effectivePrefs(next) };
+}
+
 /** Business-side list (pseudonymous). @param {string} companyId */
 export async function listConnectionsForOrg(companyId, { state = "", limit = 100 } = {}) {
     const entity = await getOrgEntityByCompanyId(companyId);

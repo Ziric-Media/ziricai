@@ -445,6 +445,30 @@ export async function subscribeToEntity(snId, { disclosedFields = [] } = {}) {
   return sub;
 }
 
+/** Gate 2 — My Organisations: relationships joined to public org cards → `{ organisations, counts }`. */
+export async function fetchMyOrganisations() {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(await apiRequest('/api/network/v1/my-organisations', { silent: true }));
+  return out.error ? out : { organisations: out.data?.organisations || [], counts: out.data?.counts || {} };
+}
+
+/** Gate 2 — channel preferences for one organisation (`{ notifications, announcements, reminders }` booleans). */
+export async function updateOrganisationPreferences(snId, prefs) {
+  const id = String(snId || '').trim();
+  if (!id) return { error: 'This business has no Sarah Network ID yet', code: 'SNID_REQUIRED' };
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(
+    await apiRequest(`/api/network/v1/my-organisations/${encodeURIComponent(id)}/preferences`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefs }),
+    })
+  );
+  return out.error ? out : { prefs: out.data?.prefs };
+}
+
 /** Unsubscribe (back to following) and revoke the standing consent grant. */
 export async function unsubscribeFromEntity(snId, grantId = null) {
   const out = await setEntityRelationship(snId, 'unsubscribe');
@@ -575,6 +599,8 @@ function mountPublicApi() {
     fetchChatConversations,
     fetchDiscoverCompanies,
     fetchConnections,
+    fetchMyOrganisations,
+    updateOrganisationPreferences,
     setEntityRelationship,
     subscribeToEntity,
     unsubscribeFromEntity,
