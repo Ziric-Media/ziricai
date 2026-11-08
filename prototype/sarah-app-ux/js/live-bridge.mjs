@@ -453,6 +453,14 @@ export async function fetchMyOrganisations() {
   return out.error ? out : { organisations: out.data?.organisations || [], counts: out.data?.counts || {} };
 }
 
+/** Gate 6 — updates from organisations the user subscribed to (pull feed) → `{ updates }`. */
+export async function fetchMyUpdates(limit = 20) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(await apiRequest(`/api/network/v1/my-updates?limit=${encodeURIComponent(limit)}`, { silent: true }));
+  return out.error ? out : { updates: out.data?.updates || [] };
+}
+
 /** Gate 2 — channel preferences for one organisation (`{ notifications, announcements, reminders }` booleans). */
 export async function updateOrganisationPreferences(snId, prefs) {
   const id = String(snId || '').trim();
@@ -600,6 +608,7 @@ function mountPublicApi() {
     fetchDiscoverCompanies,
     fetchConnections,
     fetchMyOrganisations,
+    fetchMyUpdates,
     updateOrganisationPreferences,
     setEntityRelationship,
     subscribeToEntity,

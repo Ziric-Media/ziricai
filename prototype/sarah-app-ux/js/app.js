@@ -7678,23 +7678,29 @@ function liveRelationState(companyId) {
 
 /* ---------- Gate 2: My Organisations backed by GET /api/network/v1/my-organisations ---------- */
 
-const liveMyOrgs = { loaded: false, loading: false, error: '', organisations: [] };
+const liveMyOrgs = { loaded: false, loading: false, error: '', organisations: [], updates: [] };
 
 function resetLiveMyOrgs() {
   liveMyOrgs.loaded = false;
   liveMyOrgs.loading = false;
   liveMyOrgs.error = '';
   liveMyOrgs.organisations = [];
+  liveMyOrgs.updates = [];
 }
 
 async function refreshLiveMyOrgs() {
   if (!discoverLiveActive() || !window.SarahLive?.isSignedIn?.() || liveMyOrgs.loading) return;
   liveMyOrgs.loading = true;
-  const res = await window.SarahLive.fetchMyOrganisations();
+  const [res, updatesRes] = await Promise.all([
+    window.SarahLive.fetchMyOrganisations(),
+    // Gate 6: updates are best effort — a failure here must never hide the organisations list.
+    window.SarahLive.fetchMyUpdates ? window.SarahLive.fetchMyUpdates(10) : Promise.resolve({ updates: [] }),
+  ]);
   liveMyOrgs.loading = false;
   liveMyOrgs.loaded = true;
   liveMyOrgs.error = res.error || '';
   liveMyOrgs.organisations = res.error ? [] : res.organisations || [];
+  liveMyOrgs.updates = res.error || updatesRes.error ? [] : updatesRes.updates || [];
   const { route, msPanel } = parseLocationHash();
   if (route === 'home' && msPanel === 'organisations') renderMyOrganisationsPanel();
 }
@@ -7776,7 +7782,20 @@ function renderLiveMyOrganisations(root) {
       ${rows.length ? `<ul class="ms-org-list" role="list">${rows.map(row).join('')}</ul>` : `<p class="ms-org-empty">${escapeHtml(s.empty)}</p>`}</section>`;
   }).join('');
 
-  root.innerHTML = `${header}${sections}
+  const updatesHtml = liveMyOrgs.updates.length
+    ? `<section class="ms-org-section" id="msOrgUpdates"><h3 class="ms-org-section-title">Updates</h3>
+        <ul class="ms-org-list" role="list">${liveMyOrgs.updates
+          .map(
+            (u) => `<li class="ms-org-row"><div class="ms-org-row-body">
+              <strong class="ms-org-row-name">${escapeHtml(u.title)}</strong>
+              <span class="ms-org-row-meta">${escapeHtml([u.organisation?.displayName, new Date(u.createdAt).toLocaleDateString()].filter(Boolean).join(' · '))}</span>
+              ${u.body ? `<p class="ms-org-empty">${escapeHtml(u.body)}</p>` : ''}
+            </div></li>`
+          )
+          .join('')}</ul></section>`
+    : '';
+
+  root.innerHTML = `${header}${updatesHtml}${sections}
     <footer class="ms-organisations-foot"><button type="button" class="btn btn-secondary" id="msOrgOpenDiscover">Open Discover</button></footer>`;
 
   root.querySelector('#msOrgOpenDiscover')?.addEventListener('click', () => setRoute('discover'));

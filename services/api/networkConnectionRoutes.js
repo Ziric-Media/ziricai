@@ -8,8 +8,9 @@
  *                  cancel_request | disconnect | block | unblock
  *     GET  /api/network/v1/my-organisations                   → { organisations[], counts }   (Gate 2)
  *     PUT  /api/network/v1/my-organisations/:snId/preferences { prefs: { notifications, announcements, reminders } }
- *   Tenant (member; writes owner/manager) — pseudonymous:
- *     GET/POST /api/network/v1/orgs/:companyId/subscriber-events   (Gate 5: event log only — nothing is delivered)
+ *     GET  /api/network/v1/my-updates?limit=                  → { updates[], organisations, delivery: "pull" }   (Gate 6)
+ *   Tenant (member; writes need canManageNetwork) — pseudonymous:
+ *     GET/POST /api/network/v1/orgs/:companyId/subscriber-events   (Gate 5/6: event log; consumers pull via /my-updates, nothing is pushed)
  *     GET  /api/network/v1/orgs/:companyId/connections?state=
  *     POST /api/network/v1/orgs/:companyId/connections/:connectionId/:action   accept | decline | disconnect | block | unblock
  */
@@ -26,6 +27,7 @@ import {
 } from "../network/connectionService.js";
 import { listMyOrganisations, updateMyOrganisationPreferences } from "../network/myOrganisationsService.js";
 import { listSubscriberEvents, recordSubscriberEvent } from "../network/subscriberEventService.js";
+import { listUpdatesForUser } from "../network/subscriberUpdatesService.js";
 
 function fail(res, err, fallbackCode) {
     res.status(err.status || 500).json({
@@ -95,7 +97,16 @@ export function mountNetworkConnectionRoutes(app, deps = {}) {
         }
     });
 
-    // Gate 5 — subscriber notification stub: event log only, nothing is delivered.
+    // Gate 6 — subscriber updates (pull): the consumer's feed built from the event log of the organisations they subscribed to.
+    app.get("/api/network/v1/my-updates", consumerGuard, async (req, res) => {
+        try {
+            res.json({ ok: true, data: await listUpdatesForUser(req.consumerAuth.uid, { limit: req.query.limit }) });
+        } catch (err) {
+            fail(res, err, "MY_UPDATES_FAILED");
+        }
+    });
+
+    // Gate 5 — subscriber notification event log (no push; consumers read it through GET /my-updates).
     app.get("/api/network/v1/orgs/:companyId/subscriber-events", async (req, res) => {
         try {
             const companyId = String(req.params.companyId || "").trim();

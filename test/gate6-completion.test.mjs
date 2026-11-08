@@ -34,6 +34,14 @@ import {
     consumeScopedMediaUpload,
 } from "../services/users/chatMediaService.js";
 import { ROUTE_CATALOG } from "../services/api/routeRegistry.js";
+import { SMILEMORE_DEMO_COMPANY_ID } from "../services/dental/smilemorePractice.js";
+import { clearConsentGrantsForTests, createConsentGrant } from "../services/users/consentGrantService.js";
+import { ensureOrgEntity, setOrgEntityStatus } from "../services/network/networkIdentityService.js";
+import { applyConsumerAction, clearNetworkConnectionsForTests, SUBSCRIBE_SCOPE } from "../services/network/connectionService.js";
+import { updateMyOrganisationPreferences } from "../services/network/myOrganisationsService.js";
+import { clearSubscriberEventsForTests, recordSubscriberEvent } from "../services/network/subscriberEventService.js";
+import { listUpdatesForUser } from "../services/network/subscriberUpdatesService.js";
+import { mountNetworkConnectionRoutes } from "../services/api/networkConnectionRoutes.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
@@ -255,4 +263,106 @@ test("evidence upload routes are documented in ROUTE_CATALOG and UIs show file r
     assert.match(read("js/portal/modules/network.js"), /uploadNetworkEvidenceFile/);
     assert.match(read("js/admin/modules/sarah-network.js"), /ev\.file/);
     assert.equal(read("js/admin/modules/sarah-network.js"), read("admin/js/admin/modules/sarah-network.js"), "admin/ copy in sync");
+});
+
+/* ------------------------------------------------------------------ 4. subscriber updates (pull) */
+
+const tick = () => new Promise((r) => setTimeout(r, 8));
+
+async function updatesSetup() {
+    clearConsentGrantsForTests();
+    clearNetworkEntitiesForTests();
+    clearNetworkConnectionsForTests();
+    clearSubscriberEventsForTests();
+    setBusinessDirectoryStoreForTests(null);
+    clearBusinessDirectoryForTests();
+    await tick();
+    const snId = (await ensureOrgEntity(SMILEMORE_DEMO_COMPANY_ID)).snId;
+    const subscribe = async (uid) => {
+        await applyConsumerAction(uid, snId, "follow");
+        const g = createConsentGrant(uid, { companyId: SMILEMORE_DEMO_COMPANY_ID, snId, scope: SUBSCRIBE_SCOPE });
+        await applyConsumerAction(uid, snId, "subscribe", { grantId: g.grantId });
+        return g;
+    };
+    return { snId, subscribe };
+}
+
+test("updates feed: subscribers see events from their subscription start; followers, prefs, back-reading and leaks are handled", async () => {
+    const { snId, subscribe } = await updatesSetup();
+    await recordSubscriberEvent(SMILEMORE_DEMO_COMPANY_ID, { type: "announcement", title: "Before anyone subscribed" });
+    await tick();
+    await subscribe("g6-sub");
+    await subscribe("g6-quiet");
+    await applyConsumerAction("g6-follower", snId, "follow");
+    await tick();
+    await recordSubscriberEvent(SMILEMORE_DEMO_COMPANY_ID, { type: "announcement", title: "New hours", body: "Open until 18:00" }, "member:owner-uid");
+    await recordSubscriberEvent(SMILEMORE_DEMO_COMPANY_ID, { type: "reminder", title: "Check-up due" });
+    await updateMyOrganisationPreferences("g6-quiet", snId, { reminders: false });
+
+    const feed = await listUpdatesForUser("g6-sub");
+    assert.equal(feed.delivery, "pull");
+    assert.equal(feed.organisations, 1);
+    assert.deepEqual(feed.updates.map((u) => u.title).sort(), ["Check-up due", "New hours"], "no events from before the subscription");
+    assert.equal(feed.updates[0].snId, snId);
+    assert.ok(feed.updates[0].organisation.displayName);
+    const raw = JSON.stringify(feed);
+    for (const leak of [SMILEMORE_DEMO_COMPANY_ID, "owner-uid", "createdBy", "audience", "g6-quiet"]) assert.equal(raw.includes(leak), false, `no ${leak} in the feed`);
+
+    assert.deepEqual((await listUpdatesForUser("g6-quiet")).updates.map((u) => u.title), ["New hours"], "reminders channel switched off");
+    assert.equal((await listUpdatesForUser("g6-follower")).updates.length, 0, "following is not subscribing");
+    assert.equal((await listUpdatesForUser("g6-nobody")).updates.length, 0);
+
+    // unsubscribe → feed empties; re-subscribe does not resurrect old events
+    await applyConsumerAction("g6-sub", snId, "unsubscribe");
+    assert.equal((await listUpdatesForUser("g6-sub")).updates.length, 0);
+    await tick();
+    await subscribe("g6-sub").catch(() => null);
+    assert.deepEqual((await listUpdatesForUser("g6-sub")).updates, [], "old events stay hidden after re-subscribing");
+
+    // suspended organisation contributes nothing
+    await setOrgEntityStatus(SMILEMORE_DEMO_COMPANY_ID, "suspended", { reason: "gate6" });
+    assert.equal((await listUpdatesForUser("g6-quiet")).updates.length, 0);
+});
+
+test("updates feed: consumer route, auth seam and catalogue", async () => {
+    const { subscribe } = await updatesSetup();
+    await subscribe("g6-route");
+    await tick();
+    await recordSubscriberEvent(SMILEMORE_DEMO_COMPANY_ID, { type: "notification", title: "Hello subscribers" });
+    const app = express();
+    app.use(express.json());
+    mountNetworkConnectionRoutes(app, {
+        consumerGuard: (req, res, next) => {
+            if (!req.headers["x-uid"]) return res.status(401).json({ ok: false, error: { code: "AUTH_REQUIRED" } });
+            req.consumerAuth = { uid: String(req.headers["x-uid"]) };
+            next();
+        },
+        authorize: async () => ({ uid: "m" }),
+    });
+    const server = app.listen(0);
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+        let res = await fetch(`${base}/api/network/v1/my-updates`);
+        assert.equal(res.status, 401);
+        res = await fetch(`${base}/api/network/v1/my-updates?limit=5`, { headers: { "x-uid": "g6-route" } });
+        assert.equal(res.status, 200);
+        const body = await res.json();
+        assert.equal(body.ok, true);
+        assert.equal(body.data.updates[0].title, "Hello subscribers");
+        res = await fetch(`${base}/api/network/v1/my-updates`, { headers: { "x-uid": "someone-else" } });
+        assert.deepEqual((await res.json()).data.updates, []);
+    } finally {
+        server.closeAllConnections?.();
+        await new Promise((resolve) => server.close(resolve));
+    }
+    assert.ok(ROUTE_CATALOG.some((r) => r.method === "GET" && r.path === "/api/network/v1/my-updates"));
+});
+test("Sarah App: live bridge exposes fetchMyUpdates and My Organisations renders updates best-effort", () => {
+    const bridge = read("prototype/sarah-app-ux/js/live-bridge.mjs");
+    const app = read("prototype/sarah-app-ux/js/app.js");
+    assert.match(bridge, /export async function fetchMyUpdates/);
+    assert.match(bridge, /\/api\/network\/v1\/my-updates/);
+    assert.match(app, /window\.SarahLive\.fetchMyUpdates/);
+    assert.match(app, /id="msOrgUpdates"/);
+    assert.ok(!/window\.prompt/.test(app.slice(app.indexOf("Gate 2: My Organisations backed"))));
 });

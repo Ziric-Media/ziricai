@@ -237,6 +237,7 @@ export const ROUTE_CATALOG = [
     { method: "POST", path: "/api/network/v1/orgs/:companyId/subscriber-events", domain: "network", tenantScoped: true, description: "Record an announcement / notification / reminder for subscribers (audience size only; no delivery)" },
     // Gate 2 — My Organisations
     { method: "GET", path: "/api/network/v1/my-organisations", domain: "consumer", tenantScoped: false, description: "My Organisations: my relationships joined to public directory cards" },
+    { method: "GET", path: "/api/network/v1/my-updates", domain: "consumer", tenantScoped: false, description: "Subscriber updates feed (pull): announcements / notifications / reminders from organisations the user is subscribed to, honouring channel preferences" },
     { method: "PUT", path: "/api/network/v1/my-organisations/:snId/preferences", domain: "consumer", tenantScoped: false, description: "My Organisations channel preferences (notifications / announcements / reminders)" },
     { method: "GET", path: "/api/network/v1/orgs/:companyId/connections", domain: "network", tenantScoped: true, description: "Business relationship list (pseudonymous)" },
     { method: "POST", path: "/api/network/v1/orgs/:companyId/connections/:connectionId/:action", domain: "network", tenantScoped: true, description: "accept | decline | disconnect | block | unblock" },
