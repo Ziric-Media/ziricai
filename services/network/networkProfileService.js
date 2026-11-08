@@ -18,6 +18,18 @@ import {
     verificationBadge,
 } from "../users/businessDirectoryService.js";
 import { getCompany } from "../tenants/companyService.js";
+import { ensureCompanyAgent } from "./agentRegistryService.js";
+
+/** Agent summary for the public profile (active agents only; no internals). */
+async function publicAgentRef(companyId) {
+    try {
+        const agent = await ensureCompanyAgent(companyId);
+        if (agent.status !== "active") return null;
+        return { agentSnId: agent.agentSnId, capabilities: agent.capabilities, humanHandover: agent.humanHandover !== false };
+    } catch {
+        return null;
+    }
+}
 
 /** Fields a tenant may edit, by visibility tier. */
 export const PUBLIC_PROFILE_FIELDS = Object.freeze([
@@ -221,6 +233,8 @@ export async function publishListing(companyId, actorUid = null, deps = {}) {
         seeded: false,
     });
     invalidateDirectoryEntity(companyId);
+    // SNET-06: a listed org always has its Company Sarah agent identity (idempotent; never blocks publishing).
+    await ensureCompanyAgent(companyId).catch(() => null);
     return getListing(companyId, deps);
 }
 
@@ -258,5 +272,6 @@ export async function getPublicProfileBySnId(snId) {
         verified: Boolean(entry.verified),
         verification: verificationBadge(entry),
         hasCompanySarah: true,
+        agent: await publicAgentRef(companyId),
     };
 }
