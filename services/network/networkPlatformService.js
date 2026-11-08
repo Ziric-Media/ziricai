@@ -5,7 +5,7 @@
  * capped scans (pilot scale); a materialised stats doc is a follow-up. The only write here is the audited
  * suspend / reinstate decision.
  */
-import { getSearchStats } from "./networkSearchStats.js";
+import { getDurableSearchStats, getSearchStats } from "./networkSearchStats.js";
 import { listNetworkAdminAudit, recordNetworkAdminAction } from "./networkAdminAudit.js";
 import {
     getEntityBySnId,
@@ -60,6 +60,7 @@ export async function getNetworkStats() {
     const agents = await listAllAgentsForPlatform({ limit: 2000 });
     const connections = await countConnectionsByState();
     const search = getSearchStats();
+    const durable = await getDurableSearchStats({ days: 7 }).catch(() => null);
     return {
         generatedAt: new Date().toISOString(),
         entities: { total: rows.length, listed: rows.filter((r) => r.listed).length, byStatus },
@@ -72,6 +73,8 @@ export async function getNetworkStats() {
             total: search.total,
             zeroResults: search.zeroResults,
             topZeroResultQueries: search.topZeroResultQueries,
+            /** Gate 5 — survives restarts (daily Firestore docs, last 7 UTC days). */
+            durable,
         },
     };
 }

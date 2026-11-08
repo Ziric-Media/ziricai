@@ -319,6 +319,27 @@ export async function setConnectionPreferences(uid, snId, patch = {}) {
     return { snId, prefs: effectivePrefs(next) };
 }
 
+/**
+ * Gate 5 — audience size for a subscriber notification (counts only; never uids). Subscribers = subscribed or
+ * connected relationships whose consent is still valid; `byChannel` honours each user's My Organisations prefs.
+ * @param {string} companyId
+ */
+export async function countSubscribersForOrg(companyId) {
+    const byChannel = Object.fromEntries(ORG_PREF_KEYS.map((k) => [k, 0]));
+    const entity = await getOrgEntityByCompanyId(companyId);
+    if (!entity) return { subscribers: 0, byChannel, snId: null };
+    const rows = (await col.list({ where: [["snId", "==", entity.snId]], limit: 5000 })).map(strip);
+    let subscribers = 0;
+    for (const row of rows) {
+        const conn = await reconcileConsent(row);
+        if (![S.SUBSCRIBED, S.CONNECTED].includes(conn.state)) continue;
+        subscribers += 1;
+        const prefs = effectivePrefs(conn);
+        for (const k of ORG_PREF_KEYS) if (prefs[k]) byChannel[k] += 1;
+    }
+    return { subscribers, byChannel, snId: entity.snId };
+}
+
 /** Business-side list (pseudonymous). @param {string} companyId */
 export async function listConnectionsForOrg(companyId, { state = "", limit = 100 } = {}) {
     const entity = await getOrgEntityByCompanyId(companyId);

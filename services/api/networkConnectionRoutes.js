@@ -9,6 +9,7 @@
  *     GET  /api/network/v1/my-organisations                   → { organisations[], counts }   (Gate 2)
  *     PUT  /api/network/v1/my-organisations/:snId/preferences { prefs: { notifications, announcements, reminders } }
  *   Tenant (member; writes owner/manager) — pseudonymous:
+ *     GET/POST /api/network/v1/orgs/:companyId/subscriber-events   (Gate 5: event log only — nothing is delivered)
  *     GET  /api/network/v1/orgs/:companyId/connections?state=
  *     POST /api/network/v1/orgs/:companyId/connections/:connectionId/:action   accept | decline | disconnect | block | unblock
  */
@@ -24,6 +25,7 @@ import {
     listConnectionsForUser,
 } from "../network/connectionService.js";
 import { listMyOrganisations, updateMyOrganisationPreferences } from "../network/myOrganisationsService.js";
+import { listSubscriberEvents, recordSubscriberEvent } from "../network/subscriberEventService.js";
 
 function fail(res, err, fallbackCode) {
     res.status(err.status || 500).json({
@@ -90,6 +92,28 @@ export function mountNetworkConnectionRoutes(app, deps = {}) {
             res.json({ ok: true, data });
         } catch (err) {
             fail(res, err, "MY_ORGANISATIONS_PREFS_FAILED");
+        }
+    });
+
+    // Gate 5 — subscriber notification stub: event log only, nothing is delivered.
+    app.get("/api/network/v1/orgs/:companyId/subscriber-events", async (req, res) => {
+        try {
+            const companyId = String(req.params.companyId || "").trim();
+            await authorize(req, companyId, { write: false });
+            res.json({ ok: true, data: { events: await listSubscriberEvents(companyId, { limit: req.query.limit }), delivery: "logged_only" } });
+        } catch (err) {
+            fail(res, err, "SUBSCRIBER_EVENTS_FAILED");
+        }
+    });
+
+    app.post("/api/network/v1/orgs/:companyId/subscriber-events", async (req, res) => {
+        try {
+            const companyId = String(req.params.companyId || "").trim();
+            const ctx = await authorize(req, companyId, { write: true });
+            const event = await recordSubscriberEvent(companyId, req.body || {}, ctx?.uid ? `member:${ctx.uid}` : "business");
+            res.status(201).json({ ok: true, data: { event } });
+        } catch (err) {
+            fail(res, err, "SUBSCRIBER_EVENT_FAILED");
         }
     });
 

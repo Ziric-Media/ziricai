@@ -209,6 +209,10 @@ export const NETWORK_COLLECTIONS = {
     CONNECTIONS: "networkConnections",
     MODERATION_CASES: "networkModerationCases",
     ADMIN_AUDIT: "networkAdminAudit",
+    /** Gate 5 — durable daily search counters (`day_YYYY-MM-DD`); no user identifiers. */
+    SEARCH_STATS: "networkSearchStats",
+    /** Gate 5 — subscriber notification event log (counts only; no fan-out, no recipient records). */
+    SUBSCRIBER_EVENTS: "networkSubscriberEvents",
 };
 
 /** Optional future platform person link index. */

@@ -230,6 +230,9 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/network/v1/connections", domain: "consumer", tenantScoped: false, description: "My relationships" },
     { method: "GET", path: "/api/network/v1/connections/:snId", domain: "consumer", tenantScoped: false, description: "Relationship with one entity" },
     { method: "POST", path: "/api/network/v1/connections", domain: "consumer", tenantScoped: false, description: "Follow / subscribe / connect / block (consent-linked)" },
+    // Gate 5 — subscriber notification stub (event log only)
+    { method: "GET", path: "/api/network/v1/orgs/:companyId/subscriber-events", domain: "network", tenantScoped: true, description: "Subscriber event log (logged_only; nothing delivered)" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/subscriber-events", domain: "network", tenantScoped: true, description: "Record an announcement / notification / reminder for subscribers (audience size only; no delivery)" },
     // Gate 2 — My Organisations
     { method: "GET", path: "/api/network/v1/my-organisations", domain: "consumer", tenantScoped: false, description: "My Organisations: my relationships joined to public directory cards" },
     { method: "PUT", path: "/api/network/v1/my-organisations/:snId/preferences", domain: "consumer", tenantScoped: false, description: "My Organisations channel preferences (notifications / announcements / reminders)" },

@@ -6,6 +6,7 @@
  * before listing so entries survive restarts / multiple replicas.
  */
 import { buildPilotSeedEntries } from "../network/pilotListings.js";
+import { isHardBlockedFromPublicDirectory } from "../network/networkEligibility.js";
 import { deriveCategories, DISCOVER_CATEGORIES } from "../network/networkTaxonomy.js";
 import { rankCards } from "../network/networkSearchScoring.js";
 import { recordSearch } from "../network/networkSearchStats.js";
@@ -180,6 +181,7 @@ export async function listDiscoverCards() {
     await hydrateBusinessDirectory();
     const cards = [];
     for (const entry of listPublicBusinessDirectoryEntries()) {
+        if (isHardBlockedFromPublicDirectory(entry.companyId, entry.displayName)) continue; // demo / test / acceptance
         const entity = await resolveEntity(entry);
         if (entity?.status === "suspended") continue;
         cards.push(toDiscoverCard(entry, entity));
@@ -245,7 +247,7 @@ export function discoverCategoryFacets(cards) {
  */
 export function assertCompanyDiscoverable(companyId) {
     const entry = getBusinessDirectoryEntry(companyId);
-    if (!entry || entry.discoverability !== "public") {
+    if (!entry || entry.discoverability !== "public" || isHardBlockedFromPublicDirectory(companyId, entry.displayName)) {
         throw Object.assign(new Error("This business is not available on Sarah Discover yet."), {
             status: 404,
             code: "COMPANY_NOT_DISCOVERABLE",

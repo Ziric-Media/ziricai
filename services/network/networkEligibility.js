@@ -8,6 +8,8 @@
 import { classifyTenant, TENANT_CLASS } from "../../js/shared/tenantClassification.js";
 
 const LISTABLE = new Set([TENANT_CLASS.PRODUCTION_CUSTOMER, TENANT_CLASS.CLIENT_ZERO, TENANT_CLASS.PILOT]);
+/** Classes that must never be reachable through the PUBLIC directory, whatever a stored entry says (Gate 5). */
+const HARD_BLOCKED = new Set([TENANT_CLASS.ACCEPTANCE, TENANT_CLASS.DEMO_SHOWCASE, TENANT_CLASS.TEST]);
 
 function allowListed(companyId) {
     return String(process.env.SARAH_NETWORK_PILOT_COMPANY_IDS || "smilemore-demo")
@@ -15,6 +17,18 @@ function allowListed(companyId) {
         .map((s) => s.trim())
         .filter(Boolean)
         .includes(companyId);
+}
+
+/**
+ * Gate 5 — read-time guard for the public directory (Discover, company chat entry). Publishing is already gated by
+ * `evaluateNetworkEligibility`; this also covers legacy/stored/seeded entries. UNKNOWN is deliberately NOT blocked
+ * here (it stays unlisted only via the publish gate), and an operator allow-list always wins.
+ * @param {string} companyId
+ * @param {string} [name]
+ */
+export function isHardBlockedFromPublicDirectory(companyId, name) {
+    if (!companyId || allowListed(companyId)) return false;
+    return HARD_BLOCKED.has(classifyTenant({ id: companyId, name }).classification);
 }
 
 /**
