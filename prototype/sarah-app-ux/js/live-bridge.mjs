@@ -355,6 +355,22 @@ export async function fetchChatConversations(filter = 'all') {
   return apiRequest(`/api/chat/conversations${qs}`);
 }
 
+/** SNET-01b — live Discover directory (published Sarah Network businesses). */
+export async function fetchDiscoverCompanies({ q = '', category = '', limit = 50 } = {}) {
+  if (!signedInUser) return { error: 'Sign in to browse Discover', code: 'AUTH_REQUIRED' };
+  try {
+    await ensureConsumerProfile();
+  } catch (err) {
+    return { error: err.message || 'Could not set up your Sarah profile', code: 'CONSUMER_PROFILE_REQUIRED' };
+  }
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (category && category !== 'all') params.set('category', category);
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  return apiRequest(`/api/discover/companies${qs ? `?${qs}` : ''}`);
+}
+
 export async function fetchCompanyMessages(companyId) {
   const id = String(companyId || '').trim();
   if (!id) return { error: 'Company id required' };
@@ -474,6 +490,7 @@ function mountPublicApi() {
     onAuthChange,
     resolveApiBase,
     fetchChatConversations,
+    fetchDiscoverCompanies,
     fetchCompanyMessages,
     sendCompanyMessage,
     fetchPersonMessages,

@@ -259,6 +259,15 @@ export function networkRefDocRef(refDocId) {
     return adminOnlyDocRef(networkRefPath(refDocId), refDocId);
 }
 
+/** SNET-02+ — generic server-only network collection refs (see NETWORK_COLLECTIONS). */
+export function networkDocRef(collectionName, id) {
+    return adminOnlyDocRef(`${collectionName}/${id}`, id);
+}
+
+export function networkCollectionRef(collectionName) {
+    return { __path: collectionName, __adminCol: getAdminFirestore().collection(collectionName) };
+}
+
 export function businessDirectoryDocRef(companyId) {
     return adminOnlyDocRef(businessDirectoryPath(companyId), companyId);
 }

@@ -9,6 +9,10 @@ import {
     setDoc,
     networkEntityRef,
     networkRefDocRef,
+    networkCollectionRef,
+    getDocs,
+    query,
+    queryLimit,
     runAdminFirestoreTransaction,
 } from "../database/firestoreClient.js";
 import { NETWORK_ENTITIES } from "../database/schema.js";
@@ -35,6 +39,9 @@ const memoryStore = {
         return memRefs.get(refDocId) || null;
     },
     /** @returns {Promise<{ snId: string }|null>} existing ref when already present, else null after creating */
+    async listEntities(limit) {
+        return [...memEntities.values()].slice(0, limit);
+    },
     async createRefIfAbsent(refDocId, data) {
         const existing = memRefs.get(refDocId);
         if (existing) return existing;
@@ -54,6 +61,10 @@ const firestoreStore = {
     async getRef(refDocId) {
         const snap = await getDoc(networkRefDocRef(refDocId));
         return snap.exists() ? snap.data() : null;
+    },
+    async listEntities(limit) {
+        const snap = await getDocs(query(networkCollectionRef(NETWORK_ENTITIES.ROOT), queryLimit(limit)));
+        return snap.docs.map((d) => d.data());
     },
     async createRefIfAbsent(refDocId, data) {
         return runAdminFirestoreTransaction(async (tx) => {
@@ -134,6 +145,42 @@ export async function ensureOrgEntity(companyId, input = {}) {
     const next = { ...current, ...patch, version: (current.version || 1) + 1, updatedAt: timestamp };
     await s.putEntity(next);
     return next;
+}
+
+/**
+ * Explicit status change (suspend / reinstate / list / delist) — the only path allowed to move an entity
+ * out of `suspended`. Callers (platform routes) audit the decision and invalidate directory caches.
+ * @param {string} companyId
+ * @param {"draft"|"listed"|"suspended"} status
+ * @param {{ reason?: string|null, actor?: string|null }} [meta]
+ */
+export async function setOrgEntityStatus(companyId, status, meta = {}) {
+    if (!Object.values(NETWORK_ENTITY_STATUSES).includes(status)) {
+        throw Object.assign(new Error(`Invalid entity status: ${status}`), { status: 400, code: "ENTITY_STATUS_INVALID" });
+    }
+    const current = await ensureOrgEntity(companyId);
+    if (current.status === status) return current;
+    const next = {
+        ...current,
+        status,
+        statusReason: meta.reason || null,
+        statusChangedBy: meta.actor || null,
+        statusChangedAt: nowIso(),
+        version: (current.version || 1) + 1,
+        updatedAt: nowIso(),
+    };
+    await store().putEntity(next);
+    return next;
+}
+
+/**
+ * All org entities (memory: everything; Firestore: capped scan). Used by platform stats / backfill reports.
+ * @param {{ limit?: number }} [opts]
+ */
+export async function listOrgEntities({ limit = 1000 } = {}) {
+    const s = store();
+    if (typeof s.listEntities === "function") return s.listEntities(limit);
+    return [];
 }
 
 /** @param {string} snId */

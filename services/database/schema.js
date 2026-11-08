@@ -193,6 +193,22 @@ export function networkRefPath(refDocId) {
     return `${NETWORK_ENTITIES.REFS_ROOT}/${refDocId}`;
 }
 
+/**
+ * SNET-02+ — flat top-level network collections (server writes only; client default-deny).
+ * Doc ids are opaque ids owned by each module (grantId, requestId, snId, caseId …).
+ */
+export const NETWORK_COLLECTIONS = {
+    CONSENT_GRANTS: "networkConsentGrants",
+    REQUESTS: "networkRequests",
+    REQUEST_AUDIT: "networkRequestAudit",
+    RATE_EVENTS: "networkRateEvents",
+    VERIFICATION_CASES: "networkVerificationCases",
+    AGENTS: "networkAgents",
+    CONNECTIONS: "networkConnections",
+    MODERATION_CASES: "networkModerationCases",
+    ADMIN_AUDIT: "networkAdminAudit",
+};
+
 /** Optional future platform person link index. */
 export const PERSON_LINKS = {
     ROOT: "personLinks",

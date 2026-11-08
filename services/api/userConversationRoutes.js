@@ -8,7 +8,7 @@ import {
     sendCompanySarahMessage,
     getCompanyConversationForUser,
 } from "../sarah/company/companyReceptionChatService.js";
-import { listDiscoverCompanies } from "../users/businessDirectoryService.js";
+import { searchDiscoverCompanies } from "../users/businessDirectoryService.js";
 
 const chatRateLimit = authRateLimit("auth");
 
@@ -20,9 +20,19 @@ function profileFromReq(req) {
  * @param {import('express').Express} app
  */
 export function mountUserConversationRoutes(app) {
-    app.get("/api/discover/companies", requireConsumerScope(), async (_req, res) => {
+    app.get("/api/discover/companies", requireConsumerScope(), async (req, res) => {
         try {
-            res.json({ companies: await listDiscoverCompanies() });
+            const result = await searchDiscoverCompanies({
+                q: String(req.query?.q || "").slice(0, 120),
+                category: String(req.query?.category || "").slice(0, 40),
+                limit: req.query?.limit,
+            });
+            res.json({
+                companies: result.companies,
+                total: result.total,
+                facets: result.facets,
+                query: result.query,
+            });
         } catch (err) {
             res.status(500).json({ error: err.message || "Discover unavailable" });
         }

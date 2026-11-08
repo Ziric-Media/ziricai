@@ -450,6 +450,21 @@ let activeDiscoverCategory = 'all';
 let discoverSearchQuery = '';
 let discoverSearchDebounceTimer = null;
 let pendingDiscoverSearchFromOrg = '';
+/**
+ * SNET-01b: live Discover directory (GET /api/discover/companies). In live mode the mock fixtures are
+ * NEVER merged into results; they only render when live mode is off (offline / signed out / file://).
+ */
+const liveDiscover = {
+  loaded: false,
+  loading: false,
+  error: '',
+  companies: [],
+  facets: [],
+  query: null,
+  category: null,
+  /** every live card seen this session, keyed by companyId (detail pages / chat headers survive new searches) */
+  byId: new Map(),
+};
 let activeProfileSocialTab = 'posts';
 /** BP-01: 'posts' | 'about' for Business Profile public tab */
 let activeProfileBusinessSocialTab = 'posts';
@@ -665,7 +680,7 @@ function bindSub01RegisterModalOnce() {
 function openSub01RegisterModal(companyId, opts) {
   bindSub01RegisterModalOnce();
   const id = String(companyId || '').trim();
-  const company = (MOCK_DISCOVER_COMPANIES || []).find((c) => c.id === id);
+  const company = discoverFind(id);
   const modal = document.getElementById('sub01RegisterModal');
   if (!modal || !company) {
     showProtoToast('Organisation not found');
@@ -1562,7 +1577,7 @@ function isExplicitNonPersonalThreadSelection(rt) {
   if (thread?.kind === 'company') return true;
   if (id === 'smilemore-demo') return true;
   if (getAllChats().some((c) => c.id === id)) return true;
-  if (MOCK_DISCOVER_COMPANIES.some((c) => c.id === id)) return true;
+  if (discoverFind(id)) return true;
   return false;
 }
 
@@ -1606,7 +1621,7 @@ function resolveCompanyIdForActiveThread(threadId) {
   }
   const chat = getAllChats().find((c) => c.id === id);
   if (chat?.company) return id;
-  if (MOCK_DISCOVER_COMPANIES.some((c) => c.id === id)) return id;
+  if (discoverFind(id)) return id;
   if (id === 'smilemore-demo') return id;
   const rowCompanyId = document.querySelector(`[data-open-thread="${id}"]`)?.dataset?.companyId;
   if (rowCompanyId) return rowCompanyId;
@@ -1625,7 +1640,7 @@ async function loadCompanyThreadFromApiIfNeeded() {
   if (existing?.api && existing.kind === 'company' && existing.messages?.length) return true;
 
   const chat = getAllChats().find((c) => c.id === id || c.id === companyId);
-  const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
+  const discoverCo = discoverFind(companyId);
 
   const res = await window.SarahLive.fetchCompanyMessages(companyId);
   if (res.error) {
@@ -2050,6 +2065,7 @@ function startNewWorkThread() {
 const GALLERY_SIZE = 6;
 
 function getCompanyGallery(company) {
+  if (company.live && !(company.gallery && company.gallery.length)) return [];
   let items = company.gallery && company.gallery.length ? [...company.gallery] : [];
   if (!items.length && company.image) items = [company.image];
   if (items.length) {
@@ -2062,6 +2078,7 @@ function getCompanyGallery(company) {
 
 function getCompanyProducts(company) {
   if (company.products && company.products.length) return company.products;
+  if (company.live) return [];
   return [
     {
       id: `${company.id}-sample`,
@@ -2151,7 +2168,7 @@ function getActiveThreadContext() {
   }
 
   if (consumerChatLiveActive() && companyId) {
-    const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
+    const discoverCo = discoverFind(companyId);
     const chat = getAllChats().find((c) => c.id === companyId);
     return {
       id: companyId,
@@ -2176,7 +2193,7 @@ function getActiveThreadContext() {
     };
   }
   const chat = getAllChats().find((c) => c.id === id);
-  const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === id);
+  const discoverCo = discoverFind(id);
   if (discoverCo) {
     return {
       id,
@@ -2220,7 +2237,7 @@ function getActiveThreadContext() {
 async function openCompanySarahChat(companyId) {
   const id = String(companyId || '').trim();
   if (!id) return;
-  const company = MOCK_DISCOVER_COMPANIES.find((c) => c.id === id) || {
+  const company = discoverFind(id) || {
     id,
     name: id,
     verified: true,
@@ -2260,7 +2277,7 @@ async function openCompanySarahChat(companyId) {
 let galleryViewer = { companyId: null, index: 0, images: [] };
 
 function openGalleryViewer(companyId, startIndex) {
-  const company = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
+  const company = discoverFind(companyId);
   if (!company) return;
   const images = getCompanyGallery(company);
   galleryViewer = {
@@ -6396,8 +6413,7 @@ function renderMyOrganisationsPanel() {
   if (!root) return;
 
   const subscribedIds = loadSub01SubscribedIds();
-  const all = MOCK_DISCOVER_COMPANIES || [];
-  const byId = (id) => all.find((c) => c.id === id);
+  const byId = (id) => discoverFind(id);
   const subscribed = subscribedIds.map((id) => byId(id)).filter(Boolean);
   const suggestedIds = (MOCK_MY_ORGANISATIONS_SUGGESTED_IDS || []).filter((id) => !subscribedIds.includes(id));
   const suggested = suggestedIds.map((id) => byId(id)).filter(Boolean);
@@ -7570,9 +7586,93 @@ function openDiscoverCompany(id) {
   location.hash = `discover/${id}`;
 }
 
-/** D0: client-side only until GET /api/discover/companies returns full U6 listing cards. */
+/** SNET-01b: live mode = signed-in Sarah Network directory; otherwise sample fixtures (never merged). */
+function discoverLiveActive() {
+  return consumerChatLiveActive();
+}
+
+/** Map a /api/discover/companies card into the shape the Discover/detail renderers expect. */
+function mapLiveDiscoverCard(card) {
+  const fallbackImg = SARAH_AVATAR_SRC || 'assets/sarah-avatar.svg';
+  return {
+    id: card.companyId,
+    companyId: card.companyId,
+    snId: card.snId || null,
+    live: true,
+    name: card.displayName || card.companyId,
+    categoryLabel: card.industry || '',
+    categories: card.categories || [],
+    tags: card.tags || [],
+    description: card.shortDescription || '',
+    address: card.location || '',
+    verified: Boolean(card.verified),
+    image: card.coverUrl || card.logoUrl || fallbackImg,
+    imageFallback: fallbackImg,
+    avatar: card.logoUrl || fallbackImg,
+    gallery: [],
+    products: [],
+    hours: [],
+    rating: null,
+    reviewCount: null,
+    distanceKm: null,
+    featured: false,
+  };
+}
+
+/** Companies rendered in the Discover grid. */
 function discoverCompaniesSource() {
-  return MOCK_DISCOVER_COMPANIES || [];
+  return discoverLiveActive() ? liveDiscover.companies : MOCK_DISCOVER_COMPANIES || [];
+}
+
+/** Lookup by id (companyId in live mode). Live mode never falls back to fixtures. */
+function discoverFind(id) {
+  const key = String(id || '');
+  if (!key) return undefined;
+  if (discoverLiveActive()) return liveDiscover.byId.get(key);
+  return (MOCK_DISCOVER_COMPANIES || []).find((c) => c.id === key);
+}
+
+function discoverCategoriesSource() {
+  if (!discoverLiveActive()) return MOCK_DISCOVER_CATEGORIES;
+  return [{ id: 'all', label: 'All' }, ...liveDiscover.facets.map((f) => ({ id: f.id, label: f.label }))];
+}
+
+async function refreshLiveDiscover() {
+  if (!discoverLiveActive() || liveDiscover.loading) return;
+  liveDiscover.loading = true;
+  liveDiscover.error = '';
+  liveDiscover.query = discoverSearchQuery;
+  liveDiscover.category = activeDiscoverCategory;
+  const res = await window.SarahLive.fetchDiscoverCompanies({
+    q: discoverSearchQuery,
+    category: activeDiscoverCategory,
+  });
+  liveDiscover.loading = false;
+  liveDiscover.loaded = true;
+  if (res.error) {
+    liveDiscover.error = res.error;
+    liveDiscover.companies = [];
+  } else {
+    const cards = (res.data?.companies || []).map(mapLiveDiscoverCard);
+    liveDiscover.companies = cards;
+    liveDiscover.facets = res.data?.facets || [];
+    cards.forEach((c) => liveDiscover.byId.set(c.id, c));
+  }
+  const route = parseLocationHash().route;
+  if (route === 'discover') renderDiscover();
+  else if (route === 'discover-company') renderCompanyDetail(parseLocationHash().companyId);
+}
+
+/** Kick a live fetch when the directory has not been loaded or the query/category changed. */
+function ensureLiveDiscoverFresh() {
+  if (!discoverLiveActive() || liveDiscover.loading) return;
+  if (
+    !liveDiscover.loaded ||
+    liveDiscover.query !== discoverSearchQuery ||
+    liveDiscover.category !== activeDiscoverCategory
+  ) {
+    void refreshLiveDiscover();
+  }
 }
 
 const DISCOVER_NL_KEYWORDS = {
@@ -7652,7 +7752,10 @@ function renderDiscover() {
     }
   }
 
-  catsHost.innerHTML = MOCK_DISCOVER_CATEGORIES.map(
+  const live = discoverLiveActive();
+  ensureLiveDiscoverFresh();
+
+  catsHost.innerHTML = discoverCategoriesSource().map(
     (cat) => `
     <button type="button" class="discover-cat ${cat.id === activeDiscoverCategory ? 'is-active' : ''}" data-discover-cat="${escapeHtml(cat.id)}" role="tab">
       ${escapeHtml(cat.label)}
@@ -7666,20 +7769,38 @@ function renderDiscover() {
     });
   });
 
-  const list = filterDiscoverListings(discoverCompaniesSource(), activeDiscoverCategory, discoverSearchQuery);
+  // Live: server already searched/filtered. Fixtures: client-side filter.
+  const list = live
+    ? discoverCompaniesSource()
+    : filterDiscoverListings(discoverCompaniesSource(), activeDiscoverCategory, discoverSearchQuery);
+
+  if (live && liveDiscover.loading && !list.length) {
+    gridHost.innerHTML = '<p class="feed-empty-search">Loading businesses on Sarah Network…</p>';
+    return;
+  }
+  if (live && liveDiscover.error) {
+    gridHost.innerHTML = `<p class="feed-empty-search">Couldn't load Discover: ${escapeHtml(liveDiscover.error)}</p>`;
+    return;
+  }
 
   if (!list.length) {
     const hasQuery = Boolean((discoverSearchQuery || '').trim());
     gridHost.innerHTML = hasQuery
       ? '<p class="feed-empty-search">No businesses match your search. Try another keyword or clear the field.</p>'
-      : '<p class="feed-empty-search">No businesses in this category yet.</p>';
+      : live
+        ? '<p class="feed-empty-search">No businesses are published on Sarah Network yet.</p>'
+        : '<p class="feed-empty-search">No businesses in this category yet.</p>';
     return;
   }
 
-  gridHost.innerHTML = list
+  const sampleNote = live
+    ? ''
+    : '<p class="discover-sample-note">Sample listings — sign in to see live Sarah Network businesses.</p>';
+
+  gridHost.innerHTML = sampleNote + list
     .map(
       (c) => `
-    <article class="discover-card" data-company-id="${escapeHtml(c.id)}">
+    <article class="discover-card" data-company-id="${escapeHtml(c.id)}"${c.snId ? ` data-sn-id="${escapeHtml(c.snId)}"` : ''}>
       <div class="discover-card-media">
         <img ${discoverImgAttrs(c.image, c)} />
         ${c.featured ? `<span class="discover-card-crown">${DISCOVER_SVG.crown}</span>` : ''}
@@ -7687,13 +7808,18 @@ function renderDiscover() {
       </div>
       <div class="discover-card-body">
         <h2 class="discover-card-title">${escapeHtml(c.name)}</h2>
-        <p class="discover-card-meta">
+        ${
+          c.live
+            ? `<p class="discover-card-meta">${DISCOVER_SVG.pin}<span>${escapeHtml(c.address || c.categoryLabel || 'Sarah Network')}</span></p>
+        ${c.snId ? `<p class="discover-card-snid" title="Sarah Network ID">${escapeHtml(c.snId)}</p>` : ''}`
+            : `<p class="discover-card-meta">
           ${DISCOVER_SVG.star}
           <span>${c.rating}(${c.reviewCount})</span>
           <span class="discover-card-meta-sep" aria-hidden="true">|</span>
           ${DISCOVER_SVG.pin}
           <span>${escapeHtml(String(c.distanceKm))} km</span>
-        </p>
+        </p>`
+        }
       </div>
       <div class="discover-card-actions-row">
         <button type="button" class="discover-card-subscribe ${isOrgSubscribedSub01(c.id) ? 'is-active' : ''}" data-sub01-subscribe="${escapeHtml(c.id)}">
@@ -7761,13 +7887,18 @@ function renderDiscover() {
 function renderCompanyDetail(companyId) {
   const root = document.getElementById('companyDetailRoot');
   if (!root) return;
-  const company = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
+  const company = discoverFind(companyId);
+  if (!company && discoverLiveActive() && !liveDiscover.loaded) {
+    root.innerHTML = '<div class="company-detail-body"><p>Loading business…</p></div>';
+    ensureLiveDiscoverFresh();
+    return;
+  }
   if (!company) {
     root.innerHTML = `<div class="company-detail-body"><p>Company not found.</p><button type="button" class="btn btn-primary" onclick="location.hash='discover'">Back</button></div>`;
     return;
   }
 
-  const hoursHtml = company.hours
+  const hoursHtml = (company.hours || [])
     .map(
       (h, i) => `
     <div class="company-hours-row ${i === 0 ? 'is-today' : ''}">
@@ -7822,13 +7953,13 @@ function renderCompanyDetail(companyId) {
         <div class="company-head-text">
           <h1>${escapeHtml(company.name)}${company.verified ? ` ${verifiedBadge}` : ''}</h1>
           <p class="company-tags">${escapeHtml(company.categoryLabel)}</p>
-          <p class="company-meta">
+          ${company.live ? (company.snId ? `<p class="company-meta company-snid" title="Sarah Network ID">${escapeHtml(company.snId)}</p>` : '') : `<p class="company-meta">
             ${DISCOVER_SVG.star}
             <span>${company.rating}(${company.reviewCount})</span>
             <span class="discover-card-meta-sep">|</span>
             ${DISCOVER_SVG.pin}
             <span>${escapeHtml(String(company.distanceKm))} km</span>
-          </p>
+          </p>`}
           <p class="company-address">${escapeHtml(company.address)}</p>
         </div>
         <button type="button" class="company-fav-lg" data-fav-toggle aria-label="Favorite">${DISCOVER_SVG.heart}</button>
@@ -7856,25 +7987,37 @@ function renderCompanyDetail(companyId) {
         <button type="button" class="company-desc-more" id="companyDescToggle" aria-expanded="false">View more</button>
       </section>
 
-      <section class="company-block company-section company-gallery-block">
+      ${
+        gallery.length
+          ? `<section class="company-block company-section company-gallery-block">
         <h2>Gallery</h2>
         <div class="company-gallery-grid company-gallery-grid--six">${galleryHtml}</div>
         <p class="company-gallery-hint">Tap a photo to view, like, or swipe through the gallery.</p>
-      </section>
+      </section>`
+          : ''
+      }
 
-      <section class="company-block company-section company-products-block">
+      ${
+        products.length
+          ? `<section class="company-block company-section company-products-block">
         <h2>Products</h2>
         <p class="company-section-lead">Available to order — like items or buy through Sarah (mock checkout).</p>
         <div class="product-grid">${productsHtml}</div>
-      </section>
+      </section>`
+          : ''
+      }
 
-      <section class="company-block company-section company-hours">
+      ${
+        (company.hours || []).length
+          ? `<section class="company-block company-section company-hours">
         <button type="button" class="company-hours-toggle" id="companyHoursToggle" aria-expanded="true">
           <span>Business Hours</span>
           <svg class="icon-svg icon-svg--xs" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
         </button>
         <div class="company-hours-list" id="companyHoursList">${hoursHtml}</div>
-      </section>
+      </section>`
+          : ''
+      }
     </div>`;
 
   root.querySelector('[data-fav-toggle]')?.addEventListener('click', (e) => {

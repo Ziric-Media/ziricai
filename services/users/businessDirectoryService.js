@@ -5,7 +5,8 @@
  * (Admin backend; no-op in memory mode). Sync getters are unchanged; call `hydrateBusinessDirectory()`
  * before listing so entries survive restarts / multiple replicas.
  */
-import { SMILEMORE_DEMO_COMPANY_ID } from "../dental/smilemorePractice.js";
+import { buildPilotSeedEntries } from "../network/pilotListings.js";
+import { deriveCategories, DISCOVER_CATEGORIES } from "../network/networkTaxonomy.js";
 import {
     useAdminBackend,
     getDocs,
@@ -38,29 +39,34 @@ const firestoreDirectoryStore = {
 let store = firestoreDirectoryStore;
 
 function seedPilotCompanies() {
-    const extra = String(process.env.SARAH_NETWORK_PILOT_COMPANY_IDS || SMILEMORE_DEMO_COMPANY_ID)
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    for (const companyId of extra) {
-        if (!directory.has(companyId)) {
-            seeded.add(companyId);
-            directory.set(companyId, {
-                companyId,
-                discoverability: "public",
-                displayName:
-                    companyId === SMILEMORE_DEMO_COMPANY_ID ? "SmileMore Dentists" : companyId,
-                industry: companyId === SMILEMORE_DEMO_COMPANY_ID ? "Healthcare · Dental" : null,
-                location: "Rustenburg, South Africa",
-                shortDescription:
-                    companyId === SMILEMORE_DEMO_COMPANY_ID
-                        ? "Family and paediatric dental care. Chat with Company Sarah for services and appointments."
-                        : "Verified business on Sarah App.",
-                industryPresetId: null,
-                verified: companyId === SMILEMORE_DEMO_COMPANY_ID,
-            });
+    for (const entry of buildPilotSeedEntries()) {
+        if (!directory.has(entry.companyId)) {
+            seeded.add(entry.companyId);
+            directory.set(entry.companyId, entry);
         }
     }
+}
+
+const ENTITY_TTL_MS = 60 * 1000;
+/** @type {Map<string, { entity: object|null, at: number }>} */
+const entityCache = new Map();
+
+/** Resolve (and idempotently mint) the SN-ID entity for a directory entry; short TTL cache. */
+async function resolveEntity(entry) {
+    const cached = entityCache.get(entry.companyId);
+    if (cached && Date.now() - cached.at < ENTITY_TTL_MS) return cached.entity;
+    const entity = await ensureOrgEntitySafe(entry.companyId, {
+        displayName: entry.displayName,
+        status: entry.discoverability === "public" ? "listed" : "draft",
+    });
+    entityCache.set(entry.companyId, { entity, at: Date.now() });
+    return entity;
+}
+
+/** Drop the cached entity (call after suspend / reinstate / publish). */
+export function invalidateDirectoryEntity(companyId) {
+    if (companyId) entityCache.delete(companyId);
+    else entityCache.clear();
 }
 
 seedPilotCompanies();
@@ -124,20 +130,82 @@ export function listPublicBusinessDirectoryEntries() {
         .sort((a, b) => String(a.displayName || a.companyId).localeCompare(String(b.displayName || b.companyId)));
 }
 
-/**
- * `GET /api/discover/companies` payload — durable directory (SmileMore stays seeded by default).
- */
-export async function listDiscoverCompanies() {
-    await hydrateBusinessDirectory();
-    return listPublicBusinessDirectoryEntries().map((entry) => ({
+/** Public card shape for Discover (never includes restricted/private fields). */
+export function toDiscoverCard(entry, entity) {
+    return {
+        snId: entity?.snId || entry.snId || null,
         companyId: entry.companyId,
         displayName: entry.displayName || entry.companyId,
-        industry: entry.industry || "Healthcare",
-        location: entry.location || "South Africa",
+        industry: entry.industry || null,
+        location: entry.location || null,
         verified: Boolean(entry.verified),
         shortDescription:
             entry.shortDescription || "Chat with this business using Company Sarah on Sarah App.",
-    }));
+        categories: deriveCategories(entry),
+        tags: Array.isArray(entry.tags) ? entry.tags : [],
+        logoUrl: entry.logoUrl || null,
+        coverUrl: entry.coverUrl || null,
+        hasCompanySarah: true,
+    };
+}
+
+function cardHaystack(card) {
+    return [card.displayName, card.industry, card.location, card.shortDescription, ...card.categories, ...card.tags]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+}
+
+/**
+ * `GET /api/discover/companies` payload — durable directory (SmileMore stays seeded by default).
+ * Suspended entities are never listed. SNET-05 replaces the plain matcher with the scored search provider.
+ * @param {{ q?: string, category?: string, limit?: number }} [opts]
+ */
+export async function listDiscoverCompanies({ q = "", category = "", limit = 50 } = {}) {
+    await hydrateBusinessDirectory();
+    const cards = [];
+    for (const entry of listPublicBusinessDirectoryEntries()) {
+        const entity = await resolveEntity(entry);
+        if (entity?.status === "suspended") continue;
+        cards.push(toDiscoverCard(entry, entity));
+    }
+    const terms = String(q || "")
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((t) => t.length >= 2);
+    const cat = String(category || "").toLowerCase();
+    const max = Math.min(Math.max(Number(limit) || 50, 1), 100);
+    return cards
+        .filter((c) => !cat || cat === "all" || c.categories.includes(cat))
+        .filter((c) => !terms.length || terms.some((t) => cardHaystack(c).includes(t)))
+        .slice(0, max);
+}
+
+/**
+ * Discover query result with facets computed over the text-matched set (before the category filter),
+ * so the tab bar can show where results exist.
+ * @param {{ q?: string, category?: string, limit?: number }} [opts]
+ */
+export async function searchDiscoverCompanies({ q = "", category = "", limit = 50 } = {}) {
+    const matched = await listDiscoverCompanies({ q, limit: 100 });
+    const cat = String(category || "").toLowerCase();
+    const filtered = !cat || cat === "all" ? matched : matched.filter((c) => c.categories.includes(cat));
+    const max = Math.min(Math.max(Number(limit) || 50, 1), 100);
+    return {
+        companies: filtered.slice(0, max),
+        total: filtered.length,
+        facets: discoverCategoryFacets(matched),
+        query: String(q || ""),
+    };
+}
+
+/** Category facets (id/label/count) over the currently listed cards. */
+export function discoverCategoryFacets(cards) {
+    return DISCOVER_CATEGORIES.map((c) => ({
+        id: c.id,
+        label: c.label,
+        count: cards.filter((card) => card.categories.includes(c.id)).length,
+    })).filter((f) => f.count > 0);
 }
 
 /**
@@ -160,7 +228,15 @@ export function assertCompanyDiscoverable(companyId) {
  */
 export async function assertCompanyDiscoverableAsync(companyId) {
     if (!getBusinessDirectoryEntry(companyId)) await hydrateBusinessDirectory();
-    return assertCompanyDiscoverable(companyId);
+    const entry = assertCompanyDiscoverable(companyId);
+    const entity = await resolveEntity(entry);
+    if (entity?.status === "suspended") {
+        throw Object.assign(new Error("This business is not available on Sarah Discover yet."), {
+            status: 404,
+            code: "COMPANY_NOT_DISCOVERABLE",
+        });
+    }
+    return entry;
 }
 
 /**
@@ -171,6 +247,7 @@ export function upsertBusinessDirectoryEntry(companyId, data) {
     const existing = directory.get(companyId) || { companyId };
     const next = { ...existing, ...data, companyId, updatedAt: new Date().toISOString() };
     directory.set(companyId, next);
+    entityCache.delete(companyId);
     void persistEntry(next);
     return next;
 }
@@ -178,6 +255,7 @@ export function upsertBusinessDirectoryEntry(companyId, data) {
 export function clearBusinessDirectoryForTests() {
     directory.clear();
     seeded.clear();
+    entityCache.clear();
     hydratedAt = 0;
     hydratePromise = null;
     seedPilotCompanies();
