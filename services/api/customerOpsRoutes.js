@@ -358,6 +358,50 @@ export function mountCustomerOpsRoutes(app) {
         }
     });
 
+    app.post("/api/companies/:companyId/conversations/:conversationId/assign", requireAuthenticatedTenantMember(), async (req, res) => {
+        try {
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const employeeId = String(req.body?.employeeId || req.tenant?.uid || "staff").trim();
+            const humanAgent = String(req.body?.humanAgent || employeeId).trim();
+            const result = await setHumanTakeover(dataCompanyId, req.params.conversationId, {
+                enabled: true,
+                humanAgent,
+            });
+            res.json({
+                success: true,
+                assignmentState: "human_assigned",
+                employeeId,
+                ...result,
+            });
+        } catch (err) {
+            res.status(500).json({ error: err.message || "Failed to assign conversation" });
+        }
+    });
+
+    app.post("/api/companies/:companyId/conversations/:conversationId/internal-note", requireAuthenticatedTenantMember(), async (req, res) => {
+        try {
+            const text = String(req.body?.text || "").trim();
+            if (!text) return res.status(400).json({ error: "text is required" });
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const { saveOutboundMessage } = await import("../conversationService.js");
+            const { resolveTenantConversationRef } = await import("../conversation/tenantConversationRef.js");
+            const ref = resolveTenantConversationRef(req.params.conversationId, {
+                channel: req.body?.channel || "sarah_app",
+            });
+            await saveOutboundMessage(ref.phone, text, {
+                companyId: dataCompanyId,
+                channel: ref.channel,
+                source: "internal_note",
+                senderName: resolveStaffSenderName(req.tenant),
+                visibility: "tenant_only",
+                externalUserId: ref.channel === "sarah_app" ? ref.phone : undefined,
+            });
+            res.status(201).json({ success: true, conversationId: ref.canonicalId, visibility: "tenant_only" });
+        } catch (err) {
+            res.status(500).json({ error: err.message || "Failed to save internal note" });
+        }
+    });
+
     /* ── Appointments ── */
     app.get("/api/companies/:companyId/appointments", requireTenantScope(), async (req, res) => {
         try {

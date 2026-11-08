@@ -178,6 +178,28 @@ export async function markConversationRead(companyId, conversationId) {
   });
 }
 
+export async function assignConversation(companyId, conversationId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/assign`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function saveInternalNote(companyId, conversationId, text, channel = 'sarah_app') {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/internal-note`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, channel }),
+    }
+  );
+}
+
 export async function fetchAppointments(companyId, { upcoming = true } = {}) {
   const qs = upcoming ? '?upcoming=true' : '';
   return request(`/api/companies/${encodeURIComponent(companyId)}/appointments${qs}`);
