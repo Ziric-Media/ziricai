@@ -1,7 +1,7 @@
 /**
  * CHAT-01 — Chat media upload tokens (signed URL MVP; metadata-only body).
  */
-import { randomUUID, createHmac } from "node:crypto";
+import { randomUUID, createHmac, createHash } from "node:crypto";
 import { personIdFromUserId } from "./identityContracts.js";
 
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
@@ -56,7 +56,7 @@ export function createChatMediaUpload(userId, input = {}) {
  */
 export function completeChatMediaUpload(uploadId, personId, token, body) {
     const record = uploads.get(uploadId);
-    if (!record) throw Object.assign(new Error("Upload not found"), { status: 404, code: "UPLOAD_NOT_FOUND" });
+    if (!record || record.purpose) throw Object.assign(new Error("Upload not found"), { status: 404, code: "UPLOAD_NOT_FOUND" });
     if (record.personId !== personId) {
         throw Object.assign(new Error("Forbidden"), { status: 403, code: "UPLOAD_FORBIDDEN" });
     }
@@ -89,7 +89,7 @@ export function completeChatMediaUpload(uploadId, personId, token, body) {
 
 export function getChatMediaAttachment(uploadId, personId, token) {
     const record = uploads.get(uploadId);
-    if (!record || record.status !== "ready") {
+    if (!record || record.purpose || record.status !== "ready") {
         throw Object.assign(new Error("Attachment not found"), { status: 404, code: "ATTACHMENT_NOT_FOUND" });
     }
     if (record.personId !== personId || record.token !== token) {
@@ -100,4 +100,106 @@ export function getChatMediaAttachment(uploadId, personId, token) {
 
 export function clearChatMediaForTests() {
     uploads.clear();
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Scoped (non-consumer) uploads — Gate 6.
+ * Same signed-token mechanism, but bound to an explicit `subject` string (e.g. "tenant:<companyId>") and a
+ * `purpose`, never to a consumer personId. Consumer-facing functions above refuse these records, and scoped
+ * functions refuse consumer records, so the two trust domains cannot be mixed. As with chat media the MVP stores
+ * metadata only: size + sha256 of the received bytes; the bytes themselves are not persisted and not scanned.
+ * ------------------------------------------------------------------------------------------------ */
+
+const SCOPED_MAX_BYTES = 10 * 1024 * 1024;
+
+function scopedErr(status, code, message) {
+    return Object.assign(new Error(message), { status, code });
+}
+
+/**
+ * @param {{ subject: string, purpose: string, allowedMimeTypes: string[], maxBytes?: number }} scope
+ * @param {{ mimeType?: string, byteLength?: number, fileName?: string }} input
+ */
+export function createScopedMediaUpload(scope, input = {}) {
+    const { subject, purpose, allowedMimeTypes } = scope || {};
+    if (!subject || !purpose || !Array.isArray(allowedMimeTypes) || !allowedMimeTypes.length) {
+        throw scopedErr(500, "UPLOAD_SCOPE_INVALID", "Upload scope is not configured.");
+    }
+    const maxBytes = Math.min(Number(scope.maxBytes) || SCOPED_MAX_BYTES, SCOPED_MAX_BYTES);
+    const mimeType = String(input.mimeType || "").trim().toLowerCase().slice(0, 120);
+    if (!allowedMimeTypes.includes(mimeType)) {
+        throw scopedErr(415, "UPLOAD_TYPE_NOT_ALLOWED", `File type not allowed. Use one of: ${allowedMimeTypes.join(", ")}`);
+    }
+    const byteLength = Number(input.byteLength || 0);
+    if (byteLength > maxBytes) throw scopedErr(400, "FILE_TOO_LARGE", `File exceeds ${Math.floor(maxBytes / 1024 / 1024)}MB limit`);
+    const uploadId = `smed_${randomUUID()}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120);
+    const expiresAt = new Date(Date.now() + UPLOAD_TTL_MS).toISOString();
+    const token = signToken(uploadId, `${purpose}:${subject}`, expiresAt);
+    uploads.set(uploadId, {
+        uploadId,
+        subject,
+        purpose,
+        personId: null,
+        mimeType,
+        fileName: input.fileName ? String(input.fileName).replace(/[\u0000-\u001f<>"\\/]/g, "_").slice(0, 200) : null,
+        byteLength: byteLength || null,
+        maxBytes,
+        expiresAt,
+        token,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+    });
+    return { uploadId, token, expiresAt, mimeType, maxBytes, allowedMimeTypes };
+}
+
+function scopedRecord(uploadId, subject, purpose, token) {
+    const record = uploads.get(uploadId);
+    if (!record || record.purpose !== purpose) throw scopedErr(404, "UPLOAD_NOT_FOUND", "Upload not found");
+    if (record.subject !== subject) throw scopedErr(403, "UPLOAD_FORBIDDEN", "Forbidden");
+    if (token !== undefined && record.token !== token) throw scopedErr(403, "UPLOAD_TOKEN_INVALID", "Invalid upload token");
+    if (new Date(record.expiresAt).getTime() < Date.now()) throw scopedErr(410, "UPLOAD_EXPIRED", "Upload token expired");
+    return record;
+}
+
+/** Receive the bytes for a pending scoped upload (records size + sha256; bytes are not retained). */
+export function completeScopedMediaUpload(uploadId, subject, purpose, token, body) {
+    const record = scopedRecord(uploadId, subject, purpose, token);
+    if (record.status !== "pending") throw scopedErr(409, "UPLOAD_ALREADY_COMPLETED", "Upload already completed");
+    const size = body?.length || 0;
+    if (!size) throw scopedErr(400, "FILE_EMPTY", "File is empty");
+    if (size > record.maxBytes) throw scopedErr(400, "FILE_TOO_LARGE", `File exceeds ${Math.floor(record.maxBytes / 1024 / 1024)}MB limit`);
+    record.status = "ready";
+    record.byteLength = size;
+    record.sha256 = createHash("sha256").update(body).digest("hex");
+    record.completedAt = new Date().toISOString();
+    uploads.set(uploadId, record);
+    return { uploadId, mimeType: record.mimeType, fileName: record.fileName, byteLength: size, sha256: record.sha256 };
+}
+
+/** Undo `consumeScopedMediaUpload` when the attach step failed afterwards (so the tenant can retry). */
+export function releaseScopedMediaUpload(uploadId) {
+    const record = uploads.get(uploadId);
+    if (record?.purpose && record.status === "attached") {
+        record.status = "ready";
+        uploads.set(uploadId, record);
+    }
+}
+
+/**
+ * Resolve a completed scoped upload into a durable file reference and mark it attached (single use).
+ * @returns {{ uploadId: string, fileName: string|null, mimeType: string, byteLength: number, sha256: string }}
+ */
+export function consumeScopedMediaUpload(uploadId, subject, purpose) {
+    const record = scopedRecord(uploadId, subject, purpose);
+    if (record.status === "attached") throw scopedErr(409, "UPLOAD_ALREADY_ATTACHED", "This file is already attached");
+    if (record.status !== "ready") throw scopedErr(409, "UPLOAD_NOT_READY", "Upload the file before attaching it");
+    record.status = "attached";
+    uploads.set(uploadId, record);
+    return {
+        uploadId,
+        fileName: record.fileName,
+        mimeType: record.mimeType,
+        byteLength: record.byteLength,
+        sha256: record.sha256,
+    };
 }

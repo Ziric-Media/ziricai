@@ -197,7 +197,9 @@ export const ROUTE_CATALOG = [
     // SNET-04 — Verification
     { method: "GET", path: "/api/network/v1/orgs/:companyId/verification", domain: "network", tenantScoped: true, description: "Tenant verification status" },
     { method: "POST", path: "/api/network/v1/orgs/:companyId/verification", domain: "network", tenantScoped: true, description: "Submit for verification (optional evidence refs)" },
-    { method: "POST", path: "/api/network/v1/orgs/:companyId/verification/evidence", domain: "network", tenantScoped: true, description: "Attach evidence references (https URL / external ref) to the open verification case" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/verification/evidence", domain: "network", tenantScoped: true, description: "Attach evidence references (https URL / external ref / uploaded file ref) to the open verification case" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/verification/evidence-uploads", domain: "network", tenantScoped: true, description: "Request a tenant-scoped signed upload token for a verification evidence file (metadata + sha256 only)" },
+    { method: "PUT", path: "/api/network/v1/orgs/:companyId/verification/evidence-uploads/:uploadId", domain: "network", tenantScoped: true, description: "Complete an evidence upload (raw body; records size + sha256; file bytes are not stored)" },
     { method: "GET", path: "/api/platform/network/v1/verification", domain: "platform", tenantScoped: false, description: "Verification queue (platform)" },
     { method: "GET", path: "/api/platform/network/v1/verification/:caseId", domain: "platform", tenantScoped: false, description: "Verification case (platform)" },
     { method: "POST", path: "/api/platform/network/v1/verification/:caseId/decision", domain: "platform", tenantScoped: false, description: "Decide verification case: start_review, request_info, verify/approve, reject, restrict (audited)" },

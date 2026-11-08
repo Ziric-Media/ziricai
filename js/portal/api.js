@@ -738,7 +738,28 @@ export async function submitNetworkVerification(companyId, body = {}) {
   return networkRequest(`${networkOrg(companyId)}/verification`, jsonBody('POST', body));
 }
 
-/** body: { items: [{ kind, label, url?|ref? }] } */
+/** body: { items: [{ kind, label, url?|ref?|uploadId? }] } */
 export async function addNetworkVerificationEvidence(companyId, items) {
   return networkRequest(`${networkOrg(companyId)}/verification/evidence`, jsonBody('POST', { items }));
+}
+
+/**
+ * Upload an evidence file (Gate 6): request a tenant-scoped token, then PUT the bytes.
+ * Resolves `{ data: { uploadId, file } }`; attach it with `{ kind, label, uploadId }` in the evidence call.
+ * The server records size + sha256 only (the file bytes are not stored yet).
+ */
+export async function uploadNetworkEvidenceFile(companyId, file) {
+  const mimeType = file?.type || '';
+  const issued = await networkRequest(
+    `${networkOrg(companyId)}/verification/evidence-uploads`,
+    jsonBody('POST', { mimeType, fileName: file?.name || null, byteLength: file?.size || 0 })
+  );
+  if (issued.error) return issued;
+  const { uploadId, token } = issued.data;
+  const done = await networkRequest(
+    `${networkOrg(companyId)}/verification/evidence-uploads/${encodeURIComponent(uploadId)}?token=${encodeURIComponent(token)}`,
+    { method: 'PUT', headers: { 'Content-Type': mimeType || 'application/octet-stream' }, body: await file.arrayBuffer() }
+  );
+  if (done.error) return done;
+  return { data: { uploadId, file: done.data.file } };
 }

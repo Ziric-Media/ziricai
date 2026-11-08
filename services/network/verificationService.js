@@ -85,8 +85,28 @@ export async function listCasesForCompany(companyId) {
 }
 
 function clientEvidence(row) {
-    const { evidenceId, kind, label, url = null, ref = null, addedAt } = row;
-    return { evidenceId, kind, label, url, ref, addedAt };
+    const { evidenceId, kind, label, url = null, ref = null, addedAt, fileRef = null } = row;
+    return { evidenceId, kind, label, url, ref, addedAt, file: fileRef ? clientFileRef(fileRef) : null };
+}
+
+/** File reference shape returned to tenants and platform officers (no storage keys). */
+function clientFileRef(f) {
+    return {
+        uploadId: f.uploadId,
+        fileName: f.fileName || null,
+        mimeType: f.mimeType,
+        byteLength: f.byteLength,
+        sha256: f.sha256,
+    };
+}
+
+/**
+ * Only the server (routes, after resolving a completed scoped upload) may attach a file reference to an evidence
+ * item. A client-supplied `fileRef` in a request body is ignored: the marker is a Symbol, which JSON cannot carry.
+ */
+const TRUSTED_FILE_REF = Symbol("trustedFileRef");
+export function withTrustedFileRef(item, fileRef) {
+    return { ...item, [TRUSTED_FILE_REF]: fileRef };
 }
 
 /** Evidence references attached to a case, oldest first. */
@@ -117,11 +137,13 @@ export function normalizeEvidenceRef(raw) {
         }
     }
     if (ref.length > 200) fields.ref = "Reference is too long (max 200 characters).";
-    if (!url && !ref) fields.url = fields.url || "Provide a https link or a reference.";
+    const trusted = raw?.[TRUSTED_FILE_REF];
+    const fileRef = trusted && trusted.uploadId && trusted.sha256 ? clientFileRef(trusted) : null;
+    if (!url && !ref && !fileRef) fields.url = fields.url || "Provide a https link, a reference or an uploaded file.";
     if (Object.keys(fields).length) {
         throw Object.assign(err(422, "EVIDENCE_INVALID", "Evidence reference is invalid."), { fields });
     }
-    return { kind, label, url: url || null, ref: ref || null };
+    return { kind, label, url: url || null, ref: ref || null, ...(fileRef ? { fileRef } : {}) };
 }
 
 async function writeEvidence(kase, refs, actorUid, now) {

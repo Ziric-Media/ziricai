@@ -15,6 +15,7 @@ import {
   fetchNetworkVerification,
   submitNetworkVerification,
   addNetworkVerificationEvidence,
+  uploadNetworkEvidenceFile,
 } from '../api.js';
 
 const FALLBACK_KINDS = ['registration_certificate', 'proof_of_address', 'ownership_proof', 'website', 'other'];
@@ -79,7 +80,10 @@ function evidenceListHtml(evidence) {
       const name = href
         ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(e.label)}</a>`
         : escapeHtml(e.label);
-      return `<li>${name} <span class="panel-hint">${escapeHtml(label(e.kind))}${e.ref ? ` · ref ${escapeHtml(e.ref)}` : ''}</span></li>`;
+      const file = e.file
+        ? ` · file ${escapeHtml(e.file.fileName || 'upload')} (${escapeHtml(String(Math.max(1, Math.round((e.file.byteLength || 0) / 1024))))} KB, sha256 ${escapeHtml(String(e.file.sha256 || '').slice(0, 12))}…)`
+        : '';
+      return `<li>${name} <span class="panel-hint">${escapeHtml(label(e.kind))}${e.ref ? ` · ref ${escapeHtml(e.ref)}` : ''}${file}</span></li>`;
     })
     .join('')}</ul>`;
 }
@@ -189,7 +193,10 @@ function verificationHtml(listing, verification) {
       <select id="${idPrefix}Kind">${kinds.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(label(k))}</option>`).join('')}</select></div>
     ${field(`${idPrefix}Label`, 'Label', '', { placeholder: 'e.g. CIPC registration certificate' })}
     ${field(`${idPrefix}Url`, 'Public https link (optional)', '', { type: 'url', hint: 'Link to a document you host (Drive, Dropbox, your website). Files are not uploaded to Ziricai.' })}
-    ${field(`${idPrefix}Ref`, 'Or external reference (optional)', '', { placeholder: 'e.g. document number' })}`;
+    ${field(`${idPrefix}Ref`, 'Or external reference (optional)', '', { placeholder: 'e.g. document number' })}
+    <div class="form-group"><label for="${idPrefix}File">Or attach a file (PDF / PNG / JPEG / WebP, max 5 MB)</label>
+      <input type="file" id="${idPrefix}File" accept="application/pdf,image/png,image/jpeg,image/webp" />
+      <div class="form-hint">A file reference (name, size, checksum) is recorded on the case. The file itself is not stored yet — keep a hosted link or reference as well.</div></div>`;
   return `
     <div class="card" style="margin-bottom:16px;">
       <div class="card-header"><h3>Verification</h3></div>
@@ -223,7 +230,17 @@ function verificationHtml(listing, verification) {
 
 function readEvidence(container, prefix) {
   const get = (suffix) => container.querySelector(`#${prefix}${suffix}`)?.value?.trim() || '';
-  return { kind: get('Kind') || 'other', label: get('Label'), url: get('Url'), ref: get('Ref') };
+  const file = container.querySelector(`#${prefix}File`)?.files?.[0] || null;
+  return { kind: get('Kind') || 'other', label: get('Label'), url: get('Url'), ref: get('Ref'), file };
+}
+
+/** Upload the chosen file (if any) and return the API item `{ kind, label, url, ref, uploadId? }`. */
+async function evidenceToItem(companyId, ev) {
+  const { file, ...item } = ev;
+  if (!file) return { item };
+  const up = await uploadNetworkEvidenceFile(companyId, file);
+  if (up.error) return { error: fieldError(up) };
+  return { item: { ...item, uploadId: up.data.uploadId } };
 }
 
 function readProfile(container) {
@@ -336,7 +353,12 @@ function bind(container, companyId, listing) {
   if (submit) {
     submit.onclick = guard(submit, async () => {
       const ev = readEvidence(container, 'nvNew');
-      const evidence = ev.label || ev.url || ev.ref ? [ev] : [];
+      let evidence = [];
+      if (ev.label || ev.url || ev.ref || ev.file) {
+        const prepared = await evidenceToItem(companyId, ev);
+        if (prepared.error) return showToast(prepared.error, 'error');
+        evidence = [prepared.item];
+      }
       // Persist the registration details the case is built from before requesting.
       const saved = await saveNetworkListingDraft(companyId, {
         legalName: container.querySelector('#nlLegalName')?.value?.trim() || '',
@@ -353,7 +375,9 @@ function bind(container, companyId, listing) {
   const add = container.querySelector('#nvAddBtn');
   if (add) {
     add.onclick = guard(add, async () => {
-      const res = await addNetworkVerificationEvidence(companyId, [readEvidence(container, 'nvAdd')]);
+      const prepared = await evidenceToItem(companyId, readEvidence(container, 'nvAdd'));
+      if (prepared.error) return showToast(prepared.error, 'error');
+      const res = await addNetworkVerificationEvidence(companyId, [prepared.item]);
       if (res.error) return showToast(fieldError(res), 'error');
       showToast('Evidence attached', 'success');
       rerender();

@@ -64,9 +64,15 @@ function evidenceItemHtml(ev) {
   const target = href
     ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(ev.label)}</a>`
     : escapeHtml(ev.label);
+  // Gate 6: uploaded file reference (name / size / checksum — the bytes themselves are not stored yet).
+  const file = ev.file
+    ? ` · file ${escapeHtml(ev.file.fileName || 'upload')} (${escapeHtml(String(Math.max(1, Math.round((ev.file.byteLength || 0) / 1024))))} KB, ${escapeHtml(
+        String(ev.file.mimeType || '')
+      )}, sha256 ${escapeHtml(String(ev.file.sha256 || '').slice(0, 16))}…)`
+    : '';
   return `<li>${target} <span class="panel-hint">${escapeHtml(String(ev.kind || '').replace(/_/g, ' '))}${
     ev.ref ? ` · ref ${escapeHtml(ev.ref)}` : ''
-  }</span></li>`;
+  }${file}</span></li>`;
 }
 
 /**
