@@ -13,6 +13,14 @@ import {
 import { buildCompanyReceptionContext } from "../network/companyReceptionContext.js";
 import { handleSarahChat } from "../sarahOrchestrator.js";
 import { auditLog } from "../../audit/auditLog.js";
+import { getConversationTakeoverState } from "../../conversation/takeoverSafety.js";
+import {
+    detectHumanHandoverIntent,
+    isHumanControlledOwnership,
+    transitionOwnershipState,
+    syncOwnershipFromTenant,
+} from "../../users/handoverStateService.js";
+import { HANDOVER_STATES } from "../../users/messagingContracts.js";
 
 /**
  * Ensure thread exists and greeting is present for new chats.
@@ -48,6 +56,25 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
 
     const { conversation: conv } = await ensureCompanyChatThread(uid, companyId, consumerProfile);
     await appendUserConversationMessage(conv, { role: "user", content: text });
+
+    if (detectHumanHandoverIntent(text)) {
+        await transitionOwnershipState(conv, HANDOVER_STATES.HUMAN_REQUESTED);
+    }
+    await syncOwnershipFromTenant(uid, companyId);
+
+    const takeover = await getConversationTakeoverState(companyId, uid, "sarah_app");
+    if (Boolean(takeover?.humanTakeover) || isHumanControlledOwnership(conv.ownershipState)) {
+        auditLog("company_sarah_chat_paused_human", { uid, companyId, conversationId: conv.id });
+        return {
+            conversationId: conv.id,
+            companyId,
+            companyName: conv.companyName,
+            reply: null,
+            humanActive: true,
+            ownershipState: conv.ownershipState,
+            messages: getUserConversationMessages(conv.id),
+        };
+    }
 
     const history = getUserConversationMessages(conv.id)
         .slice(-12)

@@ -25,7 +25,11 @@ import {
     findConversationInList,
     resolveListedChannel,
     resolveTenantConversationRef,
+    resolveSarahAppUidFromRef,
 } from "../conversation/tenantConversationRef.js";
+import { mirrorSarahAppHumanReplyToConsumer } from "../users/sarahAppConsumerMirrorService.js";
+import { openUserConversation, getUserConversationByCompany } from "../users/userConversationService.js";
+import { ownershipStateFromTakeover } from "../users/handoverStateService.js";
 
 const CHANNEL_LABELS = {
     whatsapp: "WhatsApp",
@@ -186,6 +190,9 @@ export async function sendConversationReply(companyId, conversationId, { text, c
         senderName: senderName || null,
         externalUserId: outboundChannel === "sarah_app" ? phone : undefined,
     });
+    if (outboundChannel === "sarah_app") {
+        await mirrorSarahAppHumanReplyToConsumer(companyId, canonicalId, text, { senderName });
+    }
     if (outboundChannel !== "sarah_app") {
         try {
             await integrationSend(outboundChannel, { companyId }, { to: phone, text });
@@ -257,6 +264,18 @@ export async function setHumanTakeover(companyId, conversationId, { enabled = tr
         channel,
         updatedAt: new Date().toISOString(),
     });
+
+    if (channel === "sarah_app") {
+        const uid = resolveSarahAppUidFromRef(canonicalId);
+        if (uid) {
+            await openUserConversation(uid, companyId, {});
+            const conv = getUserConversationByCompany(uid, companyId);
+            if (conv) {
+                conv.ownershipState = ownershipStateFromTakeover(enabled, conv.ownershipState);
+                conv.assignedEmployeeId = enabled ? humanAgent : null;
+            }
+        }
+    }
 
     if (channel === "whatsapp") {
         const legacyId = normalizePhone(phone);
