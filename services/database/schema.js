@@ -142,6 +142,33 @@ export function sarahNetworkAuditPath(eventId) {
 export const USER_CONVERSATIONS = {
     ROOT: "userConversations",
     MESSAGES: "messages",
+    /** CH1 — conversation doc schemaVersion field value. */
+    SCHEMA_VERSION: 1,
+};
+
+/** CH1 — logical Chat conversation types (CHAT-01 §3.2). */
+export const CHAT_CONVERSATION_TYPES = {
+    PERSON_TO_PERSON: "person_to_person",
+    PERSON_TO_BUSINESS: "person_to_business",
+    PERSON_TO_ORGANISATION: "person_to_organisation",
+    PERSON_TO_SARAH: "person_to_sarah",
+    GROUP_PERSONAL: "group_personal",
+    GROUP_ORGANISATION: "group_organisation",
+    AI_TO_AI: "ai_to_ai",
+    HUMAN_ASSISTED: "human_assisted",
+};
+
+/** CH1 — handover state enum (CH6 implements transitions; stored from CH1). */
+export const CHAT_HANDOVER_STATES = {
+    AI_ACTIVE: "ai_active",
+    HUMAN_REQUESTED: "human_requested",
+    AWAITING_ASSIGNMENT: "awaiting_assignment",
+    HUMAN_ASSIGNED: "human_assigned",
+    HUMAN_ACTIVE: "human_active",
+    AI_RESUME_PENDING: "ai_resume_pending",
+    AI_ACTIVE_AGAIN: "ai_active_again",
+    RESOLVED: "resolved",
+    CLOSED: "closed",
 };
 
 /** Published discover snapshot (U6; constants only in C1). */

@@ -21,6 +21,11 @@ import {
 import { getConversationTakeoverState } from "../conversation/takeoverSafety.js";
 import { mapMessageForInboxApi } from "../conversation/inboxMessageContract.js";
 import { buildSlimInboxContext } from "../conversation/inboxContext.js";
+import {
+    findConversationInList,
+    resolveListedChannel,
+    resolveTenantConversationRef,
+} from "../conversation/tenantConversationRef.js";
 
 const CHANNEL_LABELS = {
     whatsapp: "WhatsApp",
@@ -73,14 +78,14 @@ function resolvePhoneFromConversationRef(conversationId) {
 }
 
 function findListedConversation(convList, conversationId, phone) {
-    const canonicalId = resolveCanonicalConversationId(phone, "whatsapp");
-    return convList.find(
-        (c) =>
-            c.phone === phone ||
-            c.id === conversationId ||
-            c.id === canonicalId ||
-            c.id === phone
-    );
+    return findConversationInList(convList, conversationId) ||
+        convList.find(
+            (c) =>
+                c.phone === phone ||
+                c.id === conversationId ||
+                c.id === resolveCanonicalConversationId(phone, c.channel || "whatsapp") ||
+                c.id === phone
+        );
 }
 
 function mapConversationRow(conv, companyId) {
@@ -166,21 +171,27 @@ export async function getTenantConversation(companyId, conversationId) {
 }
 
 export async function sendConversationReply(companyId, conversationId, { text, channel, senderName }) {
-    const phone = resolvePhoneFromConversationRef(conversationId);
     const convList = await legacyListConversations({ companyId, limit: 100 });
-    const conv = findListedConversation(convList, conversationId, phone);
-    const outboundChannel = channel || conv?.channel || "whatsapp";
+    const listedChannel = resolveListedChannel(convList, conversationId);
+    const ref = resolveTenantConversationRef(conversationId, {
+        channel: channel || listedChannel,
+        listedChannel,
+    });
+    const { phone, channel: outboundChannel, canonicalId } = ref;
 
     await saveOutboundMessage(phone, text, {
         companyId,
         channel: outboundChannel,
         source: "human",
         senderName: senderName || null,
+        externalUserId: outboundChannel === "sarah_app" ? phone : undefined,
     });
-    try {
-        await integrationSend(outboundChannel, { companyId }, { to: phone, text });
-    } catch (err) {
-        console.warn("[conversationService] outbound send:", err.message);
+    if (outboundChannel !== "sarah_app") {
+        try {
+            await integrationSend(outboundChannel, { companyId }, { to: phone, text });
+        } catch (err) {
+            console.warn("[conversationService] outbound send:", err.message);
+        }
     }
 
     await publish(companyId, EventTypes.MESSAGE_SENT, {
@@ -192,18 +203,22 @@ export async function sendConversationReply(companyId, conversationId, { text, c
 
     return {
         success: true,
-        conversationId: resolveCanonicalConversationId(phone, outboundChannel),
+        conversationId: canonicalId,
         phone,
         channel: outboundChannel,
     };
 }
 
 export async function markConversationRead(companyId, conversationId) {
-    const phone = resolvePhoneFromConversationRef(conversationId);
-    const channel = "whatsapp";
-    const canonicalId = resolveCanonicalConversationId(phone, channel);
+    const convList = await legacyListConversations({ companyId, limit: 100 });
+    const listedChannel = resolveListedChannel(convList, conversationId);
+    const { phone, channel, canonicalId, customerId } = resolveTenantConversationRef(conversationId, {
+        listedChannel,
+    });
 
-    const existing = await conversationRepo.get(companyId, canonicalId);
+    const existing =
+        (await conversationRepo.get(companyId, canonicalId)) ||
+        (await conversationRepo.get(companyId, conversationId));
     if (!existing) {
         throw Object.assign(new Error("Conversation not found"), { status: 404, code: "NOT_FOUND" });
     }
@@ -213,7 +228,7 @@ export async function markConversationRead(companyId, conversationId) {
         unread: false,
         readAt,
         conversationId: canonicalId,
-        customerId: customerDocId(phone),
+        customerId,
         channel,
         updatedAt: readAt,
     });
@@ -227,44 +242,49 @@ export async function markConversationRead(companyId, conversationId) {
 }
 
 export async function setHumanTakeover(companyId, conversationId, { enabled = true, humanAgent = "Staff" } = {}) {
-    const phone = resolvePhoneFromConversationRef(conversationId);
-    const channel = "whatsapp";
-    const canonicalId = resolveCanonicalConversationId(phone, channel);
+    const convList = await legacyListConversations({ companyId, limit: 100 });
+    const listedChannel = resolveListedChannel(convList, conversationId);
+    const { phone, channel, canonicalId, customerId } = resolveTenantConversationRef(conversationId, {
+        listedChannel,
+    });
 
     await conversationRepo.upsert(companyId, canonicalId, {
         humanTakeover: enabled,
         mode: enabled ? "human" : "ai",
         assignedHumanAgent: enabled ? humanAgent : null,
-        customerId: customerDocId(phone),
+        customerId,
         conversationId: canonicalId,
         channel,
         updatedAt: new Date().toISOString(),
     });
 
-    const legacyId = normalizePhone(phone);
-    if (legacyId && legacyId !== canonicalId) {
-        const legacy = await conversationRepo.get(companyId, legacyId);
-        if (legacy && (legacy.humanTakeover || legacy.mode === "human")) {
-            await conversationRepo.upsert(companyId, legacyId, {
-                humanTakeover: false,
-                mode: "ai",
-                assignedHumanAgent: null,
-                migratedTo: canonicalId,
-                updatedAt: new Date().toISOString(),
-            });
+    if (channel === "whatsapp") {
+        const legacyId = normalizePhone(phone);
+        if (legacyId && legacyId !== canonicalId) {
+            const legacy = await conversationRepo.get(companyId, legacyId);
+            if (legacy && (legacy.humanTakeover || legacy.mode === "human")) {
+                await conversationRepo.upsert(companyId, legacyId, {
+                    humanTakeover: false,
+                    mode: "ai",
+                    assignedHumanAgent: null,
+                    migratedTo: canonicalId,
+                    updatedAt: new Date().toISOString(),
+                });
+            }
         }
-    }
 
-    await upsertCustomerFromWhatsApp(phone, {
-        companyId,
-        mode: enabled ? "human" : "ai",
-        assignedHumanAgent: enabled ? humanAgent : null,
-    });
+        await upsertCustomerFromWhatsApp(phone, {
+            companyId,
+            mode: enabled ? "human" : "ai",
+            assignedHumanAgent: enabled ? humanAgent : null,
+        });
+    }
 
     return {
         success: true,
         conversationId: canonicalId,
         phone,
+        channel,
         humanTakeover: enabled,
         mode: enabled ? "human" : "ai",
         humanAgent: enabled ? humanAgent : null,

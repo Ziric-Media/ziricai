@@ -14,6 +14,7 @@ import {
     queryOrderBy,
     useAdminBackend,
 } from "../database/firestoreClient.js";
+import { ensureConversationMessagingFoundation } from "./messagingContracts.js";
 
 /**
  * @param {object} raw
@@ -22,7 +23,7 @@ import {
  */
 function normalizeConversation(docId, raw) {
     if (!raw || typeof raw !== "object") return null;
-    return {
+    const base = {
         id: docId,
         personId: raw.personId || raw.userId,
         userId: raw.userId,
@@ -35,7 +36,14 @@ function normalizeConversation(docId, raw) {
         preview: raw.preview || "",
         createdAt: raw.createdAt || new Date().toISOString(),
         consumerDisplayName: raw.consumerDisplayName,
+        schemaVersion: raw.schemaVersion,
+        type: raw.type,
+        participants: raw.participants,
+        ownershipState: raw.ownershipState,
+        assignedEmployeeId: raw.assignedEmployeeId ?? null,
+        companySarahAgentId: raw.companySarahAgentId ?? null,
     };
+    return ensureConversationMessagingFoundation(base);
 }
 
 /**
@@ -52,6 +60,7 @@ function normalizeMessage(docId, raw) {
         source: raw.source ?? null,
         createdAt: raw.createdAt || new Date().toISOString(),
         tenantMessageId: raw.tenantMessageId ?? null,
+        authorParticipantId: raw.authorParticipantId ?? null,
     };
 }
 
@@ -64,19 +73,26 @@ export function firestoreUserConversationStoreEnabled() {
  */
 export async function upsertConversation(conv) {
     if (!firestoreUserConversationStoreEnabled() || !conv?.id) return;
+    const enriched = ensureConversationMessagingFoundation(conv);
     const payload = {
-        id: conv.id,
-        personId: conv.personId || conv.userId,
-        userId: conv.userId,
-        companyId: conv.companyId,
-        companyName: conv.companyName || null,
-        channel: conv.channel || "sarah_app",
-        tenantConversationId: conv.tenantConversationId ?? null,
-        tenantCustomerId: conv.tenantCustomerId ?? null,
-        lastMessageAt: conv.lastMessageAt,
-        preview: conv.preview || "",
-        createdAt: conv.createdAt || conv.lastMessageAt,
-        consumerDisplayName: conv.consumerDisplayName || null,
+        id: enriched.id,
+        personId: enriched.personId || enriched.userId,
+        userId: enriched.userId,
+        companyId: enriched.companyId,
+        companyName: enriched.companyName || null,
+        channel: enriched.channel || "sarah_app",
+        tenantConversationId: enriched.tenantConversationId ?? null,
+        tenantCustomerId: enriched.tenantCustomerId ?? null,
+        lastMessageAt: enriched.lastMessageAt,
+        preview: enriched.preview || "",
+        createdAt: enriched.createdAt || enriched.lastMessageAt,
+        consumerDisplayName: enriched.consumerDisplayName || null,
+        schemaVersion: enriched.schemaVersion,
+        type: enriched.type,
+        participants: enriched.participants,
+        ownershipState: enriched.ownershipState,
+        assignedEmployeeId: enriched.assignedEmployeeId ?? null,
+        companySarahAgentId: enriched.companySarahAgentId ?? null,
     };
     await setDoc(userConversationRef(conv.id), payload, { merge: true });
 }
@@ -134,6 +150,7 @@ export async function upsertMessage(conversationId, message, conversationPatch =
         source: message.source ?? null,
         createdAt: message.createdAt || new Date().toISOString(),
         tenantMessageId: message.tenantMessageId ?? null,
+        authorParticipantId: message.authorParticipantId ?? null,
     };
     await setDoc(userConversationMessageRef(conversationId, message.id), msgPayload, { merge: true });
 

@@ -60,6 +60,10 @@ export function isValidConsumerMessageId(value) {
 }
 
 /**
+ * @typedef {import("./messagingContracts.js").ChatParticipant} ChatParticipant
+ */
+
+/**
  * @typedef {object} UserConversationMetadata
  * @property {ConsumerConversationId} id
  * @property {PersonId} personId
@@ -71,15 +75,34 @@ export function isValidConsumerMessageId(value) {
  * @property {string} lastMessageAt
  * @property {string} preview
  * @property {string} createdAt
+ * @property {number} [schemaVersion] CH1
+ * @property {string} [type] CH1 conversation type
+ * @property {ChatParticipant[]} [participants] CH1
+ * @property {string} [ownershipState] CH1 handover placeholder (CH6)
+ * @property {string|null} [assignedEmployeeId]
+ * @property {string|null} [companySarahAgentId]
  */
 
 /**
  * @typedef {object} UserConversationMessage
  * @property {ConsumerMessageId} id
  * @property {ConsumerConversationId} conversationId
- * @property {"user"|"assistant"|"system"} role
+ * @property {"user"|"assistant"|"system"|"human"} role
  * @property {string} content
  * @property {string|null} [source]
  * @property {string} createdAt
  * @property {string|null} [tenantMessageId]
+ * @property {string|null} [authorParticipantId] CH1 — ties message to participants[].id
  */
+
+export {
+    CONVERSATION_TYPES,
+    HANDOVER_STATES,
+    MESSAGE_ROLES,
+    PARTICIPANT_KINDS,
+    buildPersonToBusinessConversationMeta,
+    ensureConversationMessagingFoundation,
+    isValidConversationType,
+    isValidMessageRole,
+    isValidHandoverState,
+} from "./messagingContracts.js";

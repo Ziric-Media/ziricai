@@ -9,6 +9,8 @@ import { getPortalCompanyAsync } from "../portal/portalDemo.js";
 import {
     buildConsumerConversationId,
     personIdFromUserId,
+    ensureConversationMessagingFoundation,
+    MESSAGE_ROLES,
 } from "./identityContracts.js";
 import {
     upsertConversation,
@@ -126,11 +128,15 @@ export async function openUserConversation(userId, companyId, meta = {}) {
     let conv = conversations.get(key);
     if (!conv) {
         conv = await tryHydrateConversationFromFirestore(userId, companyId);
+        if (conv) {
+            conv = ensureConversationMessagingFoundation(conv);
+            conversations.set(key, conv);
+        }
     }
     if (!conv) {
         const personId = personIdFromUserId(userId);
         const companyName = await resolveCompanyDisplayName(companyId);
-        conv = {
+        conv = ensureConversationMessagingFoundation({
             id: buildConsumerConversationId(personId, companyId),
             personId,
             userId,
@@ -142,7 +148,7 @@ export async function openUserConversation(userId, companyId, meta = {}) {
             tenantConversationId: null,
             createdAt: new Date().toISOString(),
             ...meta,
-        };
+        });
         conversations.set(key, conv);
         messagesByConversation.set(conv.id, []);
         await mirrorConversationToFirestore(conv);
@@ -179,11 +185,13 @@ export function getUserConversationMessages(conversationId) {
  */
 export async function appendUserConversationMessage(conv, message) {
     const list = messagesByConversation.get(conv.id) || [];
+    const role = String(message.role || MESSAGE_ROLES.USER);
     const entry = {
         id: message.id && String(message.id) ? String(message.id) : randomUUID(),
-        role: message.role,
+        role,
         content: String(message.content || ""),
         source: message.source || null,
+        authorParticipantId: message.authorParticipantId ?? null,
         createdAt: new Date().toISOString(),
     };
     const existing = list.find((m) => m.id === entry.id);
@@ -205,7 +213,8 @@ export async function appendUserConversationMessage(conv, message) {
         companyName: conv.companyName,
     };
 
-    if (message.role === "user") {
+    if (role === MESSAGE_ROLES.USER) {
+        entry.authorParticipantId = entry.authorParticipantId || conv.personId;
         const saved = await saveInboundMessage(conv.userId, entry.content, {
             companyId: conv.companyId,
             ...tenantOpts,
@@ -213,12 +222,23 @@ export async function appendUserConversationMessage(conv, message) {
             externalId: entry.id,
         });
         conv.tenantConversationId = saved.conversationId || conv.tenantConversationId;
-    } else if (message.role === "assistant") {
+    } else if (role === MESSAGE_ROLES.ASSISTANT) {
+        entry.authorParticipantId =
+            entry.authorParticipantId || conv.companySarahAgentId || `company_sarah:${conv.companyId}`;
         await saveOutboundMessage(conv.userId, entry.content, {
             companyId: conv.companyId,
             ...tenantOpts,
             source: "ai",
             senderName: conv.companyName ? `${conv.companyName} Sarah` : "Company Sarah",
+            externalId: entry.id,
+        });
+    } else if (role === MESSAGE_ROLES.HUMAN) {
+        entry.authorParticipantId = entry.authorParticipantId || conv.assignedEmployeeId;
+        await saveOutboundMessage(conv.userId, entry.content, {
+            companyId: conv.companyId,
+            ...tenantOpts,
+            source: "human",
+            senderName: message.senderName || "Staff",
             externalId: entry.id,
         });
     }
