@@ -13,6 +13,7 @@ import {
     getNetworkAudit,
 } from "./sarahNetworkStore.js";
 import { dispatchCompanyReception } from "./dispatchCompanyReception.js";
+import { ensureNetworkChatThread } from "../../users/sarahNetworkChatLinkService.js";
 
 const RATE_WINDOW_MS = 60 * 60 * 1000;
 const RATE_MAX_PER_USER = Number(process.env.SARAH_NETWORK_RATE_PER_HOUR) || 30;
@@ -90,6 +91,7 @@ export async function submitPersonalToCompanyEnquiry(uid, input) {
     try {
         const response = await dispatchCompanyReception(requestDoc);
         const completed = attachNetworkResponse(requestDoc.requestId, response);
+        await ensureNetworkChatThread({ ...completed, response });
         return completed;
     } catch (err) {
         failNetworkRequest(requestDoc.requestId, err);
