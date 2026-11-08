@@ -18,6 +18,12 @@ function persist(grant) {
     void writeThrough("consent grant", () => col.put(grant.grantId, grant, { merge: false }));
 }
 
+/** One-off enquiry grants last a day; standing relationship grants (SNET-07) last a year unless revoked. */
+const STANDING_SCOPES = new Set(["sarah_network_subscription", "sarah_network_connection"]);
+function defaultTtlMs(scope) {
+    return (STANDING_SCOPES.has(scope) ? 365 : 1) * 24 * 60 * 60 * 1000;
+}
+
 /**
  * @param {string} uid
  * @param {object} input
@@ -34,7 +40,7 @@ export function createConsentGrant(uid, input = {}) {
         requestId: input.requestId || null,
         status: "active",
         createdAt: new Date().toISOString(),
-        expiresAt: input.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt: input.expiresAt || new Date(Date.now() + defaultTtlMs(input.scope)).toISOString(),
     };
     grants.set(grantId, grant);
     persist(grant);

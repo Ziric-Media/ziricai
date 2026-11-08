@@ -4,6 +4,7 @@
 import { assertCompanyDiscoverableAsync } from "../../users/businessDirectoryService.js";
 import { validateConsentGrantAsync } from "../../users/consentGrantService.js";
 import { auditLog } from "../../audit/auditLog.js";
+import { assertNotBlockedByBusiness } from "../../network/connectionService.js";
 import {
     createNetworkRequest,
     getNetworkRequest,
@@ -69,6 +70,7 @@ export async function submitPersonalToCompanyEnquiry(uid, input) {
     }
 
     await assertCompanyDiscoverableAsync(companyId);
+    await assertNotBlockedByBusiness(uid, companyId); // SNET-07: a business-side block stops new enquiries
 
     const grantId = input.grantId;
     if (!grantId) {
