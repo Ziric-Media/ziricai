@@ -9,6 +9,7 @@ import {
     getCompanyConversationForUser,
 } from "../sarah/company/companyReceptionChatService.js";
 import { searchDiscoverCompanies } from "../users/businessDirectoryService.js";
+import { attachSnId, attachSnIds } from "../network/networkIntegration.js";
 
 const chatRateLimit = authRateLimit("auth");
 
@@ -19,8 +20,9 @@ function profileFromReq(req) {
 /**
  * @param {import('express').Express} app
  */
-export function mountUserConversationRoutes(app) {
-    app.get("/api/discover/companies", requireConsumerScope(), async (req, res) => {
+export function mountUserConversationRoutes(app, deps = {}) {
+    const guard = deps.consumerGuard || requireConsumerScope();
+    app.get("/api/discover/companies", guard, async (req, res) => {
         try {
             const result = await searchDiscoverCompanies({
                 q: String(req.query?.q || "").slice(0, 120),
@@ -40,22 +42,22 @@ export function mountUserConversationRoutes(app) {
         }
     });
 
-    app.get("/api/user-conversations", requireConsumerScope(), async (req, res) => {
+    app.get("/api/user-conversations", guard, async (req, res) => {
         try {
-            const conversations = listUserConversations(req.consumerAuth.uid);
+            const conversations = await attachSnIds(listUserConversations(req.consumerAuth.uid));
             res.json({ conversations });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to list conversations" });
         }
     });
 
-    app.get("/api/user-conversations/:companyId/messages", requireConsumerScope(), async (req, res) => {
+    app.get("/api/user-conversations/:companyId/messages", guard, async (req, res) => {
         try {
             const uid = req.consumerAuth.uid;
             const companyId = req.params.companyId;
             const data = await getCompanyConversationForUser(uid, companyId, profileFromReq(req));
             res.json({
-                conversation: data.conversation,
+                conversation: await attachSnId(data.conversation),
                 messages: data.messages,
             });
         } catch (err) {
@@ -69,7 +71,7 @@ export function mountUserConversationRoutes(app) {
     app.post(
         "/api/user-conversations/:companyId/messages",
         chatRateLimit,
-        requireConsumerScope(),
+        guard,
         async (req, res) => {
             try {
                 const uid = req.consumerAuth.uid;
@@ -86,13 +88,13 @@ export function mountUserConversationRoutes(app) {
         }
     );
 
-    app.get("/api/user-conversations/id/:conversationId/messages", requireConsumerScope(), async (req, res) => {
+    app.get("/api/user-conversations/id/:conversationId/messages", guard, async (req, res) => {
         try {
             const uid = req.consumerAuth.uid;
             const conv = getUserConversationById(uid, req.params.conversationId);
             const data = await getCompanyConversationForUser(uid, conv.companyId, profileFromReq(req));
             res.json({
-                conversation: data.conversation,
+                conversation: await attachSnId(data.conversation),
                 messages: data.messages,
             });
         } catch (err) {
