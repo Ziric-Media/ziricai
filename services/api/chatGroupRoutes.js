@@ -13,6 +13,7 @@ import {
     invitePersonalSarahToGroup,
 } from "../users/groupConversationService.js";
 import { isValidPersonId } from "../users/identityContracts.js";
+import { hydrateFederatedChatIndex } from "../users/chatConversationIndexService.js";
 
 const chatRateLimit = authRateLimit("auth");
 
@@ -22,6 +23,7 @@ const chatRateLimit = authRateLimit("auth");
 export function mountChatGroupRoutes(app) {
     app.get("/api/group-conversations", requireConsumerScope(), async (req, res) => {
         try {
+            await hydrateFederatedChatIndex(req.consumerAuth.uid); // restart-safe (no-op in memory mode)
             res.json({ conversations: listGroupConversations(req.consumerAuth.uid) });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to list groups" });
@@ -39,6 +41,7 @@ export function mountChatGroupRoutes(app) {
 
     app.get("/api/group-conversations/:groupId/messages", requireConsumerScope(), async (req, res) => {
         try {
+            await hydrateFederatedChatIndex(req.consumerAuth.uid); // restart-safe (no-op in memory mode)
             const conv = getGroupConversation(req.consumerAuth.uid, req.params.groupId);
             res.json({ conversation: conv, messages: getGroupMessages(conv.id) });
         } catch (err) {
@@ -52,6 +55,7 @@ export function mountChatGroupRoutes(app) {
         chatRateLimit,
         async (req, res) => {
             try {
+                await hydrateFederatedChatIndex(req.consumerAuth.uid);
                 const result = await sendGroupMessage(
                     req.consumerAuth.uid,
                     req.params.groupId,

@@ -61,3 +61,4 @@ These are in the master spec but intentionally **not** covered by milestones 01b
 | 2026-11-08 | 06, 07, 08, 09 done; 10 done (trust reports and moderation queue). |
 | 2026-11-08 | 11 partial (snId on chat and handover payloads); 12 done (`test:snet-programme`). |
 | 2026-11-08 | Close-out: 03 (Company Portal Sarah Network section), 04 (evidence refs, request-info, MC modal) and 11 (Sarah App Follow/Subscribe via connections API, snId on chat state) → done with residual gaps listed; Discover and directory search are now a public, rate-limited read of listed entries. |
+| 2026-11-08 | Backlog gates started: see [SNET_BACKLOG_GATES.md](./SNET_BACKLOG_GATES.md). Gate 1 (chat durability) done: the SNET-08 gap "P2P and group threads are not rehydrated" is closed.

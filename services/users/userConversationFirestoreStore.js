@@ -46,6 +46,11 @@ function normalizeConversation(docId, raw) {
     // SNET-08: network-linked (ai_to_ai) threads carry their request link so the index can rebuild after a restart.
     if (raw.networkRequestId) base.networkRequestId = raw.networkRequestId;
     if (raw.networkConsentScope) base.networkConsentScope = raw.networkConsentScope;
+    // Gate 1: P2P / group threads carry their own display fields; keep them so the index can rebuild after a restart.
+    for (const key of ["peerPersonId", "peerDisplayName", "title", "ownerId", "organisationId"]) {
+        if (raw[key]) base[key] = raw[key];
+    }
+    if (raw.orgConsentGranted) base.orgConsentGranted = true;
     return ensureConversationMessagingFoundation(base);
 }
 
@@ -64,6 +69,7 @@ function normalizeMessage(docId, raw) {
         createdAt: raw.createdAt || new Date().toISOString(),
         tenantMessageId: raw.tenantMessageId ?? null,
         authorParticipantId: raw.authorParticipantId ?? null,
+        attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
     };
 }
 
@@ -98,6 +104,16 @@ export async function upsertConversation(conv) {
         companySarahAgentId: enriched.companySarahAgentId ?? null,
         networkRequestId: enriched.networkRequestId ?? null,
         networkConsentScope: enriched.networkConsentScope ?? null,
+        peerPersonId: enriched.peerPersonId ?? null,
+        peerDisplayName: enriched.peerDisplayName ?? null,
+        title: enriched.title ?? null,
+        ownerId: enriched.ownerId ?? null,
+        organisationId: enriched.organisationId ?? null,
+        orgConsentGranted: enriched.orgConsentGranted ?? null,
+        // Lets non-creator members (P2P peer, group members) find the thread with a single array-contains query.
+        participantPersonIds: (enriched.participants || [])
+            .filter((p) => p?.kind === "person" && p.id)
+            .map((p) => String(p.id)),
     };
     await setDoc(userConversationRef(conv.id), payload, { merge: true });
 }
@@ -141,6 +157,23 @@ export async function listConversationsByUserId(userId) {
 }
 
 /**
+ * Gate 1: threads where `personId` is a person participant (P2P peers, group members), regardless of who created it.
+ * Threads written before this field existed are only found via {@link listConversationsByUserId} (creator).
+ * Single-field array-contains: no composite index needed; sorted in memory.
+ * @param {string} personId
+ */
+export async function listConversationsByParticipant(personId) {
+    if (!firestoreUserConversationStoreEnabled() || !personId) return [];
+    const col = userConversationsCollectionRef();
+    const q = query(col, queryWhere("participantPersonIds", "array-contains", personId));
+    const snap = await getDocs(q);
+    return snap.docs
+        .map((d) => normalizeConversation(d.id, d.data()))
+        .filter(Boolean)
+        .sort((a, b) => String(b.lastMessageAt).localeCompare(String(a.lastMessageAt)));
+}
+
+/**
  * @param {string} conversationId
  * @param {object} message
  * @param {object} [conversationPatch]
@@ -156,6 +189,8 @@ export async function upsertMessage(conversationId, message, conversationPatch =
         createdAt: message.createdAt || new Date().toISOString(),
         tenantMessageId: message.tenantMessageId ?? null,
         authorParticipantId: message.authorParticipantId ?? null,
+        // Gate 1: attachment metadata (media refs) must survive a restart; it was previously dropped on write.
+        attachments: Array.isArray(message.attachments) ? message.attachments : [],
     };
     await setDoc(userConversationMessageRef(conversationId, message.id), msgPayload, { merge: true });
 

@@ -4,6 +4,7 @@
 import { requireConsumerScope } from "../auth/consumerAuth.js";
 import { authRateLimit } from "../auth/authRateLimiter.js";
 import { isValidPersonId } from "../users/identityContracts.js";
+import { hydrateFederatedChatIndex } from "../users/chatConversationIndexService.js";
 import {
     openPersonToPersonConversation,
     listPersonToPersonConversations,
@@ -30,6 +31,7 @@ function profileFromReq(req) {
 export function mountChatPersonRoutes(app) {
     app.get("/api/person-conversations", requireConsumerScope(), async (req, res) => {
         try {
+            await hydrateFederatedChatIndex(req.consumerAuth.uid); // restart-safe (no-op in memory mode)
             const conversations = listPersonToPersonConversations(req.consumerAuth.uid);
             res.json({ conversations });
         } catch (err) {
@@ -44,6 +46,7 @@ export function mountChatPersonRoutes(app) {
                 return res.status(400).json({ error: "targetPersonId is required", code: "TARGET_REQUIRED" });
             }
             const profile = profileFromReq(req);
+            await hydrateFederatedChatIndex(req.consumerAuth.uid);
             const conversation = await openPersonToPersonConversation(req.consumerAuth.uid, targetPersonId, {
                 selfDisplayName: profile.displayName || profile.preferredName || null,
                 peerDisplayName: req.body?.peerDisplayName || null,
@@ -59,6 +62,7 @@ export function mountChatPersonRoutes(app) {
 
     app.get("/api/person-conversations/:conversationId/messages", requireConsumerScope(), async (req, res) => {
         try {
+            await hydrateFederatedChatIndex(req.consumerAuth.uid); // restart-safe (no-op in memory mode)
             const conv = getPersonToPersonConversation(req.consumerAuth.uid, req.params.conversationId);
             const messages = getPersonToPersonMessages(conv.id);
             res.json({ conversation: conv, messages });
@@ -76,6 +80,7 @@ export function mountChatPersonRoutes(app) {
         chatRateLimit,
         async (req, res) => {
             try {
+                await hydrateFederatedChatIndex(req.consumerAuth.uid);
                 const result = await sendPersonToPersonMessage(
                     req.consumerAuth.uid,
                     req.params.conversationId,

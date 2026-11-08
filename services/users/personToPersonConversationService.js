@@ -105,6 +105,19 @@ export async function openPersonToPersonConversation(userId, targetPersonId, met
     return conv;
 }
 
+/**
+ * Gate 1: seed the process cache from the durable store (restart recovery). Never overwrites live state.
+ * @returns {boolean} true when added
+ */
+export function seedPersonToPersonFromStore(conv, messages = []) {
+    if (!conv?.id || conv.type !== CONVERSATION_TYPES.PERSON_TO_PERSON || !conv.participants?.length) return false;
+    if (conversations.has(conv.id)) return false;
+    conversations.set(conv.id, conv);
+    messagesByConversation.set(conv.id, Array.isArray(messages) ? messages : []);
+    registerForParticipants(conv);
+    return true;
+}
+
 export function listPersonToPersonConversations(userId) {
     const personId = personIdFromUserId(userId);
     const ids = indexByPerson.get(personId) || [];

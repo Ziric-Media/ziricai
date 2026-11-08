@@ -2,10 +2,10 @@
  * CH4 — Federated consumer Chat index (business, P2P, groups, network threads).
  */
 import { listUserConversations, getUserConversationByCompany, seedUserConversationFromStore } from "./userConversationService.js";
-import { listPersonToPersonConversations } from "./personToPersonConversationService.js";
-import { listGroupConversations } from "./groupConversationService.js";
+import { listPersonToPersonConversations, seedPersonToPersonFromStore } from "./personToPersonConversationService.js";
+import { listGroupConversations, seedGroupFromStore } from "./groupConversationService.js";
 import { listNetworkLinkedConversations, seedNetworkConversationFromStore } from "./sarahNetworkChatLinkService.js";
-import { listConversationsByUserId, listMessages } from "./userConversationFirestoreStore.js";
+import { listConversationsByUserId, listConversationsByParticipant, listMessages } from "./userConversationFirestoreStore.js";
 import { useAdminBackend } from "../database/firestoreClient.js";
 import { CONVERSATION_TYPES } from "./messagingContracts.js";
 
@@ -84,9 +84,10 @@ function hydrationEnabled() {
  * replica (the services are process caches over `userConversations`). Never overwrites live in-process state.
  * Only runs when USER_CONVERSATIONS_BACKEND is dual|firestore and Firebase Admin is available; otherwise a no-op.
  *
- * Scope: person_to_business and ai_to_ai threads. P2P and group threads keep their own stores (not rehydrated here).
+ * Scope: person_to_business, ai_to_ai, person_to_person and group threads (Gate 1). Threads are found by creator
+ * (`userId`) and by participant (`participantPersonIds`); P2P/group threads written before Gate 1 are only found by creator.
  * @param {string} userId
- * @param {{ enabled?: boolean, force?: boolean, store?: { listConversationsByUserId: Function, listMessages: Function } }} [deps] test seams
+ * @param {{ enabled?: boolean, force?: boolean, store?: { listConversationsByUserId: Function, listConversationsByParticipant?: Function, listMessages: Function } }} [deps] test seams
  * @returns {Promise<{ hydrated: number, skipped?: string, error?: string }>}
  */
 export async function hydrateFederatedChatIndex(userId, deps = {}) {
@@ -95,10 +96,21 @@ export async function hydrateFederatedChatIndex(userId, deps = {}) {
     const last = lastHydratedAt.get(userId);
     if (!deps.force && last && Date.now() - last < HYDRATE_TTL_MS) return { hydrated: 0, skipped: "fresh" };
 
-    const store = deps.store || { listConversationsByUserId, listMessages };
+    const store = deps.store || { listConversationsByUserId, listConversationsByParticipant, listMessages };
     let stored;
     try {
         stored = await store.listConversationsByUserId(userId);
+        if (typeof store.listConversationsByParticipant === "function") {
+            // Participant lookup is additive: a failure must not hide the creator's own threads.
+            const asParticipant = await store.listConversationsByParticipant(userId).catch((err) => {
+                console.warn("[chatConversationIndex] participant lookup failed:", err.message);
+                return [];
+            });
+            const seen = new Set(stored.map((c) => c.id));
+            stored = [...stored, ...asParticipant.filter((c) => !seen.has(c.id))].sort((a, b) =>
+                String(b.lastMessageAt).localeCompare(String(a.lastMessageAt))
+            );
+        }
     } catch (err) {
         console.warn("[chatConversationIndex] hydrate failed:", err.message);
         return { hydrated: 0, error: err.message };
@@ -118,6 +130,15 @@ export async function hydrateFederatedChatIndex(userId, deps = {}) {
                 if (!withLink.networkRequestId) continue;
                 const messages = await store.listMessages(conv.id);
                 if (seedNetworkConversationFromStore(withLink, messages)) hydrated += 1;
+            } else if (conv.type === CONVERSATION_TYPES.PERSON_TO_PERSON) {
+                if (listPersonToPersonConversations(userId).some((c) => c.id === conv.id)) continue;
+                if (seedPersonToPersonFromStore(conv, await store.listMessages(conv.id))) hydrated += 1;
+            } else if (
+                conv.type === CONVERSATION_TYPES.GROUP_PERSONAL ||
+                conv.type === CONVERSATION_TYPES.GROUP_ORGANISATION
+            ) {
+                if (listGroupConversations(userId).some((c) => c.id === conv.id)) continue;
+                if (seedGroupFromStore(conv, await store.listMessages(conv.id))) hydrated += 1;
             } else if (conv.type === CONVERSATION_TYPES.PERSON_TO_BUSINESS || !conv.type) {
                 if (getUserConversationByCompany(userId, conv.companyId)) continue;
                 const messages = await store.listMessages(conv.id);

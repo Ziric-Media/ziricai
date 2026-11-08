@@ -209,6 +209,21 @@ export async function createOrganisationGroup(userId, input = {}) {
     return conv;
 }
 
+/**
+ * Gate 1: seed the process cache from the durable store (restart recovery). Never overwrites live state.
+ * @returns {boolean} true when added
+ */
+export function seedGroupFromStore(conv, messages = []) {
+    const isGroup =
+        conv?.type === CONVERSATION_TYPES.GROUP_PERSONAL || conv?.type === CONVERSATION_TYPES.GROUP_ORGANISATION;
+    if (!conv?.id || !isGroup || !conv.participants?.length) return false;
+    if (conversations.has(conv.id)) return false;
+    conversations.set(conv.id, { ownerId: conv.userId, ...conv });
+    messagesByConversation.set(conv.id, Array.isArray(messages) ? messages : []);
+    registerMembers(conv);
+    return true;
+}
+
 export function listGroupConversations(userId) {
     const personId = personIdFromUserId(userId);
     const ids = indexByPerson.get(personId) || [];
