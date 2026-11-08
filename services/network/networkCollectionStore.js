@@ -53,6 +53,10 @@ function matches(doc, filters) {
 export function createNetworkCollection(name) {
     return {
         name,
+        /** Tests only: empty the in-memory adapter (no-op against Firestore). */
+        clearMemory() {
+            memory.delete(name);
+        },
         /** @param {string} id */
         async get(id) {
             if (!id) return null;
@@ -70,7 +74,8 @@ export function createNetworkCollection(name) {
          */
         async put(id, data, { merge = true } = {}) {
             if (useAdminBackend()) {
-                await setDoc(networkDocRef(name, id), data, { merge });
+                // JSON round-trip drops `undefined` (Firestore rejects it) and detaches from caller objects.
+                await setDoc(networkDocRef(name, id), JSON.parse(JSON.stringify(data)), { merge });
                 return;
             }
             const col = memCol(name);

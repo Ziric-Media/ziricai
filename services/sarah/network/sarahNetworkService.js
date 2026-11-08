@@ -2,7 +2,7 @@
  * Sarah Network orchestration (U4).
  */
 import { assertCompanyDiscoverableAsync } from "../../users/businessDirectoryService.js";
-import { validateConsentGrant } from "../../users/consentGrantService.js";
+import { validateConsentGrantAsync } from "../../users/consentGrantService.js";
 import { auditLog } from "../../audit/auditLog.js";
 import {
     createNetworkRequest,
@@ -11,9 +11,14 @@ import {
     failNetworkRequest,
     listNetworkRequestsForUser,
     getNetworkAudit,
+    getNetworkRequestAsync,
+    getNetworkAuditAsync,
+    listNetworkRequestsForUserAsync,
 } from "./sarahNetworkStore.js";
 import { dispatchCompanyReception } from "./dispatchCompanyReception.js";
 import { ensureNetworkChatThread } from "../../users/sarahNetworkChatLinkService.js";
+import { NETWORK_COLLECTIONS } from "../../database/schema.js";
+import { createNetworkCollection } from "../../network/networkCollectionStore.js";
 
 const RATE_WINDOW_MS = 60 * 60 * 1000;
 const RATE_MAX_PER_USER = Number(process.env.SARAH_NETWORK_RATE_PER_HOUR) || 30;
@@ -21,7 +26,14 @@ const RATE_MAX_PER_USER = Number(process.env.SARAH_NETWORK_RATE_PER_HOUR) || 30;
 /** @type {Map<string, number[]>} */
 const rateEvents = new Map();
 
-function assertRateLimit(uid) {
+const rateCol = createNetworkCollection(NETWORK_COLLECTIONS.RATE_EVENTS);
+
+/**
+ * Per-user hourly limit. In-process sliding window (cheap, exact on one instance) plus a durable fixed-window
+ * counter (networkRateEvents/{uid}__{hour}) so limits hold across restarts / replicas. The durable counter is a
+ * read-then-write (not a transaction): under heavy concurrency it may under-count slightly; it is a guard rail, not billing.
+ */
+async function assertRateLimit(uid) {
     const now = Date.now();
     const events = (rateEvents.get(uid) || []).filter((t) => now - t < RATE_WINDOW_MS);
     if (events.length >= RATE_MAX_PER_USER) {
@@ -30,8 +42,19 @@ function assertRateLimit(uid) {
             code: "RATE_LIMITED",
         });
     }
+    const bucket = Math.floor(now / RATE_WINDOW_MS);
+    const rateId = `${uid}__${bucket}`;
+    const durable = await rateCol.get(rateId);
+    const used = Number(durable?.count || 0);
+    if (used >= RATE_MAX_PER_USER) {
+        throw Object.assign(new Error("Too many Sarah Network requests. Please try again later."), {
+            status: 429,
+            code: "RATE_LIMITED",
+        });
+    }
     events.push(now);
     rateEvents.set(uid, events);
+    await rateCol.put(rateId, { uid, bucket, count: used + 1, updatedAt: new Date(now).toISOString() }, { merge: false });
 }
 
 /**
@@ -39,7 +62,7 @@ function assertRateLimit(uid) {
  * @param {object} input
  */
 export async function submitPersonalToCompanyEnquiry(uid, input) {
-    assertRateLimit(uid);
+    await assertRateLimit(uid);
     const companyId = String(input.companyId || "").trim();
     if (!companyId) {
         throw Object.assign(new Error("companyId is required."), { status: 400, code: "COMPANY_ID_REQUIRED" });
@@ -54,7 +77,7 @@ export async function submitPersonalToCompanyEnquiry(uid, input) {
             code: "GRANT_REQUIRED",
         });
     }
-    validateConsentGrant(uid, grantId, { companyId });
+    await validateConsentGrantAsync(uid, grantId, { companyId });
 
     const requestDoc = createNetworkRequest({
         interactionType: input.interactionType || "business_information",
@@ -99,21 +122,37 @@ export async function submitPersonalToCompanyEnquiry(uid, input) {
     }
 }
 
-export function getSarahNetworkRequest(requestId, uid) {
-    const doc = getNetworkRequest(requestId);
+function assertOwnRequest(doc, uid) {
     if (!doc) {
         throw Object.assign(new Error("Network request not found."), { status: 404, code: "REQUEST_NOT_FOUND" });
     }
     if (doc.source?.userId !== uid) {
         throw Object.assign(new Error("Forbidden."), { status: 403, code: "REQUEST_FORBIDDEN" });
     }
+}
+
+export function getSarahNetworkRequest(requestId, uid) {
+    const doc = getNetworkRequest(requestId);
+    assertOwnRequest(doc, uid);
     return { request: doc, audit: getNetworkAudit(requestId) };
+}
+
+/** Read-through variant (cold start / other replica). */
+export async function getSarahNetworkRequestAsync(requestId, uid) {
+    const doc = await getNetworkRequestAsync(requestId);
+    assertOwnRequest(doc, uid);
+    return { request: doc, audit: await getNetworkAuditAsync(requestId) };
 }
 
 export function listSarahNetworkRequests(uid) {
     return listNetworkRequestsForUser(uid);
 }
 
+export async function listSarahNetworkRequestsAsync(uid) {
+    return listNetworkRequestsForUserAsync(uid);
+}
+
 export function resetSarahNetworkRateLimitsForTests() {
     rateEvents.clear();
+    rateCol.clearMemory();
 }
