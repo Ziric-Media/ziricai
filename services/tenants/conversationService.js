@@ -24,6 +24,7 @@ import { buildSlimInboxContext } from "../conversation/inboxContext.js";
 
 const CHANNEL_LABELS = {
     whatsapp: "WhatsApp",
+    sarah_app: "Sarah App · Sarah Inbox",
     facebook: "Facebook",
     instagram: "Instagram",
     telegram: "Telegram",
