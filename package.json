@@ -19,6 +19,8 @@
         "tunnel": "npx --yes ngrok http 3000",
         "migrate:tenants": "node scripts/migrate-demo-to-tenants.js",
         "migrate:tenants:dry": "node scripts/migrate-demo-to-tenants.js --dry-run",
+        "backfill:user-conversations": "node scripts/backfill-user-conversations-from-tenant.mjs",
+        "backfill:user-conversations:dry": "node scripts/backfill-user-conversations-from-tenant.mjs --dry-run",
         "verify:sprint1": "node scripts/verify-sprint1-flow.js",
         "verify:journey": "node scripts/verify-customer-journey.js",
         "verify:firestore": "node scripts/verify-firestore.js",

@@ -238,3 +238,22 @@ export function clearUserConversationsForTests() {
     conversations.clear();
     messagesByConversation.clear();
 }
+
+/**
+ * Snapshot in-memory U5 index for C1 backfill (same-process or JSON file).
+ * @returns {{ version: number, exportedAt: string, conversations: object[], messagesByConversationId: Record<string, object[]> }}
+ */
+export function exportInMemoryUserConversationsSnapshot() {
+    const list = [...conversations.values()];
+    /** @type {Record<string, object[]>} */
+    const messagesByConversationId = {};
+    for (const conv of list) {
+        messagesByConversationId[conv.id] = [...(messagesByConversation.get(conv.id) || [])];
+    }
+    return {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        conversations: list.map((c) => ({ ...c })),
+        messagesByConversationId,
+    };
+}
