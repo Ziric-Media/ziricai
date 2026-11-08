@@ -413,3 +413,18 @@ export async function decideNetworkVerification(caseId, body) {
     silent: true,
   });
 }
+
+export async function fetchNetworkModeration(status = '') {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request(`/api/platform/network/v1/moderation${qs}`, { silent: true });
+}
+
+/** body: { action: 'start_review' | 'dismiss' | 'suspend_entity', note? } */
+export async function decideNetworkModeration(caseId, body) {
+  return request(`/api/platform/network/v1/moderation/${encodeURIComponent(caseId)}/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    silent: true,
+  });
+}

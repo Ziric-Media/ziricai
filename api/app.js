@@ -243,6 +243,7 @@ import { mountNetworkSearchRoutes } from "../services/api/networkSearchRoutes.js
 import { mountNetworkAgentRoutes } from "../services/api/networkAgentRoutes.js";
 import { mountNetworkConnectionRoutes } from "../services/api/networkConnectionRoutes.js";
 import { mountNetworkPlatformRoutes } from "../services/api/networkPlatformRoutes.js";
+import { mountNetworkTrustRoutes } from "../services/api/networkTrustRoutes.js";
 import { mountUserConversationRoutes } from "../services/api/userConversationRoutes.js";
 import { mountChatPersonRoutes } from "../services/api/chatPersonRoutes.js";
 import { mountChatGroupRoutes } from "../services/api/chatGroupRoutes.js";
@@ -2738,6 +2739,7 @@ mountNetworkSearchRoutes(app);
 mountNetworkAgentRoutes(app);
 mountNetworkConnectionRoutes(app);
 mountNetworkPlatformRoutes(app);
+mountNetworkTrustRoutes(app);
 mountUserConversationRoutes(app);
 mountChatPersonRoutes(app);
 mountChatGroupRoutes(app);

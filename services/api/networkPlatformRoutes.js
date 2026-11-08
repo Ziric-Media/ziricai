@@ -7,6 +7,7 @@
  * Verification queue lives in networkVerificationRoutes (SNET-04); moderation in networkTrustRoutes (SNET-10).
  */
 import { requirePlatformAccess } from "../auth/platformAuth.js";
+import { getModerationStats } from "../network/moderationService.js";
 import {
     changeEntityStatus,
     getEntityForPlatform,
@@ -34,7 +35,7 @@ export function mountNetworkPlatformRoutes(app, deps = {}) {
 
     app.get("/api/platform/network/v1/stats", platformGuard, async (_req, res) => {
         try {
-            res.json({ ok: true, data: await getNetworkStats() });
+            res.json({ ok: true, data: { ...(await getNetworkStats()), moderation: await getModerationStats() } });
         } catch (err) {
             fail(res, err, "NETWORK_STATS_FAILED");
         }

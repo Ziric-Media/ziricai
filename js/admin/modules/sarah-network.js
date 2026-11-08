@@ -6,9 +6,11 @@
 import { escapeHtml, formatDate, formatNumber, pageHeader, showToast, statusBadge } from '../ui.js';
 import {
   changeNetworkEntityStatus,
+  decideNetworkModeration,
   decideNetworkVerification,
   fetchNetworkEntities,
   fetchNetworkEntity,
+  fetchNetworkModeration,
   fetchNetworkStats,
   fetchNetworkVerificationQueue,
 } from '../api.js';
@@ -17,11 +19,13 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'entities', label: 'Entities' },
   { id: 'verification', label: 'Verification queue' },
+  { id: 'moderation', label: 'Moderation' },
 ];
 
 let activeTab = 'overview';
 let entityFilters = { q: '', status: '' };
 let verificationFilter = 'submitted';
+let moderationFilter = 'open';
 
 function errText(res) {
   const e = res?.error;
@@ -66,6 +70,7 @@ async function overviewHtml() {
       ${kpi('Suspended', formatNumber(s.entities.byStatus?.suspended || 0))}
       ${kpi('Verified', formatNumber(verified))}
       ${kpi('Open verification cases', formatNumber(s.verification.openCases))}
+      ${kpi('Open moderation cases', formatNumber(s.moderation?.open || 0), `${formatNumber(s.moderation?.total || 0)} reports total`)}
       ${kpi('Company Sarah agents', formatNumber(s.agents.active), `${formatNumber(s.agents.total)} registered`)}
       ${kpi('Relationships', formatNumber(s.connections?.total || 0), s.connections?.truncated ? 'capped scan' : '')}
       ${kpi('Searches (since restart)', formatNumber(s.search.total), `${formatNumber(s.search.zeroResults)} with no results`)}
@@ -169,6 +174,50 @@ async function verificationHtml() {
     </div>`;
 }
 
+/* ---------- Moderation queue (stub: list + decisions via prompts) ---------- */
+async function moderationHtml() {
+  const res = await fetchNetworkModeration(moderationFilter);
+  if (res.error) return errorBlock(errText(res));
+  const { cases = [] } = body(res) || {};
+  const rows = cases
+    .map((c) => {
+      const actions = [];
+      if (c.status === 'open') actions.push(['start_review', 'Start review']);
+      if (c.status === 'open' || c.status === 'reviewing') actions.push(['dismiss', 'Dismiss'], ['suspend_entity', 'Suspend entity']);
+      return `
+      <tr>
+        <td><strong>${escapeHtml(String(c.reason || '').replace(/_/g, ' '))}</strong>${
+          c.priority === 'high' ? ' <span class="status-badge suspended">high priority</span>' : ''
+        }<span class="panel-hint">${escapeHtml(c.details || 'No details')}</span></td>
+        <td><span class="panel-hint">${escapeHtml(c.snId)}</span>${formatNumber(c.openReportsForEntity || 0)} open report(s)</td>
+        <td>${escapeHtml(c.status)}</td>
+        <td>${escapeHtml(formatDate(c.createdAt))}<span class="panel-hint">reporter ${escapeHtml(c.reporterRef)}</span></td>
+        <td>${actions
+          .map(
+            ([a, label]) =>
+              `<button type="button" class="btn btn-secondary btn-sm" data-snet-moderate="${a}" data-case-id="${escapeHtml(c.caseId)}">${escapeHtml(label)}</button>`
+          )
+          .join(' ')}</td>
+      </tr>`;
+    })
+    .join('');
+  return `
+    <div class="table-container">
+      <div class="table-toolbar">
+        <div class="panel-hint">Reports about entities. Reporters are pseudonymous. Humans decide — reports never auto-suspend.</div>
+        <select id="snetModerationStatus">
+          ${['open', 'reviewing', 'actioned', 'dismissed', '']
+            .map((v) => `<option value="${v}" ${moderationFilter === v ? 'selected' : ''}>${v || 'All'}</option>`)
+            .join('')}
+        </select>
+      </div>
+      <table class="org-table">
+        <thead><tr><th>Report</th><th>Entity</th><th>Status</th><th>Received</th><th>Decision</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" class="panel-hint">No reports in this view.</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
+
 function errorBlock(message) {
   return `<div class="profile-card" style="border-color:var(--danger);"><strong>Unable to load</strong><div class="panel-hint">${escapeHtml(message)}</div></div>`;
 }
@@ -180,7 +229,13 @@ async function paint(container) {
   host.innerHTML = '<div class="panel-hint">Loading…</div>';
   try {
     host.innerHTML =
-      activeTab === 'entities' ? await entitiesHtml() : activeTab === 'verification' ? await verificationHtml() : await overviewHtml();
+      activeTab === 'entities'
+        ? await entitiesHtml()
+        : activeTab === 'verification'
+          ? await verificationHtml()
+          : activeTab === 'moderation'
+            ? await moderationHtml()
+            : await overviewHtml();
   } catch (err) {
     host.innerHTML = errorBlock(err?.message || 'Failed to load.');
   }
@@ -219,6 +274,30 @@ function bind(container) {
       paint(container);
     };
   }
+
+  const ms = container.querySelector('#snetModerationStatus');
+  if (ms) {
+    ms.onchange = () => {
+      moderationFilter = ms.value;
+      paint(container);
+    };
+  }
+
+  container.querySelectorAll('[data-snet-moderate]').forEach((btn) => {
+    btn.onclick = async () => {
+      const action = btn.dataset.snetModerate;
+      const payload = { action };
+      if (action !== 'start_review') {
+        const note = window.prompt(`Decision note for "${action.replace(/_/g, ' ')}" (required, audited):`);
+        if (note === null) return;
+        payload.note = note;
+      }
+      const res = await decideNetworkModeration(btn.dataset.caseId, payload);
+      if (res.error) return showToast(errText(res), 'error');
+      showToast(`Report updated: ${action.replace(/_/g, ' ')}`, 'success');
+      paint(container);
+    };
+  });
 
   container.querySelectorAll('[data-snet-status]').forEach((btn) => {
     btn.onclick = async () => {

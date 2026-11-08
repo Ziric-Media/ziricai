@@ -207,6 +207,13 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/platform/network/v1/entities/:snId", domain: "platform", tenantScoped: false, description: "Entity detail + audit trail" },
     { method: "POST", path: "/api/platform/network/v1/entities/:snId/status", domain: "platform", tenantScoped: false, description: "Suspend / reinstate entity (reason required, audited)" },
 
+    // SNET-10 — Trust & safety
+    { method: "POST", path: "/api/network/v1/entities/:snId/report", domain: "consumer", tenantScoped: false, description: "Report a listed entity (rate-limited, deduped)" },
+    { method: "GET", path: "/api/network/v1/reports", domain: "consumer", tenantScoped: false, description: "My reports (status only)" },
+    { method: "GET", path: "/api/platform/network/v1/moderation", domain: "platform", tenantScoped: false, description: "Moderation queue (priority-ordered)" },
+    { method: "GET", path: "/api/platform/network/v1/moderation/:caseId", domain: "platform", tenantScoped: false, description: "Moderation case" },
+    { method: "POST", path: "/api/platform/network/v1/moderation/:caseId/decision", domain: "platform", tenantScoped: false, description: "start_review | dismiss | suspend_entity (audited)" },
+
     // SNET-05 — Search
     { method: "GET", path: "/api/network/v1/directory/search", domain: "consumer", tenantScoped: false, description: "Ranked directory search (q, category, verified, cursor)" },
     { method: "GET", path: "/api/network/v1/directory/suggest", domain: "consumer", tenantScoped: false, description: "Search autocomplete" },
