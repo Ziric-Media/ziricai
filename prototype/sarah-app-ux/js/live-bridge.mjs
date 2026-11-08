@@ -1,0 +1,466 @@
+/**
+ * Connects UX prototype My Sarah to U1/U2 consumer APIs (Firebase auth + Personal Sarah chat).
+ */
+import { initializeApp } from 'firebase/app';
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+} from 'firebase/auth';
+
+const POPIA_CONSENT_VERSION = 'sarah-u1-2026-11-04';
+const SESSION_STORAGE_KEY = 'sarah.app.personalSarah.sessionId';
+const LEGACY_SESSION_STORAGE_KEY = 'sarah.prototype.personalSarah.sessionId';
+
+/** @typedef {'connecting'|'connected'|'offline'|'auth_required'|'error'} SarahConnectionState */
+
+function cfg() {
+  return window.__ZIRICAI_CONFIG__ || {};
+}
+
+function firebaseConfig() {
+  const fb = cfg().firebase;
+  if (!fb || !fb.apiKey || String(fb.apiKey).includes('your_firebase')) return null;
+  return fb;
+}
+
+export function isLiveEnabled() {
+  if (cfg().prototypeLive === false) return false;
+  if (typeof location !== 'undefined' && location.protocol === 'file:') return false;
+  return Boolean(firebaseConfig());
+}
+
+function resolveApiBase() {
+  const c = cfg();
+  if (c.apiBase !== undefined && c.apiBase !== null) return c.apiBase;
+  if (c.sites?.api) return c.sites.api;
+  return 'https://ziricai-production.up.railway.app';
+}
+
+let auth = null;
+let signedInUser = null;
+let consumerProfile = null;
+let authReady = false;
+/** @type {SarahConnectionState} */
+let connectionState = 'connecting';
+let lastHealthError = '';
+
+async function withAuthHeaders(options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (auth) {
+    await auth.authStateReady();
+    const user = auth.currentUser;
+    if (user) {
+      const token = await user.getIdToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return { ...options, headers };
+}
+
+async function apiRequest(path, options = {}) {
+  const { silent = false, ...fetchOptions } = options;
+  try {
+    const finalOptions = await withAuthHeaders(fetchOptions);
+    const res = await fetch(`${resolveApiBase()}${path}`, finalOptions);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        error: data.error || `Request failed (${res.status})`,
+        code: data.code,
+        status: res.status,
+        data,
+      };
+    }
+    return { data, status: res.status };
+  } catch (err) {
+    const message = err.message || 'Network error';
+    if (!silent) console.warn('[SarahLive]', message);
+    return { error: message };
+  }
+}
+
+function readSessionId() {
+  try {
+    let id = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!id) {
+      id = localStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
+      if (id) {
+        localStorage.setItem(SESSION_STORAGE_KEY, id);
+        localStorage.removeItem(LEGACY_SESSION_STORAGE_KEY);
+      }
+    }
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+function persistSessionId(id) {
+  try {
+    if (id) localStorage.setItem(SESSION_STORAGE_KEY, id);
+    else localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+const connectionListeners = new Set();
+
+function setConnectionState(next, detail = '') {
+  connectionState = next;
+  lastHealthError = detail || '';
+  connectionListeners.forEach((fn) => {
+    try {
+      fn(connectionState, detail);
+    } catch (e) {
+      console.warn('[SarahLive] connection listener', e);
+    }
+  });
+}
+
+export function getConnectionState() {
+  return connectionState;
+}
+
+export function onConnectionChange(fn) {
+  connectionListeners.add(fn);
+  fn(connectionState, lastHealthError);
+  return () => connectionListeners.delete(fn);
+}
+
+export async function checkApiHealth() {
+  if (!isLiveEnabled()) {
+    setConnectionState('offline', 'Live mode unavailable');
+    return { ok: false, state: connectionState };
+  }
+  setConnectionState('connecting');
+  const res = await apiRequest('/api/health', { silent: true });
+  if (res.error) {
+    setConnectionState('offline', res.error);
+    return { ok: false, state: connectionState, error: res.error };
+  }
+  const status = res.data?.status;
+  if (status && status !== 'ok' && status !== 'starting') {
+    setConnectionState('error', `API status: ${status}`);
+    return { ok: false, state: connectionState, error: lastHealthError };
+  }
+  if (auth) {
+    try {
+      await auth.authStateReady();
+      if (auth.currentUser) signedInUser = auth.currentUser;
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!signedInUser) {
+    setConnectionState('auth_required');
+    return { ok: true, state: connectionState, authenticated: false };
+  }
+  setConnectionState('connected');
+  return { ok: true, state: connectionState, authenticated: true };
+}
+
+async function bootstrapConsumerProfile(extra = {}) {
+  return apiRequest('/api/users/bootstrap', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: signedInUser?.email,
+      popiaConsentVersion: POPIA_CONSENT_VERSION,
+      ...extra,
+    }),
+  });
+}
+
+async function fetchConsumerProfile() {
+  return apiRequest('/api/users/profile', { silent: true });
+}
+
+async function ensureConsumerProfile(extra = {}) {
+  let prof = await fetchConsumerProfile();
+  if (prof.error) {
+    const missingProfile =
+      prof.code === 'CONSUMER_PROFILE_REQUIRED' ||
+      (prof.status === 403 && /profile required|bootstrap/i.test(String(prof.error || '')));
+    if (prof.status === 401 || prof.code === 'UNAUTHORIZED') {
+      setConnectionState('auth_required', prof.error);
+      throw new Error(prof.error);
+    }
+    if (missingProfile || prof.status === 404) {
+      const boot = await bootstrapConsumerProfile(extra);
+      if (boot.error) throw new Error(boot.error);
+      prof = await fetchConsumerProfile();
+    } else if (prof.error) {
+      throw new Error(prof.error);
+    }
+  }
+  if (prof.error) throw new Error(prof.error);
+  consumerProfile = prof.data?.profile || prof.profile || consumerProfile;
+  return consumerProfile;
+}
+
+export function isSignedIn() {
+  return Boolean(signedInUser);
+}
+
+export function getConsumerProfile() {
+  return consumerProfile;
+}
+
+export function getSessionId() {
+  return readSessionId();
+}
+
+export async function fetchActiveSession() {
+  const res = await apiRequest('/api/personal-sarah/sessions/active', { silent: true });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  const session = res.data?.session;
+  if (!session) return { session: null };
+  if (session.id) persistSessionId(session.id);
+  return {
+    sessionId: session.id,
+    title: session.title,
+    messages: (session.messages || []).map((m) => ({
+      role: m.role,
+      content: m.content,
+    })),
+  };
+}
+
+export async function fetchPersonalSessions() {
+  const res = await apiRequest('/api/personal-sarah/sessions', { silent: true });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { sessions: res.data?.sessions || [] };
+}
+
+export async function createPersonalSession(options = {}) {
+  const res = await apiRequest('/api/personal-sarah/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: options.title || undefined }),
+  });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  const session = res.data?.session;
+  if (session?.id) persistSessionId(session.id);
+  return { session };
+}
+
+export async function fetchPersonalSession(sessionId) {
+  const id = String(sessionId || '').trim();
+  if (!id) return { error: 'Session id required' };
+  const res = await apiRequest(`/api/personal-sarah/sessions/${encodeURIComponent(id)}`, { silent: true });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  const session = res.data?.session;
+  if (session?.id) persistSessionId(session.id);
+  return { session };
+}
+
+export async function sendPersonalMessage(message, options = {}) {
+  const text = String(message || '').trim();
+  if (!text) return { error: 'Message is empty' };
+  if (!signedInUser) return { error: 'Sign in to chat with Personal Sarah', code: 'AUTH_REQUIRED' };
+  if (!consumerProfile) {
+    try {
+      await ensureConsumerProfile();
+    } catch (err) {
+      return { error: err.message || 'Could not set up your Sarah profile', code: 'CONSUMER_PROFILE_REQUIRED' };
+    }
+  }
+
+  const sessionId = options.sessionId ?? readSessionId();
+  const res = await apiRequest('/api/personal-sarah/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: text,
+      sessionId,
+      preferences: options.work ? { mode: 'work' } : null,
+    }),
+  });
+  if (res.error) {
+    if (res.status === 401 || res.code === 'UNAUTHORIZED') {
+      setConnectionState('auth_required', res.error);
+    } else if (res.status >= 500) {
+      setConnectionState('error', res.error);
+    }
+    const quota =
+      res.data?.code === 'CHAT_QUOTA_EXCEEDED' || res.code === 'CHAT_QUOTA_EXCEEDED'
+        ? { usage: res.data?.usage, limit: res.data?.limit, dayKey: res.data?.dayKey }
+        : res.data?.quota;
+    return { error: res.error, code: res.code || res.data?.code, status: res.status, quota };
+  }
+  const payload = res.data || {};
+  if (payload.sessionId) persistSessionId(payload.sessionId);
+  await checkApiHealth();
+  return {
+    reply: payload.reply || '…',
+    sessionId: payload.sessionId || sessionId,
+    mode: payload.mode,
+    quota: payload.quota,
+  };
+}
+
+function authErrorMessage(err) {
+  const code = err?.code || '';
+  const map = {
+    'auth/invalid-credential': 'Invalid email or password.',
+    'auth/user-not-found': 'No account with that email.',
+    'auth/email-already-in-use': 'Email already registered — sign in instead.',
+    'auth/weak-password': 'Password should be at least 6 characters.',
+  };
+  return map[code] || err?.message || 'Authentication failed';
+}
+
+export async function signIn(email, password) {
+  if (!auth) return { error: 'Live mode not available' };
+  try {
+    const cred = await signInWithEmailAndPassword(auth, String(email).trim(), password);
+    signedInUser = cred.user;
+    await ensureConsumerProfile();
+    await checkApiHealth();
+    return { user: cred.user, profile: consumerProfile };
+  } catch (err) {
+    return { error: authErrorMessage(err) };
+  }
+}
+
+export async function signUp({ email, password, firstName }) {
+  if (!auth) return { error: 'Live mode not available' };
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, String(email).trim(), password);
+    signedInUser = cred.user;
+    await ensureConsumerProfile({
+      firstName: firstName || undefined,
+      preferredName: firstName || undefined,
+    });
+    await checkApiHealth();
+    return { user: cred.user, profile: consumerProfile };
+  } catch (err) {
+    return { error: authErrorMessage(err) };
+  }
+}
+
+export async function signOutUser() {
+  if (auth) await signOut(auth);
+  signedInUser = null;
+  consumerProfile = null;
+  setConnectionState('auth_required');
+}
+
+export async function fetchChatConversations(filter = 'all') {
+  const qs = filter && filter !== 'all' ? `?filter=${encodeURIComponent(filter)}` : '';
+  return apiRequest(`/api/chat/conversations${qs}`);
+}
+
+export async function fetchCompanyMessages(companyId) {
+  return apiRequest(`/api/user-conversations/${encodeURIComponent(companyId)}/messages`);
+}
+
+export async function sendCompanyMessage(companyId, message) {
+  return apiRequest(`/api/user-conversations/${encodeURIComponent(companyId)}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+}
+
+const authListeners = new Set();
+
+export function onAuthChange(fn) {
+  authListeners.add(fn);
+  if (authReady) fn(signedInUser, consumerProfile);
+  return () => authListeners.delete(fn);
+}
+
+function notifyAuth() {
+  authListeners.forEach((fn) => {
+    try {
+      fn(signedInUser, consumerProfile);
+    } catch (e) {
+      console.warn('[SarahLive] auth listener', e);
+    }
+  });
+}
+
+function mountPublicApi() {
+  window.SarahLive = {
+    ready: true,
+    isLiveEnabled,
+    isSignedIn,
+    getConsumerProfile,
+    getSessionId,
+    fetchActiveSession,
+    fetchPersonalSessions,
+    createPersonalSession,
+    fetchPersonalSession,
+    sendPersonalMessage,
+    checkApiHealth,
+    getConnectionState,
+    onConnectionChange,
+    signIn,
+    signUp,
+    signOut: signOutUser,
+    onAuthChange,
+    resolveApiBase,
+    fetchChatConversations,
+    fetchCompanyMessages,
+    sendCompanyMessage,
+  };
+}
+
+function signalSarahLiveBoot(kind) {
+  if (window.__sarahLiveBootSignaled) return;
+  window.__sarahLiveBootSignaled = true;
+  window.dispatchEvent(new CustomEvent(kind));
+}
+
+const liveBootWatchdog = window.setTimeout(() => {
+  if (!window.__sarahLiveBootSignaled) signalSarahLiveBoot('sarah-live-skipped');
+}, 4000);
+
+async function start() {
+  if (!isLiveEnabled()) {
+    window.clearTimeout(liveBootWatchdog);
+    signalSarahLiveBoot('sarah-live-skipped');
+    return;
+  }
+
+  const app = initializeApp(firebaseConfig());
+  auth = getAuth(app);
+  mountPublicApi();
+  window.clearTimeout(liveBootWatchdog);
+  signalSarahLiveBoot('sarah-live-ready');
+  await checkApiHealth();
+
+  onAuthStateChanged(auth, async (user) => {
+    signedInUser = user;
+    consumerProfile = null;
+    if (user) {
+      try {
+        await ensureConsumerProfile();
+      } catch (err) {
+        console.warn('[SarahLive] profile', err.message);
+      }
+    } else {
+      setConnectionState('auth_required');
+    }
+    authReady = true;
+    notifyAuth();
+    await checkApiHealth();
+  });
+
+  await auth.authStateReady();
+  signedInUser = auth.currentUser;
+  authReady = true;
+  notifyAuth();
+  await checkApiHealth();
+}
+
+start().catch((err) => {
+  console.warn('[SarahLive] failed to start', err);
+  window.clearTimeout(liveBootWatchdog);
+  signalSarahLiveBoot('sarah-live-skipped');
+});

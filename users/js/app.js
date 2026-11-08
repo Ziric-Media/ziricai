@@ -331,9 +331,8 @@ function renderProtoSearchResults(query) {
 
   host.querySelectorAll('[data-open-thread]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      getSarahRuntime().activeThreadId = btn.dataset.openThread || 'smilemore-demo';
       closeProtoSearchSheet();
-      setRoute('chat-thread');
+      openChatFromList(btn.dataset.openThread || 'smilemore-demo', btn);
     });
   });
 }
@@ -1551,6 +1550,108 @@ function personalSarahLiveActive() {
   return Boolean(window.SarahLive?.isLiveEnabled?.() && window.SarahLive?.isSignedIn?.());
 }
 
+function consumerChatLiveActive() {
+  return personalSarahLiveActive();
+}
+
+function isExplicitNonPersonalThreadSelection(rt) {
+  const id = String(rt.activeThreadId || '').trim();
+  if (!id) return false;
+  const thread = rt.threads[id];
+  if (thread?.kind === 'personal' && thread?.api) return false;
+  if (thread?.kind === 'company') return true;
+  if (id === 'smilemore-demo') return true;
+  if (getAllChats().some((c) => c.id === id)) return true;
+  if (MOCK_DISCOVER_COMPANIES.some((c) => c.id === id)) return true;
+  return false;
+}
+
+function guessCompanyAvatarKey(companyId, label = '') {
+  const hay = `${companyId} ${label}`.toLowerCase();
+  if (hay.includes('smile')) return 'smilemore';
+  if (hay.includes('motor') || hay.includes('central')) return 'centralMotors';
+  return null;
+}
+
+function mapFederatedConversationToChatRow(c) {
+  const kind = String(c.conversationKind || c.type || 'person_to_business')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '_');
+  const isBusiness = kind === 'person_to_business';
+  const companyId = c.companyId || '';
+  const convId = c.id || '';
+  const id = isBusiness ? companyId || convId : convId || companyId;
+  return {
+    id,
+    convId,
+    conversationKind: kind,
+    name: c.displayLabel || c.companyName || c.title || id || 'Chat',
+    preview: c.preview || c.lastMessagePreview || 'Tap to open',
+    time: formatPersonalThreadTime(c.lastMessageAt) || '',
+    online: false,
+    avatarKey: isBusiness ? guessCompanyAvatarKey(companyId, c.displayLabel) : null,
+    company: isBusiness,
+    api: true,
+  };
+}
+
+async function loadCompanyThreadFromApiIfNeeded() {
+  if (!consumerChatLiveActive()) return false;
+  const rt = getSarahRuntime();
+  const id = String(rt.activeThreadId || '').trim();
+  if (!id) return false;
+  const existing = rt.threads[id];
+  if (existing?.api && existing.kind === 'company') return true;
+
+  const chat = getAllChats().find((c) => c.id === id);
+  const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === id);
+  const companyId =
+    existing?.companyId ||
+    (chat?.company || discoverCo ? id : null) ||
+    (id === 'smilemore-demo' ? id : null);
+  if (!companyId) return false;
+
+  const res = await window.SarahLive.fetchCompanyMessages(companyId);
+  if (res.error) {
+    showProtoToast(res.error);
+    return false;
+  }
+  const payload = res.data || {};
+  const messages = mapApiMessagesToThread(payload.messages);
+  const name =
+    payload.conversation?.companyName || chat?.name || discoverCo?.name || companyId;
+  rt.threads[companyId] = {
+    kind: 'company',
+    name,
+    companyId,
+    verified: true,
+    api: true,
+    messages: messages.length
+      ? messages
+      : [
+          {
+            role: 'assistant',
+            markdown: `**Hi ${MOCK_USER.name}** — how can I help you today?`,
+          },
+        ],
+  };
+  rt.activeThreadId = companyId;
+  return true;
+}
+
+let chatsListLoadGen = 0;
+
+async function openChatFromList(chatId, rowEl) {
+  const rt = getSarahRuntime();
+  rt.activeThreadId = chatId || 'smilemore-demo';
+  const isCompany = rowEl?.dataset?.company !== '0';
+  if (consumerChatLiveActive() && isCompany) {
+    await loadCompanyThreadFromApiIfNeeded();
+  }
+  setRoute('chat-thread');
+}
+
 function updatePersonalSarahLiveUi() {
   const el = document.getElementById('msLiveStatus');
   if (!el) return;
@@ -2053,19 +2154,11 @@ function getActiveThreadContext() {
   };
 }
 
-function openCompanySarahChat(companyId) {
+async function openCompanySarahChat(companyId) {
   const company = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
   if (!company) return;
   const rt = getSarahRuntime();
   const threadId = company.id;
-  rt.threads[threadId] = {
-    kind: 'company',
-    name: company.name,
-    avatar: companyAvatarUrl(company),
-    verified: company.verified,
-    companyId: company.id,
-    messages: [{ role: 'assistant', markdown: `**Hi ${MOCK_USER.name}** — I'm Sarah from **${company.name}**. How can I help you today?` }],
-  };
   rt.activeThreadId = threadId;
   upsertRuntimeChat({
     id: threadId,
@@ -2076,6 +2169,23 @@ function openCompanySarahChat(companyId) {
     avatar: companyAvatarUrl(company),
     company: true,
   });
+  if (consumerChatLiveActive()) {
+    await loadCompanyThreadFromApiIfNeeded();
+  } else {
+    rt.threads[threadId] = {
+      kind: 'company',
+      name: company.name,
+      avatar: companyAvatarUrl(company),
+      verified: company.verified,
+      companyId: company.id,
+      messages: [
+        {
+          role: 'assistant',
+          markdown: `**Hi ${MOCK_USER.name}** — I'm Sarah from **${company.name}**. How can I help you today?`,
+        },
+      ],
+    };
+  }
   setRoute('chat-thread');
 }
 
@@ -2168,18 +2278,32 @@ function bindGalleryLightbox() {
   });
 }
 
-function renderChatsList() {
+async function renderChatsList() {
   const host = document.getElementById('chatsList');
   if (!host) return;
+  const gen = ++chatsListLoadGen;
   const q = (document.getElementById('chatsTabSearchInput')?.value || '').trim().toLowerCase();
-  const chats = getAllChats().filter((c) => {
+
+  let chats = getAllChats();
+  if (consumerChatLiveActive()) {
+    const res = await window.SarahLive.fetchChatConversations('all');
+    if (gen !== chatsListLoadGen) return;
+  const payload = res.data || {};
+    const conversations = payload.conversations;
+    if (!res.error && Array.isArray(conversations) && conversations.length) {
+      chats = conversations.map(mapFederatedConversationToChatRow);
+    }
+  }
+
+  chats = chats.filter((c) => {
     if (!q) return true;
     return `${c.name} ${c.preview}`.toLowerCase().includes(q);
   });
+
   host.innerHTML = chats
     .map(
-    (c) => `
-    <div class="chat-row" data-open-thread="${escapeHtml(c.id)}" role="button" tabindex="0">
+      (c) => `
+    <div class="chat-row" data-open-thread="${escapeHtml(c.id)}" data-company="${c.company ? '1' : '0'}" data-company-id="${escapeHtml(c.company ? c.id : '')}" data-conv-id="${escapeHtml(c.convId || '')}" data-kind="${escapeHtml(c.conversationKind || '')}" role="button" tabindex="0">
       <img class="avatar avatar-sm chat-row-avatar" src="${escapeHtml(prototypeAsset(resolveItemAvatar(c)))}" alt="" width="44" height="44" ${profileImgOnError((c.avatarKey && COMPANY_AVATARS?.[c.avatarKey]) || MOCK_PROFILE.avatarFallback)} />
       <div class="meta">
         <div class="name">${escapeHtml(c.name)}${c.company ? ` ${verifiedBadge}` : ''}</div>
@@ -2187,13 +2311,11 @@ function renderChatsList() {
       </div>
       <div class="time">${escapeHtml(c.time)}</div>
     </div>`
-  ).join('');
+    )
+    .join('');
 
   host.querySelectorAll('[data-open-thread]').forEach((row) => {
-    const open = () => {
-      getSarahRuntime().activeThreadId = row.dataset.openThread || 'smilemore-demo';
-      setRoute('chat-thread');
-    };
+    const open = () => openChatFromList(row.dataset.openThread || 'smilemore-demo', row);
     row.addEventListener('click', open);
     row.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -6731,10 +6853,15 @@ function renderThread() {
 
   const composeForm = document.getElementById('threadComposeForm');
   const composeInput = document.getElementById('threadComposeInput');
-  composeForm?.classList.toggle('is-disabled', !isPersonal);
+  const companyLive = !isPersonal && Boolean(ctx.api);
+  composeForm?.classList.toggle('is-disabled', !isPersonal && !companyLive);
   if (composeInput) {
-    composeInput.disabled = !isPersonal;
-    composeInput.placeholder = isPersonal ? 'Ask Sarah anything…' : 'Company messaging — Wave 2';
+    composeInput.disabled = !isPersonal && !companyLive;
+    composeInput.placeholder = isPersonal
+      ? 'Ask Sarah anything…'
+      : companyLive
+        ? `Message ${ctx.name}…`
+        : 'Company messaging — Wave 2';
   }
 
   const log = document.getElementById('threadLog');
@@ -6794,18 +6921,20 @@ function activateView() {
       } else {
         renderThread();
       }
+    } else if (isExplicitNonPersonalThreadSelection(rt)) {
+      loadCompanyThreadFromApiIfNeeded().finally(() => renderThread());
     } else if (
       personalSarahLiveActive() &&
       rt.activeThreadId &&
       rt.threads[rt.activeThreadId]?.kind === 'personal' &&
       rt.threads[rt.activeThreadId]?.api
     ) {
-      setRoute('chat-thread');
+      loadPersonalThreadFromServer(rt.activeThreadId).then(() => renderThread());
     } else if (personalSarahLiveActive() && window.SarahLive?.getSessionId?.()) {
       const sid = window.SarahLive.getSessionId();
       rt.activeThreadId = sid;
       loadPersonalThreadFromServer(sid).then((ok) => {
-        if (ok) setRoute('chat-thread');
+        if (ok) renderThread();
         else renderThread();
       });
     } else {
@@ -7898,6 +8027,7 @@ function bindSarahLiveAuth() {
       await syncPersonalSarahSessionsFromServer();
       const route = parseLocationHash().route;
       if (route === 'auth' || route === 'welcome') setRoute('home');
+      if (route === 'chats') renderChatsList();
     }
   });
 }
@@ -7934,12 +8064,37 @@ function init() {
   document.getElementById('threadComposeForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const ctx = getActiveThreadContext();
-    if (ctx.kind !== 'personal') return;
     const input = document.getElementById('threadComposeInput');
     const text = input?.value.trim();
     if (!text) return;
-    await deliverPersonalSarahMessage(text, { threadId: ctx.id, work: ctx.work });
-    if (input) input.value = '';
+    if (ctx.kind === 'personal') {
+      await deliverPersonalSarahMessage(text, { threadId: ctx.id, work: ctx.work });
+      if (input) input.value = '';
+      return;
+    }
+    if (ctx.kind === 'company' && ctx.api && consumerChatLiveActive()) {
+      const companyId = ctx.companyId || ctx.id;
+      if (!companyId) return;
+      setPersonalSarahComposeBusy(true);
+      try {
+        const res = await window.SarahLive.sendCompanyMessage(companyId, text);
+        if (res.error) {
+          showProtoToast(res.error);
+          return;
+        }
+        const payload = res.data || {};
+        const rt = getSarahRuntime();
+        if (payload.messages && rt.threads[companyId]) {
+          rt.threads[companyId].messages = mapApiMessagesToThread(payload.messages);
+        } else {
+          await loadCompanyThreadFromApiIfNeeded();
+        }
+        if (input) input.value = '';
+        renderThread();
+      } finally {
+        setPersonalSarahComposeBusy(false);
+      }
+    }
   });
 
   initAuthTabs();
