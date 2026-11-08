@@ -256,26 +256,57 @@ export async function appendUserConversationMessage(conv, message) {
 /**
  * Load tenant history into user view when local empty (memory restart recovery).
  */
-export async function syncMessagesFromTenant(conv, max = 50) {
-    const local = getUserConversationMessages(conv.id);
-    if (local.length) return local;
-    const history = await getTenantConversationHistory(conv.companyId, conv.userId, CHANNEL, max, {
-        externalUserId: conv.userId,
-    });
-    const mapped = history.map((m) => ({
+function mapTenantHistoryToConsumerMessages(history) {
+    return (history || []).map((m) => ({
         id: m.id || randomUUID(),
         role: m.role === "assistant" ? "assistant" : "user",
         content: m.content || m.message || "",
         createdAt: m.createdAt || new Date().toISOString(),
     }));
-    if (mapped.length) {
+}
+
+/**
+ * Merge tenant sarah_app inbox into consumer view (recovery + portal human/AI replies).
+ */
+export async function syncMessagesFromTenant(conv, max = 50) {
+    const local = [...getUserConversationMessages(conv.id)];
+    const history = await getTenantConversationHistory(conv.companyId, conv.userId, CHANNEL, max, {
+        externalUserId: conv.userId,
+    });
+    const mapped = mapTenantHistoryToConsumerMessages(history);
+    if (!mapped.length) return local;
+
+    if (!local.length) {
         messagesByConversation.set(conv.id, mapped);
         const last = mapped[mapped.length - 1];
         conv.preview = last.content.slice(0, 160);
         conv.lastMessageAt = last.createdAt;
+        if (history[0]?.conversationId) {
+            conv.tenantConversationId = history[0].conversationId;
+        }
+        conversations.set(conversationKey(conv.userId, conv.companyId), conv);
         await mirrorConversationToFirestore(conv);
+        return mapped;
     }
-    return mapped;
+
+    const known = new Set(local.map((m) => m.id));
+    let merged = false;
+    for (const row of mapped) {
+        if (known.has(row.id)) continue;
+        local.push(row);
+        known.add(row.id);
+        merged = true;
+    }
+    if (!merged) return local;
+
+    local.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+    messagesByConversation.set(conv.id, local);
+    const last = local[local.length - 1];
+    conv.preview = last.content.slice(0, 160);
+    conv.lastMessageAt = last.createdAt;
+    conversations.set(conversationKey(conv.userId, conv.companyId), conv);
+    await mirrorConversationToFirestore(conv);
+    return local;
 }
 
 export function buildCompanySarahGreeting(preferredName, companyName) {

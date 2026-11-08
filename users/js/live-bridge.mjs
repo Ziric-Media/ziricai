@@ -356,14 +356,32 @@ export async function fetchChatConversations(filter = 'all') {
 }
 
 export async function fetchCompanyMessages(companyId) {
-  return apiRequest(`/api/user-conversations/${encodeURIComponent(companyId)}/messages`);
+  const id = String(companyId || '').trim();
+  if (!id) return { error: 'Company id required' };
+  if (!signedInUser) return { error: 'Sign in to chat with Company Sarah', code: 'AUTH_REQUIRED' };
+  try {
+    await ensureConsumerProfile();
+  } catch (err) {
+    return { error: err.message || 'Could not set up your Sarah profile', code: 'CONSUMER_PROFILE_REQUIRED' };
+  }
+  return apiRequest(`/api/user-conversations/${encodeURIComponent(id)}/messages`);
 }
 
 export async function sendCompanyMessage(companyId, message) {
-  return apiRequest(`/api/user-conversations/${encodeURIComponent(companyId)}/messages`, {
+  const text = String(message || '').trim();
+  if (!text) return { error: 'Message is empty' };
+  const id = String(companyId || '').trim();
+  if (!id) return { error: 'Company id required' };
+  if (!signedInUser) return { error: 'Sign in to chat with Company Sarah', code: 'AUTH_REQUIRED' };
+  try {
+    await ensureConsumerProfile();
+  } catch (err) {
+    return { error: err.message || 'Could not set up your Sarah profile', code: 'CONSUMER_PROFILE_REQUIRED' };
+  }
+  return apiRequest(`/api/user-conversations/${encodeURIComponent(id)}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message: text }),
   });
 }
 

@@ -1596,21 +1596,36 @@ function mapFederatedConversationToChatRow(c) {
   };
 }
 
+function resolveCompanyIdForActiveThread(threadId) {
+  const id = String(threadId || '').trim();
+  if (!id) return null;
+  const rt = getSarahRuntime();
+  const cached = rt.threads[id];
+  if (cached?.kind === 'company' && (cached.companyId || id)) {
+    return cached.companyId || id;
+  }
+  const chat = getAllChats().find((c) => c.id === id);
+  if (chat?.company) return id;
+  if (MOCK_DISCOVER_COMPANIES.some((c) => c.id === id)) return id;
+  if (id === 'smilemore-demo') return id;
+  const rowCompanyId = document.querySelector(`[data-open-thread="${id}"]`)?.dataset?.companyId;
+  if (rowCompanyId) return rowCompanyId;
+  return null;
+}
+
 async function loadCompanyThreadFromApiIfNeeded() {
   if (!consumerChatLiveActive()) return false;
   const rt = getSarahRuntime();
   const id = String(rt.activeThreadId || '').trim();
   if (!id) return false;
-  const existing = rt.threads[id];
-  if (existing?.api && existing.kind === 'company') return true;
-
-  const chat = getAllChats().find((c) => c.id === id);
-  const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === id);
-  const companyId =
-    existing?.companyId ||
-    (chat?.company || discoverCo ? id : null) ||
-    (id === 'smilemore-demo' ? id : null);
+  const companyId = resolveCompanyIdForActiveThread(id);
   if (!companyId) return false;
+
+  const existing = rt.threads[companyId] || rt.threads[id];
+  if (existing?.api && existing.kind === 'company' && existing.messages?.length) return true;
+
+  const chat = getAllChats().find((c) => c.id === id || c.id === companyId);
+  const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
 
   const res = await window.SarahLive.fetchCompanyMessages(companyId);
   if (res.error) {
@@ -1627,14 +1642,7 @@ async function loadCompanyThreadFromApiIfNeeded() {
     companyId,
     verified: true,
     api: true,
-    messages: messages.length
-      ? messages
-      : [
-          {
-            role: 'assistant',
-            markdown: `**Hi ${MOCK_USER.name}** — how can I help you today?`,
-          },
-        ],
+    messages,
   };
   rt.activeThreadId = companyId;
   return true;
@@ -2092,15 +2100,35 @@ function toggleCompanyFollow(companyId) {
 function getActiveThreadContext() {
   const rt = getSarahRuntime();
   const id = rt.activeThreadId;
-  if (rt.threads[id]) {
-    const row = rt.threads[id];
+  const companyId = resolveCompanyIdForActiveThread(id);
+  const threadKey = companyId && rt.threads[companyId] ? companyId : id;
+
+  if (rt.threads[threadKey]) {
+    const row = rt.threads[threadKey];
     return {
-      id,
+      id: threadKey,
       ...row,
+      companyId: row.companyId || companyId || threadKey,
       name: row.name || row.title || 'Sarah',
       avatar: row.avatar || SARAH_AVATAR_SRC,
     };
   }
+
+  if (consumerChatLiveActive() && companyId) {
+    const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
+    const chat = getAllChats().find((c) => c.id === companyId);
+    return {
+      id: companyId,
+      kind: 'company',
+      companyId,
+      api: true,
+      verified: discoverCo?.verified ?? true,
+      name: discoverCo?.name || chat?.name || companyId,
+      avatar: discoverCo ? companyAvatarUrl(discoverCo) : chat?.avatar || MOCK_THREAD.avatar,
+      messages: [],
+    };
+  }
+
   if (id === 'smilemore-demo') {
     return {
       id,
@@ -2114,7 +2142,6 @@ function getActiveThreadContext() {
   const chat = getAllChats().find((c) => c.id === id);
   const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === id);
   if (discoverCo) {
-    const greeting = `Hi ${MOCK_USER.name}, I'm Sarah from ${discoverCo.name}, how can I help you today?`;
     return {
       id,
       kind: 'company',
@@ -2155,8 +2182,13 @@ function getActiveThreadContext() {
 }
 
 async function openCompanySarahChat(companyId) {
-  const company = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
-  if (!company) return;
+  const id = String(companyId || '').trim();
+  if (!id) return;
+  const company = MOCK_DISCOVER_COMPANIES.find((c) => c.id === id) || {
+    id,
+    name: id,
+    verified: true,
+  };
   const rt = getSarahRuntime();
   const threadId = company.id;
   rt.activeThreadId = threadId;
@@ -6844,8 +6876,10 @@ function renderThread() {
       subtitleEl.textContent = labels[st] || labels.connecting;
     } else if (isPersonal) {
       subtitleEl.textContent = 'Personal Sarah · Prototype (offline)';
+    } else if (!isPersonal && ctx.api && consumerChatLiveActive()) {
+      subtitleEl.textContent = `Company Sarah · ${ctx.name}`;
     } else {
-      subtitleEl.textContent = 'Company Sarah · Active now';
+      subtitleEl.textContent = 'Company Sarah · Prototype (offline)';
     }
   }
   const footnote = document.getElementById('threadFootnote');
