@@ -2,7 +2,7 @@
  * CH4 — Unified Chat home index routes.
  */
 import { requireConsumerScope } from "../auth/consumerAuth.js";
-import { listFederatedChatConversations } from "../users/chatConversationIndexService.js";
+import { hydrateFederatedChatIndex, listFederatedChatConversationsAsync } from "../users/chatConversationIndexService.js";
 import { syncOwnershipFromTenant } from "../users/handoverStateService.js";
 import {
     getNetworkLinkedConversation,
@@ -17,7 +17,7 @@ export function mountChatIndexRoutes(app) {
         try {
             const uid = req.consumerAuth.uid;
             const filter = req.query.filter;
-            const conversations = listFederatedChatConversations(uid, { filter });
+            const conversations = await listFederatedChatConversationsAsync(uid, { filter });
             res.json({ conversations, filter: filter || "all" });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to load chat index" });
@@ -26,6 +26,7 @@ export function mountChatIndexRoutes(app) {
 
     app.get("/api/network-conversations/:conversationId/messages", requireConsumerScope(), async (req, res) => {
         try {
+            await hydrateFederatedChatIndex(req.consumerAuth.uid); // restart-safe (no-op in memory mode)
             const conv = getNetworkLinkedConversation(req.consumerAuth.uid, req.params.conversationId);
             const since = req.query?.since || null;
             res.json({

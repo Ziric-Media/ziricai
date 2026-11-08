@@ -390,6 +390,11 @@ function renderProtoNotifications() {
         setRoute('chat-thread');
       } else if (id === 'n2') {
         closeProtoNotifSheet();
+        // SNET-08: `central-motors` is a prototype fixture id, not a tenant. In live mode fail closed (no fake chat).
+        if (consumerChatLiveActive()) {
+          showProtoToast('That business is not on Sarah Network yet.');
+          return;
+        }
         getSarahRuntime().activeThreadId = 'central-motors';
         setRoute('chat-thread');
       } else {

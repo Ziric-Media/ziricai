@@ -43,6 +43,9 @@ function normalizeConversation(docId, raw) {
         assignedEmployeeId: raw.assignedEmployeeId ?? null,
         companySarahAgentId: raw.companySarahAgentId ?? null,
     };
+    // SNET-08: network-linked (ai_to_ai) threads carry their request link so the index can rebuild after a restart.
+    if (raw.networkRequestId) base.networkRequestId = raw.networkRequestId;
+    if (raw.networkConsentScope) base.networkConsentScope = raw.networkConsentScope;
     return ensureConversationMessagingFoundation(base);
 }
 
@@ -93,6 +96,8 @@ export async function upsertConversation(conv) {
         ownershipState: enriched.ownershipState,
         assignedEmployeeId: enriched.assignedEmployeeId ?? null,
         companySarahAgentId: enriched.companySarahAgentId ?? null,
+        networkRequestId: enriched.networkRequestId ?? null,
+        networkConsentScope: enriched.networkConsentScope ?? null,
     };
     await setDoc(userConversationRef(conv.id), payload, { merge: true });
 }

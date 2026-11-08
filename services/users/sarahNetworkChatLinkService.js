@@ -181,6 +181,23 @@ export function getNetworkLinkedConversation(userId, conversationId) {
     return conv;
 }
 
+/**
+ * SNET-08: seed the process cache from the durable store (restart recovery). Never overwrites live state.
+ * @returns {boolean} true when the thread was added
+ */
+export function seedNetworkConversationFromStore(conv, messages = []) {
+    if (!conv?.id || conv.type !== CONVERSATION_TYPES.AI_TO_AI || !conv.networkRequestId) return false;
+    if (conversations.has(conv.id)) return false;
+    conversations.set(conv.id, conv);
+    requestIndex.set(conv.networkRequestId, conv.id);
+    messagesByConversation.set(conv.id, Array.isArray(messages) ? messages : []);
+    const personId = conv.personId || personIdFromUserId(conv.userId);
+    const list = indexByPerson.get(personId) || [];
+    if (!list.includes(conv.id)) list.push(conv.id);
+    indexByPerson.set(personId, list);
+    return true;
+}
+
 export function clearNetworkChatLinksForTests() {
     conversations.clear();
     requestIndex.clear();

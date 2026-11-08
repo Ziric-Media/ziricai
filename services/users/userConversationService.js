@@ -164,6 +164,19 @@ export function listUserConversations(userId) {
         .sort((a, b) => String(b.lastMessageAt).localeCompare(String(a.lastMessageAt)));
 }
 
+/**
+ * SNET-08: seed the process cache from the durable store (restart recovery). Never overwrites live state.
+ * @returns {boolean} true when the conversation was added
+ */
+export function seedUserConversationFromStore(conv, messages = []) {
+    if (!conv?.userId || !conv?.companyId) return false;
+    const key = conversationKey(conv.userId, conv.companyId);
+    if (conversations.has(key)) return false;
+    conversations.set(key, ensureConversationMessagingFoundation(conv));
+    messagesByConversation.set(conv.id, Array.isArray(messages) ? messages : []);
+    return true;
+}
+
 export function getUserConversationById(userId, conversationId) {
     const conv = [...conversations.values()].find((c) => c.id === conversationId && c.userId === userId);
     if (!conv) {

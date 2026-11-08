@@ -1,10 +1,12 @@
 /**
  * CH4 — Federated consumer Chat index (business, P2P, groups, network threads).
  */
-import { listUserConversations } from "./userConversationService.js";
+import { listUserConversations, getUserConversationByCompany, seedUserConversationFromStore } from "./userConversationService.js";
 import { listPersonToPersonConversations } from "./personToPersonConversationService.js";
 import { listGroupConversations } from "./groupConversationService.js";
-import { listNetworkLinkedConversations } from "./sarahNetworkChatLinkService.js";
+import { listNetworkLinkedConversations, seedNetworkConversationFromStore } from "./sarahNetworkChatLinkService.js";
+import { listConversationsByUserId, listMessages } from "./userConversationFirestoreStore.js";
+import { useAdminBackend } from "../database/firestoreClient.js";
 import { CONVERSATION_TYPES } from "./messagingContracts.js";
 
 /**
@@ -65,4 +67,75 @@ export function listFederatedChatConversations(userId, options = {}) {
     }
 
     return items.sort((a, b) => String(b.lastMessageAt || "").localeCompare(String(a.lastMessageAt || "")));
+}
+
+const HYDRATE_TTL_MS = 30_000;
+const HYDRATE_MAX_THREADS = 50;
+/** @type {Map<string, number>} */
+const lastHydratedAt = new Map();
+
+function hydrationEnabled() {
+    const raw = String(process.env.USER_CONVERSATIONS_BACKEND || "memory").trim().toLowerCase();
+    return (raw === "dual" || raw === "firestore") && useAdminBackend();
+}
+
+/**
+ * SNET-08 — rebuild this user's business + network threads from the durable store after a restart / on another
+ * replica (the services are process caches over `userConversations`). Never overwrites live in-process state.
+ * Only runs when USER_CONVERSATIONS_BACKEND is dual|firestore and Firebase Admin is available; otherwise a no-op.
+ *
+ * Scope: person_to_business and ai_to_ai threads. P2P and group threads keep their own stores (not rehydrated here).
+ * @param {string} userId
+ * @param {{ enabled?: boolean, force?: boolean, store?: { listConversationsByUserId: Function, listMessages: Function } }} [deps] test seams
+ * @returns {Promise<{ hydrated: number, skipped?: string, error?: string }>}
+ */
+export async function hydrateFederatedChatIndex(userId, deps = {}) {
+    const enabled = deps.enabled ?? hydrationEnabled();
+    if (!enabled || !userId) return { hydrated: 0, skipped: "disabled" };
+    const last = lastHydratedAt.get(userId);
+    if (!deps.force && last && Date.now() - last < HYDRATE_TTL_MS) return { hydrated: 0, skipped: "fresh" };
+
+    const store = deps.store || { listConversationsByUserId, listMessages };
+    let stored;
+    try {
+        stored = await store.listConversationsByUserId(userId);
+    } catch (err) {
+        console.warn("[chatConversationIndex] hydrate failed:", err.message);
+        return { hydrated: 0, error: err.message };
+    }
+    lastHydratedAt.set(userId, Date.now());
+
+    const knownNetwork = new Set(listNetworkLinkedConversations(userId).map((c) => c.id));
+    let hydrated = 0;
+    for (const conv of stored.slice(0, HYDRATE_MAX_THREADS)) {
+        try {
+            if (conv.type === CONVERSATION_TYPES.AI_TO_AI) {
+                if (knownNetwork.has(conv.id)) continue;
+                // Threads written before SNET-08 lack `networkRequestId`; it is the suffix of the id.
+                const withLink = conv.networkRequestId
+                    ? conv
+                    : { ...conv, networkRequestId: conv.id.includes("_net_") ? conv.id.split("_net_").pop() : null };
+                if (!withLink.networkRequestId) continue;
+                const messages = await store.listMessages(conv.id);
+                if (seedNetworkConversationFromStore(withLink, messages)) hydrated += 1;
+            } else if (conv.type === CONVERSATION_TYPES.PERSON_TO_BUSINESS || !conv.type) {
+                if (getUserConversationByCompany(userId, conv.companyId)) continue;
+                const messages = await store.listMessages(conv.id);
+                if (seedUserConversationFromStore(conv, messages)) hydrated += 1;
+            }
+        } catch (err) {
+            console.warn("[chatConversationIndex] hydrate thread failed:", err.message);
+        }
+    }
+    return { hydrated };
+}
+
+/** Async index: hydrate from the durable store first (no-op in memory mode), then list. */
+export async function listFederatedChatConversationsAsync(userId, options = {}, deps = {}) {
+    await hydrateFederatedChatIndex(userId, deps);
+    return listFederatedChatConversations(userId, options);
+}
+
+export function resetFederatedHydrationForTests() {
+    lastHydratedAt.clear();
 }
