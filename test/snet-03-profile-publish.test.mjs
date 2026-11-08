@@ -138,7 +138,7 @@ test("API: role-gated writes, error envelope, consumer public profile", async ()
     mountNetworkListingRoutes(app, {
         listingDeps: deps,
         authorize: async (req, companyId, { write }) => {
-            if (write && !hasPermission(role, "canManageWorkspace")) {
+            if (write && !hasPermission(role, "canManageNetwork")) {
                 throw Object.assign(new Error("denied"), { status: 403, code: "PERMISSION_DENIED" });
             }
             req.tenant = { companyId, uid: "uid-1", role };
@@ -244,8 +244,8 @@ test("Company Portal: Sarah Network section is registered, permission-gated and 
     assert.match(read("js/portal/core/lazyLoader.js"), /network: 'renderNetwork'/);
     assert.match(read("js/portal/core/appShell.js"), /id: 'network', label: 'Sarah Network'/);
     // same key the server enforces on the listing writes — no matrix drift
-    assert.match(read("js/portal/permissions.js"), /network: 'canManageWorkspace'/);
-    assert.match(read("services/api/networkListingRoutes.js"), /hasPermission\(req\.tenant\.role, "canManageWorkspace"\)/);
+    assert.match(read("js/portal/permissions.js"), /network: 'canManageNetwork'/);
+    assert.match(read("services/api/networkListingRoutes.js"), /hasPermission\(req\.tenant\.role, "canManageNetwork"\)/);
 
     const api = read("js/portal/api.js");
     for (const frag of ["/listing`", "/listing/publish`", "/listing/unpublish`", "/verification`", "/verification/evidence`"]) {
@@ -258,6 +258,6 @@ test("Company Portal: Sarah Network section is registered, permission-gated and 
     }
     assert.ok(!/window\.prompt/.test(mod));
     // generated app/ is rebuilt by prepare-sites; the source of truth is js/portal
-    assert.equal(hasPermission("manager", "canManageWorkspace"), true);
-    assert.equal(hasPermission("support", "canManageWorkspace"), false);
+    assert.equal(hasPermission("manager", "canManageNetwork"), true);
+    assert.equal(hasPermission("support", "canManageNetwork"), false);
 });

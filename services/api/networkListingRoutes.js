@@ -39,7 +39,7 @@ export async function defaultAuthorize(req, companyId, { write = false } = {}) {
     const ctx = await resolveTenantContext(req);
     req.tenant = { ...ctx, companyId };
     await assertAuthenticatedTenantMemberAccess(req.tenant, { auditSurface: "network_listing" });
-    if (write && !hasPermission(req.tenant.role, "canManageWorkspace")) {
+    if (write && !hasPermission(req.tenant.role, "canManageNetwork")) {
         throw Object.assign(new Error("Only owners and managers can change the Sarah Network listing."), {
             status: 403,
             code: "PERMISSION_DENIED",
@@ -74,7 +74,7 @@ export function mountNetworkListingRoutes(app, deps = {}) {
         ...(await getListing(companyId, listingDeps)),
         // Lets the Company Portal editor offer the real taxonomy without hard-coding drift, and show read-only for non-managers.
         categoryOptions: DISCOVER_CATEGORIES.map(({ id, label }) => ({ id, label })),
-        canEdit: Boolean(ctx?.role) && hasPermission(ctx.role, "canManageWorkspace"),
+        canEdit: Boolean(ctx?.role) && hasPermission(ctx.role, "canManageNetwork"),
     }));
 
     tenantRoute("put", "/api/network/v1/orgs/:companyId/listing", true, async (companyId, req, ctx) => {

@@ -44,3 +44,12 @@ Railway env set: `SARAH_NETWORK_PILOT_COMPANY_IDS=smilemore-demo,central-motors-
 Rollback: set the variable back to `smilemore-demo` and redeploy.
 Caveat: a variable-change redeploy (`b8e7993f`) FAILED with ERR_MODULE_NOT_FOUND for `services/tenants/teamMemberService.js` (a tracked file, present in the clean tree). Always follow variable changes with `railway up` from a clean worktree.
 Gate 1: `USER_CONVERSATIONS_BACKEND` was not changed. See `docs/deployment/SARAH_CHAT_FIRESTORE_PRODUCTION.md` for the manual step.
+
+## Completion run (Gate 6)
+
+Run on 2026-11-09 against the exit checklist in [SNET_GATE_COMPLETE.md](./SNET_GATE_COMPLETE.md). One commit per item, explicit paths only; the order was fixed by the user and the run stopped on the first blocker. Gate 5 decisions that this run **reverses** are called out explicitly.
+
+| # | Item | Status | Outcome |
+|---|------|--------|---------|
+| 6.1 | `canManageNetwork` | **done** (reverses the Gate 5 "decided: not added") | New permission key `canManageNetwork` (owner, manager — same roles as `canManageWorkspace` today, so no user-visible change) in `services/auth/permissionsService.js` **and** `js/portal/permissions.js` (role array + label). Server: `defaultAuthorize` in `networkListingRoutes.js` enforces it for every tenant network **write** and `GET …/listing` returns `canEdit` from it; because `networkVerificationRoutes`, `networkConnectionRoutes` (incl. subscriber events) and `networkAgentRoutes` all reuse `defaultAuthorize`, they inherit it. Portal: the `network` module gate (`MODULE_PERMISSIONS.network`) and the editor's fast-path check use it. Reads stay open to every company member. The Sarah tool matrix (`services/sarah/permissions.js`) is intentionally untouched: no Sarah tool requires a network permission, and `verify-sarah-permission-matrix-drift` still passes. Tests: `test/gate6-completion.test.mjs` (server/portal matrices agree, role table, every network write route and the UI use the new key) and the updated `test/snet-03-profile-publish.test.mjs`. Why the Gate 5 concern no longer blocks it: parity between the two matrices is now test-enforced. Residual: `canManageWorkspace` still exists for branding/settings; the two keys can now diverge by design. |
+

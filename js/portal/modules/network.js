@@ -2,7 +2,7 @@
  * Company Portal — Sarah Network listing (SNET-03 UI) + verification requests (SNET-04).
  * Edit the public profile draft, publish / unpublish it on Sarah Discover, and submit verification evidence
  * references. Talks to /api/network/v1/orgs/:companyId/{listing,verification}; owners and managers write
- * (server enforces `canManageWorkspace`), other members see it read-only.
+ * (server enforces `canManageNetwork`), other members see it read-only.
  */
 import { state } from '../core/dataStore.js';
 import { escapeHtml, pageHeader, loadingState, showToast, statusBadge, errorState } from '../../admin/ui.js';
@@ -271,7 +271,7 @@ export async function renderNetwork(container) {
   }
 
   // Server decides write access; the role check is only a fast-path for the portal gate.
-  const listing = { ...listingRes.data, canEdit: listingRes.data.canEdit ?? can(state.profile?.role, 'canManageWorkspace') };
+  const listing = { ...listingRes.data, canEdit: listingRes.data.canEdit ?? can(state.profile?.role, 'canManageNetwork') };
   const verification = verificationRes.error ? null : verificationRes.data;
 
   container.innerHTML = `
