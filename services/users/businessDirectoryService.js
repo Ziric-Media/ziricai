@@ -32,7 +32,10 @@ const firestoreDirectoryStore = {
         return snap.docs.map((d) => ({ ...d.data(), companyId: d.id }));
     },
     async save(entry) {
-        await setDoc(businessDirectoryDocRef(entry.companyId), entry, { merge: true });
+        // Replace each top-level field wholesale (so a cleared `draft`/`tags` map really clears) while leaving
+        // fields this process doesn't know about untouched. JSON round-trip drops `undefined`.
+        const clean = JSON.parse(JSON.stringify(entry));
+        await setDoc(businessDirectoryDocRef(entry.companyId), clean, { mergeFields: Object.keys(clean) });
     },
 };
 
@@ -71,11 +74,12 @@ export function invalidateDirectoryEntity(companyId) {
 
 seedPilotCompanies();
 
-async function persistEntry(entry) {
+async function persistEntry(entry, { strict = false } = {}) {
     try {
         if (store.enabled()) await store.save(entry);
     } catch (err) {
         console.warn("[businessDirectoryService] Firestore write failed:", err.message);
+        if (strict) throw err;
     }
     await ensureOrgEntitySafe(entry.companyId, {
         displayName: entry.displayName,
@@ -249,6 +253,21 @@ export function upsertBusinessDirectoryEntry(companyId, data) {
     directory.set(companyId, next);
     entityCache.delete(companyId);
     void persistEntry(next);
+    return next;
+}
+
+/**
+ * Awaitable upsert for user-initiated publish flows: the durable write must succeed (or throw) before the
+ * caller reports success. Cache is only updated after the store accepted the write.
+ * @param {string} companyId
+ * @param {object} data
+ */
+export async function saveBusinessDirectoryEntry(companyId, data) {
+    const existing = directory.get(companyId) || { companyId };
+    const next = { ...existing, ...data, companyId, updatedAt: new Date().toISOString() };
+    await persistEntry(next, { strict: true });
+    directory.set(companyId, next);
+    entityCache.delete(companyId);
     return next;
 }
 
