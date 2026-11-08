@@ -3,9 +3,12 @@
  * Edit the public profile draft, publish / unpublish it on Sarah Discover, and submit verification evidence
  * references. Talks to /api/network/v1/orgs/:companyId/{listing,verification}; owners and managers write
  * (server enforces `canManageNetwork`), other members see it read-only.
+ *
+ * Layout: status hero → public profile (grid) → private registration → action bar → verification timeline.
+ * Styles live in css/company-portal.css under "Sarah Network module (snet-*)".
  */
 import { state } from '../core/dataStore.js';
-import { escapeHtml, pageHeader, loadingState, showToast, statusBadge, errorState } from '../../admin/ui.js';
+import { escapeHtml, pageHeader, loadingState, showToast, errorState } from '../../admin/ui.js';
 import { can } from '../permissions.js';
 import {
   fetchNetworkListing,
@@ -33,6 +36,7 @@ const VERIFICATION_COPY = {
 const OPEN_STATES = new Set(['submitted', 'under_review', 'info_requested']);
 
 const label = (s) => String(s || '').replace(/_/g, ' ');
+const titleCase = (s) => label(s).replace(/\b\w/g, (c) => c.toUpperCase());
 const lines = (arr) => (Array.isArray(arr) ? arr : []);
 const csv = (arr) => lines(arr).join(', ');
 const splitCsv = (v) =>
@@ -56,12 +60,39 @@ function parseHours(text) {
 
 const hoursText = (hours) => lines(hours).map((h) => `${h.day}: ${h.time}`).join('\n');
 
-function field(id, text, value, { type = 'text', hint = '', disabled = false, placeholder = '' } = {}) {
-  return `<div class="form-group">
+/** Status pill: tone = success | warn | danger | info | neutral. */
+function pill(tone, text) {
+  return `<span class="snet-pill snet-pill--${tone}"><span class="snet-pill-dot" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
+}
+
+function verificationTone(vState) {
+  if (vState === 'verified') return 'success';
+  if (vState === 'rejected' || vState === 'restricted') return 'danger';
+  if (vState === 'info_requested') return 'warn';
+  if (OPEN_STATES.has(vState)) return 'info';
+  return 'neutral';
+}
+
+function field(id, text, value, { type = 'text', hint = '', disabled = false, placeholder = '', wide = false } = {}) {
+  return `<div class="form-group snet-field${wide ? ' snet-field--wide' : ''}">
     <label for="${id}">${escapeHtml(text)}</label>
     <input type="${type}" id="${id}" value="${escapeHtml(value || '')}" placeholder="${escapeHtml(placeholder)}" ${disabled ? 'disabled' : ''} />
     ${hint ? `<div class="form-hint">${escapeHtml(hint)}</div>` : ''}
   </div>`;
+}
+
+function sectionCard({ icon, title, hint = '', body, tone = '' }) {
+  return `
+    <section class="snet-card">
+      <header class="snet-card-head">
+        <span class="snet-card-icon${tone ? ` snet-card-icon--${tone}` : ''}" aria-hidden="true"><i class="fa-solid ${icon}"></i></span>
+        <div>
+          <h3>${escapeHtml(title)}</h3>
+          ${hint ? `<p>${escapeHtml(hint)}</p>` : ''}
+        </div>
+      </header>
+      <div class="snet-card-body">${body}</div>
+    </section>`;
 }
 
 function fieldError(res) {
@@ -73,22 +104,30 @@ function fieldError(res) {
 }
 
 function evidenceListHtml(evidence) {
-  if (!evidence?.length) return '<div class="panel-hint">No evidence references attached yet.</div>';
-  return `<ul>${evidence
+  if (!evidence?.length) {
+    return '<div class="snet-empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i> No evidence attached yet.</div>';
+  }
+  return `<ul class="snet-evidence">${evidence
     .map((e) => {
       const href = typeof e.url === 'string' && /^https:\/\//i.test(e.url) ? e.url : '';
       const name = href
         ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(e.label)}</a>`
         : escapeHtml(e.label);
       const file = e.file
-        ? ` · file ${escapeHtml(e.file.fileName || 'upload')} (${escapeHtml(String(Math.max(1, Math.round((e.file.byteLength || 0) / 1024))))} KB, sha256 ${escapeHtml(String(e.file.sha256 || '').slice(0, 12))}…)`
+        ? ` · file ${escapeHtml(e.file.fileName || 'upload')} (${escapeHtml(String(Math.max(1, Math.round((e.file.byteLength || 0) / 1024))))} KB, sha256 ${escapeHtml(String(e.file.sha256 || '').slice(0, 12))}…)${
+            e.file.stored ? ' · stored for officer review' : ''
+          }`
         : '';
-      return `<li>${name} <span class="panel-hint">${escapeHtml(label(e.kind))}${e.ref ? ` · ref ${escapeHtml(e.ref)}` : ''}${file}</span></li>`;
+      return `<li class="snet-evidence-item">
+        <span class="snet-evidence-icon" aria-hidden="true"><i class="fa-solid ${e.file ? 'fa-file-shield' : 'fa-link'}"></i></span>
+        <div><div class="snet-evidence-name">${name}</div>
+        <div class="snet-evidence-meta">${escapeHtml(titleCase(e.kind))}${e.ref ? ` · ref ${escapeHtml(e.ref)}` : ''}${file}</div></div>
+      </li>`;
     })
     .join('')}</ul>`;
 }
 
-function statusCardHtml(listing, verification) {
+function statusCardHtml(listing, verification, companyName) {
   const published = listing.published;
   const vState = verification?.state || 'unverified';
   const blockers = [];
@@ -99,20 +138,39 @@ function statusCardHtml(listing, verification) {
   if (listing.missingRequired?.length) {
     blockers.push(`Complete before publishing: ${listing.missingRequired.map(label).join(', ')}.`);
   }
+  const name = listing.profile?.displayName || companyName;
   return `
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-body">
-        <div class="info-row"><span class="label">Discover listing</span><span class="value">${statusBadge(published ? 'active' : 'pending')} ${
-          published ? 'Published on Sarah Discover' : 'Draft — not visible to customers'
-        }</span></div>
-        <div class="info-row"><span class="label">Sarah Network ID</span><span class="value">${escapeHtml(listing.snId || 'Assigned when you first save or publish')}</span></div>
-        <div class="info-row"><span class="label">Verification</span><span class="value">${statusBadge(
-          vState === 'verified' ? 'active' : vState === 'rejected' || vState === 'restricted' ? 'suspended' : 'pending'
-        )} ${escapeHtml(label(vState))}</span></div>
-        ${listing.publishedAt ? `<div class="info-row"><span class="label">Last published</span><span class="value">${escapeHtml(String(listing.publishedAt).slice(0, 10))}</span></div>` : ''}
-        ${blockers.length ? `<div class="panel-hint" style="margin-top:8px;" id="networkBlockers">${blockers.map(escapeHtml).join('<br>')}</div>` : ''}
+    <section class="snet-hero" aria-label="Sarah Network status">
+      <div class="snet-hero-top">
+        <span class="snet-hero-mark" aria-hidden="true"><i class="fa-solid fa-globe"></i></span>
+        <div class="snet-hero-id">
+          <div class="snet-hero-name">${escapeHtml(name)}</div>
+          <div class="snet-hero-sub">Sarah Network ID · <code class="snet-code">${escapeHtml(listing.snId || 'Assigned when you first save or publish')}</code></div>
+        </div>
       </div>
-    </div>`;
+      <div class="snet-stats">
+        <div class="snet-stat">
+          <div class="snet-stat-label">Discover listing</div>
+          <div class="snet-stat-value">${published ? pill('success', 'Published') : pill('warn', 'Draft')}</div>
+          <div class="snet-stat-help">${published ? 'Visible to customers on Sarah Discover' : 'Not visible to customers yet'}</div>
+        </div>
+        <div class="snet-stat">
+          <div class="snet-stat-label">Verification</div>
+          <div class="snet-stat-value">${pill(verificationTone(vState), titleCase(vState))}</div>
+          <div class="snet-stat-help">${escapeHtml(VERIFICATION_COPY[vState] || '')}</div>
+        </div>
+        <div class="snet-stat">
+          <div class="snet-stat-label">Last published</div>
+          <div class="snet-stat-value snet-stat-value--text">${listing.publishedAt ? escapeHtml(String(listing.publishedAt).slice(0, 10)) : '—'}</div>
+          <div class="snet-stat-help">${listing.publishedAt ? 'Publish again to push profile changes live' : 'Publish once your profile is complete'}</div>
+        </div>
+      </div>
+      ${
+        blockers.length
+          ? `<div class="snet-alert snet-alert--warn" id="networkBlockers" role="status"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div>${blockers.map(escapeHtml).join('<br>')}</div></div>`
+          : ''
+      }
+    </section>`;
 }
 
 function formHtml(listing) {
@@ -122,64 +180,115 @@ function formHtml(listing) {
   const ro = !listing.canEdit;
   const selected = new Set(lines(p.categories));
   const cats = lines(listing.categoryOptions);
+
+  const profileBody = `
+    <div class="snet-grid">
+      ${field('nlDisplayName', 'Business name', p.displayName, { disabled: ro })}
+      ${field('nlIndustry', 'Industry', p.industry, { disabled: ro, placeholder: 'e.g. Automotive dealership' })}
+      <div class="form-group snet-field snet-field--wide">
+        <label for="nlShort">Short description</label>
+        <textarea id="nlShort" rows="3" maxlength="600" ${ro ? 'disabled' : ''}>${escapeHtml(p.shortDescription || '')}</textarea>
+        <div class="form-hint">Up to 600 characters — the first line customers read on your Discover card.</div>
+      </div>
+      ${field('nlLocation', 'Location (city, country)', p.location, { disabled: ro })}
+      ${field('nlAddress', 'Street address (optional)', p.address, { disabled: ro })}
+      ${
+        cats.length
+          ? `<div class="form-group snet-field snet-field--wide"><label>Categories</label><div id="nlCategories" class="snet-chips">${cats
+              .map(
+                (cat) =>
+                  `<label class="snet-chip"><input type="checkbox" name="nlCategory" value="${escapeHtml(cat.id)}" ${
+                    selected.has(cat.id) ? 'checked' : ''
+                  } ${ro ? 'disabled' : ''}><span>${escapeHtml(cat.label)}</span></label>`
+              )
+              .join('')}</div><div class="form-hint">Leave empty to derive categories from your industry.</div></div>`
+          : ''
+      }
+      ${field('nlTags', 'Keywords (comma separated)', csv(p.tags), { disabled: ro })}
+      ${field('nlLanguages', 'Languages (comma separated)', csv(p.languages), { disabled: ro })}
+      ${field('nlAreas', 'Service areas (comma separated)', csv(p.serviceAreas), { disabled: ro, wide: true })}
+      ${field('nlLogo', 'Logo URL (https)', p.logoUrl, { disabled: ro, type: 'url' })}
+      ${field('nlCover', 'Cover image URL (https)', p.coverUrl, { disabled: ro, type: 'url' })}
+      <div class="form-group snet-field snet-field--wide">
+        <label for="nlHours">Opening hours</label>
+        <textarea id="nlHours" rows="4" ${ro ? 'disabled' : ''} placeholder="Mon-Fri: 08:00-17:00">${escapeHtml(hoursText(p.hours))}</textarea>
+        <div class="form-hint">One per line, e.g. “Mon-Fri: 08:00-17:00”.</div>
+      </div>
+    </div>`;
+
+  const contactBody = `
+    <div class="snet-grid snet-grid--3">
+      ${field('nlPhone', 'Contact phone', c.phone, { disabled: ro })}
+      ${field('nlEmail', 'Contact email', c.email, { disabled: ro, type: 'email' })}
+      ${field('nlWebsite', 'Website (https)', c.website, { disabled: ro, type: 'url' })}
+    </div>`;
+
+  const privateBody = `
+    <div class="snet-grid">
+      ${field('nlLegalName', 'Registered legal name', r.legalName, { disabled: ro })}
+      ${field('nlRegNo', 'Registration number', r.registrationNumber, { disabled: ro })}
+    </div>`;
+
   return `
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-header"><h3>Public profile</h3></div>
-      <div class="card-body">
-        <p class="form-hint">What customers see on Sarah Discover once published. Changes stay in your draft until you publish.</p>
-        ${field('nlDisplayName', 'Business name', p.displayName, { disabled: ro })}
-        ${field('nlIndustry', 'Industry', p.industry, { disabled: ro, placeholder: 'e.g. Automotive dealership' })}
-        <div class="form-group">
-          <label for="nlShort">Short description</label>
-          <textarea id="nlShort" rows="3" maxlength="600" ${ro ? 'disabled' : ''}>${escapeHtml(p.shortDescription || '')}</textarea>
-        </div>
-        ${field('nlLocation', 'Location (city, country)', p.location, { disabled: ro })}
-        ${field('nlAddress', 'Street address (optional)', p.address, { disabled: ro })}
-        ${
-          cats.length
-            ? `<div class="form-group"><label>Categories</label><div id="nlCategories">${cats
-                .map(
-                  (cat) =>
-                    `<label style="display:inline-block;margin-right:12px;font-weight:400;"><input type="checkbox" name="nlCategory" value="${escapeHtml(cat.id)}" ${
-                      selected.has(cat.id) ? 'checked' : ''
-                    } ${ro ? 'disabled' : ''}> ${escapeHtml(cat.label)}</label>`
-                )
-                .join('')}</div><div class="form-hint">Leave empty to derive categories from your industry.</div></div>`
-            : ''
-        }
-        ${field('nlTags', 'Keywords (comma separated)', csv(p.tags), { disabled: ro })}
-        ${field('nlLanguages', 'Languages (comma separated)', csv(p.languages), { disabled: ro })}
-        ${field('nlAreas', 'Service areas (comma separated)', csv(p.serviceAreas), { disabled: ro })}
-        ${field('nlLogo', 'Logo URL (https)', p.logoUrl, { disabled: ro, type: 'url' })}
-        ${field('nlCover', 'Cover image URL (https)', p.coverUrl, { disabled: ro, type: 'url' })}
-        <div class="form-group">
-          <label for="nlHours">Opening hours (one per line, e.g. "Mon-Fri: 08:00-17:00")</label>
-          <textarea id="nlHours" rows="4" ${ro ? 'disabled' : ''}>${escapeHtml(hoursText(p.hours))}</textarea>
-        </div>
-        ${field('nlPhone', 'Contact phone', c.phone, { disabled: ro })}
-        ${field('nlEmail', 'Contact email', c.email, { disabled: ro, type: 'email' })}
-        ${field('nlWebsite', 'Website (https)', c.website, { disabled: ro, type: 'url' })}
-      </div>
-    </div>
+    ${sectionCard({
+      icon: 'fa-store',
+      title: 'Public profile',
+      hint: 'What customers see on Sarah Discover once published. Changes stay in your draft until you publish.',
+      body: profileBody,
+    })}
+    ${sectionCard({ icon: 'fa-address-book', title: 'Contact', hint: 'How customers can reach you outside of Sarah.', body: contactBody })}
+    ${sectionCard({
+      icon: 'fa-lock',
+      title: 'Registration details',
+      hint: 'Private — used only for verification and never shown to customers.',
+      body: privateBody,
+      tone: 'private',
+    })}
 
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-header"><h3>Registration details (private)</h3></div>
-      <div class="card-body">
-        <p class="form-hint">Used only for verification. Never shown to customers.</p>
-        ${field('nlLegalName', 'Registered legal name', r.legalName, { disabled: ro })}
-        ${field('nlRegNo', 'Registration number', r.registrationNumber, { disabled: ro })}
-      </div>
-    </div>
-
-    <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;">
+    <div class="snet-actionbar">
       ${
         ro
-          ? '<div class="panel-hint">Only owners and managers can edit the Sarah Network listing.</div>'
-          : `<button class="btn btn-secondary" type="button" id="nlSave">Save draft</button>
-             <button class="btn btn-primary" type="button" id="nlPublish">${listing.published ? 'Publish changes' : 'Publish to Sarah Discover'}</button>
-             ${listing.published ? '<button class="btn btn-secondary" type="button" id="nlUnpublish">Unpublish</button>' : ''}`
+          ? '<div class="snet-readonly"><i class="fa-solid fa-eye" aria-hidden="true"></i> Only owners and managers can edit the Sarah Network listing.</div>'
+          : `<div class="snet-actionbar-note">${
+              listing.published ? 'Live on Sarah Discover — publish to push your latest changes.' : 'Draft saved privately until you publish.'
+            }</div>
+             <div class="snet-actionbar-buttons">
+               ${listing.published ? '<button class="btn btn-secondary snet-btn-danger" type="button" id="nlUnpublish">Unpublish</button>' : ''}
+               <button class="btn btn-secondary" type="button" id="nlSave">Save draft</button>
+               <button class="btn btn-primary" type="button" id="nlPublish">${listing.published ? 'Publish changes' : 'Publish to Sarah Discover'}</button>
+             </div>`
       }
     </div>`;
+}
+
+/** Timeline: Request → Review → Decision. */
+function timelineHtml(vState) {
+  const steps = [
+    { id: 'request', label: 'Request', help: 'Legal name, registration number and evidence' },
+    { id: 'review', label: 'Officer review', help: 'A Ziricai verification officer checks your evidence' },
+    { id: 'decision', label: 'Decision', help: 'Verified badge, or a note on what to fix' },
+  ];
+  let current = 0;
+  let tone = 'info';
+  if (OPEN_STATES.has(vState)) {
+    current = 1;
+    if (vState === 'info_requested') tone = 'warn';
+  } else if (vState === 'verified') {
+    current = 3;
+    tone = 'success';
+  } else if (vState === 'rejected' || vState === 'restricted') {
+    current = 2;
+    tone = 'danger';
+  }
+  return `<ol class="snet-steps" aria-label="Verification progress">${steps
+    .map((s, i) => {
+      const done = i < current;
+      const active = i === current;
+      const cls = done ? 'is-done' : active ? `is-active is-${tone}` : '';
+      return `<li class="snet-step ${cls}"><span class="snet-step-dot">${done ? '<i class="fa-solid fa-check"></i>' : i + 1}</span>
+        <div><div class="snet-step-label">${s.label}</div><div class="snet-step-help">${s.help}</div></div></li>`;
+    })
+    .join('')}</ol>`;
 }
 
 function verificationHtml(listing, verification) {
@@ -189,43 +298,58 @@ function verificationHtml(listing, verification) {
   const open = OPEN_STATES.has(vState);
   const canRequest = listing.canEdit && !open && vState !== 'verified' && vState !== 'restricted';
   const evidenceForm = (idPrefix) => `
-    <div class="form-group"><label for="${idPrefix}Kind">Type</label>
-      <select id="${idPrefix}Kind">${kinds.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(label(k))}</option>`).join('')}</select></div>
-    ${field(`${idPrefix}Label`, 'Label', '', { placeholder: 'e.g. CIPC registration certificate' })}
-    ${field(`${idPrefix}Url`, 'Public https link (optional)', '', { type: 'url', hint: 'Link to a document you host (Drive, Dropbox, your website). Files are not uploaded to Ziricai.' })}
-    ${field(`${idPrefix}Ref`, 'Or external reference (optional)', '', { placeholder: 'e.g. document number' })}
-    <div class="form-group"><label for="${idPrefix}File">Or attach a file (PDF / PNG / JPEG / WebP, max 5 MB)</label>
-      <input type="file" id="${idPrefix}File" accept="application/pdf,image/png,image/jpeg,image/webp" />
-      <div class="form-hint">A file reference (name, size, checksum) is recorded on the case. The file itself is not stored yet — keep a hosted link or reference as well.</div></div>`;
-  return `
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-header"><h3>Verification</h3></div>
-      <div class="card-body">
-        <p>${escapeHtml(VERIFICATION_COPY[vState] || '')}</p>
-        ${
-          latest?.decisionNote && ['info_requested', 'rejected', 'restricted'].includes(vState)
-            ? `<div class="info-row"><span class="label">Reviewer note</span><span class="value" id="nvNote">${escapeHtml(latest.decisionNote)}</span></div>`
-            : ''
-        }
-        ${verification?.checked?.length ? `<div class="info-row"><span class="label">What was checked</span><span class="value">${verification.checked.map((c) => escapeHtml(label(c))).join(', ')}</span></div>` : ''}
-        <h4 style="margin-top:12px;">Evidence references</h4>
-        ${evidenceListHtml(latest?.evidence)}
-        ${
-          open && listing.canEdit
-            ? `<h4 style="margin-top:12px;">Add evidence</h4>${evidenceForm('nvAdd')}
-               <button class="btn btn-secondary btn-sm" type="button" id="nvAddBtn">Attach evidence</button>`
-            : ''
-        }
-        ${
-          canRequest
-            ? `<h4 style="margin-top:12px;">Request verification</h4>
-               <p class="form-hint">Requires your registered legal name and registration number above (save them first). You can attach one evidence reference now and add more later.</p>
-               ${evidenceForm('nvNew')}
-               <button class="btn btn-primary btn-sm" type="button" id="nvSubmit">Request verification</button>`
-            : ''
-        }
-      </div>
+    <div class="snet-grid">
+      <div class="form-group snet-field"><label for="${idPrefix}Kind">Type</label>
+        <select id="${idPrefix}Kind">${kinds.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(titleCase(k))}</option>`).join('')}</select></div>
+      ${field(`${idPrefix}Label`, 'Label', '', { placeholder: 'e.g. CIPC registration certificate' })}
+      ${field(`${idPrefix}Url`, 'Public https link (optional)', '', { type: 'url', hint: 'Link to a document you host (Drive, Dropbox, your website).' })}
+      ${field(`${idPrefix}Ref`, 'External reference (optional)', '', { placeholder: 'e.g. document number' })}
+      <div class="form-group snet-field snet-field--wide"><label for="${idPrefix}File">Attach a file (PDF / PNG / JPEG / WebP, max 5 MB)</label>
+        <input type="file" id="${idPrefix}File" accept="application/pdf,image/png,image/jpeg,image/webp" />
+        <div class="form-hint">A file reference (name, size, checksum) is recorded on the case. Keep a hosted link or reference as well.</div></div>
     </div>`;
+
+  const noteRow =
+    latest?.decisionNote && ['info_requested', 'rejected', 'restricted'].includes(vState)
+      ? `<div class="snet-alert snet-alert--${vState === 'info_requested' ? 'warn' : 'danger'}"><i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+           <div><strong>Reviewer note</strong><div id="nvNote">${escapeHtml(latest.decisionNote)}</div></div></div>`
+      : '';
+
+  const checkedRow = verification?.checked?.length
+    ? `<div class="snet-checked"><span class="snet-checked-label">What was checked</span>${verification.checked
+        .map((c) => `<span class="snet-tag"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> ${escapeHtml(titleCase(c))}</span>`)
+        .join('')}</div>`
+    : '';
+
+  const body = `
+    <div class="snet-verify-head">${pill(verificationTone(vState), titleCase(vState))}<p>${escapeHtml(VERIFICATION_COPY[vState] || '')}</p></div>
+    ${timelineHtml(vState)}
+    ${noteRow}
+    ${checkedRow}
+    <h4 class="snet-subtitle">Evidence</h4>
+    ${evidenceListHtml(latest?.evidence)}
+    ${
+      open && listing.canEdit
+        ? `<div class="snet-subcard"><h4 class="snet-subtitle">Add evidence</h4>${evidenceForm('nvAdd')}
+             <button class="btn btn-secondary btn-sm" type="button" id="nvAddBtn">Attach evidence</button></div>`
+        : ''
+    }
+    ${
+      canRequest
+        ? `<div class="snet-subcard"><h4 class="snet-subtitle">Request verification</h4>
+             <p class="form-hint">Requires your registered legal name and registration number above (save them first). You can attach one evidence item now and add more later.</p>
+             ${evidenceForm('nvNew')}
+             <button class="btn btn-primary btn-sm" type="button" id="nvSubmit">Request verification</button></div>`
+        : ''
+    }`;
+
+  return sectionCard({
+    icon: 'fa-shield-halved',
+    title: 'Verification',
+    hint: 'A verified badge tells customers a Ziricai officer checked your business.',
+    body,
+    tone: 'verify',
+  });
 }
 
 function readEvidence(container, prefix) {
@@ -290,12 +414,19 @@ export async function renderNetwork(container) {
   // Server decides write access; the role check is only a fast-path for the portal gate.
   const listing = { ...listingRes.data, canEdit: listingRes.data.canEdit ?? can(state.profile?.role, 'canManageNetwork') };
   const verification = verificationRes.error ? null : verificationRes.data;
+  const companyName = state.company?.name || 'your business';
 
   container.innerHTML = `
-    ${pageHeader('Sarah Network', `How ${escapeHtml(state.company?.name || 'your business')} appears on Sarah Discover and who has verified it.`)}
-    ${statusCardHtml(listing, verification)}
-    ${formHtml(listing)}
-    ${verificationRes.error ? `<div class="panel-hint">Verification status unavailable: ${escapeHtml(verificationRes.error)}</div>` : verificationHtml(listing, verification)}
+    <div class="snet-page">
+      ${pageHeader('Sarah Network', `How ${escapeHtml(companyName)} appears on Sarah Discover and who has verified it.`)}
+      ${statusCardHtml(listing, verification, companyName)}
+      ${formHtml(listing)}
+      ${
+        verificationRes.error
+          ? `<div class="snet-alert snet-alert--warn"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div>Verification status unavailable: ${escapeHtml(verificationRes.error)}</div></div>`
+          : verificationHtml(listing, verification)
+      }
+    </div>
   `;
   bind(container, companyId, listing);
 }
