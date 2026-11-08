@@ -12,6 +12,7 @@ import {
     ensureConversationMessagingFoundation,
     MESSAGE_ROLES,
 } from "./identityContracts.js";
+import { normalizeAttachments } from "./personToPersonConversationService.js";
 import {
     upsertConversation,
     upsertMessage as upsertFirestoreMessage,
@@ -190,6 +191,7 @@ export async function appendUserConversationMessage(conv, message) {
         id: message.id && String(message.id) ? String(message.id) : randomUUID(),
         role,
         content: String(message.content || ""),
+        attachments: normalizeAttachments(message.attachments),
         source: message.source || null,
         authorParticipantId: message.authorParticipantId ?? null,
         createdAt: new Date().toISOString(),

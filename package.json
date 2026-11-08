@@ -24,6 +24,7 @@
         "test:sarah-c1": "node --test test/c1-user-conversations-wp1.test.mjs test/c1-integration-events-wp4.test.mjs test/c1-user-conversations-wp5.test.mjs test/user-conversations-persistence.test.mjs test/user-conversations-u5.test.mjs",
         "test:sarah-ch1": "node --test test/ch1-messaging-foundation.test.mjs",
         "test:sarah-ch2": "node --test test/ch2-person-to-person.test.mjs",
+        "test:sarah-ch3": "node --test test/ch3-media-groups.test.mjs",
         "test:sarah-chat-foundation": "node --test test/c1-user-conversations-wp1.test.mjs test/ch1-messaging-foundation.test.mjs test/c2-sarah-inbox-channel.test.mjs test/user-conversations-u5.test.mjs",
         "verify:sprint1": "node scripts/verify-sprint1-flow.js",
         "verify:journey": "node scripts/verify-customer-journey.js",

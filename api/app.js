@@ -238,6 +238,7 @@ import { mountPlatformRevenueRoutes } from "../services/api/platformRevenueRoute
 import { mountSarahNetworkRoutes } from "../services/api/sarahNetworkRoutes.js";
 import { mountUserConversationRoutes } from "../services/api/userConversationRoutes.js";
 import { mountChatPersonRoutes } from "../services/api/chatPersonRoutes.js";
+import { mountChatGroupRoutes } from "../services/api/chatGroupRoutes.js";
 import { mountPersonalSarahRoutes } from "../services/api/personalSarahRoutes.js";
 import { mountPersonalKnowledgeRoutes } from "../services/api/personalKnowledgeRoutes.js";
 import { mountAutomotiveRoutes } from "../services/api/automotiveRoutes.js";
@@ -2721,6 +2722,7 @@ mountPlatformRevenueRoutes(app);
 mountSarahNetworkRoutes(app);
 mountUserConversationRoutes(app);
 mountChatPersonRoutes(app);
+mountChatGroupRoutes(app);
 mountPersonalSarahRoutes(app);
 mountPersonalKnowledgeRoutes(app);
 mountCustomerOpsRoutes(app);
