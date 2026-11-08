@@ -38,6 +38,15 @@ async function persist(conv, entry) {
 }
 
 /**
+ * Company answer text. Real dispatch (`dispatchCompanyReception`) returns `payload.naturalLanguage`;
+ * `reply` / `summary` are accepted as legacy shapes.
+ * @param {object} [response]
+ */
+export function networkResponseText(response) {
+    return String(response?.payload?.naturalLanguage || response?.reply || response?.summary || "").trim();
+}
+
+/**
  * Create or return Chat thread for a completed network request.
  * @param {object} requestDoc
  */
@@ -80,7 +89,7 @@ export async function ensureNetworkChatThread(requestDoc) {
     indexByPerson.set(personId, list);
 
     const enquiry = String(requestDoc.payload?.naturalLanguage || "").trim();
-    const responseText = String(requestDoc.response?.reply || requestDoc.response?.summary || "").trim();
+    const responseText = networkResponseText(requestDoc.response);
     const msgs = [];
     if (enquiry) {
         msgs.push({

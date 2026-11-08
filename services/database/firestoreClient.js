@@ -27,6 +27,10 @@ import {
     userConversationPath,
     userConversationMessagesCollectionPath,
     userConversationMessagePath,
+    BUSINESS_DIRECTORY,
+    businessDirectoryPath,
+    networkEntityPath,
+    networkRefPath,
 } from "./schema.js";
 import {
     getAdminFirestore,
@@ -240,6 +244,27 @@ export function userConversationMessageRef(conversationId, messageId) {
         return { __path: path, __admin: getAdminFirestore().doc(path), id: messageId };
     }
     return doc(db, USER_CONVERSATIONS.ROOT, conversationId, USER_CONVERSATIONS.MESSAGES, messageId);
+}
+
+/** SNET-01a — server-only (Admin SDK) top-level doc/collection refs. */
+function adminOnlyDocRef(path, id) {
+    return { __path: path, __admin: getAdminFirestore().doc(path), id };
+}
+
+export function networkEntityRef(snId) {
+    return adminOnlyDocRef(networkEntityPath(snId), snId);
+}
+
+export function networkRefDocRef(refDocId) {
+    return adminOnlyDocRef(networkRefPath(refDocId), refDocId);
+}
+
+export function businessDirectoryDocRef(companyId) {
+    return adminOnlyDocRef(businessDirectoryPath(companyId), companyId);
+}
+
+export function businessDirectoryCollectionRef() {
+    return { __path: BUSINESS_DIRECTORY.ROOT, __adminCol: getAdminFirestore().collection(BUSINESS_DIRECTORY.ROOT) };
 }
 
 export function personalSarahDocRef(uid, subcollection, docId) {

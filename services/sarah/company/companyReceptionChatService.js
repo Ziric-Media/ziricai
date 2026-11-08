@@ -1,7 +1,7 @@
 /**
  * U5 — User ↔ Company Sarah chat (Company Reception persona).
  */
-import { assertCompanyDiscoverable } from "../../users/businessDirectoryService.js";
+import { assertCompanyDiscoverableAsync } from "../../users/businessDirectoryService.js";
 import {
     openUserConversation,
     getUserConversationByCompany,
@@ -26,7 +26,7 @@ import { HANDOVER_STATES } from "../../users/messagingContracts.js";
  * Ensure thread exists and greeting is present for new chats.
  */
 export async function ensureCompanyChatThread(uid, companyId, consumerProfile = {}) {
-    assertCompanyDiscoverable(companyId);
+    await assertCompanyDiscoverableAsync(companyId);
     const preferredName =
         consumerProfile.preferredName || consumerProfile.firstName || consumerProfile.displayName || null;
     const conv = await openUserConversation(uid, companyId, {

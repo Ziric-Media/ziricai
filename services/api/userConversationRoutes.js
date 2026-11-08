@@ -8,7 +8,7 @@ import {
     sendCompanySarahMessage,
     getCompanyConversationForUser,
 } from "../sarah/company/companyReceptionChatService.js";
-import { getBusinessDirectoryEntry } from "../users/businessDirectoryService.js";
+import { listDiscoverCompanies } from "../users/businessDirectoryService.js";
 
 const chatRateLimit = authRateLimit("auth");
 
@@ -22,25 +22,7 @@ function profileFromReq(req) {
 export function mountUserConversationRoutes(app) {
     app.get("/api/discover/companies", requireConsumerScope(), async (_req, res) => {
         try {
-            const { SMILEMORE_DEMO_COMPANY_ID } = await import("../dental/smilemorePractice.js");
-            const pilots = String(process.env.SARAH_NETWORK_PILOT_COMPANY_IDS || SMILEMORE_DEMO_COMPANY_ID)
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean);
-            const companies = pilots.map((companyId) => {
-                const entry = getBusinessDirectoryEntry(companyId);
-                return {
-                    companyId,
-                    displayName: entry?.displayName || companyId,
-                    industry: entry?.industry || "Healthcare",
-                    location: entry?.location || "South Africa",
-                    verified: Boolean(entry?.verified),
-                    shortDescription:
-                        entry?.shortDescription ||
-                        "Chat with this business using Company Sarah on Sarah App.",
-                };
-            });
-            res.json({ companies });
+            res.json({ companies: await listDiscoverCompanies() });
         } catch (err) {
             res.status(500).json({ error: err.message || "Discover unavailable" });
         }

@@ -181,8 +181,12 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/sarah-network/requests", domain: "consumer", tenantScoped: false, description: "List network requests" },
     { method: "GET", path: "/api/sarah-network/requests/:requestId", domain: "consumer", tenantScoped: false, description: "Get network request" },
 
+    // SNET-01a — Network identity (tenant members / superadmin)
+    { method: "GET", path: "/api/network/v1/entities", domain: "network", tenantScoped: true, description: "Network entity by companyId (?companyId=)" },
+    { method: "GET", path: "/api/network/v1/entities/:snId", domain: "network", tenantScoped: true, description: "Network entity by SN-ID" },
+
     // U5 — Company conversations
-    { method: "GET", path: "/api/discover/companies", domain: "consumer", tenantScoped: false, description: "Pilot discover list" },
+    { method: "GET", path: "/api/discover/companies", domain: "consumer", tenantScoped: false, description: "Discover list (durable business directory)" },
     { method: "GET", path: "/api/user-conversations", domain: "consumer", tenantScoped: false, description: "User chat list" },
     { method: "GET", path: "/api/user-conversations/:companyId/messages", domain: "consumer", tenantScoped: false, description: "Company chat history" },
     { method: "POST", path: "/api/user-conversations/:companyId/messages", domain: "consumer", tenantScoped: false, description: "Send company Sarah message" },

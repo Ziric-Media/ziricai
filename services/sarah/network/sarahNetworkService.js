@@ -1,7 +1,7 @@
 /**
  * Sarah Network orchestration (U4).
  */
-import { assertCompanyDiscoverable } from "../../users/businessDirectoryService.js";
+import { assertCompanyDiscoverableAsync } from "../../users/businessDirectoryService.js";
 import { validateConsentGrant } from "../../users/consentGrantService.js";
 import { auditLog } from "../../audit/auditLog.js";
 import {
@@ -45,7 +45,7 @@ export async function submitPersonalToCompanyEnquiry(uid, input) {
         throw Object.assign(new Error("companyId is required."), { status: 400, code: "COMPANY_ID_REQUIRED" });
     }
 
-    assertCompanyDiscoverable(companyId);
+    await assertCompanyDiscoverableAsync(companyId);
 
     const grantId = input.grantId;
     if (!grantId) {

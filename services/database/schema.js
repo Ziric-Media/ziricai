@@ -177,6 +177,22 @@ export const BUSINESS_DIRECTORY = {
     SECTIONS: "sections",
 };
 
+/** SNET-01a — opaque Sarah Network identity (server writes only). See SNET_01a_SN_ID_ADR.md. */
+export const NETWORK_ENTITIES = {
+    ROOT: "networkEntities",
+    /** Reverse index: doc id `{kind}__{refKey}` → { snId } (create-if-absent; idempotent mint). */
+    REFS_ROOT: "networkRefs",
+    SCHEMA_VERSION: 1,
+};
+
+export function networkEntityPath(snId) {
+    return `${NETWORK_ENTITIES.ROOT}/${snId}`;
+}
+
+export function networkRefPath(refDocId) {
+    return `${NETWORK_ENTITIES.REFS_ROOT}/${refDocId}`;
+}
+
 /** Optional future platform person link index. */
 export const PERSON_LINKS = {
     ROOT: "personLinks",

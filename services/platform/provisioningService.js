@@ -19,6 +19,7 @@ import { seedDefaultDepartments } from "../tenants/departmentService.js";
 import { upsertTenantUser } from "../tenants/userService.js";
 import { createTrialSubscription } from "../payments/billingService.js";
 import { portalUrlForCompany } from "../core/siteUrls.js";
+import { ensureOrgEntitySafe } from "../network/networkIdentityService.js";
 import { listWorkflows as seedAutomationTemplates } from "../automation/workflowRegistry.js";
 import { pushActivity, createNotification } from "../tenants/notificationService.js";
 import { createWorkflow } from "../workflows/workflowService.js";
@@ -327,6 +328,9 @@ export async function provisionCompany(companyId, companyData = {}) {
         provisionedAt: timestamp,
         isNew: true,
     });
+
+    // SNET-01a: draft network identity for the tenant (not listed until published).
+    await ensureOrgEntitySafe(companyId, { displayName: name });
 
     return {
         companyId,
