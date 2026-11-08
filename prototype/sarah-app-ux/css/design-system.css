@@ -1,0 +1,315 @@
+:root {
+  --color-bg: #f4f6fb;
+  --color-feed-bg: #f0f2f5;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-text-secondary: #65676b;
+  --color-border: #e2e8f0;
+  --color-feed-divider: #ced0d4;
+  --color-primary: #5b21b6;
+  --color-primary-soft: #ede9fe;
+  --color-primary-hover: #4c1d95;
+  --color-company: #1e3a8a;
+  --color-company-soft: #dbeafe;
+  --color-success: #059669;
+  --color-chat-out: #2563eb;
+  --color-chat-in: #f1f5f9;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --font: "Roboto", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 15px;
+  --font-size-md: 15px;
+  --font-size-lg: 16px;
+  --line-height-body: 1.3333;
+  --line-height-post: 1.3333;
+  /* Type roles */
+  --type-post-size: clamp(15px, 2.5vw, 16px);
+  --type-post-weight: 400;
+  --type-username-size: 15px;
+  --type-username-weight: 600;
+  --type-comment-size: clamp(14px, 2.5vw, 15px);
+  --type-comment-weight: 400;
+  --type-comment-user-size: clamp(13px, 2.5vw, 14px);
+  --type-comment-user-weight: 600;
+  --type-timestamp-size: clamp(12px, 2.5vw, 13px);
+  --type-timestamp-weight: 400;
+  --type-action-size: clamp(14px, 2.5vw, 15px);
+  --type-action-weight: 600;
+  --type-nav-size: 13px;
+  --type-nav-weight: 500;
+  --type-nav-size-emphasis: 14px;
+  --type-nav-weight-emphasis: 600;
+  --type-section-heading-size: clamp(18px, 3vw, 20px);
+  --type-section-heading-weight: 700;
+  --type-page-heading-size: clamp(20px, 3.5vw, 24px);
+  --type-page-heading-weight: 700;
+  --type-desc-size: clamp(12px, 2.5vw, 13px);
+  --type-desc-weight: 400;
+  --nav-h: 64px;
+  --proto-banner-h: 36px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--font);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-body);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+p {
+  margin: 0 0 0.65em;
+}
+
+p:last-child {
+  margin-bottom: 0;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #6d28d9, #5b21b6);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #5b21b6, #4c1d95);
+}
+
+.btn-company {
+  background: var(--color-company);
+  color: #fff;
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: 8px 12px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border: none;
+}
+
+.badge-verified {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-company);
+  background: var(--color-company-soft);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-border);
+}
+
+.avatar-sm {
+  width: 36px;
+  height: 36px;
+}
+
+.avatar-xs {
+  width: 32px;
+  height: 32px;
+}
+
+.avatar-lg {
+  width: 72px;
+  height: 72px;
+}
+
+.avatar-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.avatar-wrap .dot-online {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  background: var(--color-success);
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+}
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  background: var(--color-surface);
+}
+
+.input:focus,
+.textarea:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-color: transparent;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #f1f5f9;
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+}
+
+.search-bar input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  outline: none;
+}
+
+/* Semantic type roles (map in docs: class → UI element) */
+.text-post {
+  font-size: var(--type-post-size);
+  font-weight: var(--type-post-weight);
+  line-height: var(--line-height-post);
+}
+
+.text-username {
+  font-size: var(--type-username-size);
+  font-weight: var(--type-username-weight);
+  line-height: 1.2;
+}
+
+.text-comment {
+  font-size: var(--type-comment-size);
+  font-weight: var(--type-comment-weight);
+  line-height: var(--line-height-post);
+}
+
+.text-comment-user {
+  font-size: var(--type-comment-user-size);
+  font-weight: var(--type-comment-user-weight);
+  line-height: 1.2;
+}
+
+.text-timestamp {
+  font-size: var(--type-timestamp-size);
+  font-weight: var(--type-timestamp-weight);
+  line-height: 1.2;
+  color: var(--color-text-secondary);
+}
+
+.text-action {
+  font-size: var(--type-action-size);
+  font-weight: var(--type-action-weight);
+  line-height: 1.2;
+}
+
+.text-nav-label {
+  font-size: var(--type-nav-size);
+  font-weight: var(--type-nav-weight);
+}
+
+.text-section-heading {
+  font-size: var(--type-section-heading-size);
+  font-weight: var(--type-section-heading-weight);
+  line-height: 1.25;
+}
+
+.text-page-heading {
+  font-size: var(--type-page-heading-size);
+  font-weight: var(--type-page-heading-weight);
+  line-height: 1.2;
+}
+
+.text-desc {
+  font-size: var(--type-desc-size);
+  font-weight: var(--type-desc-weight);
+  line-height: 1.3333;
+  color: var(--color-text-secondary);
+}
