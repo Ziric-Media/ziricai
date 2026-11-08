@@ -125,6 +125,22 @@ export function getNetworkChatMessages(conversationId) {
     return messagesByConversation.get(conversationId) || [];
 }
 
+/**
+ * @param {string} userId
+ * @param {string} conversationId
+ */
+export function getNetworkLinkedConversation(userId, conversationId) {
+    const conv = conversations.get(conversationId);
+    if (!conv || conv.type !== CONVERSATION_TYPES.AI_TO_AI) {
+        throw Object.assign(new Error("Conversation not found."), { status: 404, code: "CONVERSATION_NOT_FOUND" });
+    }
+    const personId = personIdFromUserId(userId);
+    if (conv.personId !== personId && conv.userId !== userId) {
+        throw Object.assign(new Error("Forbidden."), { status: 403, code: "CONVERSATION_FORBIDDEN" });
+    }
+    return conv;
+}
+
 export function clearNetworkChatLinksForTests() {
     conversations.clear();
     requestIndex.clear();

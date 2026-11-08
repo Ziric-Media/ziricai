@@ -42,6 +42,9 @@ export function navigateTo(route) {
     if (!host.dataset.keepChatThread) {
       host.dataset.activeCompany = '';
       host.dataset.activeCompanyName = '';
+      host.dataset.activeThreadKind = '';
+      host.dataset.activeConvId = '';
+      host.dataset.activeThreadTitle = '';
     }
     host.dataset.keepChatThread = '';
     renderChats(host);

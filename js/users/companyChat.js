@@ -34,3 +34,31 @@ export async function requestHumanHandover(companyId) {
     body: JSON.stringify({}),
   });
 }
+
+export async function fetchPersonMessages(conversationId) {
+  return apiRequest(`/api/person-conversations/${encodeURIComponent(conversationId)}/messages`);
+}
+
+export async function sendPersonMessage(conversationId, message) {
+  return apiRequest(`/api/person-conversations/${encodeURIComponent(conversationId)}/messages`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ message }),
+  });
+}
+
+export async function fetchGroupMessages(groupId) {
+  return apiRequest(`/api/group-conversations/${encodeURIComponent(groupId)}/messages`);
+}
+
+export async function sendGroupMessage(groupId, message) {
+  return apiRequest(`/api/group-conversations/${encodeURIComponent(groupId)}/messages`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ message }),
+  });
+}
+
+export async function fetchNetworkMessages(conversationId) {
+  return apiRequest(`/api/network-conversations/${encodeURIComponent(conversationId)}/messages`);
+}

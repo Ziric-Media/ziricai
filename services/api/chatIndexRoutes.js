@@ -4,6 +4,10 @@
 import { requireConsumerScope } from "../auth/consumerAuth.js";
 import { listFederatedChatConversations } from "../users/chatConversationIndexService.js";
 import { syncOwnershipFromTenant } from "../users/handoverStateService.js";
+import {
+    getNetworkLinkedConversation,
+    getNetworkChatMessages,
+} from "../users/sarahNetworkChatLinkService.js";
 
 /**
  * @param {import('express').Express} app
@@ -17,6 +21,18 @@ export function mountChatIndexRoutes(app) {
             res.json({ conversations, filter: filter || "all" });
         } catch (err) {
             res.status(500).json({ error: err.message || "Failed to load chat index" });
+        }
+    });
+
+    app.get("/api/network-conversations/:conversationId/messages", requireConsumerScope(), async (req, res) => {
+        try {
+            const conv = getNetworkLinkedConversation(req.consumerAuth.uid, req.params.conversationId);
+            res.json({ conversation: conv, messages: getNetworkChatMessages(conv.id) });
+        } catch (err) {
+            res.status(err.status || 500).json({
+                error: err.message || "Failed to load network thread",
+                code: err.code || "NETWORK_LOAD_FAILED",
+            });
         }
     });
 
