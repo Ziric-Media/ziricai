@@ -170,7 +170,7 @@ function copyFile(src, dest) {
 /** Logo + favicon.png for MC and portal; optional legacy SVG favicons for white-label hints. */
 function copyPlatformBrandAssets(targetDir, extraAssetNames = []) {
   fs.mkdirSync(path.join(targetDir, 'assets'), { recursive: true });
-  const names = ['favicon.png', 'ZIRICAI LOGO.png', 'sarah-avatar.svg', ...extraAssetNames];
+  const names = ['favicon.png', 'ZIRICAI LOGO.png', 'sarah-avatar.svg', 'sarah-avatar.png', ...extraAssetNames];
   for (const name of names) {
     const src = path.join(ROOT, 'assets', name);
     if (fs.existsSync(src)) {
@@ -775,7 +775,7 @@ function assertUsersShellComplete(dir) {
     if (!ref || /^(?:[a-z]+:)?\/\//i.test(ref) || ref.startsWith('data:')) continue;
     refs.add(ref.replace(/^\//, ''));
   }
-  for (const extra of ['manifest.webmanifest', 'offline.html', 'sw.js', 'assets/icon-192.png', 'assets/icon-512.png']) {
+  for (const extra of ['manifest.webmanifest', 'offline.html', 'sw.js', 'assets/icon-192.png', 'assets/icon-512.png', 'assets/sarah-avatar.png']) {
     refs.add(extra);
   }
   const missing = [...refs].filter((r) => !fs.existsSync(path.join(dir, r)));
