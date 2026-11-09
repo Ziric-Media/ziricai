@@ -337,7 +337,56 @@ function renderProtoSearchResults(query) {
   });
 }
 
+/**
+ * Phase 2.0: in live mode the bell shows the server inbox (GET /api/network/v1/my-notifications — subscriber
+ * announcements / reminders from organisations the user subscribed to). Fixtures only render when live mode is off.
+ */
+const liveNotifs = { items: [], unread: 0, loaded: false, loading: false, error: '', timer: null };
+
+function notifLiveActive() {
+  return Boolean(window.SarahLive?.isLiveEnabled?.() && window.SarahLive?.fetchMyNotifications);
+}
+
+function formatNotifTime(iso) {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return new Date(t).toLocaleDateString();
+}
+
+async function refreshLiveNotifications() {
+  if (!notifLiveActive() || liveNotifs.loading) return;
+  liveNotifs.loading = true;
+  const res = await window.SarahLive.fetchMyNotifications(30);
+  liveNotifs.loading = false;
+  liveNotifs.loaded = true;
+  if (res.error) {
+    liveNotifs.error = res.error;
+    liveNotifs.items = [];
+    liveNotifs.unread = 0;
+  } else {
+    liveNotifs.error = '';
+    liveNotifs.items = res.notifications || [];
+    liveNotifs.unread = Number(res.unread) || 0;
+  }
+  syncNotificationBadge();
+  if (!document.getElementById('protoNotifSheet')?.classList.contains('hidden')) renderProtoNotifications();
+}
+
+function startLiveNotificationPolling() {
+  if (liveNotifs.timer || !notifLiveActive()) return;
+  void refreshLiveNotifications();
+  liveNotifs.timer = setInterval(() => {
+    if (!document.hidden) void refreshLiveNotifications();
+  }, 60000);
+}
+
 function unreadNotificationCount() {
+  if (notifLiveActive()) return liveNotifs.unread;
   const dismissed = getSarahRuntime().notifDismissed || {};
   return (MOCK_NOTIFICATIONS || []).filter((n) => n.unread && !dismissed[n.id]).length;
 }
@@ -346,8 +395,9 @@ function syncNotificationBadge() {
   const count = unreadNotificationCount();
   const badge = document.getElementById('statusNotifBadge');
   if (!badge) return;
-  badge.textContent = String(count);
+  badge.textContent = count > 99 ? '99+' : String(count);
   badge.hidden = count <= 0;
+  if (notifLiveActive()) startLiveNotificationPolling();
 }
 
 function openProtoNotifSheet() {
@@ -355,6 +405,46 @@ function openProtoNotifSheet() {
   sheet?.classList.remove('hidden');
   sheet?.setAttribute('aria-hidden', 'false');
   renderProtoNotifications();
+  if (notifLiveActive()) void refreshLiveNotifications();
+}
+
+function renderLiveNotifications(host) {
+  if (liveNotifs.error) {
+    host.innerHTML = `<p class="proto-search-empty">${escapeHtml(
+      /sign/i.test(liveNotifs.error) ? 'Sign in to see notifications from businesses you subscribe to.' : 'Notifications are unavailable right now.'
+    )}</p>`;
+    return;
+  }
+  if (!liveNotifs.items.length) {
+    host.innerHTML = `<p class="proto-search-empty">${liveNotifs.loaded ? 'No notifications yet. Subscribe to a business to receive its updates.' : 'Loading…'}</p>`;
+    return;
+  }
+  host.innerHTML = liveNotifs.items
+    .map(
+      (n) => `
+    <button type="button" class="proto-notif-item ${n.read ? '' : 'is-unread'}" data-live-notif-id="${escapeHtml(n.notificationId)}">
+      <span class="proto-notif-title">${escapeHtml(n.title)}${n.organisation?.displayName ? ` · ${escapeHtml(n.organisation.displayName)}` : ''}</span>
+      <span class="proto-notif-body">${escapeHtml(n.body || '')}</span>
+      <span class="proto-notif-time">${escapeHtml(formatNotifTime(n.createdAt))}</span>
+    </button>`
+    )
+    .join('');
+  host.querySelectorAll('[data-live-notif-id]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.liveNotifId;
+      const item = liveNotifs.items.find((n) => n.notificationId === id);
+      if (!item || item.read) return;
+      item.read = true;
+      liveNotifs.unread = Math.max(0, liveNotifs.unread - 1);
+      btn.classList.remove('is-unread');
+      syncNotificationBadge();
+      const res = await window.SarahLive.markNotificationsRead({ ids: [id] });
+      if (!res.error && typeof res.unread === 'number') {
+        liveNotifs.unread = res.unread;
+        syncNotificationBadge();
+      }
+    });
+  });
 }
 
 function closeProtoNotifSheet() {
@@ -365,6 +455,10 @@ function closeProtoNotifSheet() {
 function renderProtoNotifications() {
   const host = document.getElementById('protoNotifList');
   if (!host) return;
+  if (notifLiveActive()) {
+    renderLiveNotifications(host);
+    return;
+  }
   const rt = getSarahRuntime();
   if (!rt.notifDismissed) rt.notifDismissed = {};
   host.innerHTML = (MOCK_NOTIFICATIONS || [])
@@ -433,6 +527,22 @@ function bindProtoSearchAndNotif() {
     renderDiscover();
   });
 
+  // Phase 2.0 geo: place filter (city or province) → /api/discover/companies?city=|region=
+  const discoverPlaceEl = document.getElementById('discoverPlaceInput');
+  const applyDiscoverPlace = (value) => {
+    discoverPlaceQuery = String(value || '').trim();
+    renderDiscover();
+  };
+  discoverPlaceEl?.addEventListener('input', (e) => {
+    if (discoverPlaceDebounceTimer) clearTimeout(discoverPlaceDebounceTimer);
+    const next = e.target.value;
+    discoverPlaceDebounceTimer = setTimeout(() => applyDiscoverPlace(next), 250);
+  });
+  discoverPlaceEl?.addEventListener('search', (e) => {
+    if (discoverPlaceDebounceTimer) clearTimeout(discoverPlaceDebounceTimer);
+    applyDiscoverPlace(e.target.value);
+  });
+
   document.querySelectorAll('[data-proto-sheet-close]').forEach((el) => {
     el.addEventListener('click', () => {
       const which = el.getAttribute('data-proto-sheet-close');
@@ -454,6 +564,19 @@ let activeFeedTab = 'for-you';
 let activeDiscoverCategory = 'all';
 let discoverSearchQuery = '';
 let discoverSearchDebounceTimer = null;
+let discoverPlaceQuery = '';
+let discoverPlaceDebounceTimer = null;
+const DISCOVER_PROVINCES = [
+  'eastern cape',
+  'free state',
+  'gauteng',
+  'kwazulu-natal',
+  'limpopo',
+  'mpumalanga',
+  'north west',
+  'northern cape',
+  'western cape',
+];
 let pendingDiscoverSearchFromOrg = '';
 /**
  * SNET-01b: live Discover directory (GET /api/discover/companies). In live mode the mock fixtures are
@@ -467,6 +590,7 @@ const liveDiscover = {
   facets: [],
   query: null,
   category: null,
+  place: '',
   /** every live card seen this session, keyed by companyId (detail pages / chat headers survive new searches) */
   byId: new Map(),
 };
@@ -8016,9 +8140,14 @@ async function refreshLiveDiscover() {
   liveDiscover.error = '';
   liveDiscover.query = discoverSearchQuery;
   liveDiscover.category = activeDiscoverCategory;
+  liveDiscover.place = discoverPlaceQuery;
+  const placeKey = discoverPlaceQuery.toLowerCase();
+  const isProvince = DISCOVER_PROVINCES.includes(placeKey);
   const res = await window.SarahLive.fetchDiscoverCompanies({
     q: discoverSearchQuery,
     category: activeDiscoverCategory,
+    city: discoverPlaceQuery && !isProvince ? discoverPlaceQuery : '',
+    region: isProvince ? discoverPlaceQuery : '',
   });
   liveDiscover.loading = false;
   liveDiscover.loaded = true;
@@ -8042,7 +8171,8 @@ function ensureLiveDiscoverFresh() {
   if (
     !liveDiscover.loaded ||
     liveDiscover.query !== discoverSearchQuery ||
-    liveDiscover.category !== activeDiscoverCategory
+    liveDiscover.category !== activeDiscoverCategory ||
+    (liveDiscover.place || '') !== discoverPlaceQuery
   ) {
     void refreshLiveDiscover();
   }
@@ -8126,6 +8256,13 @@ function renderDiscover() {
   }
 
   const live = discoverLiveActive();
+  // Phase 2.0: the place filter is a server-side search, so it only exists in live mode.
+  const placeWrap = document.getElementById('discoverPlaceWrap');
+  if (placeWrap) placeWrap.hidden = !live;
+  const placeInput = document.getElementById('discoverPlaceInput');
+  if (placeInput && placeInput.value !== discoverPlaceQuery && document.activeElement !== placeInput) {
+    placeInput.value = discoverPlaceQuery;
+  }
   ensureLiveDiscoverFresh();
   ensureLiveConnectionsFresh();
 

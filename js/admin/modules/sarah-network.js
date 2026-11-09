@@ -1,19 +1,26 @@
 /**
  * Mission Control — Sarah Network (SNET-09).
- * Overview · Entities · Verification queue · Moderation (list + audited decisions through a form modal).
- * Reads/writes only the platform APIs under /api/platform/network/v1 (superadmin / platform key).
+ * Overview · Entities · Verification queue · Moderation · Search (categories + synonyms) · Access (platform roles).
+ * Reads/writes only the platform APIs under /api/platform/network/v1 (Super Admin, platform key, or a scoped
+ * Sarah Network role such as Verification Officer / Search Admin).
  */
 import { escapeHtml, formatDate, formatNumber, pageHeader, showToast, statusBadge } from '../ui.js';
 import {
   changeNetworkEntityStatus,
   decideNetworkModeration,
   decideNetworkVerification,
+  downloadNetworkEvidenceFile,
   fetchNetworkEntities,
   fetchNetworkEntity,
   fetchNetworkModeration,
+  fetchNetworkRoles,
+  fetchNetworkSearchConfig,
   fetchNetworkStats,
   fetchNetworkVerificationCase,
   fetchNetworkVerificationQueue,
+  resetNetworkSearchConfig,
+  saveNetworkSearchConfig,
+  setNetworkRoles,
 } from '../api.js';
 
 const TABS = [
@@ -21,6 +28,8 @@ const TABS = [
   { id: 'entities', label: 'Entities' },
   { id: 'verification', label: 'Verification queue' },
   { id: 'moderation', label: 'Moderation' },
+  { id: 'search', label: 'Search' },
+  { id: 'access', label: 'Access' },
 ];
 
 let activeTab = 'overview';
@@ -59,20 +68,26 @@ function verificationBadge(state) {
 /* ---------- Decision modal (form dialog; replaces browser prompt boxes) ---------- */
 
 /** One evidence reference → safe markup (links only for https URLs). */
-function evidenceItemHtml(ev) {
+function evidenceItemHtml(ev, caseId = '') {
   const href = typeof ev.url === 'string' && /^https:\/\//i.test(ev.url) ? ev.url : '';
   const target = href
     ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(ev.label)}</a>`
     : escapeHtml(ev.label);
-  // Gate 6: uploaded file reference (name / size / checksum — the bytes themselves are not stored yet).
+  // Gate 6: uploaded file reference (name / size / checksum). Phase 2.0: the bytes are stored → officer download.
   const file = ev.file
     ? ` · file ${escapeHtml(ev.file.fileName || 'upload')} (${escapeHtml(String(Math.max(1, Math.round((ev.file.byteLength || 0) / 1024))))} KB, ${escapeHtml(
         String(ev.file.mimeType || '')
       )}, sha256 ${escapeHtml(String(ev.file.sha256 || '').slice(0, 16))}…)`
     : '';
+  const download =
+    ev.file?.stored && caseId && ev.evidenceId
+      ? ` <button type="button" class="btn btn-secondary btn-sm" data-snet-download data-case-id="${escapeHtml(caseId)}" data-evidence-id="${escapeHtml(ev.evidenceId)}" data-file-name="${escapeHtml(ev.file.fileName || 'evidence')}">Download</button>`
+      : ev.file
+        ? ' <span class="panel-hint">(checksum only — not downloadable)</span>'
+        : '';
   return `<li>${target} <span class="panel-hint">${escapeHtml(String(ev.kind || '').replace(/_/g, ' '))}${
     ev.ref ? ` · ref ${escapeHtml(ev.ref)}` : ''
-  }${file}</span></li>`;
+  }${file}</span>${download}</li>`;
 }
 
 /**
@@ -89,6 +104,7 @@ function openDecisionModal({
   minNote = 1,
   checks = null,
   evidence = null,
+  caseId = '',
   confirmLabel = 'Confirm',
   danger = false,
 }) {
@@ -107,7 +123,7 @@ function openDecisionModal({
     const evidenceHtml = Array.isArray(evidence)
       ? `<div class="form-group"><label>Evidence references (${formatNumber(evidence.length)})</label>${
           evidence.length
-            ? `<ul>${evidence.map(evidenceItemHtml).join('')}</ul>`
+            ? `<ul>${evidence.map((ev) => evidenceItemHtml(ev, caseId)).join('')}</ul>`
             : '<div class="panel-hint">None attached. You can ask the business for more with “Request info”.</div>'
         }</div>`
       : '';
@@ -141,6 +157,18 @@ function openDecisionModal({
     document.addEventListener('keydown', onKey);
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) done(null);
+    });
+    overlay.querySelectorAll('[data-snet-download]').forEach((dl) => {
+      dl.onclick = async () => {
+        dl.disabled = true;
+        const res = await downloadNetworkEvidenceFile(dl.dataset.caseId, dl.dataset.evidenceId, dl.dataset.fileName);
+        dl.disabled = false;
+        if (res.error) errEl.textContent = typeof res.error === 'string' ? res.error : 'Download failed.';
+        else {
+          errEl.textContent = '';
+          showToast('Evidence downloaded (audited)', 'success');
+        }
+      };
     });
     overlay.querySelector('[data-snet-modal-cancel]').onclick = () => done(null);
     overlay.querySelector('[data-snet-modal-confirm]').onclick = () => {
@@ -324,6 +352,117 @@ async function moderationHtml() {
     </div>`;
 }
 
+/* ---------- Search administration (Phase 2.0): Discover categories + synonyms ---------- */
+
+function categoriesToText(categories = []) {
+  return categories.map((c) => `${c.id} | ${c.label} | ${(c.keywords || []).join(', ')}`).join('\n');
+}
+
+function synonymsToText(synonyms = {}) {
+  return Object.entries(synonyms)
+    .map(([term, list]) => `${term}: ${(list || []).join(', ')}`)
+    .join('\n');
+}
+
+/** "id | Label | kw, kw" per line → [{ id, label, keywords[] }] (server validates). */
+function parseCategoriesText(text) {
+  return String(text || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [id = '', label = '', keywords = ''] = line.split('|').map((s) => s.trim());
+      return { id, label, keywords: keywords.split(',').map((k) => k.trim()).filter(Boolean) };
+    });
+}
+
+/** "term: a, b, c" per line → { term: [a, b, c] }. */
+function parseSynonymsText(text) {
+  const out = {};
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const idx = line.indexOf(':');
+    if (idx < 1) throw new Error(`Synonym line needs "term: word, word": ${line.slice(0, 40)}`);
+    out[line.slice(0, idx).trim()] = line
+      .slice(idx + 1)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return out;
+}
+
+async function searchHtml() {
+  const res = await fetchNetworkSearchConfig();
+  if (res.error) return errorBlock(errText(res));
+  const c = body(res);
+  if (!c) return errorBlock('No data returned.');
+  const o = c.overridden || {};
+  const l = c.limits || {};
+  return `
+    <div class="profile-card">
+      <h4>Discover categories ${o.categories ? '<span class="status-badge pending">customised</span>' : '<span class="status-badge active">defaults</span>'}</h4>
+      <div class="panel-hint">One per line: <code>id | Label | keyword, keyword</code>. Keywords map a business to the category by its name, tags and description. Up to ${formatNumber(l.maxCategories || 24)} categories.</div>
+      <textarea id="snetCategoriesText" rows="12" spellcheck="false" style="width:100%;font-family:monospace;margin-top:8px;">${escapeHtml(categoriesToText(c.categories))}</textarea>
+      <div class="modal-actions" style="margin-top:8px;"><button type="button" class="btn btn-primary btn-sm" data-snet-search-save="categories">Save categories</button></div>
+    </div>
+    <div class="profile-card" style="margin-top:16px;">
+      <h4>Search synonyms ${o.synonyms ? '<span class="status-badge pending">customised</span>' : '<span class="status-badge active">defaults</span>'}</h4>
+      <div class="panel-hint">One per line: <code>term: related, related</code>. A search for the term also matches the related words. Up to ${formatNumber(l.maxSynonymTerms || 200)} terms.</div>
+      <textarea id="snetSynonymsText" rows="12" spellcheck="false" style="width:100%;font-family:monospace;margin-top:8px;">${escapeHtml(synonymsToText(c.synonyms))}</textarea>
+      <div class="modal-actions" style="margin-top:8px;">
+        <button type="button" class="btn btn-secondary btn-sm" data-snet-search-reset>Reset all to defaults</button>
+        <button type="button" class="btn btn-primary btn-sm" data-snet-search-save="synonyms">Save synonyms</button>
+      </div>
+    </div>
+    <div class="panel-hint" id="snetSearchStatus" role="status" style="margin-top:8px;">${
+      c.updatedAt ? `Last changed ${escapeHtml(new Date(c.updatedAt).toLocaleString())} by ${escapeHtml(c.updatedBy || 'unknown')} (v${escapeHtml(String(c.version || 0))}).` : 'Using shipped defaults.'
+    } Changes are audited and reach every server within about 30 seconds.</div>`;
+}
+
+/* ---------- Access (Phase 2.0): platform roles — Super Admin only ---------- */
+async function accessHtml() {
+  const res = await fetchNetworkRoles();
+  if (res.error) {
+    return res.status === 403
+      ? '<div class="profile-card"><strong>Super Admin only</strong><div class="panel-hint">Granting Sarah Network roles needs a Super Admin account.</div></div>'
+      : errorBlock(errText(res));
+  }
+  const { roles = [], grants = [] } = body(res) || {};
+  const roleLabel = (id) => roles.find((r) => r.id === id)?.label || id;
+  return `
+    <div class="profile-card">
+      <h4>Roles</h4>
+      <ul>${roles
+        .map((r) => `<li><strong>${escapeHtml(r.label)}</strong> <span class="panel-hint">${escapeHtml(r.id)} · ${escapeHtml((r.permissions || []).join(', '))}</span></li>`)
+        .join('')}</ul>
+    </div>
+    <div class="table-container" style="margin-top:16px;">
+      <table class="org-table">
+        <thead><tr><th>User id</th><th>Roles</th><th>Updated</th><th></th></tr></thead>
+        <tbody>${
+          grants
+            .map(
+              (g) => `<tr><td>${escapeHtml(g.uid)}</td><td>${escapeHtml((g.roles || []).map(roleLabel).join(', '))}</td><td>${escapeHtml(formatDate(g.updatedAt))}<span class="panel-hint">${escapeHtml(g.updatedBy || '')}</span></td>
+              <td><button type="button" class="btn btn-secondary btn-sm" data-snet-role-revoke="${escapeHtml(g.uid)}">Revoke</button></td></tr>`
+            )
+            .join('') || '<tr><td colspan="4" class="panel-hint">No role grants yet. Super Admins always have full access.</td></tr>'
+        }</tbody>
+      </table>
+    </div>
+    <div class="profile-card" style="margin-top:16px;">
+      <h4>Grant roles</h4>
+      <div class="form-group"><label for="snetRoleUid">User id (Firebase UID)</label><input type="text" id="snetRoleUid" autocomplete="off"></div>
+      <div class="form-group">${roles
+        .map((r) => `<label style="display:block;font-weight:400;"><input type="checkbox" name="snetRole" value="${escapeHtml(r.id)}"> ${escapeHtml(r.label)}</label>`)
+        .join('')}</div>
+      <div class="panel-hint" id="snetRoleError" role="alert" style="color:var(--danger);min-height:1.2em;"></div>
+      <button type="button" class="btn btn-primary btn-sm" data-snet-role-save>Save roles</button>
+      <div class="panel-hint">Replaces the user's roles. Saving with none selected revokes access. Audited.</div>
+    </div>`;
+}
+
 function errorBlock(message) {
   return `<div class="profile-card" style="border-color:var(--danger);"><strong>Unable to load</strong><div class="panel-hint">${escapeHtml(message)}</div></div>`;
 }
@@ -341,7 +480,11 @@ async function paint(container) {
           ? await verificationHtml()
           : activeTab === 'moderation'
             ? await moderationHtml()
-            : await overviewHtml();
+            : activeTab === 'search'
+              ? await searchHtml()
+              : activeTab === 'access'
+                ? await accessHtml()
+                : await overviewHtml();
   } catch (err) {
     host.innerHTML = errorBlock(err?.message || 'Failed to load.');
   }
@@ -388,6 +531,80 @@ function bind(container) {
       paint(container);
     };
   }
+
+  container.querySelectorAll('[data-snet-search-save]').forEach((btn) => {
+    btn.onclick = async () => {
+      const part = btn.dataset.snetSearchSave;
+      let payload;
+      try {
+        payload = part === 'categories'
+          ? { categories: parseCategoriesText(container.querySelector('#snetCategoriesText')?.value) }
+          : { synonyms: parseSynonymsText(container.querySelector('#snetSynonymsText')?.value) };
+      } catch (e) {
+        return showToast(e.message, 'error');
+      }
+      const res = await saveNetworkSearchConfig(payload);
+      if (res.error) return showToast(errText(res), 'error');
+      showToast(part === 'categories' ? 'Categories saved' : 'Synonyms saved', 'success');
+      paint(container);
+    };
+  });
+
+  const resetBtn = container.querySelector('[data-snet-search-reset]');
+  if (resetBtn) {
+    resetBtn.onclick = async () => {
+      const result = await openDecisionModal({
+        title: 'Reset search configuration',
+        lead: 'Categories and synonyms return to the shipped defaults for every user.',
+        noteRequired: false,
+        noteLabel: 'Note',
+        confirmLabel: 'Reset',
+        danger: true,
+      });
+      if (!result) return;
+      const res = await resetNetworkSearchConfig();
+      if (res.error) return showToast(errText(res), 'error');
+      showToast('Search configuration reset to defaults', 'success');
+      paint(container);
+    };
+  }
+
+  const saveRole = container.querySelector('[data-snet-role-save]');
+  if (saveRole) {
+    saveRole.onclick = async () => {
+      const uid = container.querySelector('#snetRoleUid')?.value.trim();
+      const errEl = container.querySelector('#snetRoleError');
+      if (!uid) {
+        errEl.textContent = 'Enter a user id.';
+        return;
+      }
+      const roles = [...container.querySelectorAll('input[name="snetRole"]:checked')].map((i) => i.value);
+      const res = await setNetworkRoles(uid, { roles });
+      if (res.error) {
+        errEl.textContent = errText(res);
+        return;
+      }
+      showToast(roles.length ? 'Roles saved' : 'Roles revoked', 'success');
+      paint(container);
+    };
+  }
+  container.querySelectorAll('[data-snet-role-revoke]').forEach((btn) => {
+    btn.onclick = async () => {
+      const result = await openDecisionModal({
+        title: 'Revoke roles',
+        lead: `Remove all Sarah Network roles from ${btn.dataset.snetRoleRevoke}.`,
+        noteRequired: false,
+        noteLabel: 'Note',
+        confirmLabel: 'Revoke',
+        danger: true,
+      });
+      if (!result) return;
+      const res = await setNetworkRoles(btn.dataset.snetRoleRevoke, { roles: [] });
+      if (res.error) return showToast(errText(res), 'error');
+      showToast('Roles revoked', 'success');
+      paint(container);
+    };
+  });
 
   container.querySelectorAll('[data-snet-moderate]').forEach((btn) => {
     btn.onclick = async () => {
@@ -480,6 +697,7 @@ function bind(container) {
           confirmLabel: labels[1],
           noteLabel: labels[2],
           evidence,
+          caseId: btn.dataset.caseId,
           checks: action === 'verify' ? known : null,
           danger: action === 'reject' || action === 'restrict',
         });

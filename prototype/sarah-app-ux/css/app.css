@@ -825,6 +825,29 @@
   background: #f3f5f9;
 }
 
+/* Phase 2.0: place (city / province) filter under the search bar */
+.discover-search-wrap .discover-place {
+  margin-top: 8px;
+}
+.discover-search-wrap .discover-place[hidden] {
+  display: none;
+}
+.discover-search-wrap .discover-place input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+.discover-search-wrap .discover-place input:focus {
+  outline: 2px solid #7c3aed;
+  outline-offset: 1px;
+}
+
 .discover-cats-wrap {
   overflow-x: auto;
   padding: 0 16px 14px;

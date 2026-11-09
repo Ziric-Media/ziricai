@@ -355,6 +355,165 @@ export async function fetchChatConversations(filter = 'all') {
   return apiRequest(`/api/chat/conversations${qs}`);
 }
 
+/**
+ * SNET-01b — live Discover directory (published Sarah Network businesses).
+ * Public read: works signed out (the server only returns listed, non-suspended entries).
+ */
+export async function fetchDiscoverCompanies({ q = '', category = '', limit = 50, city = '', region = '', near = '', radiusKm = '' } = {}) {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (category && category !== 'all') params.set('category', category);
+  // Phase 2.0 geo filters (server: /api/discover/companies)
+  if (city) params.set('city', city);
+  if (region) params.set('region', region);
+  if (near) params.set('near', near);
+  if (near && radiusKm) params.set('radiusKm', String(radiusKm));
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  return apiRequest(`/api/discover/companies${qs ? `?${qs}` : ''}`);
+}
+
+/* ---------- SNET-11 — relationships (follow / subscribe) keyed by SN-ID ---------- */
+
+const SUBSCRIBE_SCOPE = 'sarah_network_subscription';
+
+/** v1 envelope errors are `{ code, message }`; normalise to string + code for the UI. */
+function normaliseNetworkResult(res) {
+  if (!res.error) return { data: res.data?.data ?? res.data };
+  const e = res.error;
+  const isObj = typeof e === 'object' && e !== null;
+  return {
+    error: isObj ? e.message || e.code || 'Request failed' : e,
+    code: (isObj && e.code) || res.code,
+    status: res.status,
+  };
+}
+
+async function requireSignedInConsumer() {
+  if (!signedInUser) return { error: 'Sign in to continue', code: 'AUTH_REQUIRED' };
+  try {
+    await ensureConsumerProfile();
+  } catch (err) {
+    return { error: err.message || 'Could not set up your Sarah profile', code: 'CONSUMER_PROFILE_REQUIRED' };
+  }
+  return null;
+}
+
+/** All of the signed-in user's relationships → `{ connections: [{ snId, state, consent }] }`. */
+export async function fetchConnections() {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(await apiRequest('/api/network/v1/connections', { silent: true }));
+  return out.error ? out : { connections: out.data?.connections || [] };
+}
+
+/**
+ * Apply a consumer relationship action (follow | unfollow | unsubscribe | block | …) → `{ connection }`.
+ * `subscribe` needs a consent grant — use `subscribeToEntity`.
+ */
+export async function setEntityRelationship(snId, action, options = {}) {
+  const id = String(snId || '').trim();
+  if (!id) return { error: 'This business has no Sarah Network ID yet', code: 'SNID_REQUIRED' };
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(
+    await apiRequest('/api/network/v1/connections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ snId: id, action, grantId: options.grantId || undefined }),
+    })
+  );
+  return out.error ? out : { connection: out.data?.connection };
+}
+
+/** Subscribe = standing, entity-scoped consent grant + `subscribe` action (nothing is disclosed by default). */
+export async function subscribeToEntity(snId, { disclosedFields = [] } = {}) {
+  const id = String(snId || '').trim();
+  if (!id) return { error: 'This business has no Sarah Network ID yet', code: 'SNID_REQUIRED' };
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const grantRes = normaliseNetworkResult(
+    await apiRequest('/api/sarah-network/grants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ snId: id, scope: SUBSCRIBE_SCOPE, disclosedFields }),
+    })
+  );
+  if (grantRes.error) return grantRes;
+  const grantId = grantRes.data?.grant?.grantId;
+  if (!grantId) return { error: 'Could not record your consent', code: 'GRANT_CREATE_FAILED' };
+  const sub = await setEntityRelationship(id, 'subscribe', { grantId });
+  if (sub.error) {
+    // Do not leave an unused standing grant behind.
+    await apiRequest(`/api/sarah-network/grants/${encodeURIComponent(grantId)}/revoke`, { method: 'POST', silent: true });
+  }
+  return sub;
+}
+
+/** Gate 2 — My Organisations: relationships joined to public org cards → `{ organisations, counts }`. */
+export async function fetchMyOrganisations() {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(await apiRequest('/api/network/v1/my-organisations', { silent: true }));
+  return out.error ? out : { organisations: out.data?.organisations || [], counts: out.data?.counts || {} };
+}
+
+/** Gate 6 — updates from organisations the user subscribed to (pull feed) → `{ updates }`. */
+export async function fetchMyUpdates(limit = 20) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(await apiRequest(`/api/network/v1/my-updates?limit=${encodeURIComponent(limit)}`, { silent: true }));
+  return out.error ? out : { updates: out.data?.updates || [] };
+}
+
+/** Phase 2.0 — persisted in-app notifications (poll) → `{ notifications, unread }`. */
+export async function fetchMyNotifications(limit = 30) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(await apiRequest(`/api/network/v1/my-notifications?limit=${encodeURIComponent(limit)}`, { silent: true }));
+  return out.error ? out : { notifications: out.data?.notifications || [], unread: Number(out.data?.unread) || 0 };
+}
+
+/** Phase 2.0 — mark notifications read: `{ ids: string[] }` or `{ all: true }` → `{ updated, unread }`. */
+export async function markNotificationsRead({ ids = [], all = false } = {}) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(
+    await apiRequest('/api/network/v1/my-notifications/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(all ? { all: true } : { ids }),
+      silent: true,
+    })
+  );
+  return out.error ? out : { updated: Number(out.data?.updated) || 0, unread: Number(out.data?.unread) || 0 };
+}
+
+/** Gate 2 — channel preferences for one organisation (`{ notifications, announcements, reminders }` booleans). */
+export async function updateOrganisationPreferences(snId, prefs) {
+  const id = String(snId || '').trim();
+  if (!id) return { error: 'This business has no Sarah Network ID yet', code: 'SNID_REQUIRED' };
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(
+    await apiRequest(`/api/network/v1/my-organisations/${encodeURIComponent(id)}/preferences`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefs }),
+    })
+  );
+  return out.error ? out : { prefs: out.data?.prefs };
+}
+
+/** Unsubscribe (back to following) and revoke the standing consent grant. */
+export async function unsubscribeFromEntity(snId, grantId = null) {
+  const out = await setEntityRelationship(snId, 'unsubscribe');
+  if (!out.error && grantId) {
+    await apiRequest(`/api/sarah-network/grants/${encodeURIComponent(grantId)}/revoke`, { method: 'POST', silent: true });
+  }
+  return out;
+}
+
 export async function fetchCompanyMessages(companyId) {
   const id = String(companyId || '').trim();
   if (!id) return { error: 'Company id required' };
@@ -365,6 +524,56 @@ export async function fetchCompanyMessages(companyId) {
     return { error: err.message || 'Could not set up your Sarah profile', code: 'CONSUMER_PROFILE_REQUIRED' };
   }
   return apiRequest(`/api/user-conversations/${encodeURIComponent(id)}/messages`);
+}
+
+export async function fetchPersonMessages(conversationId) {
+  return apiRequest(`/api/person-conversations/${encodeURIComponent(conversationId)}/messages`);
+}
+
+export async function sendPersonMessage(conversationId, message) {
+  return apiRequest(`/api/person-conversations/${encodeURIComponent(conversationId)}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+}
+
+export async function fetchGroupMessages(groupId) {
+  return apiRequest(`/api/group-conversations/${encodeURIComponent(groupId)}/messages`);
+}
+
+export async function sendGroupMessage(groupId, message) {
+  return apiRequest(`/api/group-conversations/${encodeURIComponent(groupId)}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+}
+
+export async function fetchNetworkMessages(conversationId, since = null) {
+  const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+  return apiRequest(`/api/network-conversations/${encodeURIComponent(conversationId)}/messages${qs}`);
+}
+
+export async function searchChatThreads(query) {
+  const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+  return apiRequest(`/api/chat/search${qs}`);
+}
+
+export async function patchChatPreferences(conversationId, patch) {
+  return apiRequest(`/api/chat/conversations/${encodeURIComponent(conversationId)}/preferences`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch || {}),
+  });
+}
+
+export async function requestHumanHandover(companyId) {
+  return apiRequest(`/api/user-conversations/${encodeURIComponent(companyId)}/request-human`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
 }
 
 export async function sendCompanyMessage(companyId, message) {
@@ -424,8 +633,26 @@ function mountPublicApi() {
     onAuthChange,
     resolveApiBase,
     fetchChatConversations,
+    fetchDiscoverCompanies,
+    fetchConnections,
+    fetchMyOrganisations,
+    fetchMyUpdates,
+    fetchMyNotifications,
+    markNotificationsRead,
+    updateOrganisationPreferences,
+    setEntityRelationship,
+    subscribeToEntity,
+    unsubscribeFromEntity,
     fetchCompanyMessages,
     sendCompanyMessage,
+    fetchPersonMessages,
+    sendPersonMessage,
+    fetchGroupMessages,
+    sendGroupMessage,
+    fetchNetworkMessages,
+    searchChatThreads,
+    patchChatPreferences,
+    requestHumanHandover,
   };
 }
 

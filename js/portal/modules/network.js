@@ -207,6 +207,9 @@ function formHtml(listing) {
       ${field('nlTags', 'Keywords (comma separated)', csv(p.tags), { disabled: ro })}
       ${field('nlLanguages', 'Languages (comma separated)', csv(p.languages), { disabled: ro })}
       ${field('nlAreas', 'Service areas (comma separated)', csv(p.serviceAreas), { disabled: ro, wide: true })}
+      ${field('nlLat', 'Map latitude (optional)', String(p.geo?.lat ?? ''), { disabled: ro })}
+      ${field('nlLng', 'Map longitude (optional)', String(p.geo?.lng ?? ''), { disabled: ro })}
+      <div class="form-hint snet-field--wide">Lets “near me” searches find you precisely (e.g. -25.8713, 29.2332). Shown to the public at about 1&nbsp;km precision. Leave empty to be placed from your location text.</div>
       ${field('nlLogo', 'Logo URL (https)', p.logoUrl, { disabled: ro, type: 'url' })}
       ${field('nlCover', 'Cover image URL (https)', p.coverUrl, { disabled: ro, type: 'url' })}
       <div class="form-group snet-field snet-field--wide">
@@ -306,7 +309,7 @@ function verificationHtml(listing, verification) {
       ${field(`${idPrefix}Ref`, 'External reference (optional)', '', { placeholder: 'e.g. document number' })}
       <div class="form-group snet-field snet-field--wide"><label for="${idPrefix}File">Attach a file (PDF / PNG / JPEG / WebP, max 5 MB)</label>
         <input type="file" id="${idPrefix}File" accept="application/pdf,image/png,image/jpeg,image/webp" />
-        <div class="form-hint">A file reference (name, size, checksum) is recorded on the case. Keep a hosted link or reference as well.</div></div>
+        <div class="form-hint">The file is stored securely for Ziricai verification officers only (never shown publicly). Its name, size and checksum are recorded on the case.</div></div>
     </div>`;
 
   const noteRow =
@@ -380,6 +383,7 @@ function readProfile(container) {
     tags: splitCsv(v('nlTags')),
     languages: splitCsv(v('nlLanguages')),
     serviceAreas: splitCsv(v('nlAreas')),
+    geo: v('nlLat') || v('nlLng') ? { lat: v('nlLat'), lng: v('nlLng') } : null,
     logoUrl: v('nlLogo'),
     coverUrl: v('nlCover'),
     hours: parseHours(container.querySelector('#nlHours')?.value),

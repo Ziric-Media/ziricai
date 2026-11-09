@@ -359,10 +359,15 @@ export async function fetchChatConversations(filter = 'all') {
  * SNET-01b — live Discover directory (published Sarah Network businesses).
  * Public read: works signed out (the server only returns listed, non-suspended entries).
  */
-export async function fetchDiscoverCompanies({ q = '', category = '', limit = 50 } = {}) {
+export async function fetchDiscoverCompanies({ q = '', category = '', limit = 50, city = '', region = '', near = '', radiusKm = '' } = {}) {
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   if (category && category !== 'all') params.set('category', category);
+  // Phase 2.0 geo filters (server: /api/discover/companies)
+  if (city) params.set('city', city);
+  if (region) params.set('region', region);
+  if (near) params.set('near', near);
+  if (near && radiusKm) params.set('radiusKm', String(radiusKm));
   if (limit) params.set('limit', String(limit));
   const qs = params.toString();
   return apiRequest(`/api/discover/companies${qs ? `?${qs}` : ''}`);
@@ -459,6 +464,29 @@ export async function fetchMyUpdates(limit = 20) {
   if (blocked) return blocked;
   const out = normaliseNetworkResult(await apiRequest(`/api/network/v1/my-updates?limit=${encodeURIComponent(limit)}`, { silent: true }));
   return out.error ? out : { updates: out.data?.updates || [] };
+}
+
+/** Phase 2.0 — persisted in-app notifications (poll) → `{ notifications, unread }`. */
+export async function fetchMyNotifications(limit = 30) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(await apiRequest(`/api/network/v1/my-notifications?limit=${encodeURIComponent(limit)}`, { silent: true }));
+  return out.error ? out : { notifications: out.data?.notifications || [], unread: Number(out.data?.unread) || 0 };
+}
+
+/** Phase 2.0 — mark notifications read: `{ ids: string[] }` or `{ all: true }` → `{ updated, unread }`. */
+export async function markNotificationsRead({ ids = [], all = false } = {}) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const out = normaliseNetworkResult(
+    await apiRequest('/api/network/v1/my-notifications/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(all ? { all: true } : { ids }),
+      silent: true,
+    })
+  );
+  return out.error ? out : { updated: Number(out.data?.updated) || 0, unread: Number(out.data?.unread) || 0 };
 }
 
 /** Gate 2 — channel preferences for one organisation (`{ notifications, announcements, reminders }` booleans). */
@@ -609,6 +637,8 @@ function mountPublicApi() {
     fetchConnections,
     fetchMyOrganisations,
     fetchMyUpdates,
+    fetchMyNotifications,
+    markNotificationsRead,
     updateOrganisationPreferences,
     setEntityRelationship,
     subscribeToEntity,

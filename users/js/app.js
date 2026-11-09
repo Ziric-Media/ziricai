@@ -337,7 +337,56 @@ function renderProtoSearchResults(query) {
   });
 }
 
+/**
+ * Phase 2.0: in live mode the bell shows the server inbox (GET /api/network/v1/my-notifications — subscriber
+ * announcements / reminders from organisations the user subscribed to). Fixtures only render when live mode is off.
+ */
+const liveNotifs = { items: [], unread: 0, loaded: false, loading: false, error: '', timer: null };
+
+function notifLiveActive() {
+  return Boolean(window.SarahLive?.isLiveEnabled?.() && window.SarahLive?.fetchMyNotifications);
+}
+
+function formatNotifTime(iso) {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return new Date(t).toLocaleDateString();
+}
+
+async function refreshLiveNotifications() {
+  if (!notifLiveActive() || liveNotifs.loading) return;
+  liveNotifs.loading = true;
+  const res = await window.SarahLive.fetchMyNotifications(30);
+  liveNotifs.loading = false;
+  liveNotifs.loaded = true;
+  if (res.error) {
+    liveNotifs.error = res.error;
+    liveNotifs.items = [];
+    liveNotifs.unread = 0;
+  } else {
+    liveNotifs.error = '';
+    liveNotifs.items = res.notifications || [];
+    liveNotifs.unread = Number(res.unread) || 0;
+  }
+  syncNotificationBadge();
+  if (!document.getElementById('protoNotifSheet')?.classList.contains('hidden')) renderProtoNotifications();
+}
+
+function startLiveNotificationPolling() {
+  if (liveNotifs.timer || !notifLiveActive()) return;
+  void refreshLiveNotifications();
+  liveNotifs.timer = setInterval(() => {
+    if (!document.hidden) void refreshLiveNotifications();
+  }, 60000);
+}
+
 function unreadNotificationCount() {
+  if (notifLiveActive()) return liveNotifs.unread;
   const dismissed = getSarahRuntime().notifDismissed || {};
   return (MOCK_NOTIFICATIONS || []).filter((n) => n.unread && !dismissed[n.id]).length;
 }
@@ -346,8 +395,9 @@ function syncNotificationBadge() {
   const count = unreadNotificationCount();
   const badge = document.getElementById('statusNotifBadge');
   if (!badge) return;
-  badge.textContent = String(count);
+  badge.textContent = count > 99 ? '99+' : String(count);
   badge.hidden = count <= 0;
+  if (notifLiveActive()) startLiveNotificationPolling();
 }
 
 function openProtoNotifSheet() {
@@ -355,6 +405,46 @@ function openProtoNotifSheet() {
   sheet?.classList.remove('hidden');
   sheet?.setAttribute('aria-hidden', 'false');
   renderProtoNotifications();
+  if (notifLiveActive()) void refreshLiveNotifications();
+}
+
+function renderLiveNotifications(host) {
+  if (liveNotifs.error) {
+    host.innerHTML = `<p class="proto-search-empty">${escapeHtml(
+      /sign/i.test(liveNotifs.error) ? 'Sign in to see notifications from businesses you subscribe to.' : 'Notifications are unavailable right now.'
+    )}</p>`;
+    return;
+  }
+  if (!liveNotifs.items.length) {
+    host.innerHTML = `<p class="proto-search-empty">${liveNotifs.loaded ? 'No notifications yet. Subscribe to a business to receive its updates.' : 'Loading…'}</p>`;
+    return;
+  }
+  host.innerHTML = liveNotifs.items
+    .map(
+      (n) => `
+    <button type="button" class="proto-notif-item ${n.read ? '' : 'is-unread'}" data-live-notif-id="${escapeHtml(n.notificationId)}">
+      <span class="proto-notif-title">${escapeHtml(n.title)}${n.organisation?.displayName ? ` · ${escapeHtml(n.organisation.displayName)}` : ''}</span>
+      <span class="proto-notif-body">${escapeHtml(n.body || '')}</span>
+      <span class="proto-notif-time">${escapeHtml(formatNotifTime(n.createdAt))}</span>
+    </button>`
+    )
+    .join('');
+  host.querySelectorAll('[data-live-notif-id]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.liveNotifId;
+      const item = liveNotifs.items.find((n) => n.notificationId === id);
+      if (!item || item.read) return;
+      item.read = true;
+      liveNotifs.unread = Math.max(0, liveNotifs.unread - 1);
+      btn.classList.remove('is-unread');
+      syncNotificationBadge();
+      const res = await window.SarahLive.markNotificationsRead({ ids: [id] });
+      if (!res.error && typeof res.unread === 'number') {
+        liveNotifs.unread = res.unread;
+        syncNotificationBadge();
+      }
+    });
+  });
 }
 
 function closeProtoNotifSheet() {
@@ -365,6 +455,10 @@ function closeProtoNotifSheet() {
 function renderProtoNotifications() {
   const host = document.getElementById('protoNotifList');
   if (!host) return;
+  if (notifLiveActive()) {
+    renderLiveNotifications(host);
+    return;
+  }
   const rt = getSarahRuntime();
   if (!rt.notifDismissed) rt.notifDismissed = {};
   host.innerHTML = (MOCK_NOTIFICATIONS || [])
@@ -390,6 +484,11 @@ function renderProtoNotifications() {
         setRoute('chat-thread');
       } else if (id === 'n2') {
         closeProtoNotifSheet();
+        // SNET-08: `central-motors` is a prototype fixture id, not a tenant. In live mode fail closed (no fake chat).
+        if (consumerChatLiveActive()) {
+          showProtoToast('That business is not on Sarah Network yet.');
+          return;
+        }
         getSarahRuntime().activeThreadId = 'central-motors';
         setRoute('chat-thread');
       } else {
@@ -428,6 +527,22 @@ function bindProtoSearchAndNotif() {
     renderDiscover();
   });
 
+  // Phase 2.0 geo: place filter (city or province) → /api/discover/companies?city=|region=
+  const discoverPlaceEl = document.getElementById('discoverPlaceInput');
+  const applyDiscoverPlace = (value) => {
+    discoverPlaceQuery = String(value || '').trim();
+    renderDiscover();
+  };
+  discoverPlaceEl?.addEventListener('input', (e) => {
+    if (discoverPlaceDebounceTimer) clearTimeout(discoverPlaceDebounceTimer);
+    const next = e.target.value;
+    discoverPlaceDebounceTimer = setTimeout(() => applyDiscoverPlace(next), 250);
+  });
+  discoverPlaceEl?.addEventListener('search', (e) => {
+    if (discoverPlaceDebounceTimer) clearTimeout(discoverPlaceDebounceTimer);
+    applyDiscoverPlace(e.target.value);
+  });
+
   document.querySelectorAll('[data-proto-sheet-close]').forEach((el) => {
     el.addEventListener('click', () => {
       const which = el.getAttribute('data-proto-sheet-close');
@@ -449,7 +564,36 @@ let activeFeedTab = 'for-you';
 let activeDiscoverCategory = 'all';
 let discoverSearchQuery = '';
 let discoverSearchDebounceTimer = null;
+let discoverPlaceQuery = '';
+let discoverPlaceDebounceTimer = null;
+const DISCOVER_PROVINCES = [
+  'eastern cape',
+  'free state',
+  'gauteng',
+  'kwazulu-natal',
+  'limpopo',
+  'mpumalanga',
+  'north west',
+  'northern cape',
+  'western cape',
+];
 let pendingDiscoverSearchFromOrg = '';
+/**
+ * SNET-01b: live Discover directory (GET /api/discover/companies). In live mode the mock fixtures are
+ * NEVER merged into results; they only render when live mode is off (offline / signed out / file://).
+ */
+const liveDiscover = {
+  loaded: false,
+  loading: false,
+  error: '',
+  companies: [],
+  facets: [],
+  query: null,
+  category: null,
+  place: '',
+  /** every live card seen this session, keyed by companyId (detail pages / chat headers survive new searches) */
+  byId: new Map(),
+};
 let activeProfileSocialTab = 'posts';
 /** BP-01: 'posts' | 'about' for Business Profile public tab */
 let activeProfileBusinessSocialTab = 'posts';
@@ -589,12 +733,20 @@ function removeSub01Record(companyId) {
 }
 
 function isOrgSubscribedSub01(companyId) {
+  const live = liveRelationState(companyId);
+  if (live !== null) return live === 'subscribed';
   return Boolean(getSub01Record(companyId));
 }
 
-/** Legacy helper — subscribed id list for suggestions */
+/** Subscribed id list: local prototype subscriptions + live subscriptions (from the connections API) seen on Discover. */
 function loadSub01SubscribedIds() {
-  return Object.keys(loadSub01SubscribersMap());
+  const ids = new Set(Object.keys(loadSub01SubscribersMap()));
+  if (discoverLiveActive()) {
+    liveDiscover.byId.forEach((card, companyId) => {
+      if (card.snId && liveConnections.bySnId.get(card.snId)?.state === 'subscribed') ids.add(companyId);
+    });
+  }
+  return [...ids];
 }
 
 function sub01RefreshSurfaces() {
@@ -625,10 +777,20 @@ function bindSub01RegisterModalOnce() {
     }
   });
 
-  document.getElementById('sub01RegisterSubmit')?.addEventListener('click', () => {
+  document.getElementById('sub01RegisterSubmit')?.addEventListener('click', async () => {
     const idEl = document.getElementById('sub01RegisterCompanyId');
     const companyId = idEl && 'value' in idEl ? String(idEl.value || '').trim() : '';
     if (!companyId) return;
+    if (discoverFind(companyId)?.live) {
+      // SNET-11: live businesses subscribe through the connections API (consent grant + subscribe).
+      const submitBtn = document.getElementById('sub01RegisterSubmit');
+      if (submitBtn) submitBtn.disabled = true;
+      const already = isOrgSubscribedSub01(companyId);
+      const ok = already ? true : await handleLiveSubscribe(companyId);
+      if (submitBtn) submitBtn.disabled = false;
+      if (ok) close();
+      return;
+    }
     const hasExisting = Boolean(document.getElementById('sub01AccountYes')?.checked);
     const refEl = document.getElementById('sub01Reference');
     const reference = refEl && 'value' in refEl ? String(refEl.value || '').trim() : '';
@@ -651,10 +813,14 @@ function bindSub01RegisterModalOnce() {
     sub01RefreshSurfaces();
   });
 
-  document.getElementById('sub01RegisterRemove')?.addEventListener('click', () => {
+  document.getElementById('sub01RegisterRemove')?.addEventListener('click', async () => {
     const idEl = document.getElementById('sub01RegisterCompanyId');
     const companyId = idEl && 'value' in idEl ? String(idEl.value || '').trim() : '';
     if (!companyId) return;
+    if (discoverFind(companyId)?.live) {
+      if (await handleLiveUnsubscribe(companyId)) close();
+      return;
+    }
     removeSub01Record(companyId);
     close();
     showProtoToast('Subscription removed');
@@ -665,7 +831,7 @@ function bindSub01RegisterModalOnce() {
 function openSub01RegisterModal(companyId, opts) {
   bindSub01RegisterModalOnce();
   const id = String(companyId || '').trim();
-  const company = (MOCK_DISCOVER_COMPANIES || []).find((c) => c.id === id);
+  const company = discoverFind(id);
   const modal = document.getElementById('sub01RegisterModal');
   if (!modal || !company) {
     showProtoToast('Organisation not found');
@@ -696,7 +862,25 @@ function openSub01RegisterModal(companyId, opts) {
   document.getElementById('sub01PrefAnnounce').checked = rec?.prefs?.announcements !== false;
   document.getElementById('sub01PrefRemind').checked = rec?.prefs?.reminders !== false;
 
-  document.getElementById('sub01RegisterRemove')?.classList.toggle('hidden', !rec);
+  document.getElementById('sub01RegisterRemove')?.classList.toggle('hidden', !rec && !isOrgSubscribedSub01(id));
+
+  // SNET-11: live businesses use real consent + the connections API; the prototype-only fields do not apply.
+  const live = Boolean(company.live);
+  modal.querySelectorAll('.ms-knowledge-field-row').forEach((row) => row.classList.toggle('hidden', live));
+  const leadEl = document.getElementById('sub01RegisterLead');
+  if (leadEl) {
+    if (leadEl.dataset.protoLead === undefined) leadEl.dataset.protoLead = leadEl.textContent || '';
+    leadEl.textContent = live
+      ? `Subscribing records your consent for ${company.name} to send you updates. No personal details are shared. You can unsubscribe any time.`
+      : leadEl.dataset.protoLead;
+  }
+  const footEl = modal.querySelector('.sub01-register-foot');
+  if (footEl) {
+    if (footEl.dataset.protoFoot === undefined) footEl.dataset.protoFoot = footEl.textContent || '';
+    footEl.textContent = live ? 'Sarah Network · consent-linked subscription' : footEl.dataset.protoFoot;
+  }
+  const submitEl = document.getElementById('sub01RegisterSubmit');
+  if (submitEl) submitEl.textContent = live ? (isOrgSubscribedSub01(id) ? 'Subscribed' : 'Subscribe') : 'Save subscription';
 
   modal.classList.remove('hidden');
   modal.setAttribute('aria-hidden', 'false');
@@ -706,6 +890,7 @@ function openSub01RegisterModal(companyId, opts) {
 function sub01OpenSubscribeFlow(companyId) {
   const id = String(companyId || '').trim();
   if (!id) return;
+  if (discoverFind(id)?.live && !requireLiveSignIn('subscribe to businesses')) return;
   openSub01RegisterModal(id, { edit: isOrgSubscribedSub01(id) });
 }
 
@@ -1562,7 +1747,7 @@ function isExplicitNonPersonalThreadSelection(rt) {
   if (thread?.kind === 'company') return true;
   if (id === 'smilemore-demo') return true;
   if (getAllChats().some((c) => c.id === id)) return true;
-  if (MOCK_DISCOVER_COMPANIES.some((c) => c.id === id)) return true;
+  if (discoverFind(id)) return true;
   return false;
 }
 
@@ -1592,6 +1777,7 @@ function mapFederatedConversationToChatRow(c) {
     online: false,
     avatarKey: isBusiness ? guessCompanyAvatarKey(companyId, c.displayLabel) : null,
     company: isBusiness,
+    snId: c.snId || null,
     api: true,
   };
 }
@@ -1606,7 +1792,7 @@ function resolveCompanyIdForActiveThread(threadId) {
   }
   const chat = getAllChats().find((c) => c.id === id);
   if (chat?.company) return id;
-  if (MOCK_DISCOVER_COMPANIES.some((c) => c.id === id)) return id;
+  if (discoverFind(id)) return id;
   if (id === 'smilemore-demo') return id;
   const rowCompanyId = document.querySelector(`[data-open-thread="${id}"]`)?.dataset?.companyId;
   if (rowCompanyId) return rowCompanyId;
@@ -1625,7 +1811,7 @@ async function loadCompanyThreadFromApiIfNeeded() {
   if (existing?.api && existing.kind === 'company' && existing.messages?.length) return true;
 
   const chat = getAllChats().find((c) => c.id === id || c.id === companyId);
-  const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
+  const discoverCo = discoverFind(companyId);
 
   const res = await window.SarahLive.fetchCompanyMessages(companyId);
   if (res.error) {
@@ -1640,6 +1826,7 @@ async function loadCompanyThreadFromApiIfNeeded() {
     kind: 'company',
     name,
     companyId,
+    snId: payload.conversation?.snId || chat?.snId || discoverCo?.snId || null,
     verified: true,
     api: true,
     messages,
@@ -1650,12 +1837,48 @@ async function loadCompanyThreadFromApiIfNeeded() {
 
 let chatsListLoadGen = 0;
 
+async function loadNonCompanyThreadFromApi(convId, kind) {
+  if (!consumerChatLiveActive() || !convId) return false;
+  const rt = getSarahRuntime();
+  const k = String(kind || '').toLowerCase();
+  let res;
+  if (k === 'person_to_person') res = await window.SarahLive.fetchPersonMessages(convId);
+  else if (k === 'group_personal' || k === 'group_organisation') {
+    res = await window.SarahLive.fetchGroupMessages(convId);
+  } else if (k === 'ai_to_ai') res = await window.SarahLive.fetchNetworkMessages(convId);
+  else return false;
+  if (res?.error) {
+    showProtoToast(res.error);
+    return false;
+  }
+  const payload = res.data || {};
+  const title =
+    payload.conversation?.peerDisplayName ||
+    payload.conversation?.title ||
+    payload.conversation?.companyName ||
+    convId;
+  rt.threads[convId] = {
+    kind: k,
+    convId,
+    name: title,
+    api: true,
+    readOnly: k === 'ai_to_ai',
+    consentScope: payload.consentScope || payload.conversation?.networkConsentScope,
+    messages: mapApiMessagesToThread(payload.messages || []),
+  };
+  rt.activeThreadId = convId;
+  return true;
+}
+
 async function openChatFromList(chatId, rowEl) {
   const rt = getSarahRuntime();
-  rt.activeThreadId = chatId || 'smilemore-demo';
+  const kind = rowEl?.dataset?.kind || '';
+  const convId = rowEl?.dataset?.convId || chatId;
   const isCompany = rowEl?.dataset?.company !== '0';
-  if (consumerChatLiveActive() && isCompany) {
-    await loadCompanyThreadFromApiIfNeeded();
+  rt.activeThreadId = isCompany ? chatId || 'smilemore-demo' : convId;
+  if (consumerChatLiveActive()) {
+    if (isCompany) await loadCompanyThreadFromApiIfNeeded();
+    else await loadNonCompanyThreadFromApi(convId, kind);
   }
   setRoute('chat-thread');
 }
@@ -2014,6 +2237,7 @@ function startNewWorkThread() {
 const GALLERY_SIZE = 6;
 
 function getCompanyGallery(company) {
+  if (company.live && !(company.gallery && company.gallery.length)) return [];
   let items = company.gallery && company.gallery.length ? [...company.gallery] : [];
   if (!items.length && company.image) items = [company.image];
   if (items.length) {
@@ -2026,6 +2250,7 @@ function getCompanyGallery(company) {
 
 function getCompanyProducts(company) {
   if (company.products && company.products.length) return company.products;
+  if (company.live) return [];
   return [
     {
       id: `${company.id}-sample`,
@@ -2088,6 +2313,8 @@ function companyAvatarUrl(company) {
 }
 
 function isCompanyFollowed(companyId) {
+  const live = liveRelationState(companyId);
+  if (live !== null) return LIVE_FOLLOWING_STATES.has(live);
   return Boolean(getSarahRuntime().followed[companyId]);
 }
 
@@ -2115,7 +2342,7 @@ function getActiveThreadContext() {
   }
 
   if (consumerChatLiveActive() && companyId) {
-    const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
+    const discoverCo = discoverFind(companyId);
     const chat = getAllChats().find((c) => c.id === companyId);
     return {
       id: companyId,
@@ -2140,7 +2367,7 @@ function getActiveThreadContext() {
     };
   }
   const chat = getAllChats().find((c) => c.id === id);
-  const discoverCo = MOCK_DISCOVER_COMPANIES.find((c) => c.id === id);
+  const discoverCo = discoverFind(id);
   if (discoverCo) {
     return {
       id,
@@ -2184,11 +2411,13 @@ function getActiveThreadContext() {
 async function openCompanySarahChat(companyId) {
   const id = String(companyId || '').trim();
   if (!id) return;
-  const company = MOCK_DISCOVER_COMPANIES.find((c) => c.id === id) || {
+  const company = discoverFind(id) || {
     id,
     name: id,
     verified: true,
   };
+  // Public Discover can be browsed signed out; chatting with Company Sarah needs an account.
+  if (company.live && !requireLiveSignIn('chat with this business')) return;
   const rt = getSarahRuntime();
   const threadId = company.id;
   rt.activeThreadId = threadId;
@@ -2224,7 +2453,7 @@ async function openCompanySarahChat(companyId) {
 let galleryViewer = { companyId: null, index: 0, images: [] };
 
 function openGalleryViewer(companyId, startIndex) {
-  const company = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
+  const company = discoverFind(companyId);
   if (!company) return;
   const images = getCompanyGallery(company);
   galleryViewer = {
@@ -6358,15 +6587,21 @@ function renderMyOrganisationsPanel() {
   bindSub01RegisterModalOnce();
   const root = document.getElementById('msOrganisationsRoot');
   if (!root) return;
+  ensureLiveDiscoverFresh();
+  ensureLiveConnectionsFresh();
+  if (discoverLiveActive()) {
+    renderLiveMyOrganisations(root);
+    return;
+  }
 
   const subscribedIds = loadSub01SubscribedIds();
-  const all = MOCK_DISCOVER_COMPANIES || [];
-  const byId = (id) => all.find((c) => c.id === id);
+  const byId = (id) => discoverFind(id);
   const subscribed = subscribedIds.map((id) => byId(id)).filter(Boolean);
   const suggestedIds = (MOCK_MY_ORGANISATIONS_SUGGESTED_IDS || []).filter((id) => !subscribedIds.includes(id));
   const suggested = suggestedIds.map((id) => byId(id)).filter(Boolean);
 
   const orgStatusLine = (companyId) => {
+    if (discoverFind(companyId)?.live) return isOrgSubscribedSub01(companyId) ? 'Subscribed on Sarah Network' : '';
     const rec = getSub01Record(companyId);
     if (!rec) return '';
     const v =
@@ -6455,6 +6690,10 @@ function renderMyOrganisationsPanel() {
       e.preventDefault();
       const id = btn.getAttribute('data-sub01-unsub');
       if (!id) return;
+      if (discoverFind(id)?.live) {
+        void handleLiveUnsubscribe(id).then(() => renderMyOrganisationsPanel());
+        return;
+      }
       removeSub01Record(id);
       showProtoToast('Unsubscribed');
       renderMyOrganisationsPanel();
@@ -7534,9 +7773,409 @@ function openDiscoverCompany(id) {
   location.hash = `discover/${id}`;
 }
 
-/** D0: client-side only until GET /api/discover/companies returns full U6 listing cards. */
+/**
+ * SNET-01b + public Discover: live mode = the Sarah Network directory (public listed businesses, readable signed
+ * out); sample fixtures only render when live mode is unavailable (file://, no Firebase config). Never merged.
+ */
+function discoverLiveActive() {
+  return Boolean(window.SarahLive?.isLiveEnabled?.());
+}
+
+/* ---------- SNET-11: follow / subscribe wired to /api/network/v1/connections (keyed by snId) ---------- */
+
+const LIVE_FOLLOWING_STATES = new Set(['following', 'subscribed', 'connect_requested', 'connected']);
+
+/** snId → { state, grantId } for the signed-in user (empty when signed out). */
+const liveConnections = { loaded: false, loading: false, bySnId: new Map() };
+
+function liveSnIdForCompany(companyId) {
+  if (!discoverLiveActive()) return null;
+  return liveDiscover.byId.get(String(companyId || ''))?.snId || null;
+}
+
+/** Server relationship state for a live Discover company, or null when the company is a fixture / has no snId. */
+function liveRelationState(companyId) {
+  const snId = liveSnIdForCompany(companyId);
+  if (!snId) return null;
+  return liveConnections.bySnId.get(snId)?.state || 'none';
+}
+
+/* ---------- Gate 2: My Organisations backed by GET /api/network/v1/my-organisations ---------- */
+
+const liveMyOrgs = { loaded: false, loading: false, error: '', organisations: [], updates: [] };
+
+function resetLiveMyOrgs() {
+  liveMyOrgs.loaded = false;
+  liveMyOrgs.loading = false;
+  liveMyOrgs.error = '';
+  liveMyOrgs.organisations = [];
+  liveMyOrgs.updates = [];
+}
+
+async function refreshLiveMyOrgs() {
+  if (!discoverLiveActive() || !window.SarahLive?.isSignedIn?.() || liveMyOrgs.loading) return;
+  liveMyOrgs.loading = true;
+  const [res, updatesRes] = await Promise.all([
+    window.SarahLive.fetchMyOrganisations(),
+    // Gate 6: updates are best effort — a failure here must never hide the organisations list.
+    window.SarahLive.fetchMyUpdates ? window.SarahLive.fetchMyUpdates(10) : Promise.resolve({ updates: [] }),
+  ]);
+  liveMyOrgs.loading = false;
+  liveMyOrgs.loaded = true;
+  liveMyOrgs.error = res.error || '';
+  liveMyOrgs.organisations = res.error ? [] : res.organisations || [];
+  liveMyOrgs.updates = res.error || updatesRes.error ? [] : updatesRes.updates || [];
+  const { route, msPanel } = parseLocationHash();
+  if (route === 'home' && msPanel === 'organisations') renderMyOrganisationsPanel();
+}
+
+function ensureLiveMyOrgsFresh() {
+  if (liveMyOrgs.loaded || liveMyOrgs.loading) return;
+  if (!discoverLiveActive() || !window.SarahLive?.isSignedIn?.()) return;
+  void refreshLiveMyOrgs();
+}
+
+const LIVE_MY_ORG_SECTIONS = [
+  { id: 'subscriptions', title: 'My subscriptions', empty: 'No subscriptions yet — use Subscribe on Discover.' },
+  { id: 'connections', title: 'Connected', empty: '' },
+  { id: 'pending', title: 'Connection requests', empty: '' },
+  { id: 'following', title: 'Following', empty: 'You are not following any organisations yet.' },
+  { id: 'unavailable', title: 'No longer available', empty: '' },
+];
+
+function renderLiveMyOrganisations(root) {
+  const signedIn = Boolean(window.SarahLive?.isSignedIn?.());
+  const fallbackImg = prototypeAsset(MOCK_PROFILE.avatarFallback || 'assets/discover/green-haven-fallback.svg');
+  const header = `
+    <header class="ms-organisations-hero">
+      <h5 class="ms-headline">My Organisations</h5>
+      <p class="ms-organisations-lead">The organisations you follow and subscribe to on Sarah Network. Subscribing shares nothing by default; you can change what each organisation may send you.</p>
+    </header>`;
+  if (!signedIn) {
+    root.innerHTML = `${header}<section class="ms-org-section"><p class="ms-org-empty">Sign in to see your organisations.</p><button type="button" class="btn btn-secondary" id="msOrgSignIn">Sign in</button></section>`;
+    root.querySelector('#msOrgSignIn')?.addEventListener('click', () => setRoute('auth'));
+    return;
+  }
+  ensureLiveMyOrgsFresh();
+  if (!liveMyOrgs.loaded) {
+    root.innerHTML = `${header}<section class="ms-org-section"><p class="ms-org-empty">Loading your organisations…</p></section>`;
+    return;
+  }
+  if (liveMyOrgs.error) {
+    root.innerHTML = `${header}<section class="ms-org-section"><p class="ms-org-empty">${escapeHtml(liveMyOrgs.error)}</p><button type="button" class="btn btn-secondary" id="msOrgRetry">Retry</button></section>`;
+    root.querySelector('#msOrgRetry')?.addEventListener('click', () => {
+      resetLiveMyOrgs();
+      renderMyOrganisationsPanel();
+    });
+    return;
+  }
+
+  const prefRow = (o, key, label) =>
+    `<label class="ms-org-pref"><input type="checkbox" data-live-org-pref="${escapeHtml(o.snId)}" data-pref-key="${key}" ${o.prefs?.[key] ? 'checked' : ''} /> ${label}</label>`;
+  const row = (o) => {
+    const org = o.organisation;
+    const name = org?.displayName || 'Organisation no longer available';
+    const meta = [org?.industry, org?.verified ? 'Verified' : ''].filter(Boolean).join(' · ');
+    const img = org?.logoUrl ? org.logoUrl : fallbackImg;
+    const canView = o.available && org?.companyId;
+    const actions = [];
+    if (canView) actions.push(`<button type="button" class="ms-org-btn ms-org-btn--ghost" data-live-org-view="${escapeHtml(org.companyId)}">View</button>`);
+    if (o.state === 'subscribed') actions.push(`<button type="button" class="ms-org-btn ms-org-btn--danger" data-live-org-unsub="${escapeHtml(o.snId)}">Unsubscribe</button>`);
+    else if (o.state === 'following' || o.state === 'unavailable') actions.push(`<button type="button" class="ms-org-btn ms-org-btn--ghost" data-live-org-unfollow="${escapeHtml(o.snId)}">Unfollow</button>`);
+    const prefs =
+      o.available && ['subscribed', 'following', 'connected'].includes(o.state)
+        ? `<details class="ms-org-manage"><summary>Manage</summary>
+            <div class="ms-org-prefs">${prefRow(o, 'notifications', 'Notifications')}${prefRow(o, 'announcements', 'Announcements')}${prefRow(o, 'reminders', 'Reminders')}</div>
+          </details>`
+        : '';
+    return `<li class="ms-org-row" data-org-sn-id="${escapeHtml(o.snId)}">
+      <img class="ms-org-row-img" src="${escapeHtml(img)}" alt="" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='${escapeHtml(fallbackImg)}';}" />
+      <div class="ms-org-row-body">
+        <strong class="ms-org-row-name">${escapeHtml(name)}</strong>
+        <span class="ms-org-row-meta">${escapeHtml(meta)}</span>
+        ${prefs}
+      </div>
+      <div class="ms-org-row-actions">${actions.join('')}</div>
+    </li>`;
+  };
+
+  const sections = LIVE_MY_ORG_SECTIONS.map((s) => {
+    const rows = liveMyOrgs.organisations.filter((o) => o.section === s.id);
+    if (!rows.length && !s.empty) return '';
+    return `<section class="ms-org-section"><h3 class="ms-org-section-title">${escapeHtml(s.title)}</h3>
+      ${rows.length ? `<ul class="ms-org-list" role="list">${rows.map(row).join('')}</ul>` : `<p class="ms-org-empty">${escapeHtml(s.empty)}</p>`}</section>`;
+  }).join('');
+
+  const updatesHtml = liveMyOrgs.updates.length
+    ? `<section class="ms-org-section" id="msOrgUpdates"><h3 class="ms-org-section-title">Updates</h3>
+        <ul class="ms-org-list" role="list">${liveMyOrgs.updates
+          .map(
+            (u) => `<li class="ms-org-row"><div class="ms-org-row-body">
+              <strong class="ms-org-row-name">${escapeHtml(u.title)}</strong>
+              <span class="ms-org-row-meta">${escapeHtml([u.organisation?.displayName, new Date(u.createdAt).toLocaleDateString()].filter(Boolean).join(' · '))}</span>
+              ${u.body ? `<p class="ms-org-empty">${escapeHtml(u.body)}</p>` : ''}
+            </div></li>`
+          )
+          .join('')}</ul></section>`
+    : '';
+
+  root.innerHTML = `${header}${updatesHtml}${sections}
+    <footer class="ms-organisations-foot"><button type="button" class="btn btn-secondary" id="msOrgOpenDiscover">Open Discover</button></footer>`;
+
+  root.querySelector('#msOrgOpenDiscover')?.addEventListener('click', () => setRoute('discover'));
+  root.querySelectorAll('[data-live-org-view]').forEach((btn) =>
+    btn.addEventListener('click', () => openDiscoverCompany(btn.getAttribute('data-live-org-view')))
+  );
+  const act = async (snId, fn, toast) => {
+    const res = await fn();
+    if (res?.error) {
+      showProtoToast(res.error);
+      return;
+    }
+    if (res?.connection) applyLiveConnection(res.connection);
+    showProtoToast(toast);
+    liveMyOrgs.loaded = false;
+    void refreshLiveMyOrgs();
+    sub01RefreshSurfaces();
+  };
+  root.querySelectorAll('[data-live-org-unsub]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const snId = btn.getAttribute('data-live-org-unsub');
+      const prev = liveConnections.bySnId.get(snId);
+      void act(snId, () => window.SarahLive.unsubscribeFromEntity(snId, prev?.grantId || null), 'Unsubscribed');
+    })
+  );
+  root.querySelectorAll('[data-live-org-unfollow]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const snId = btn.getAttribute('data-live-org-unfollow');
+      void act(snId, () => window.SarahLive.setEntityRelationship(snId, 'unfollow'), 'Unfollowed');
+    })
+  );
+  root.querySelectorAll('[data-live-org-pref]').forEach((box) =>
+    box.addEventListener('change', async () => {
+      const snId = box.getAttribute('data-live-org-pref');
+      const key = box.getAttribute('data-pref-key');
+      const res = await window.SarahLive.updateOrganisationPreferences(snId, { [key]: box.checked });
+      if (res.error) {
+        box.checked = !box.checked;
+        showProtoToast(res.error);
+        return;
+      }
+      const o = liveMyOrgs.organisations.find((x) => x.snId === snId);
+      if (o) o.prefs = res.prefs || o.prefs;
+      showProtoToast('Preferences saved');
+    })
+  );
+}
+
+function applyLiveConnection(connection) {
+  if (!connection?.snId) return;
+  // Any relationship change makes the My Organisations view stale.
+  liveMyOrgs.loaded = false;
+  if (!connection.state || connection.state === 'none' || connection.state === 'discovered') {
+    liveConnections.bySnId.delete(connection.snId);
+  } else {
+    liveConnections.bySnId.set(connection.snId, {
+      state: connection.state,
+      grantId: connection.consent?.grantId || null,
+    });
+  }
+}
+
+async function refreshLiveConnections() {
+  if (!discoverLiveActive() || !window.SarahLive?.isSignedIn?.() || liveConnections.loading) return;
+  liveConnections.loading = true;
+  const res = await window.SarahLive.fetchConnections();
+  liveConnections.loading = false;
+  liveConnections.loaded = true;
+  if (res.error) return;
+  liveConnections.bySnId.clear();
+  const myOrgsFresh = liveMyOrgs.loaded; // a bulk reload is not a relationship change
+  (res.connections || []).forEach(applyLiveConnection);
+  liveMyOrgs.loaded = myOrgsFresh;
+  sub01RefreshSurfaces();
+}
+
+/** Load relationships once per sign-in (kicked from Discover / detail / My Organisations renders). */
+function ensureLiveConnectionsFresh() {
+  if (liveConnections.loaded || liveConnections.loading) return;
+  if (!discoverLiveActive() || !window.SarahLive?.isSignedIn?.()) return;
+  void refreshLiveConnections();
+}
+
+function resetLiveConnections() {
+  resetLiveMyOrgs();
+  liveConnections.loaded = false;
+  liveConnections.loading = false;
+  liveConnections.bySnId.clear();
+}
+
+function requireLiveSignIn(actionLabel) {
+  if (window.SarahLive?.isSignedIn?.()) return true;
+  showProtoToast(`Sign in to ${actionLabel}`);
+  setRoute('auth');
+  return false;
+}
+
+/** Follow / unfollow. Live companies call the connections API by snId; fixtures keep the local toggle. */
+async function handleFollowToggle(btn, companyId) {
+  const company = discoverFind(companyId);
+  if (!company?.live) {
+    const on = toggleCompanyFollow(companyId);
+    btn.classList.toggle('is-active', on);
+    btn.textContent = on ? 'Following' : 'Follow';
+    return;
+  }
+  if (!company.snId) {
+    showProtoToast('This business is not on Sarah Network yet');
+    return;
+  }
+  if (!requireLiveSignIn('follow businesses')) return;
+  const wasFollowing = isCompanyFollowed(companyId);
+  const wasSubscribed = liveRelationState(companyId) === 'subscribed';
+  btn.disabled = true;
+  let res;
+  if (wasSubscribed) {
+    // Unfollowing a subscription first ends the subscription (consent is revoked), then the follow.
+    const prev = liveConnections.bySnId.get(company.snId);
+    res = await window.SarahLive.unsubscribeFromEntity(company.snId, prev?.grantId || null);
+    if (!res.error) res = await window.SarahLive.setEntityRelationship(company.snId, 'unfollow');
+  } else {
+    res = await window.SarahLive.setEntityRelationship(company.snId, wasFollowing ? 'unfollow' : 'follow');
+  }
+  btn.disabled = false;
+  if (res.error) {
+    showProtoToast(res.error);
+    return;
+  }
+  applyLiveConnection(res.connection);
+  if (!res.connection?.state || res.connection.state === 'discovered') liveConnections.bySnId.delete(company.snId);
+  showProtoToast(wasFollowing ? `Unfollowed ${company.name}` : `Following ${company.name}`);
+  sub01RefreshSurfaces();
+}
+
+/** Live subscribe: records a standing consent grant for this entity, then subscribes. */
+async function handleLiveSubscribe(companyId) {
+  const company = discoverFind(companyId);
+  if (!company?.snId) {
+    showProtoToast('This business is not on Sarah Network yet');
+    return false;
+  }
+  if (!requireLiveSignIn('subscribe to businesses')) return false;
+  const res = await window.SarahLive.subscribeToEntity(company.snId);
+  if (res.error) {
+    showProtoToast(res.error);
+    return false;
+  }
+  applyLiveConnection(res.connection);
+  showProtoToast(`Subscribed to ${company.name}`);
+  sub01RefreshSurfaces();
+  return true;
+}
+
+async function handleLiveUnsubscribe(companyId) {
+  const company = discoverFind(companyId);
+  if (!company?.snId) return false;
+  const prev = liveConnections.bySnId.get(company.snId);
+  const res = await window.SarahLive.unsubscribeFromEntity(company.snId, prev?.grantId || null);
+  if (res.error) {
+    showProtoToast(res.error);
+    return false;
+  }
+  applyLiveConnection(res.connection);
+  showProtoToast(`Unsubscribed from ${company.name}`);
+  sub01RefreshSurfaces();
+  return true;
+}
+
+/** Map a /api/discover/companies card into the shape the Discover/detail renderers expect. */
+function mapLiveDiscoverCard(card) {
+  const fallbackImg = SARAH_AVATAR_SRC || 'assets/sarah-avatar.svg';
+  return {
+    id: card.companyId,
+    companyId: card.companyId,
+    snId: card.snId || null,
+    live: true,
+    name: card.displayName || card.companyId,
+    categoryLabel: card.industry || '',
+    categories: card.categories || [],
+    tags: card.tags || [],
+    description: card.shortDescription || '',
+    address: card.location || '',
+    verified: Boolean(card.verified),
+    image: card.coverUrl || card.logoUrl || fallbackImg,
+    imageFallback: fallbackImg,
+    avatar: card.logoUrl || fallbackImg,
+    gallery: [],
+    products: [],
+    hours: [],
+    rating: null,
+    reviewCount: null,
+    distanceKm: null,
+    featured: false,
+  };
+}
+
+/** Companies rendered in the Discover grid. */
 function discoverCompaniesSource() {
-  return MOCK_DISCOVER_COMPANIES || [];
+  return discoverLiveActive() ? liveDiscover.companies : MOCK_DISCOVER_COMPANIES || [];
+}
+
+/** Lookup by id (companyId in live mode). Live mode never falls back to fixtures. */
+function discoverFind(id) {
+  const key = String(id || '');
+  if (!key) return undefined;
+  if (discoverLiveActive()) return liveDiscover.byId.get(key);
+  return (MOCK_DISCOVER_COMPANIES || []).find((c) => c.id === key);
+}
+
+function discoverCategoriesSource() {
+  if (!discoverLiveActive()) return MOCK_DISCOVER_CATEGORIES;
+  return [{ id: 'all', label: 'All' }, ...liveDiscover.facets.map((f) => ({ id: f.id, label: f.label }))];
+}
+
+async function refreshLiveDiscover() {
+  if (!discoverLiveActive() || liveDiscover.loading) return;
+  liveDiscover.loading = true;
+  liveDiscover.error = '';
+  liveDiscover.query = discoverSearchQuery;
+  liveDiscover.category = activeDiscoverCategory;
+  liveDiscover.place = discoverPlaceQuery;
+  const placeKey = discoverPlaceQuery.toLowerCase();
+  const isProvince = DISCOVER_PROVINCES.includes(placeKey);
+  const res = await window.SarahLive.fetchDiscoverCompanies({
+    q: discoverSearchQuery,
+    category: activeDiscoverCategory,
+    city: discoverPlaceQuery && !isProvince ? discoverPlaceQuery : '',
+    region: isProvince ? discoverPlaceQuery : '',
+  });
+  liveDiscover.loading = false;
+  liveDiscover.loaded = true;
+  if (res.error) {
+    liveDiscover.error = res.error;
+    liveDiscover.companies = [];
+  } else {
+    const cards = (res.data?.companies || []).map(mapLiveDiscoverCard);
+    liveDiscover.companies = cards;
+    liveDiscover.facets = res.data?.facets || [];
+    cards.forEach((c) => liveDiscover.byId.set(c.id, c));
+  }
+  const route = parseLocationHash().route;
+  if (route === 'discover') renderDiscover();
+  else if (route === 'discover-company') renderCompanyDetail(parseLocationHash().companyId);
+}
+
+/** Kick a live fetch when the directory has not been loaded or the query/category changed. */
+function ensureLiveDiscoverFresh() {
+  if (!discoverLiveActive() || liveDiscover.loading) return;
+  if (
+    !liveDiscover.loaded ||
+    liveDiscover.query !== discoverSearchQuery ||
+    liveDiscover.category !== activeDiscoverCategory ||
+    (liveDiscover.place || '') !== discoverPlaceQuery
+  ) {
+    void refreshLiveDiscover();
+  }
 }
 
 const DISCOVER_NL_KEYWORDS = {
@@ -7616,7 +8255,18 @@ function renderDiscover() {
     }
   }
 
-  catsHost.innerHTML = MOCK_DISCOVER_CATEGORIES.map(
+  const live = discoverLiveActive();
+  // Phase 2.0: the place filter is a server-side search, so it only exists in live mode.
+  const placeWrap = document.getElementById('discoverPlaceWrap');
+  if (placeWrap) placeWrap.hidden = !live;
+  const placeInput = document.getElementById('discoverPlaceInput');
+  if (placeInput && placeInput.value !== discoverPlaceQuery && document.activeElement !== placeInput) {
+    placeInput.value = discoverPlaceQuery;
+  }
+  ensureLiveDiscoverFresh();
+  ensureLiveConnectionsFresh();
+
+  catsHost.innerHTML = discoverCategoriesSource().map(
     (cat) => `
     <button type="button" class="discover-cat ${cat.id === activeDiscoverCategory ? 'is-active' : ''}" data-discover-cat="${escapeHtml(cat.id)}" role="tab">
       ${escapeHtml(cat.label)}
@@ -7630,20 +8280,38 @@ function renderDiscover() {
     });
   });
 
-  const list = filterDiscoverListings(discoverCompaniesSource(), activeDiscoverCategory, discoverSearchQuery);
+  // Live: server already searched/filtered. Fixtures: client-side filter.
+  const list = live
+    ? discoverCompaniesSource()
+    : filterDiscoverListings(discoverCompaniesSource(), activeDiscoverCategory, discoverSearchQuery);
+
+  if (live && liveDiscover.loading && !list.length) {
+    gridHost.innerHTML = '<p class="feed-empty-search">Loading businesses on Sarah Network…</p>';
+    return;
+  }
+  if (live && liveDiscover.error) {
+    gridHost.innerHTML = `<p class="feed-empty-search">Couldn't load Discover: ${escapeHtml(liveDiscover.error)}</p>`;
+    return;
+  }
 
   if (!list.length) {
     const hasQuery = Boolean((discoverSearchQuery || '').trim());
     gridHost.innerHTML = hasQuery
       ? '<p class="feed-empty-search">No businesses match your search. Try another keyword or clear the field.</p>'
-      : '<p class="feed-empty-search">No businesses in this category yet.</p>';
+      : live
+        ? '<p class="feed-empty-search">No businesses are published on Sarah Network yet.</p>'
+        : '<p class="feed-empty-search">No businesses in this category yet.</p>';
     return;
   }
 
-  gridHost.innerHTML = list
+  const sampleNote = live
+    ? ''
+    : '<p class="discover-sample-note">Sample listings — sign in to see live Sarah Network businesses.</p>';
+
+  gridHost.innerHTML = sampleNote + list
     .map(
       (c) => `
-    <article class="discover-card" data-company-id="${escapeHtml(c.id)}">
+    <article class="discover-card" data-company-id="${escapeHtml(c.id)}"${c.snId ? ` data-sn-id="${escapeHtml(c.snId)}"` : ''}>
       <div class="discover-card-media">
         <img ${discoverImgAttrs(c.image, c)} />
         ${c.featured ? `<span class="discover-card-crown">${DISCOVER_SVG.crown}</span>` : ''}
@@ -7651,13 +8319,18 @@ function renderDiscover() {
       </div>
       <div class="discover-card-body">
         <h2 class="discover-card-title">${escapeHtml(c.name)}</h2>
-        <p class="discover-card-meta">
+        ${
+          c.live
+            ? `<p class="discover-card-meta">${DISCOVER_SVG.pin}<span>${escapeHtml(c.address || c.categoryLabel || 'Sarah Network')}</span></p>
+        ${c.snId ? `<p class="discover-card-snid" title="Sarah Network ID">${escapeHtml(c.snId)}</p>` : ''}`
+            : `<p class="discover-card-meta">
           ${DISCOVER_SVG.star}
           <span>${c.rating}(${c.reviewCount})</span>
           <span class="discover-card-meta-sep" aria-hidden="true">|</span>
           ${DISCOVER_SVG.pin}
           <span>${escapeHtml(String(c.distanceKm))} km</span>
-        </p>
+        </p>`
+        }
       </div>
       <div class="discover-card-actions-row">
         <button type="button" class="discover-card-subscribe ${isOrgSubscribedSub01(c.id) ? 'is-active' : ''}" data-sub01-subscribe="${escapeHtml(c.id)}">
@@ -7701,9 +8374,7 @@ function renderDiscover() {
       e.stopPropagation();
       const id = btn.getAttribute('data-follow-company');
       if (!id) return;
-      const on = toggleCompanyFollow(id);
-      btn.classList.toggle('is-active', on);
-      btn.textContent = on ? 'Following' : 'Follow';
+      void handleFollowToggle(btn, id);
     });
   });
 
@@ -7725,13 +8396,18 @@ function renderDiscover() {
 function renderCompanyDetail(companyId) {
   const root = document.getElementById('companyDetailRoot');
   if (!root) return;
-  const company = MOCK_DISCOVER_COMPANIES.find((c) => c.id === companyId);
+  const company = discoverFind(companyId);
+  if (!company && discoverLiveActive() && !liveDiscover.loaded) {
+    root.innerHTML = '<div class="company-detail-body"><p>Loading business…</p></div>';
+    ensureLiveDiscoverFresh();
+    return;
+  }
   if (!company) {
     root.innerHTML = `<div class="company-detail-body"><p>Company not found.</p><button type="button" class="btn btn-primary" onclick="location.hash='discover'">Back</button></div>`;
     return;
   }
 
-  const hoursHtml = company.hours
+  const hoursHtml = (company.hours || [])
     .map(
       (h, i) => `
     <div class="company-hours-row ${i === 0 ? 'is-today' : ''}">
@@ -7771,6 +8447,7 @@ function renderCompanyDetail(companyId) {
     })
     .join('');
 
+  ensureLiveConnectionsFresh();
   const following = isCompanyFollowed(company.id);
   const subbed = isOrgSubscribedSub01(company.id);
 
@@ -7786,13 +8463,13 @@ function renderCompanyDetail(companyId) {
         <div class="company-head-text">
           <h1>${escapeHtml(company.name)}${company.verified ? ` ${verifiedBadge}` : ''}</h1>
           <p class="company-tags">${escapeHtml(company.categoryLabel)}</p>
-          <p class="company-meta">
+          ${company.live ? (company.snId ? `<p class="company-meta company-snid" title="Sarah Network ID">${escapeHtml(company.snId)}</p>` : '') : `<p class="company-meta">
             ${DISCOVER_SVG.star}
             <span>${company.rating}(${company.reviewCount})</span>
             <span class="discover-card-meta-sep">|</span>
             ${DISCOVER_SVG.pin}
             <span>${escapeHtml(String(company.distanceKm))} km</span>
-          </p>
+          </p>`}
           <p class="company-address">${escapeHtml(company.address)}</p>
         </div>
         <button type="button" class="company-fav-lg" data-fav-toggle aria-label="Favorite">${DISCOVER_SVG.heart}</button>
@@ -7820,25 +8497,37 @@ function renderCompanyDetail(companyId) {
         <button type="button" class="company-desc-more" id="companyDescToggle" aria-expanded="false">View more</button>
       </section>
 
-      <section class="company-block company-section company-gallery-block">
+      ${
+        gallery.length
+          ? `<section class="company-block company-section company-gallery-block">
         <h2>Gallery</h2>
         <div class="company-gallery-grid company-gallery-grid--six">${galleryHtml}</div>
         <p class="company-gallery-hint">Tap a photo to view, like, or swipe through the gallery.</p>
-      </section>
+      </section>`
+          : ''
+      }
 
-      <section class="company-block company-section company-products-block">
+      ${
+        products.length
+          ? `<section class="company-block company-section company-products-block">
         <h2>Products</h2>
         <p class="company-section-lead">Available to order — like items or buy through Sarah (mock checkout).</p>
         <div class="product-grid">${productsHtml}</div>
-      </section>
+      </section>`
+          : ''
+      }
 
-      <section class="company-block company-section company-hours">
+      ${
+        (company.hours || []).length
+          ? `<section class="company-block company-section company-hours">
         <button type="button" class="company-hours-toggle" id="companyHoursToggle" aria-expanded="true">
           <span>Business Hours</span>
           <svg class="icon-svg icon-svg--xs" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
         </button>
         <div class="company-hours-list" id="companyHoursList">${hoursHtml}</div>
-      </section>
+      </section>`
+          : ''
+      }
     </div>`;
 
   root.querySelector('[data-fav-toggle]')?.addEventListener('click', (e) => {
@@ -7858,9 +8547,7 @@ function renderCompanyDetail(companyId) {
     const btn = e.currentTarget;
     const id = btn.getAttribute('data-follow-company');
     if (!id) return;
-    const on = toggleCompanyFollow(id);
-    btn.classList.toggle('is-active', on);
-    btn.textContent = on ? 'Following' : 'Follow';
+    void handleFollowToggle(btn, id);
   });
 
   root.querySelector('[data-chat-company]')?.addEventListener('click', (e) => {
@@ -8056,6 +8743,9 @@ function bindSarahLiveAuth() {
   window.SarahLive.onAuthChange(async (user, profile) => {
     if (user && profile) applyConsumerProfileToUi(profile);
     if (!user) clearLivePersonalSarahState();
+    resetLiveConnections();
+    if (user) ensureLiveConnectionsFresh();
+    else sub01RefreshSurfaces();
     updatePersonalSarahLiveUi();
     if (user) {
       await syncPersonalSarahSessionsFromServer();
@@ -8122,6 +8812,31 @@ function init() {
           rt.threads[companyId].messages = mapApiMessagesToThread(payload.messages);
         } else {
           await loadCompanyThreadFromApiIfNeeded();
+        }
+        if (input) input.value = '';
+        renderThread();
+      } finally {
+        setPersonalSarahComposeBusy(false);
+      }
+      return;
+    }
+    const p2pKinds = new Set(['person_to_person', 'group_personal', 'group_organisation']);
+    if (p2pKinds.has(ctx.kind) && ctx.api && ctx.convId && consumerChatLiveActive() && !ctx.readOnly) {
+      setPersonalSarahComposeBusy(true);
+      try {
+        const send =
+          ctx.kind === 'person_to_person'
+            ? window.SarahLive.sendPersonMessage
+            : window.SarahLive.sendGroupMessage;
+        const res = await send(ctx.convId, text);
+        if (res.error) {
+          showProtoToast(res.error);
+          return;
+        }
+        const payload = res.data || {};
+        const rt = getSarahRuntime();
+        if (payload.messages && rt.threads[ctx.convId]) {
+          rt.threads[ctx.convId].messages = mapApiMessagesToThread(payload.messages);
         }
         if (input) input.value = '';
         renderThread();
