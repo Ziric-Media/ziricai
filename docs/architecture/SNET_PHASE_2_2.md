@@ -43,10 +43,10 @@ Tests: `test/snet-14-phase2-2.test.mjs` + `npm run test:snet-programme`.
 
 | Target | Id / result |
 |---|---|
-| Railway production (`independent-trust` / `ziricai`) | *(filled by deploy run)* |
-| Netlify sarah `6200fa94-47d4-4486-a21f-8bdfbedcdf83` | *(filled by deploy run)* |
-| Netlify app `5eb02040-0849-442a-bfcf-265fae7d397c` | *(filled by deploy run)* |
-| Netlify admin `ed3936c0-c861-48f4-ae23-13740ca8f9bd` | *(filled by deploy run)* |
+| Railway production (`independent-trust` / `ziricai`) | `e870a930-f25d-44d1-a31b-7ae137cbbc9c` |
+| Netlify sarah `6200fa94-47d4-4486-a21f-8bdfbedcdf83` | `6af1bad007ca96ddaf31930a` |
+| Netlify app `5eb02040-0849-442a-bfcf-265fae7d397c` | `6af1bb06c8ee12710321ae4b` |
+| Netlify admin `ed3936c0-c861-48f4-ae23-13740ca8f9bd` | `6af1bb0a5dcfe33dd5a5f4f1` |
 
 Built from clean worktree; `npm run test:snet-programme` green before push.
 
