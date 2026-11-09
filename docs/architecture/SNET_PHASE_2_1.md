@@ -48,7 +48,9 @@ Tests: `test/snet-13-phase2-1.test.mjs` + existing programme suite (`npm run tes
 
 | Target | Id / result |
 |---|---|
-| Railway production | _(filled after deploy)_ |
-| Netlify sarah `6200fa94-47d4-4486-a21f-8bdfbedcdf83` | _(filled after deploy)_ |
-| Netlify app `5eb02040-0849-442a-bfcf-265fae7d397c` | _(filled after deploy)_ |
-| Netlify admin `ed3936c0-c861-48f4-ae23-13740ca8f9bd` | _(filled after deploy)_ |
+| Railway production (`independent-trust` / `ziricai`) | `eb1e95a1-4dbc-4d55-9732-01d624580960` |
+| Netlify sarah `6200fa94-47d4-4486-a21f-8bdfbedcdf83` | `6af11bb3b04db7e585ec6920` |
+| Netlify app `5eb02040-0849-442a-bfcf-265fae7d397c` | `6af11bd22232443e453b57f7` |
+| Netlify admin `ed3936c0-c861-48f4-ae23-13740ca8f9bd` | `6af11bd404fc05afcaa9c03a` |
+
+Built from worktree at `0e04188`; `npm run test:snet-programme` green in main tree before push.
