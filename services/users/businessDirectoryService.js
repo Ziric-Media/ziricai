@@ -7,7 +7,9 @@
  */
 import { buildPilotSeedEntries } from "../network/pilotListings.js";
 import { isHardBlockedFromPublicDirectory } from "../network/networkEligibility.js";
-import { deriveCategories, DISCOVER_CATEGORIES } from "../network/networkTaxonomy.js";
+import { deriveCategories, getCategories } from "../network/networkTaxonomy.js";
+import { hydrateSearchConfig } from "../network/searchConfigService.js";
+import { clampRadiusKm, haversineKm, locateEntry, matchesCity, matchesRegion, parseNear } from "../network/networkGeo.js";
 import { rankCards } from "../network/networkSearchScoring.js";
 import { recordSearch } from "../network/networkSearchStats.js";
 import {
@@ -152,6 +154,12 @@ export function verificationBadge(entry) {
     return { state: "unverified", checks: [], source: null, verifiedAt: null };
 }
 
+/** Phase 2.0: coordinates are public at ~1 km precision; `region` is the province used by the region filter. */
+function publicLocation(entry) {
+    const loc = locateEntry(entry);
+    return { geo: loc.geo, geoSource: loc.geoSource, region: loc.region };
+}
+
 /** Public card shape for Discover (never includes restricted/private fields). */
 export function toDiscoverCard(entry, entity) {
     return {
@@ -168,6 +176,8 @@ export function toDiscoverCard(entry, entity) {
         tags: Array.isArray(entry.tags) ? entry.tags : [],
         logoUrl: entry.logoUrl || null,
         coverUrl: entry.coverUrl || null,
+        serviceAreas: Array.isArray(entry.serviceAreas) ? entry.serviceAreas : [],
+        ...publicLocation(entry),
         hasCompanySarah: true,
     };
 }
@@ -179,6 +189,7 @@ export function toDiscoverCard(entry, entity) {
  */
 export async function listDiscoverCards() {
     await hydrateBusinessDirectory();
+    await hydrateSearchConfig(); // Mission Control category / synonym overrides (cached, short TTL)
     const cards = [];
     for (const entry of listPublicBusinessDirectoryEntries()) {
         if (isHardBlockedFromPublicDirectory(entry.companyId, entry.displayName)) continue; // demo / test / acceptance
@@ -208,23 +219,51 @@ function decodeCursor(cursor) {
  * cursor pagination. Facets are computed over the text-matched set (before category/verified filters).
  * @param {{ q?: string, category?: string, verifiedOnly?: boolean, limit?: number, cursor?: string }} [opts]
  */
-export async function searchDiscoverCompanies({ q = "", category = "", verifiedOnly = false, limit = 50, cursor = "" } = {}) {
+export async function searchDiscoverCompanies({
+    q = "",
+    category = "",
+    verifiedOnly = false,
+    limit = 50,
+    cursor = "",
+    city = "",
+    region = "",
+    near = "",
+    radiusKm,
+    sort = "",
+} = {}) {
     const cards = await listDiscoverCards();
     const ranked = rankCards(cards, q);
     const cat = String(category || "").toLowerCase();
-    const filtered = ranked
+    // Phase 2.0 geo: `city` / `region` are text filters; `near` (lat,lng or a known place) filters by radius and adds distanceKm.
+    const origin = parseNear(near);
+    const radius = clampRadiusKm(radiusKm);
+    const cityFilter = String(city || "").trim().slice(0, 80);
+    const regionFilter = String(region || "").trim().slice(0, 80);
+    let filtered = ranked
         .filter((r) => !cat || cat === "all" || r.card.categories.includes(cat))
-        .filter((r) => !verifiedOnly || r.card.verified);
+        .filter((r) => !verifiedOnly || r.card.verified)
+        .filter((r) => !cityFilter || matchesCity(r.card, cityFilter))
+        .filter((r) => !regionFilter || matchesRegion(r.card, regionFilter));
+    if (origin) {
+        filtered = filtered
+            .map((r) => ({ ...r, distanceKm: r.card.geo ? Math.round(haversineKm(origin, r.card.geo) * 10) / 10 : null }))
+            .filter((r) => r.distanceKm !== null && r.distanceKm <= radius);
+        const byDistance = String(sort || (String(q || "").trim() ? "relevance" : "distance")) === "distance";
+        if (byDistance) filtered.sort((a, b) => a.distanceKm - b.distanceKm || String(a.card.displayName).localeCompare(String(b.card.displayName)));
+    }
     const max = Math.min(Math.max(Number(limit) || 50, 1), 100);
     const offset = decodeCursor(cursor);
     const page = filtered.slice(offset, offset + max);
     recordSearch({ q, category: cat === "all" ? "" : cat, resultCount: filtered.length });
     return {
-        companies: page.map((r) => ({ ...r.card, matchedOn: r.matchedOn })),
+        companies: page.map((r) => ({ ...r.card, matchedOn: r.matchedOn, ...(origin ? { distanceKm: r.distanceKm } : {}) })),
         total: filtered.length,
         nextCursor: offset + max < filtered.length ? encodeCursor(offset + max) : null,
         facets: discoverCategoryFacets(ranked.map((r) => r.card)),
         query: String(q || ""),
+        ...(origin || cityFilter || regionFilter
+            ? { geo: { near: origin ? { lat: origin.lat, lng: origin.lng, label: origin.label } : null, radiusKm: origin ? radius : null, city: cityFilter || null, region: regionFilter || null } }
+            : {}),
     };
 }
 
@@ -235,7 +274,7 @@ export async function listDiscoverCompanies(opts = {}) {
 
 /** Category facets (id/label/count) over the currently listed cards. */
 export function discoverCategoryFacets(cards) {
-    return DISCOVER_CATEGORIES.map((c) => ({
+    return getCategories().map((c) => ({
         id: c.id,
         label: c.label,
         count: cards.filter((card) => card.categories.includes(c.id)).length,

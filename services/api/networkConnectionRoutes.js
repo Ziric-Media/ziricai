@@ -9,8 +9,10 @@
  *     GET  /api/network/v1/my-organisations                   → { organisations[], counts }   (Gate 2)
  *     PUT  /api/network/v1/my-organisations/:snId/preferences { prefs: { notifications, announcements, reminders } }
  *     GET  /api/network/v1/my-updates?limit=                  → { updates[], organisations, delivery: "pull" }   (Gate 6)
+ *     GET  /api/network/v1/my-notifications?limit=&unread=1   → { notifications[], unread, delivery: "in_app" }   (Phase 2.0)
+ *     POST /api/network/v1/my-notifications/read { ids?: string[], all?: boolean } → { updated, unread }   (Phase 2.0)
  *   Tenant (member; writes need canManageNetwork) — pseudonymous:
- *     GET/POST /api/network/v1/orgs/:companyId/subscriber-events   (Gate 5/6: event log; consumers pull via /my-updates, nothing is pushed)
+ *     GET/POST /api/network/v1/orgs/:companyId/subscriber-events   (Gate 5/6 event log; Phase 2.0 also writes in-app notifications; no device push)
  *     GET  /api/network/v1/orgs/:companyId/connections?state=
  *     POST /api/network/v1/orgs/:companyId/connections/:connectionId/:action   accept | decline | disconnect | block | unblock
  */
@@ -28,6 +30,7 @@ import {
 import { listMyOrganisations, updateMyOrganisationPreferences } from "../network/myOrganisationsService.js";
 import { listSubscriberEvents, recordSubscriberEvent } from "../network/subscriberEventService.js";
 import { listUpdatesForUser } from "../network/subscriberUpdatesService.js";
+import { listNotificationsForUser, markNotificationsRead } from "../network/notificationService.js";
 
 function fail(res, err, fallbackCode) {
     res.status(err.status || 500).json({
@@ -106,12 +109,31 @@ export function mountNetworkConnectionRoutes(app, deps = {}) {
         }
     });
 
-    // Gate 5 — subscriber notification event log (no push; consumers read it through GET /my-updates).
+    // Phase 2.0 — persisted in-app notifications (fan-out of subscriber events). Consumers poll; nothing is pushed to devices.
+    app.get("/api/network/v1/my-notifications", consumerGuard, async (req, res) => {
+        try {
+            const unreadOnly = ["1", "true"].includes(String(req.query.unread || "").toLowerCase());
+            res.json({ ok: true, data: await listNotificationsForUser(req.consumerAuth.uid, { limit: req.query.limit, unreadOnly }) });
+        } catch (err) {
+            fail(res, err, "MY_NOTIFICATIONS_FAILED");
+        }
+    });
+
+    app.post("/api/network/v1/my-notifications/read", consumerGuard, async (req, res) => {
+        try {
+            const body = req.body || {};
+            res.json({ ok: true, data: await markNotificationsRead(req.consumerAuth.uid, { ids: body.ids, all: body.all === true }) });
+        } catch (err) {
+            fail(res, err, "MY_NOTIFICATIONS_READ_FAILED");
+        }
+    });
+
+    // Gate 5 — subscriber notification event log (Phase 2.0: also fans out to in-app notifications).
     app.get("/api/network/v1/orgs/:companyId/subscriber-events", async (req, res) => {
         try {
             const companyId = String(req.params.companyId || "").trim();
             await authorize(req, companyId, { write: false });
-            res.json({ ok: true, data: { events: await listSubscriberEvents(companyId, { limit: req.query.limit }), delivery: "logged_only" } });
+            res.json({ ok: true, data: { events: await listSubscriberEvents(companyId, { limit: req.query.limit }), delivery: "in_app" } });
         } catch (err) {
             fail(res, err, "SUBSCRIBER_EVENTS_FAILED");
         }

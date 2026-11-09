@@ -10,6 +10,7 @@
 import { evaluateNetworkEligibility } from "./networkEligibility.js";
 import { ensureOrgEntity, getEntityBySnId, getOrgEntityByCompanyId } from "./networkIdentityService.js";
 import { deriveCategories, isKnownCategory } from "./networkTaxonomy.js";
+import { validLatLng } from "./networkGeo.js";
 import {
     getBusinessDirectoryEntry,
     hydrateBusinessDirectory,
@@ -46,6 +47,8 @@ export const PUBLIC_PROFILE_FIELDS = Object.freeze([
     "serviceAreas",
     "hours",
     "contact",
+    /** Phase 2.0: optional `{ lat, lng }` for Discover `near=` search (shown at ~1 km precision). */
+    "geo",
 ]);
 export const RESTRICTED_PROFILE_FIELDS = Object.freeze(["legalName", "registrationNumber"]);
 export const REQUIRED_TO_PUBLISH = Object.freeze(["displayName", "industry", "shortDescription", "location"]);
@@ -99,6 +102,12 @@ export function validateProfilePatch(input = {}) {
     if (has("coverUrl")) profile.coverUrl = url(input.coverUrl, "coverUrl");
     if (has("tags")) profile.tags = [...new Set(list(input.tags, 20, 30, "tags").map((t) => t.toLowerCase()))];
     if (has("languages")) profile.languages = list(input.languages, 10, 30, "languages");
+    if (has("geo")) {
+        const g = input.geo;
+        if (g === null || g === undefined || (typeof g === "object" && g.lat === "" && g.lng === "")) profile.geo = null;
+        else if (typeof g !== "object" || !validLatLng(g.lat, g.lng)) throw bad("geo must be { lat, lng } with valid coordinates.", "PROFILE_INVALID", { field: "geo" });
+        else profile.geo = { lat: Number(g.lat), lng: Number(g.lng) };
+    }
     if (has("serviceAreas")) profile.serviceAreas = list(input.serviceAreas, 20, 80, "serviceAreas");
     if (has("categories")) {
         const cats = list(input.categories, 8, 30, "categories").map((c) => c.toLowerCase());

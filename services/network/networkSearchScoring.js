@@ -5,7 +5,7 @@
  *   + small boosts for verification and profile completeness (applied only to results that already match).
  * Sponsored placement does not exist here (RS04 is separate and must merge after organic ranking, labelled).
  */
-import { DISCOVER_CATEGORIES, SEARCH_SYNONYMS } from "./networkTaxonomy.js";
+import { getCategories, getSynonyms } from "./networkTaxonomy.js";
 
 const STOP_WORDS = new Set([
     "a", "an", "the", "find", "me", "my", "for", "in", "near", "nearby", "around", "at", "of", "to", "i", "we",
@@ -84,7 +84,7 @@ function completeness(card) {
 }
 
 function categoryLabels(card) {
-    return (card.categories || []).map((id) => DISCOVER_CATEGORIES.find((c) => c.id === id)?.label.toLowerCase()).filter(Boolean);
+    return (card.categories || []).map((id) => getCategories().find((c) => c.id === id)?.label.toLowerCase()).filter(Boolean);
 }
 
 /**
@@ -116,7 +116,7 @@ export function scoreCard(card, parsed) {
 
     for (const term of parsed.terms) {
         const scoreBefore = score;
-        const variants = [{ t: term, f: 1 }, ...(SEARCH_SYNONYMS[term] || []).filter((s) => s !== term).map((s) => ({ t: s, f: WEIGHTS.synonymFactor }))];
+        const variants = [{ t: term, f: 1 }, ...(getSynonyms()[term] || []).filter((s) => s !== term).map((s) => ({ t: s, f: WEIGHTS.synonymFactor }))];
         for (const { t, f } of variants) {
             const multiWord = t.includes(" ");
             const singles = multiWord ? tokenize(t) : [t];

@@ -213,6 +213,15 @@ export const NETWORK_COLLECTIONS = {
     SEARCH_STATS: "networkSearchStats",
     /** Gate 5 — subscriber notification event log (counts only; no fan-out, no recipient records). */
     SUBSCRIBER_EVENTS: "networkSubscriberEvents",
+    /** Phase 2.0 — verification evidence file bytes: metadata doc per upload + base64 chunks (Firestore 1 MiB doc cap). */
+    EVIDENCE_BLOBS: "networkEvidenceBlobs",
+    EVIDENCE_BLOB_CHUNKS: "networkEvidenceBlobChunks",
+    /** Phase 2.0 — per-recipient in-app notifications for subscriber events (consumer polls; marks read). */
+    NOTIFICATIONS: "networkNotifications",
+    /** Phase 2.0 — Mission Control search administration (category / synonym overrides; single doc `config`). */
+    SEARCH_CONFIG: "networkSearchConfig",
+    /** Phase 2.0 — platform RBAC: `{ uid, roles[] }` for Verification Officer, Search Admin, … (server-only). */
+    PLATFORM_ROLES: "networkPlatformRoles",
 };
 
 /** Optional future platform person link index. */

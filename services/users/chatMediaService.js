@@ -176,6 +176,12 @@ export function completeScopedMediaUpload(uploadId, subject, purpose, token, bod
     return { uploadId, mimeType: record.mimeType, fileName: record.fileName, byteLength: size, sha256: record.sha256 };
 }
 
+/** Drop a scoped upload whose bytes were rejected after receipt (e.g. content/type mismatch) so it cannot be attached. */
+export function discardScopedMediaUpload(uploadId) {
+    const record = uploads.get(uploadId);
+    if (record?.purpose && record.status !== "attached") uploads.delete(uploadId);
+}
+
 /** Undo `consumeScopedMediaUpload` when the attach step failed afterwards (so the tenant can retry). */
 export function releaseScopedMediaUpload(uploadId) {
     const record = uploads.get(uploadId);

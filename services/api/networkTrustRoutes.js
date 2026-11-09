@@ -9,7 +9,7 @@
  *     POST /api/platform/network/v1/moderation/:caseId/decision   { action: start_review|dismiss|suspend_entity, note }
  */
 import { requireConsumerScope } from "../auth/consumerAuth.js";
-import { requirePlatformAccess } from "../auth/platformAuth.js";
+import { PLATFORM_PERMISSIONS as PERM, requirePlatformPermission } from "../auth/platformRbac.js";
 import {
     decideModerationCase,
     getModerationCase,
@@ -36,7 +36,7 @@ function actorOf(req) {
  */
 export function mountNetworkTrustRoutes(app, deps = {}) {
     const consumerGuard = deps.consumerGuard || requireConsumerScope();
-    const platformGuard = deps.platformGuard || requirePlatformAccess();
+    const guardFor = (permission) => deps.platformGuard || requirePlatformPermission(permission);
 
     app.post("/api/network/v1/entities/:snId/report", consumerGuard, async (req, res) => {
         try {
@@ -55,7 +55,7 @@ export function mountNetworkTrustRoutes(app, deps = {}) {
         }
     });
 
-    app.get("/api/platform/network/v1/moderation", platformGuard, async (req, res) => {
+    app.get("/api/platform/network/v1/moderation", guardFor(PERM.MODERATION_READ), async (req, res) => {
         try {
             const cases = await listModerationCases({
                 status: String(req.query.status || ""),
@@ -68,7 +68,7 @@ export function mountNetworkTrustRoutes(app, deps = {}) {
         }
     });
 
-    app.get("/api/platform/network/v1/moderation/:caseId", platformGuard, async (req, res) => {
+    app.get("/api/platform/network/v1/moderation/:caseId", guardFor(PERM.MODERATION_READ), async (req, res) => {
         try {
             const kase = await getModerationCase(String(req.params.caseId || ""));
             if (!kase) return res.status(404).json({ ok: false, error: { code: "CASE_NOT_FOUND", message: "Moderation case not found." } });
@@ -78,7 +78,7 @@ export function mountNetworkTrustRoutes(app, deps = {}) {
         }
     });
 
-    app.post("/api/platform/network/v1/moderation/:caseId/decision", platformGuard, async (req, res) => {
+    app.post("/api/platform/network/v1/moderation/:caseId/decision", guardFor(PERM.MODERATION_DECIDE), async (req, res) => {
         try {
             const kase = await decideModerationCase(String(req.params.caseId || ""), req.body || {}, actorOf(req));
             res.json({ ok: true, data: { case: kase } });

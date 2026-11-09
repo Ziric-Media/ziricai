@@ -16,7 +16,28 @@ export const DISCOVER_CATEGORIES = Object.freeze([
     { id: "community", label: "Community", keywords: ["church", "ministry", "ngo", "charity", "foundation", "community", "association", "club", "non-profit"] },
 ]);
 
-const CATEGORY_IDS = new Set(DISCOVER_CATEGORIES.map((c) => c.id));
+/* ---- Phase 2.0: Mission Control search administration -------------------------------------------------------
+ * The constants above are the shipped DEFAULTS. A Search Admin can override categories and/or synonyms in Mission
+ * Control; the persisted override is loaded by searchConfigService and applied here. All readers call the getters
+ * (getCategories / getSynonyms) so an edit takes effect without a deploy. `null` override = shipped defaults. */
+let override = { categories: null, synonyms: null };
+
+/** @param {{ categories?: object[]|null, synonyms?: object|null }|null} next null restores shipped defaults */
+export function setTaxonomyOverride(next) {
+    override = { categories: next?.categories || null, synonyms: next?.synonyms || null };
+}
+
+export function getTaxonomyOverride() {
+    return override;
+}
+
+export function getCategories() {
+    return override.categories || DISCOVER_CATEGORIES;
+}
+
+export function getSynonyms() {
+    return override.synonyms || SEARCH_SYNONYMS;
+}
 
 /** Query-time synonym expansion (lower-case token → related stems). */
 export const SEARCH_SYNONYMS = Object.freeze({
@@ -43,7 +64,8 @@ export const SEARCH_SYNONYMS = Object.freeze({
 
 /** @param {string} id */
 export function isKnownCategory(id) {
-    return CATEGORY_IDS.has(String(id || "").toLowerCase());
+    const key = String(id || "").toLowerCase();
+    return getCategories().some((c) => c.id === key);
 }
 
 /**
@@ -62,6 +84,8 @@ export function deriveCategories(entry) {
         .split(/[^a-z0-9]+/)
         .filter(Boolean);
     // Word-level match (short keywords exact, long keywords prefix) so "healthcare" is not "car".
-    const hit = (k) => words.some((w) => w === k || (k.length >= 5 && w.startsWith(k)));
-    return DISCOVER_CATEGORIES.filter((cat) => cat.keywords.some(hit)).map((cat) => cat.id);
+    // Multi-word keywords ("pet clinic") — added through Mission Control Search admin — match as a whole phrase.
+    const phrases = ` ${words.join(" ")} `;
+    const hit = (k) => (k.includes(" ") ? phrases.includes(` ${k.replace(/[^a-z0-9]+/g, " ").trim()} `) : words.some((w) => w === k || (k.length >= 5 && w.startsWith(k))));
+    return getCategories().filter((cat) => cat.keywords.some(hit)).map((cat) => cat.id);
 }

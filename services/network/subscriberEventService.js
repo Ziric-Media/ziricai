@@ -1,8 +1,5 @@
 /**
- * Gate 5 — subscriber notification STUB (event log only).
- *
- * A business can record an announcement / notification / reminder aimed at its subscribers. The platform stores the
- * event and the audience SIZE (honouring each subscriber's My Organisations channel preferences) — it does NOT deliver
+''s My Organisations channel preferences) — it does NOT deliver
  * anything: no push, no inbox message, no per-recipient record. `status` is always `logged_only` until a delivery
  * worker (SNET-07 gap) consumes these events. Keeping recipients out of the log also keeps this privacy-neutral.
  *
@@ -13,6 +10,8 @@ import { NETWORK_COLLECTIONS } from "../database/schema.js";
 import { createNetworkCollection } from "./networkCollectionStore.js";
 import { getOrgEntityByCompanyId } from "./networkIdentityService.js";
 import { countSubscribersForOrg } from "./connectionService.js";
+import { fanOutSubscriberEvent } from "./notificationService.js";
+import { getBusinessDirectoryEntry } from "../users/businessDirectoryService.js";
 
 const col = createNetworkCollection(NETWORK_COLLECTIONS.SUBSCRIBER_EVENTS);
 
@@ -74,6 +73,15 @@ export async function recordSubscriberEvent(companyId, input = {}, actor = "busi
         createdAt: new Date().toISOString(),
         schemaVersion: 1,
     };
+    const entry = getBusinessDirectoryEntry(companyId);
+    try {
+        const { delivered } = await fanOutSubscriberEvent(event, { displayName: entry?.displayName, verified: entry?.verified });
+        event.delivered = delivered;
+        if (delivered > 0) event.status = "delivered_in_app";
+    } catch (e) {
+        // The event log is the source of truth; a fan-out failure must not lose the announcement.
+        event.fanOutError = String(e?.message || e).slice(0, 200);
+    }
     await col.put(event.eventId, event, { merge: false });
     return event;
 }

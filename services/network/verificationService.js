@@ -97,6 +97,8 @@ function clientFileRef(f) {
         mimeType: f.mimeType,
         byteLength: f.byteLength,
         sha256: f.sha256,
+        /** Phase 2.0: true when the bytes are durably stored and a Verification Officer can download them. */
+        stored: Boolean(f.stored),
     };
 }
 
@@ -107,6 +109,19 @@ function clientFileRef(f) {
 const TRUSTED_FILE_REF = Symbol("trustedFileRef");
 export function withTrustedFileRef(item, fileRef) {
     return { ...item, [TRUSTED_FILE_REF]: fileRef };
+}
+
+/**
+ * Platform download lookup: the stored file behind one evidence item of a case (Phase 2.0).
+ * @returns {Promise<{ evidence: object, file: object, kase: object }|null>} null when the case/evidence/file does not exist
+ */
+export async function getEvidenceFileForCase(caseId, evidenceId) {
+    const raw = await col.get(caseId);
+    if (!raw) return null;
+    const rows = await listEvidenceForCase(caseId);
+    const row = rows.find((r) => r.evidenceId === evidenceId);
+    if (!row?.fileRef?.uploadId) return null;
+    return { kase: strip(raw), evidence: row, file: row.fileRef };
 }
 
 /** Evidence references attached to a case, oldest first. */

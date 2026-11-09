@@ -106,7 +106,7 @@ async function subscriberSetup() {
     return { snId, subscribe };
 }
 
-test("subscriber events: logged only, audience counts honour channel prefs, validation, rate limit", async () => {
+test("subscriber events: audience counts honour channel prefs, validation, rate limit", async () => {
     const { snId, subscribe } = await subscriberSetup();
     await subscribe("g5-u1");
     await subscribe("g5-u2");
@@ -115,8 +115,9 @@ test("subscriber events: logged only, audience counts honour channel prefs, vali
     await updateMyOrganisationPreferences("g5-u3", snId, { reminders: false });
 
     const evt = await recordSubscriberEvent(SMILEMORE_DEMO_COMPANY_ID, { type: "reminder", title: "Check-up due", body: "Book your six-month visit." }, "member:owner");
-    assert.equal(evt.status, "logged_only");
-    assert.equal(evt.delivered, 0);
+    // Phase 2.0: eligible subscribers (u1, u2) get an in-app notification; u3 muted reminders; the follower is not a subscriber.
+    assert.equal(evt.status, "delivered_in_app");
+    assert.equal(evt.delivered, 2);
     assert.deepEqual(evt.audience, { subscribers: 3, wouldReceive: 2 }, "u3 turned reminders off; follower excluded");
     assert.equal(evt.channel, "reminders");
     assert.equal(evt.createdBy, "member:owner");
@@ -164,7 +165,7 @@ test("subscriber events: tenant routes enforce write permission and are catalogu
         assert.equal((await j(url, { method: "POST", body: JSON.stringify({ type: "bad", title: "x" }) })).status, 422);
         const list = await j(url, { headers: { "x-role": "agent" } });
         assert.equal(list.status, 200, "members can read");
-        assert.equal(list.body.data.delivery, "logged_only");
+        assert.equal(list.body.data.delivery, "in_app");
         assert.equal(list.body.data.events.length, 1);
     } finally {
         server.closeAllConnections?.();

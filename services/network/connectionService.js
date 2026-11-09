@@ -340,6 +340,28 @@ export async function countSubscribersForOrg(companyId) {
     return { subscribers, byChannel, snId: entity.snId };
 }
 
+/**
+ * Phase 2.0 — SERVER-INTERNAL recipient list for in-app notification fan-out (never return to a business).
+ * Subscribed/connected relationships with valid consent whose My Organisations prefs enable `channel`.
+ * @param {string} companyId
+ * @param {string} channel one of ORG_PREF_KEYS
+ * @returns {Promise<{ uid: string, snId: string }[]>}
+ */
+export async function listNotificationRecipientsForOrg(companyId, channel, { limit = 5000 } = {}) {
+    if (!ORG_PREF_KEYS.includes(channel)) return [];
+    const entity = await getOrgEntityByCompanyId(companyId);
+    if (!entity) return [];
+    const rows = (await col.list({ where: [["snId", "==", entity.snId]], limit })).map(strip);
+    const out = [];
+    for (const row of rows) {
+        const conn = await reconcileConsent(row);
+        if (![S.SUBSCRIBED, S.CONNECTED].includes(conn.state)) continue;
+        if (!effectivePrefs(conn)[channel]) continue;
+        out.push({ uid: conn.uid, snId: entity.snId });
+    }
+    return out;
+}
+
 /** Business-side list (pseudonymous). @param {string} companyId */
 export async function listConnectionsForOrg(companyId, { state = "", limit = 100 } = {}) {
     const entity = await getOrgEntityByCompanyId(companyId);

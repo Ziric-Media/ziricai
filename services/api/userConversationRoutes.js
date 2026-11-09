@@ -31,6 +31,12 @@ export function mountUserConversationRoutes(app, deps = {}) {
                 category: String(req.query?.category || "").slice(0, 40),
                 limit: req.query?.limit,
                 cursor: String(req.query?.cursor || "").slice(0, 200),
+                // Phase 2.0 geo filters (same contract as /api/network/v1/directory/search)
+                city: String(req.query?.city || "").slice(0, 80),
+                region: String(req.query?.region || "").slice(0, 80),
+                near: String(req.query?.near || "").slice(0, 60),
+                radiusKm: req.query?.radiusKm,
+                sort: String(req.query?.sort || "").slice(0, 20),
             });
             res.json({
                 companies: result.companies,
@@ -38,9 +44,10 @@ export function mountUserConversationRoutes(app, deps = {}) {
                 nextCursor: result.nextCursor,
                 facets: result.facets,
                 query: result.query,
+                ...(result.geo ? { geo: result.geo } : {}),
             });
         } catch (err) {
-            res.status(500).json({ error: err.message || "Discover unavailable" });
+            res.status(err.status || 500).json({ error: err.message || "Discover unavailable", ...(err.code ? { code: err.code } : {}) });
         }
     });
 

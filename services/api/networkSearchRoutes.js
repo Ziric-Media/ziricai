@@ -1,6 +1,7 @@
 /**
  * SNET-05 — Network search API (v1).
  *   GET /api/network/v1/directory/search?q&category&verified=1&limit&cursor   (public read of listed entries, per-IP rate limit)
+ *       Phase 2.0 geo: &city=&region=&near=<lat,lng|town>&radiusKm=&sort=distance|relevance
  *   GET /api/network/v1/directory/suggest?q=                                  (public read, per-IP rate limit)
  *   GET /api/network/v1/health                                                (public, non-sensitive)
  */
@@ -29,6 +30,12 @@ export function mountNetworkSearchRoutes(app, deps = {}) {
                 verifiedOnly: ["1", "true"].includes(String(req.query.verified || "")),
                 limit: req.query.limit,
                 cursor: String(req.query.cursor || "").slice(0, 200),
+                // Phase 2.0 geo: city / region text filters; near = "lat,lng" or a known town (+ radiusKm, sort=distance|relevance)
+                city: String(req.query.city || "").slice(0, 80),
+                region: String(req.query.region || "").slice(0, 80),
+                near: String(req.query.near || "").slice(0, 60),
+                radiusKm: req.query.radiusKm,
+                sort: String(req.query.sort || "").slice(0, 20),
             });
             res.json({ ok: true, data: result });
         } catch (err) {

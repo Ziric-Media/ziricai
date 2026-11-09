@@ -199,13 +199,19 @@ export const ROUTE_CATALOG = [
     { method: "POST", path: "/api/network/v1/orgs/:companyId/verification", domain: "network", tenantScoped: true, description: "Submit for verification (optional evidence refs)" },
     { method: "POST", path: "/api/network/v1/orgs/:companyId/verification/evidence", domain: "network", tenantScoped: true, description: "Attach evidence references (https URL / external ref / uploaded file ref) to the open verification case" },
     { method: "POST", path: "/api/network/v1/orgs/:companyId/verification/evidence-uploads", domain: "network", tenantScoped: true, description: "Request a tenant-scoped signed upload token for a verification evidence file (metadata + sha256 only)" },
-    { method: "PUT", path: "/api/network/v1/orgs/:companyId/verification/evidence-uploads/:uploadId", domain: "network", tenantScoped: true, description: "Complete an evidence upload (raw body; records size + sha256; file bytes are not stored)" },
+    { method: "PUT", path: "/api/network/v1/orgs/:companyId/verification/evidence-uploads/:uploadId", domain: "network", tenantScoped: true, description: "Complete an evidence upload (raw body; records size + sha256; Phase 2.0: bytes are stored in the evidence blob store for officer download)" },
     { method: "GET", path: "/api/platform/network/v1/verification", domain: "platform", tenantScoped: false, description: "Verification queue (platform)" },
     { method: "GET", path: "/api/platform/network/v1/verification/:caseId", domain: "platform", tenantScoped: false, description: "Verification case (platform)" },
+    { method: "GET", path: "/api/platform/network/v1/verification/:caseId/evidence/:evidenceId/download", domain: "platform", tenantScoped: false, description: "Download a stored verification evidence file (verification_officer / super admin; audited; attachment, nosniff)" },
     { method: "POST", path: "/api/platform/network/v1/verification/:caseId/decision", domain: "platform", tenantScoped: false, description: "Decide verification case: start_review, request_info, verify/approve, reject, restrict (audited)" },
 
     // SNET-09 — Mission Control (platform)
     { method: "GET", path: "/api/platform/network/v1/stats", domain: "platform", tenantScoped: false, description: "Sarah Network overview numbers" },
+    { method: "GET", path: "/api/platform/network/v1/search-config", domain: "platform", tenantScoped: false, description: "MC Search: effective categories + synonyms and defaults (search_admin / super admin)" },
+    { method: "PUT", path: "/api/platform/network/v1/search-config", domain: "platform", tenantScoped: false, description: "MC Search: replace categories and/or synonyms (validated, audited)" },
+    { method: "POST", path: "/api/platform/network/v1/search-config/reset", domain: "platform", tenantScoped: false, description: "MC Search: reset taxonomy to built-in defaults (audited)" },
+    { method: "GET", path: "/api/platform/network/v1/roles", domain: "platform", tenantScoped: false, description: "Platform RBAC: list Sarah Network role grants (super admin only)" },
+    { method: "PUT", path: "/api/platform/network/v1/roles/:uid", domain: "platform", tenantScoped: false, description: "Platform RBAC: set the Sarah Network roles of a user (super admin only; audited)" },
     { method: "GET", path: "/api/platform/network/v1/entities", domain: "platform", tenantScoped: false, description: "Network entities list (?status=&q=)" },
     { method: "GET", path: "/api/platform/network/v1/entities/:snId", domain: "platform", tenantScoped: false, description: "Entity detail + audit trail" },
     { method: "POST", path: "/api/platform/network/v1/entities/:snId/status", domain: "platform", tenantScoped: false, description: "Suspend / reinstate entity (reason required, audited)" },
@@ -218,7 +224,7 @@ export const ROUTE_CATALOG = [
     { method: "POST", path: "/api/platform/network/v1/moderation/:caseId/decision", domain: "platform", tenantScoped: false, description: "start_review | dismiss | suspend_entity (audited)" },
 
     // SNET-05 — Search
-    { method: "GET", path: "/api/network/v1/directory/search", domain: "consumer", tenantScoped: false, description: "Ranked directory search (q, category, verified, cursor); anonymous read of listed entries, per-IP rate limited" },
+    { method: "GET", path: "/api/network/v1/directory/search", domain: "consumer", tenantScoped: false, description: "Ranked directory search (q, category, verified, cursor, city, region, near, radiusKm, sort); anonymous read of listed entries, per-IP rate limited" },
     { method: "GET", path: "/api/network/v1/directory/suggest", domain: "consumer", tenantScoped: false, description: "Search autocomplete; anonymous read of listed entries, per-IP rate limited" },
     { method: "GET", path: "/api/network/v1/health", domain: "network", tenantScoped: false, description: "Network health (public, non-sensitive)" },
 
@@ -233,11 +239,13 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/network/v1/connections/:snId", domain: "consumer", tenantScoped: false, description: "Relationship with one entity" },
     { method: "POST", path: "/api/network/v1/connections", domain: "consumer", tenantScoped: false, description: "Follow / subscribe / connect / block (consent-linked)" },
     // Gate 5 — subscriber notification stub (event log only)
-    { method: "GET", path: "/api/network/v1/orgs/:companyId/subscriber-events", domain: "network", tenantScoped: true, description: "Subscriber event log (logged_only; nothing delivered)" },
-    { method: "POST", path: "/api/network/v1/orgs/:companyId/subscriber-events", domain: "network", tenantScoped: true, description: "Record an announcement / notification / reminder for subscribers (audience size only; no delivery)" },
+    { method: "GET", path: "/api/network/v1/orgs/:companyId/subscriber-events", domain: "network", tenantScoped: true, description: "Subscriber event log (audience counts only; Phase 2.0 fans out in-app notifications; no device push)" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/subscriber-events", domain: "network", tenantScoped: true, description: "Record an announcement / notification / reminder for subscribers (audience size in the log; Phase 2.0 writes per-subscriber in-app notifications honouring channel prefs)" },
     // Gate 2 — My Organisations
     { method: "GET", path: "/api/network/v1/my-organisations", domain: "consumer", tenantScoped: false, description: "My Organisations: my relationships joined to public directory cards" },
     { method: "GET", path: "/api/network/v1/my-updates", domain: "consumer", tenantScoped: false, description: "Subscriber updates feed (pull): announcements / notifications / reminders from organisations the user is subscribed to, honouring channel preferences" },
+    { method: "GET", path: "/api/network/v1/my-notifications", domain: "consumer", tenantScoped: false, description: "My in-app notifications (Phase 2.0; poll) with unread count" },
+    { method: "POST", path: "/api/network/v1/my-notifications/read", domain: "consumer", tenantScoped: false, description: "Mark my notifications read (ids[] or all)" },
     { method: "PUT", path: "/api/network/v1/my-organisations/:snId/preferences", domain: "consumer", tenantScoped: false, description: "My Organisations channel preferences (notifications / announcements / reminders)" },
     { method: "GET", path: "/api/network/v1/orgs/:companyId/connections", domain: "network", tenantScoped: true, description: "Business relationship list (pseudonymous)" },
     { method: "POST", path: "/api/network/v1/orgs/:companyId/connections/:connectionId/:action", domain: "network", tenantScoped: true, description: "accept | decline | disconnect | block | unblock" },
@@ -248,7 +256,7 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/chat/conversations/:companyId/handover", domain: "consumer", tenantScoped: false, description: "Handover ownership sync" },
 
     // U5 — Company conversations
-    { method: "GET", path: "/api/discover/companies", domain: "consumer", tenantScoped: false, description: "Discover list: ranked search over the durable directory (q, category, limit, cursor); anonymous read of listed entries only (per-IP rate limit); fixtures never merged" },
+    { method: "GET", path: "/api/discover/companies", domain: "consumer", tenantScoped: false, description: "Discover list: ranked search over the durable directory (q, category, limit, cursor, city, region, near, radiusKm, sort); anonymous read of listed entries only (per-IP rate limit); fixtures never merged" },
     { method: "GET", path: "/api/user-conversations", domain: "consumer", tenantScoped: false, description: "User chat list" },
     { method: "GET", path: "/api/user-conversations/:companyId/messages", domain: "consumer", tenantScoped: false, description: "Company chat history" },
     { method: "GET", path: "/api/user-conversations/id/:conversationId/messages", domain: "consumer", tenantScoped: false, description: "Company chat history by conversation id" },
