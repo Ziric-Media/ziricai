@@ -51,7 +51,7 @@ export function initAuthGuard({ onReady, onDenied }) {
 
     if (!profile) {
       showAccessDenied(
-        'No Super Admin Firestore profile found for your account. Open superadmin-register.html with the same email/password to link your profile, then sign in again.'
+        'No Mission Control access for this account. Use a Super Admin profile or a Sarah Network platform role granted in MC → Sarah Network → Access.'
       );
       return;
     }

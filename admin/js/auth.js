@@ -39,6 +39,8 @@ const AUTH_ERROR_MESSAGES = {
     'This domain is not authorized for sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains.',
   'auth/missing-password': 'Please enter your password.',
   'auth/missing-email': 'Please enter your email address.',
+  'auth/internal-error':
+    'Sign-in failed (Firebase internal error). Try a private window without extensions, or confirm app.ziricai.com uses the production Firebase project (ziricai), not staging.',
 };
 
 let cachedEnforcement = null;
@@ -119,23 +121,44 @@ export async function fetchServerSessionProfile(user) {
     if (!res.ok) return null;
     const data = await res.json();
     const profile = data?.profile;
-    if (!profile) return null;
-    const role = profile.role || data.role || null;
-    const companyId = profile.companyId || profile.company || data.companyId || null;
+    const platformRoles = Array.isArray(data.platformRoles) ? data.platformRoles : [];
+    const platformPermissions = Array.isArray(data.platformPermissions) ? data.platformPermissions : [];
+    const role = profile?.role || data.role || null;
+    const companyId = profile?.companyId || profile?.company || data.companyId || null;
     if (isSuperAdminRole(role)) {
       return {
-        ...profile,
+        ...(profile || {}),
+        uid: data.uid,
+        email: data.email,
         role,
         companyId,
         isDemo: false,
+        platformRoles,
+        platformPermissions,
       };
     }
-    if (!companyId) return null;
+    if (isMissionControlHost() && platformPermissions.length) {
+      return {
+        uid: data.uid,
+        email: data.email || user.email,
+        fullName: profile?.fullName || user.displayName || data.email || user.email,
+        role: platformRoles[0] || 'platform_operator',
+        companyId: null,
+        status: 'active',
+        isDemo: false,
+        platformRoles,
+        platformPermissions,
+        isPlatformOperator: true,
+      };
+    }
+    if (!profile || !companyId) return null;
     return {
       ...profile,
       role,
       companyId,
       isDemo: false,
+      platformRoles,
+      platformPermissions,
     };
   } catch (err) {
     console.warn('[auth] fetchServerSessionProfile failed:', err?.message || err);
@@ -153,7 +176,11 @@ function isProductionZiricHost() {
 
 function isMissionControlHost() {
   if (typeof location === 'undefined') return false;
-  return /^admin\.ziricai\.com$/i.test(location.hostname);
+  const host = location.hostname;
+  if (/^admin\.ziricai\.com$/i.test(host)) return true;
+  if (/\.netlify\.app$/i.test(host) && /admin/i.test(host)) return true;
+  if ((host === 'localhost' || host === '127.0.0.1') && /^\/admin(\/|$)/.test(location.pathname || '')) return true;
+  return false;
 }
 
 function delay(ms) {
@@ -195,15 +222,16 @@ export async function resolveAuthProfile(user, options = {}) {
     return profile;
   }
 
-  const allowDemo = options.allowDemo !== false && (await isLaxTenantMode());
-  if (allowDemo && typeof options.demoFallback === 'function') {
-    return options.demoFallback(user);
-  }
-
+  // Staging/production memberships often exist only on the API — never demo-fallback before session.
   const serverProfile = await fetchServerSessionProfile(user);
   if (serverProfile) {
     updateLastLogin(user.uid).catch(() => {});
     return serverProfile;
+  }
+
+  const allowDemo = options.allowDemo !== false && (await isLaxTenantMode());
+  if (allowDemo && typeof options.demoFallback === 'function') {
+    return options.demoFallback(user);
   }
 
   if (result.error && !allowDemo) {

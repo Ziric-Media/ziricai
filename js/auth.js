@@ -176,7 +176,11 @@ function isProductionZiricHost() {
 
 function isMissionControlHost() {
   if (typeof location === 'undefined') return false;
-  return /^admin\.ziricai\.com$/i.test(location.hostname);
+  const host = location.hostname;
+  if (/^admin\.ziricai\.com$/i.test(host)) return true;
+  if (/\.netlify\.app$/i.test(host) && /admin/i.test(host)) return true;
+  if ((host === 'localhost' || host === '127.0.0.1') && /^\/admin(\/|$)/.test(location.pathname || '')) return true;
+  return false;
 }
 
 function delay(ms) {

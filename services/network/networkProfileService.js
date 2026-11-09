@@ -11,6 +11,7 @@ import { evaluateNetworkEligibility } from "./networkEligibility.js";
 import { ensureOrgEntity, getEntityBySnId, getOrgEntityByCompanyId } from "./networkIdentityService.js";
 import { deriveCategories, isKnownCategory } from "./networkTaxonomy.js";
 import { inferGeoFromProfile, validLatLng } from "./networkGeo.js";
+import { geocodeProfileLocation } from "./nominatimGeocode.js";
 import {
     getBusinessDirectoryEntry,
     hydrateBusinessDirectory,
@@ -237,6 +238,10 @@ export async function publishListing(companyId, actorUid = null, deps = {}) {
     if (!geoCleared && !validLatLng(merged.geo?.lat, merged.geo?.lng)) {
         const inferred = inferGeoFromProfile(merged);
         if (inferred) merged.geo = inferred;
+        else {
+            const geocoded = await geocodeProfileLocation(merged);
+            if (geocoded) merged.geo = { lat: geocoded.lat, lng: geocoded.lng };
+        }
     }
     await saveBusinessDirectoryEntry(companyId, {
         ...merged,

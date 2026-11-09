@@ -385,13 +385,23 @@ function startLiveNotificationPolling() {
   }, 60000);
 }
 
-/** Phase 2.1 — when the user already granted Notification permission, register a stable web token for FCM fan-out. */
+/** Phase 2.1/2.2 — FCM token when available; else stable web_* token for server fan-out. */
 async function maybeRegisterWebPush() {
   if (!window.SarahLive?.registerPushDevice || !('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
-  const token =
-    localStorage.getItem('sarah.pushDeviceToken') ||
-    `web_${crypto.randomUUID?.() || String(Date.now())}_${Math.random().toString(36).slice(2, 10)}`;
+  let token = localStorage.getItem('sarah.pushDeviceToken') || '';
+  if (!token || token.startsWith('web_')) {
+    try {
+      const { obtainFcmWebToken } = await import('./push-fcm.mjs');
+      const fcm = await obtainFcmWebToken();
+      if (fcm) token = fcm;
+    } catch (err) {
+      console.warn('[Sarah] FCM token skipped', err?.message || err);
+    }
+  }
+  if (!token) {
+    token = `web_${crypto.randomUUID?.() || String(Date.now())}_${Math.random().toString(36).slice(2, 10)}`;
+  }
   const res = await window.SarahLive.registerPushDevice({ token, consent: true, platform: 'web' });
   if (!res?.error) localStorage.setItem('sarah.pushDeviceToken', token);
 }

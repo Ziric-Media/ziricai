@@ -1,5 +1,8 @@
 /**
- * Phase 2.1 — deliver subscriber notifications to FCM when configured.
+ * Phase 2.1/2.2 — deliver subscriber notifications to FCM when configured.
+ * Server: set `FCM_SERVER_KEY` (legacy HTTP) on Railway for live send.
+ * Client: Sarah App registers a real FCM token when `firebase.vapidKey` is present in site config
+ * (Firebase Console → Cloud Messaging → Web Push certificates); otherwise a stable `web_*` token is used.
  * Without FCM_SERVER_KEY the send is a no-op (in-app poll unchanged).
  */
 import { listConsentedPushTokens } from "./pushDeviceService.js";

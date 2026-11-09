@@ -2,7 +2,7 @@
  * Sarah App PWA — precache shell; API always network.
  * Never cache /api/* or authenticated responses.
  */
-const STATIC_CACHE = 'sarah-app-static-v19';
+const STATIC_CACHE = 'sarah-app-static-v20';
 
 /** Shell only — large / lazy scripts are cached on first use via fetch handler. */
 const PRECACHE = [
@@ -63,6 +63,31 @@ self.addEventListener('activate', (event) => {
 
 function sameOrigin(url) {
   return url.origin === self.location.origin;
+}
+
+/* Phase 2.2 — FCM background notifications (same SW scope as shell). */
+try {
+  importScripts('https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js');
+  importScripts('https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging-compat.js');
+  firebase.initializeApp({
+    apiKey: 'AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8',
+    authDomain: 'ziricai.firebaseapp.com',
+    projectId: 'ziricai',
+    storageBucket: 'ziricai.firebasestorage.app',
+    messagingSenderId: '482382497730',
+    appId: '1:482382497730:web:6bc2f8668a1598fa13f85b',
+  });
+  const messaging = firebase.messaging();
+  messaging.onBackgroundMessage((payload) => {
+    const title = payload?.notification?.title || 'Sarah';
+    return self.registration.showNotification(title, {
+      body: payload?.notification?.body || '',
+      data: payload?.data || {},
+      icon: '/assets/icon-192.png',
+    });
+  });
+} catch (err) {
+  console.warn('[Sarah SW] FCM init skipped', err);
 }
 
 self.addEventListener('fetch', (event) => {
