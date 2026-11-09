@@ -37,7 +37,7 @@ async function main() {
     console.log("SNET Phase 2.2 acceptance");
     for (const c of checks) console.log(c.ok ? "✓" : "✗", c.url, c.status ?? "");
     console.log("\nManual:");
-    console.log("  • Set firebase.vapidKey in site config + FCM_SERVER_KEY on Railway for live device push.");
+    console.log("  • Set firebase.vapidKey in site config; Railway FIREBASE_* Admin trio enables FCM HTTP v1 push.");
     console.log("  • Publish a listing with an unknown town → Discover ?near=lat,lng returns the card.");
   console.log("  • MC: verification_officer Firebase user (no superadmin doc) → Verification queue landing.");
 

@@ -3,6 +3,9 @@
  */
 process.env.STORAGE_BACKEND = "memory";
 delete process.env.FCM_SERVER_KEY;
+delete process.env.FIREBASE_PROJECT_ID;
+delete process.env.FIREBASE_CLIENT_EMAIL;
+delete process.env.FIREBASE_PRIVATE_KEY;
 delete process.env.CLAMAV_HOST;
 
 import assert from "node:assert/strict";

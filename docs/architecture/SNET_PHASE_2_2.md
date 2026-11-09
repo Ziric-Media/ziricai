@@ -18,9 +18,9 @@ Tests: `test/snet-14-phase2-2.test.mjs` + `npm run test:snet-programme`.
 
 - Sarah App: when `Notification.permission === 'granted'`, tries **Firebase Messaging** `getToken` when `firebase.vapidKey` is present in site config; otherwise keeps the Phase 2.1 stable `web_*` token.
 - Service worker (`js/users/sw.js`) registers FCM background handler (compat SDK).
-- Server: unchanged legacy HTTP send via `FCM_SERVER_KEY` in `webPushService.js` (graceful no-op when unset).
+- Server: **`webPushService.js` prefers FCM HTTP v1** (`POST …/v1/projects/{projectId}/messages:send`) with OAuth from Railway `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`. Legacy `FCM_SERVER_KEY` is optional fallback only when v1 creds are absent.
 
-**Partial:** production still needs `FCM_SERVER_KEY` on Railway and a Web Push certificate (VAPID key) in Firebase → injected at deploy via `site-config.js` / env — **do not commit secrets**.
+**Partial:** VAPID / Web Push certificate on prod Sarah (prior Netlify deploy). Legacy FCM API remains **Disabled** on project `ziricai`; v1 is the supported server path. **Live device push** still depends on clients registering real FCM tokens (VAPID in site config) and Railway holding the Firebase Admin trio above — no `FCM_SERVER_KEY` required when v1 is live.
 
 ## 2.2.2 Nominatim geocode
 
@@ -43,17 +43,20 @@ Tests: `test/snet-14-phase2-2.test.mjs` + `npm run test:snet-programme`.
 
 | Target | Id / result |
 |---|---|
-| Railway production (`independent-trust` / `ziricai`) | `e870a930-f25d-44d1-a31b-7ae137cbbc9c` |
+| Railway production (`independent-trust` / `ziricai`) | *(updated after v1 deploy — see agent report)* |
 | Netlify sarah `6200fa94-47d4-4486-a21f-8bdfbedcdf83` | `6af1bad007ca96ddaf31930a` |
 | Netlify app `5eb02040-0849-442a-bfcf-265fae7d397c` | `6af1bb06c8ee12710321ae4b` |
 | Netlify admin `ed3936c0-c861-48f4-ae23-13740ca8f9bd` | `6af1bb0a5dcfe33dd5a5f4f1` |
 
 Built from clean worktree; `npm run test:snet-programme` green before push.
 
-### Railway FCM variables (production names only)
+### Railway FCM / Firebase variables (production names only)
 
 | Name | Purpose |
 |------|---------|
-| `FCM_SERVER_KEY` | Legacy HTTP server key for `webPushService.js` (optional until live push) |
+| `FIREBASE_PROJECT_ID` | FCM HTTP v1 project id (same as Admin SDK) |
+| `FIREBASE_CLIENT_EMAIL` | Service account email for v1 OAuth |
+| `FIREBASE_PRIVATE_KEY` | Service account private key for v1 OAuth |
+| `FCM_SERVER_KEY` | Legacy HTTP only (optional fallback; omit when v1 creds present) |
 
 Client VAPID: Firebase Console → Cloud Messaging → Web configuration → **Key pair** → set as `vapidKey` in Sarah site config at prepare/deploy time (not in git).

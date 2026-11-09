@@ -4,6 +4,9 @@
 process.env.STORAGE_BACKEND = "memory";
 process.env.NOMINATIM_DISABLED = "0";
 delete process.env.FCM_SERVER_KEY;
+delete process.env.FIREBASE_PROJECT_ID;
+delete process.env.FIREBASE_CLIENT_EMAIL;
+delete process.env.FIREBASE_PRIVATE_KEY;
 
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -15,9 +18,14 @@ import { clearNetworkEntitiesForTests } from "../services/network/networkIdentit
 import { publishListing, saveListingDraft } from "../services/network/networkProfileService.js";
 import { geocodeProfileLocation, resetNominatimForTests, setNominatimFetchForTests } from "../services/network/nominatimGeocode.js";
 import { inferGeoFromProfile } from "../services/network/networkGeo.js";
-import { drainPushAttemptsForTests } from "../services/network/webPushService.js";
-import { registerPushDevice } from "../services/network/pushDeviceService.js";
-import { sendPushToUser } from "../services/network/webPushService.js";
+import {
+    drainPushAttemptsForTests,
+    resetFcmForTests,
+    sendPushToUser,
+    setFcmAccessTokenForTests,
+    setFcmFetchForTests,
+} from "../services/network/webPushService.js";
+import { clearPushDevicesForTests, registerPushDevice } from "../services/network/pushDeviceService.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
@@ -68,13 +76,52 @@ test("publish: stores Nominatim coordinates on directory entry", async () => {
 });
 
 test("FCM: server no-op without key; client sources wire push-fcm", async () => {
+    resetFcmForTests();
     drainPushAttemptsForTests();
+    clearPushDevicesForTests();
     await registerPushDevice("fcm-u1", { token: "c".repeat(152), consent: true, platform: "web" });
     const r = await sendPushToUser("fcm-u1", { title: "Hi", body: "There" });
     assert.equal(r.skipped, "fcm_not_configured");
     assert.match(read("prototype/sarah-app-ux/js/app.js"), /push-fcm\.mjs/);
     assert.match(read("prototype/sarah-app-ux/js/push-fcm.mjs"), /getToken/);
     assert.match(read("js/users/sw.js"), /firebase-messaging-compat/);
+});
+
+test("FCM: HTTP v1 send uses mocked bearer (Firebase Admin env)", async () => {
+    resetFcmForTests();
+    drainPushAttemptsForTests();
+    clearPushDevicesForTests();
+    process.env.FIREBASE_PROJECT_ID = "ziricai-test";
+    process.env.FIREBASE_CLIENT_EMAIL = "fcm-test@ziricai-test.iam.gserviceaccount.com";
+    process.env.FIREBASE_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nTEST\n-----END PRIVATE KEY-----\n";
+
+    const calls = [];
+    setFcmAccessTokenForTests("mock-fcm-v1-token");
+    setFcmFetchForTests(async (url, init) => {
+        calls.push({ url: String(url), init });
+        return { ok: true, status: 200, json: async () => ({ name: "projects/ziricai-test/messages/msg-1" }) };
+    });
+
+    await registerPushDevice("fcm-v1-u1", { token: "d".repeat(152), consent: true, platform: "web" });
+    const r = await sendPushToUser("fcm-v1-u1", {
+        title: "V1",
+        body: "Ping",
+        notificationId: "n-1",
+        snId: "sn-1",
+    });
+    assert.equal(r.sent, 1);
+    assert.equal(r.mode, "v1");
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /fcm\.googleapis\.com\/v1\/projects\/ziricai-test\/messages:send/);
+    assert.equal(calls[0].init.headers.Authorization, "Bearer mock-fcm-v1-token");
+    const body = JSON.parse(calls[0].init.body);
+    assert.equal(body.message.token, "d".repeat(152));
+    assert.equal(body.message.data.type, "sarah_network");
+
+    delete process.env.FIREBASE_PROJECT_ID;
+    delete process.env.FIREBASE_CLIENT_EMAIL;
+    delete process.env.FIREBASE_PRIVATE_KEY;
+    resetFcmForTests();
 });
 
 test("MC officer: session path allows platform operator without tenant profile", () => {
