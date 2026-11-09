@@ -79,6 +79,8 @@ function firebaseConfigFromEnv() {
     appId: process.env.FIREBASE_APP_ID,
     measurementId: process.env.FIREBASE_MEASUREMENT_ID,
     databaseId: process.env.FIREBASE_DATABASE_ID || (projectId === 'ziricai' ? 'default' : '(default)'),
+    /** Web Push certificate (VAPID) — from FIREBASE_VAPID_KEY at build/prepare time; never commit. */
+    vapidKey: process.env.FIREBASE_VAPID_KEY,
   });
 }
 
