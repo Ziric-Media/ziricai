@@ -489,7 +489,14 @@ app.get("/api/auth/session", attachTenantContext(), async (req, res) => {
         }
         auditLog("session_loaded", { uid: auth.uid, email: auth.email });
         const sessionId = trackSession(auth.uid, { userAgent: req.get("user-agent") });
-        res.json(buildSessionResponse(auth, { sessionId }));
+        const { getPlatformRoles, permissionsForRoles } = await import("../services/auth/platformRbac.js");
+        const platformRoles = await getPlatformRoles(auth.uid);
+        const platformPermissions = permissionsForRoles(platformRoles);
+        res.json({
+            ...buildSessionResponse(auth, { sessionId }),
+            platformRoles,
+            platformPermissions,
+        });
     } catch (err) {
         console.error("[api/auth/session] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load session" });

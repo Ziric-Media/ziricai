@@ -5,6 +5,8 @@
  * Sarah Network role such as Verification Officer / Search Admin).
  */
 import { escapeHtml, formatDate, formatNumber, pageHeader, showToast, statusBadge } from '../ui.js';
+import { state } from '../state.js';
+import { isSuperAdminRole } from '../../auth.js';
 import {
   changeNetworkEntityStatus,
   decideNetworkModeration,
@@ -24,13 +26,31 @@ import {
 } from '../api.js';
 
 const TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'entities', label: 'Entities' },
-  { id: 'verification', label: 'Verification queue' },
-  { id: 'moderation', label: 'Moderation' },
-  { id: 'search', label: 'Search' },
-  { id: 'access', label: 'Access' },
+  { id: 'overview', label: 'Overview', perm: 'network.stats.read' },
+  { id: 'entities', label: 'Entities', perm: 'network.entities.read' },
+  { id: 'verification', label: 'Verification queue', perm: 'network.verification.read' },
+  { id: 'moderation', label: 'Moderation', perm: 'network.moderation.read' },
+  { id: 'search', label: 'Search', perm: 'network.search.read' },
+  { id: 'access', label: 'Access', perm: 'network.roles.admin', superOnly: true },
 ];
+
+function mcPermSet() {
+  if (isSuperAdminRole(state.profile?.role)) return null;
+  return new Set(state.platformPermissions || state.profile?.platformPermissions || []);
+}
+
+function canMc(perm) {
+  const set = mcPermSet();
+  if (set === null) return true;
+  return set.has(perm);
+}
+
+function visibleTabs() {
+  return TABS.filter((t) => {
+    if (t.superOnly && mcPermSet() !== null) return false;
+    return canMc(t.perm);
+  });
+}
 
 let activeTab = 'overview';
 let entityFilters = { q: '', status: '' };
@@ -53,10 +73,14 @@ function kpi(label, value, note = '') {
 }
 
 function tabsMarkup() {
-  return `<div class="segment-group" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;">${TABS.map(
-    (t) =>
-      `<button type="button" class="segment ${t.id === activeTab ? 'active' : ''}" data-snet-tab="${t.id}">${escapeHtml(t.label)}</button>`
-  ).join('')}</div>`;
+  const tabs = visibleTabs();
+  if (!tabs.some((t) => t.id === activeTab) && tabs[0]) activeTab = tabs[0].id;
+  return `<div class="segment-group" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;">${tabs
+    .map(
+      (t) =>
+        `<button type="button" class="segment ${t.id === activeTab ? 'active' : ''}" data-snet-tab="${t.id}">${escapeHtml(t.label)}</button>`
+    )
+    .join('')}</div>`;
 }
 
 function verificationBadge(state) {
@@ -236,8 +260,12 @@ async function entitiesHtml() {
         <td>${escapeHtml(e.companyId || '—')}</td>
         <td>${
           e.status === 'suspended'
-            ? `<button type="button" class="btn btn-secondary btn-sm" data-snet-status="reinstate" data-sn-id="${escapeHtml(e.snId)}">Reinstate</button>`
-            : `<button type="button" class="btn btn-secondary btn-sm" data-snet-status="suspend" data-sn-id="${escapeHtml(e.snId)}">Suspend</button>`
+            ? canMc('network.entities.write')
+              ? `<button type="button" class="btn btn-secondary btn-sm" data-snet-status="reinstate" data-sn-id="${escapeHtml(e.snId)}">Reinstate</button>`
+              : ''
+            : canMc('network.entities.write')
+              ? `<button type="button" class="btn btn-secondary btn-sm" data-snet-status="suspend" data-sn-id="${escapeHtml(e.snId)}">Suspend</button>`
+              : ''
         }
         <button type="button" class="btn btn-link btn-sm" data-snet-detail="${escapeHtml(e.snId)}">Audit</button></td>
       </tr>`
@@ -275,7 +303,8 @@ async function verificationHtml() {
       if (c.status === 'submitted' || c.status === 'under_review' || c.status === 'info_requested') {
         actions.push(['verify', 'Approve'], ['reject', 'Reject']);
       }
-      if (c.status === 'under_review' || c.status === 'verified') actions.push(['restrict', 'Restrict']);
+      if (canMc('network.verification.restrict') && (c.status === 'under_review' || c.status === 'verified'))
+        actions.push(['restrict', 'Restrict']);
       return `
       <tr>
         <td><strong>${escapeHtml(c.evidence?.legalName || c.companyId)}</strong><span class="panel-hint">${escapeHtml(c.snId)}</span></td>
@@ -317,7 +346,11 @@ async function moderationHtml() {
     .map((c) => {
       const actions = [];
       if (c.status === 'open') actions.push(['start_review', 'Start review']);
-      if (c.status === 'open' || c.status === 'reviewing') actions.push(['dismiss', 'Dismiss'], ['suspend_entity', 'Suspend entity']);
+      if (canMc('network.moderation.decide')) {
+        if (c.status === 'open' || c.status === 'reviewing') actions.push(['dismiss', 'Dismiss']);
+        if (canMc('network.entities.write') && (c.status === 'open' || c.status === 'reviewing'))
+          actions.push(['suspend_entity', 'Suspend entity']);
+      }
       return `
       <tr>
         <td><strong>${escapeHtml(String(c.reason || '').replace(/_/g, ' '))}</strong>${
@@ -404,17 +437,25 @@ async function searchHtml() {
     <div class="profile-card">
       <h4>Discover categories ${o.categories ? '<span class="status-badge pending">customised</span>' : '<span class="status-badge active">defaults</span>'}</h4>
       <div class="panel-hint">One per line: <code>id | Label | keyword, keyword</code>. Keywords map a business to the category by its name, tags and description. Up to ${formatNumber(l.maxCategories || 24)} categories.</div>
-      <textarea id="snetCategoriesText" rows="12" spellcheck="false" style="width:100%;font-family:monospace;margin-top:8px;">${escapeHtml(categoriesToText(c.categories))}</textarea>
-      <div class="modal-actions" style="margin-top:8px;"><button type="button" class="btn btn-primary btn-sm" data-snet-search-save="categories">Save categories</button></div>
+      <textarea id="snetCategoriesText" rows="12" spellcheck="false" style="width:100%;font-family:monospace;margin-top:8px;" ${canMc('network.search.admin') ? '' : 'readonly'}>${escapeHtml(categoriesToText(c.categories))}</textarea>
+      ${
+        canMc('network.search.admin')
+          ? '<div class="modal-actions" style="margin-top:8px;"><button type="button" class="btn btn-primary btn-sm" data-snet-search-save="categories">Save categories</button></div>'
+          : '<div class="panel-hint">Read-only — Search Admin role required to edit.</div>'
+      }
     </div>
     <div class="profile-card" style="margin-top:16px;">
       <h4>Search synonyms ${o.synonyms ? '<span class="status-badge pending">customised</span>' : '<span class="status-badge active">defaults</span>'}</h4>
       <div class="panel-hint">One per line: <code>term: related, related</code>. A search for the term also matches the related words. Up to ${formatNumber(l.maxSynonymTerms || 200)} terms.</div>
-      <textarea id="snetSynonymsText" rows="12" spellcheck="false" style="width:100%;font-family:monospace;margin-top:8px;">${escapeHtml(synonymsToText(c.synonyms))}</textarea>
-      <div class="modal-actions" style="margin-top:8px;">
+      <textarea id="snetSynonymsText" rows="12" spellcheck="false" style="width:100%;font-family:monospace;margin-top:8px;" ${canMc('network.search.admin') ? '' : 'readonly'}>${escapeHtml(synonymsToText(c.synonyms))}</textarea>
+      ${
+        canMc('network.search.admin')
+          ? `<div class="modal-actions" style="margin-top:8px;">
         <button type="button" class="btn btn-secondary btn-sm" data-snet-search-reset>Reset all to defaults</button>
         <button type="button" class="btn btn-primary btn-sm" data-snet-search-save="synonyms">Save synonyms</button>
-      </div>
+      </div>`
+          : ''
+      }
     </div>
     <div class="panel-hint" id="snetSearchStatus" role="status" style="margin-top:8px;">${
       c.updatedAt ? `Last changed ${escapeHtml(new Date(c.updatedAt).toLocaleString())} by ${escapeHtml(c.updatedBy || 'unknown')} (v${escapeHtml(String(c.version || 0))}).` : 'Using shipped defaults.'
@@ -714,6 +755,10 @@ function bind(container) {
 }
 
 export async function renderSarahNetwork(container) {
+  if (state.snetDefaultTab) {
+    activeTab = state.snetDefaultTab;
+    state.snetDefaultTab = null;
+  }
   container.innerHTML = `
     ${pageHeader('Sarah Network', 'Entities, verification and trust for the Sarah Network directory')}
     ${tabsMarkup()}

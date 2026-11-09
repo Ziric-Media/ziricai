@@ -121,23 +121,44 @@ export async function fetchServerSessionProfile(user) {
     if (!res.ok) return null;
     const data = await res.json();
     const profile = data?.profile;
-    if (!profile) return null;
-    const role = profile.role || data.role || null;
-    const companyId = profile.companyId || profile.company || data.companyId || null;
+    const platformRoles = Array.isArray(data.platformRoles) ? data.platformRoles : [];
+    const platformPermissions = Array.isArray(data.platformPermissions) ? data.platformPermissions : [];
+    const role = profile?.role || data.role || null;
+    const companyId = profile?.companyId || profile?.company || data.companyId || null;
     if (isSuperAdminRole(role)) {
       return {
-        ...profile,
+        ...(profile || {}),
+        uid: data.uid,
+        email: data.email,
         role,
         companyId,
         isDemo: false,
+        platformRoles,
+        platformPermissions,
       };
     }
-    if (!companyId) return null;
+    if (isMissionControlHost() && platformPermissions.length) {
+      return {
+        uid: data.uid,
+        email: data.email || user.email,
+        fullName: profile?.fullName || user.displayName || data.email || user.email,
+        role: platformRoles[0] || 'platform_operator',
+        companyId: null,
+        status: 'active',
+        isDemo: false,
+        platformRoles,
+        platformPermissions,
+        isPlatformOperator: true,
+      };
+    }
+    if (!profile || !companyId) return null;
     return {
       ...profile,
       role,
       companyId,
       isDemo: false,
+      platformRoles,
+      platformPermissions,
     };
   } catch (err) {
     console.warn('[auth] fetchServerSessionProfile failed:', err?.message || err);

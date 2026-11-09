@@ -8868,3 +8868,8 @@ input[type="color"] {
         display: none;
     }
 }
+
+/* Phase 2.1 — scoped platform roles land on Sarah Network only */
+body.mc-platform-operator #sidebarNav a[data-page]:not([data-page="sarahNetwork"]) {
+    display: none;
+}

@@ -19,6 +19,9 @@ export const state = {
   backendConfig: null,
   loading: false,
   error: null,
+  /** MC Sarah Network — initial tab for scoped platform roles */
+  snetDefaultTab: null,
+  platformPermissions: [],
 };
 
 export function setState(patch) {
