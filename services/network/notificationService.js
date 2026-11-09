@@ -11,12 +11,13 @@
  *   - recipients are only ever visible to themselves; the business-visible event log still holds counts, never uids;
  *   - the payload never carries `companyId`, `uid`, `createdBy` or audience counts;
  *   - at read time notifications from organisations the user is no longer subscribed to (or that blocked them) are hidden.
- * Not push: no device/web push is sent; the app polls (open Sarah App → badge refresh).
+ * Phase 2.1 adds optional FCM push when the consumer registered a consented device token (poll unchanged as fallback).
  */
 import { createHash } from "node:crypto";
 import { NETWORK_COLLECTIONS } from "../database/schema.js";
 import { createNetworkCollection } from "./networkCollectionStore.js";
 import { listMyOrganisationConnections, listNotificationRecipientsForOrg } from "./connectionService.js";
+import { pushForNotificationRows } from "./webPushService.js";
 
 const col = createNetworkCollection(NETWORK_COLLECTIONS.NOTIFICATIONS);
 
@@ -58,6 +59,7 @@ function view(row) {
 export async function fanOutSubscriberEvent(event, organisation = {}) {
     const recipients = await listNotificationRecipientsForOrg(event.companyId, event.channel, { limit: NOTIFICATION_MAX_RECIPIENTS });
     let delivered = 0;
+    const pushRows = [];
     for (const r of recipients) {
         const notificationId = notificationIdFor(event.eventId, r.uid);
         await col.put(
@@ -73,12 +75,28 @@ export async function fanOutSubscriberEvent(event, organisation = {}) {
                 body: event.body || "",
                 createdAt: event.createdAt,
                 readAt: null,
+                pushedAt: null,
                 organisation: { displayName: organisation.displayName || null, verified: Boolean(organisation.verified) },
                 schemaVersion: 1,
             },
             { merge: false }
         );
+        pushRows.push({ uid: r.uid, notificationId, title: event.title, body: event.body || "", snId: r.snId });
         delivered += 1;
+    }
+    if (pushRows.length) {
+        try {
+            const { pushed } = await pushForNotificationRows(pushRows);
+            if (pushed > 0) {
+                const now = new Date().toISOString();
+                for (const row of pushRows) {
+                    const existing = await col.get(row.notificationId);
+                    if (existing) await col.put(row.notificationId, { ...existing, pushedAt: now }, { merge: false });
+                }
+            }
+        } catch {
+            /* in-app delivery is authoritative */
+        }
     }
     return { delivered };
 }

@@ -222,6 +222,8 @@ export const NETWORK_COLLECTIONS = {
     SEARCH_CONFIG: "networkSearchConfig",
     /** Phase 2.0 — platform RBAC: `{ uid, roles[] }` for Verification Officer, Search Admin, … (server-only). */
     PLATFORM_ROLES: "networkPlatformRoles",
+    /** Phase 2.1 — consumer FCM/web push tokens (`consent` required for delivery). */
+    PUSH_DEVICES: "networkPushDevices",
 };
 
 /** Optional future platform person link index. */

@@ -474,6 +474,21 @@ export async function fetchMyNotifications(limit = 30) {
   return out.error ? out : { notifications: out.data?.notifications || [], unread: Number(out.data?.unread) || 0 };
 }
 
+/** Phase 2.1 — register FCM / web push token (consent required server-side). */
+export async function registerPushDevice({ token, consent = true, platform = 'web' } = {}) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const tok = String(token || '').trim();
+  if (!tok) return { error: 'Push token required', code: 'PUSH_TOKEN_INVALID' };
+  return normaliseNetworkResult(
+    await apiRequest('/api/network/v1/my-push-devices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: tok, consent, platform }),
+    })
+  );
+}
+
 /** Phase 2.0 — mark notifications read: `{ ids: string[] }` or `{ all: true }` → `{ updated, unread }`. */
 export async function markNotificationsRead({ ids = [], all = false } = {}) {
   const blocked = await requireSignedInConsumer();
@@ -639,6 +654,7 @@ function mountPublicApi() {
     fetchMyUpdates,
     fetchMyNotifications,
     markNotificationsRead,
+    registerPushDevice,
     updateOrganisationPreferences,
     setEntityRelationship,
     subscribeToEntity,

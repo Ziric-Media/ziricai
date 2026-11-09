@@ -37,7 +37,43 @@ const PLACES = [
     ["upington", -28.4478, 21.2561, "Northern Cape", []],
     ["mahikeng", -25.8560, 25.6403, "North West", ["mafikeng"]],
     ["rustenburg", -25.6676, 27.2421, "North West", []],
+    ["kempton park", -26.1007, 28.2309, "Gauteng", []],
+    ["roodepoort", -26.1625, 27.8725, "Gauteng", []],
+    ["randburg", -26.0938, 27.9923, "Gauteng", []],
+    ["fourways", -26.0167, 28.0167, "Gauteng", []],
+    ["atlantis", -33.5667, 18.4833, "Western Cape", []],
+    ["hermanus", -34.4187, 19.2345, "Western Cape", []],
+    ["knysna", -34.0361, 23.0471, "Western Cape", []],
+    ["paarl", -33.7348, 18.9612, "Western Cape", []],
+    ["bellville", -33.8985, 18.6292, "Western Cape", []],
+    ["newcastle", -27.7577, 29.9318, "KwaZulu-Natal", []],
+    ["ladysmith", -28.5615, 29.7795, "KwaZulu-Natal", []],
+    ["vanderbijlpark", -26.7034, 27.8076, "Gauteng", ["vanderbiljpark"]],
+    ["vereeniging", -26.6731, 27.9265, "Gauteng", []],
+    ["potchefstroom", -26.7145, 27.0970, "North West", []],
+    ["klerksdorp", -26.8525, 26.6647, "North West", []],
+    ["nelspruit", -25.4753, 30.9694, "Mpumalanga", ["mbombela"]],
+    ["witbank", -25.8713, 29.2332, "Mpumalanga", ["emalahleni"]],
+    ["queenstown", -31.8976, 26.8753, "Eastern Cape", []],
+    ["grahamstown", -33.3047, 26.5328, "Eastern Cape", ["makhanda"]],
+    ["welkom", -27.9777, 26.7353, "Free State", []],
 ].map(([name, lat, lng, province, aliases]) => ({ name, lat, lng, province, aliases }));
+
+/**
+ * Phase 2.1 — infer coordinates from explicit geo or the gazetteer (used on publish when lat/lon omitted).
+ * @param {{ location?: string, serviceAreas?: string[], geo?: { lat: number, lng: number }|null }} profile
+ */
+export function inferGeoFromProfile(profile) {
+    if (profile?.geo && validLatLng(profile.geo.lat, profile.geo.lng)) {
+        return { lat: Number(profile.geo.lat), lng: Number(profile.geo.lng) };
+    }
+    const texts = [profile?.location, ...(Array.isArray(profile?.serviceAreas) ? profile.serviceAreas : [])].filter(Boolean);
+    for (const t of texts) {
+        const place = resolvePlace(t);
+        if (place) return { lat: place.lat, lng: place.lng };
+    }
+    return null;
+}
 
 export const PROVINCES = Object.freeze([...new Set(PLACES.map((p) => p.province))].sort());
 

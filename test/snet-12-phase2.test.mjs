@@ -395,7 +395,7 @@ test("geo helpers: gazetteer, aliases, provinces, distance, near parsing", () =>
     assert.deepEqual(parseNear("-26.2,28.04"), { lat: -26.2, lng: 28.04, label: null });
     assert.equal(parseNear("Cape Town").label, "cape town");
     assert.equal(parseNear(""), null);
-    assert.throws(() => parseNear("Atlantis"), { code: "NEAR_UNKNOWN_PLACE" });
+    assert.throws(() => parseNear("Nowhereville"), { code: "NEAR_UNKNOWN_PLACE" });
     assert.throws(() => parseNear("999,999"), { code: "NEAR_INVALID" });
     assert.equal(clampRadiusKm(undefined), 50);
     assert.equal(clampRadiusKm(100000), 500);
@@ -447,7 +447,7 @@ test("geo discover: city / region filters, near + radius with distance ordering,
     assert.equal(mine(plain).length, 4);
     assert.equal(plain.geo, undefined);
 
-    await assert.rejects(searchDiscoverCompanies({ near: "Atlantis" }), { code: "NEAR_UNKNOWN_PLACE" });
+    await assert.rejects(searchDiscoverCompanies({ near: "Nowhereville" }), { code: "NEAR_UNKNOWN_PLACE" });
 });
 
 test("geo discover: a listing can set exact coordinates (validated), shown rounded; clearing falls back to the gazetteer", async () => {
@@ -593,6 +593,7 @@ test("clients: Sarah App sends geo + notification calls; MC has Search/Access ta
     assert.match(bridge, /params\.set\('region', region\)/);
     assert.match(bridge, /\/api\/network\/v1\/my-notifications/);
     assert.match(bridge, /fetchMyNotifications,\s*\n\s*markNotificationsRead,/);
+    assert.match(bridge, /registerPushDevice/);
     const app = read("prototype/sarah-app-ux/js/app.js");
     assert.match(app, /fetchMyNotifications/);
     assert.match(app, /discoverPlaceInput/);

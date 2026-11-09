@@ -10,7 +10,7 @@
 import { evaluateNetworkEligibility } from "./networkEligibility.js";
 import { ensureOrgEntity, getEntityBySnId, getOrgEntityByCompanyId } from "./networkIdentityService.js";
 import { deriveCategories, isKnownCategory } from "./networkTaxonomy.js";
-import { validLatLng } from "./networkGeo.js";
+import { inferGeoFromProfile, validLatLng } from "./networkGeo.js";
 import {
     getBusinessDirectoryEntry,
     hydrateBusinessDirectory,
@@ -225,13 +225,19 @@ export async function publishListing(companyId, actorUid = null, deps = {}) {
         throw Object.assign(new Error("This business is suspended from Sarah Network."), { status: 403, code: "NETWORK_SUSPENDED" });
     }
     const entry = await loadEntry(companyId);
-    const merged = { ...publicFromEntry(entry), ...(entry?.draft || {}) };
+    const draft = { ...(entry?.draft || {}) };
+    const merged = { ...publicFromEntry(entry), ...draft };
     if (!merged.displayName && company.name) merged.displayName = company.name;
     const missing = missingRequiredFields(merged);
     if (missing.length) {
         throw bad(`Complete your profile before publishing: ${missing.join(", ")}`, "PROFILE_INCOMPLETE", { missing });
     }
     const categories = merged.categories?.length ? merged.categories : deriveCategories(merged);
+    const geoCleared = draft.geo === null;
+    if (!geoCleared && !validLatLng(merged.geo?.lat, merged.geo?.lng)) {
+        const inferred = inferGeoFromProfile(merged);
+        if (inferred) merged.geo = inferred;
+    }
     await saveBusinessDirectoryEntry(companyId, {
         ...merged,
         categories,

@@ -11,6 +11,7 @@
  *     GET  /api/network/v1/my-updates?limit=                  → { updates[], organisations, delivery: "pull" }   (Gate 6)
  *     GET  /api/network/v1/my-notifications?limit=&unread=1   → { notifications[], unread, delivery: "in_app" }   (Phase 2.0)
  *     POST /api/network/v1/my-notifications/read { ids?: string[], all?: boolean } → { updated, unread }   (Phase 2.0)
+ *     POST /api/network/v1/my-push-devices { token, consent?, platform? } → register FCM token (Phase 2.1)
  *   Tenant (member; writes need canManageNetwork) — pseudonymous:
  *     GET/POST /api/network/v1/orgs/:companyId/subscriber-events   (Gate 5/6 event log; Phase 2.0 also writes in-app notifications; no device push)
  *     GET  /api/network/v1/orgs/:companyId/connections?state=
@@ -31,6 +32,7 @@ import { listMyOrganisations, updateMyOrganisationPreferences } from "../network
 import { listSubscriberEvents, recordSubscriberEvent } from "../network/subscriberEventService.js";
 import { listUpdatesForUser } from "../network/subscriberUpdatesService.js";
 import { listNotificationsForUser, markNotificationsRead } from "../network/notificationService.js";
+import { registerPushDevice } from "../network/pushDeviceService.js";
 
 function fail(res, err, fallbackCode) {
     res.status(err.status || 500).json({
@@ -109,7 +111,7 @@ export function mountNetworkConnectionRoutes(app, deps = {}) {
         }
     });
 
-    // Phase 2.0 — persisted in-app notifications (fan-out of subscriber events). Consumers poll; nothing is pushed to devices.
+    // Phase 2.0/2.1 — in-app notifications (+ optional FCM when token registered).
     app.get("/api/network/v1/my-notifications", consumerGuard, async (req, res) => {
         try {
             const unreadOnly = ["1", "true"].includes(String(req.query.unread || "").toLowerCase());
@@ -125,6 +127,20 @@ export function mountNetworkConnectionRoutes(app, deps = {}) {
             res.json({ ok: true, data: await markNotificationsRead(req.consumerAuth.uid, { ids: body.ids, all: body.all === true }) });
         } catch (err) {
             fail(res, err, "MY_NOTIFICATIONS_READ_FAILED");
+        }
+    });
+
+    app.post("/api/network/v1/my-push-devices", consumerGuard, async (req, res) => {
+        try {
+            const body = req.body || {};
+            const data = await registerPushDevice(req.consumerAuth.uid, {
+                token: body.token,
+                consent: body.consent,
+                platform: body.platform,
+            });
+            res.status(201).json({ ok: true, data });
+        } catch (err) {
+            fail(res, err, "PUSH_DEVICE_REGISTER_FAILED");
         }
     });
 

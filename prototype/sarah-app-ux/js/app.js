@@ -385,6 +385,17 @@ function startLiveNotificationPolling() {
   }, 60000);
 }
 
+/** Phase 2.1 — when the user already granted Notification permission, register a stable web token for FCM fan-out. */
+async function maybeRegisterWebPush() {
+  if (!window.SarahLive?.registerPushDevice || !('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  const token =
+    localStorage.getItem('sarah.pushDeviceToken') ||
+    `web_${crypto.randomUUID?.() || String(Date.now())}_${Math.random().toString(36).slice(2, 10)}`;
+  const res = await window.SarahLive.registerPushDevice({ token, consent: true, platform: 'web' });
+  if (!res?.error) localStorage.setItem('sarah.pushDeviceToken', token);
+}
+
 function unreadNotificationCount() {
   if (notifLiveActive()) return liveNotifs.unread;
   const dismissed = getSarahRuntime().notifDismissed || {};
@@ -397,7 +408,10 @@ function syncNotificationBadge() {
   if (!badge) return;
   badge.textContent = count > 99 ? '99+' : String(count);
   badge.hidden = count <= 0;
-  if (notifLiveActive()) startLiveNotificationPolling();
+  if (notifLiveActive()) {
+    startLiveNotificationPolling();
+    void maybeRegisterWebPush();
+  }
 }
 
 function openProtoNotifSheet() {
