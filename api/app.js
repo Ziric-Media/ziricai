@@ -232,6 +232,27 @@ import { isMetaWebhookPath, normalizeWebhookPath } from "../services/integration
 import { initEventSystem } from "../services/events/index.js";
 import { applyApiVersionHeader } from "../services/api/routeRegistry.js";
 import { mountCustomerOpsRoutes } from "../services/api/customerOpsRoutes.js";
+import { mountConsumerRoutes } from "../services/api/consumerRoutes.js";
+import { mountRevenueRoutes } from "../services/api/revenueRoutes.js";
+import { mountPlatformRevenueRoutes } from "../services/api/platformRevenueRoutes.js";
+import { mountSarahNetworkRoutes } from "../services/api/sarahNetworkRoutes.js";
+import { mountNetworkEntityRoutes } from "../services/api/networkEntityRoutes.js";
+import { mountNetworkListingRoutes } from "../services/api/networkListingRoutes.js";
+import { mountNetworkVerificationRoutes } from "../services/api/networkVerificationRoutes.js";
+import { mountNetworkSearchRoutes } from "../services/api/networkSearchRoutes.js";
+import { mountNetworkAgentRoutes } from "../services/api/networkAgentRoutes.js";
+import { mountNetworkConnectionRoutes } from "../services/api/networkConnectionRoutes.js";
+import { mountNetworkPlatformRoutes } from "../services/api/networkPlatformRoutes.js";
+import { mountNetworkTrustRoutes } from "../services/api/networkTrustRoutes.js";
+import { mountUserConversationRoutes } from "../services/api/userConversationRoutes.js";
+import { mountChatPersonRoutes } from "../services/api/chatPersonRoutes.js";
+import { mountChatGroupRoutes } from "../services/api/chatGroupRoutes.js";
+import { mountChatIndexRoutes } from "../services/api/chatIndexRoutes.js";
+import { mountChatHandoverRoutes } from "../services/api/chatHandoverRoutes.js";
+import { mountChatWorkRoutes } from "../services/api/chatWorkRoutes.js";
+import { mountChatUxRoutes } from "../services/api/chatUxRoutes.js";
+import { mountPersonalSarahRoutes } from "../services/api/personalSarahRoutes.js";
+import { mountPersonalKnowledgeRoutes } from "../services/api/personalKnowledgeRoutes.js";
 import { mountAutomotiveRoutes } from "../services/api/automotiveRoutes.js";
 import { mountFinanceAcceptanceRoutes } from "../services/api/financeAcceptanceRoutes.js";
 import { isFinanceAcceptanceRuntimeActive } from "../services/auth/financeAcceptanceMode.js";
@@ -334,6 +355,8 @@ app.use((req, res, next) => {
         'https://ziricai-production.up.railway.app',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
+        'https://sarah.ziricai.com',
+        'https://ziricai-sarah.netlify.app',
     ].filter(Boolean);
     const origin = req.get('origin');
     if (origin && (allowed.some((o) => origin.startsWith(o.replace(/\/$/, ''))) || process.env.NODE_ENV !== 'production')) {
@@ -394,6 +417,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(ROOT, 'marketing')));
 app.use('/app', express.static(path.join(ROOT, 'app')));
 app.use('/admin', express.static(path.join(ROOT, 'admin')));
+app.use('/users', express.static(path.join(ROOT, 'users')));
 app.use(express.static(ROOT));
 app.use(attachTenantContext());
 app.use(applyApiVersionHeader());
@@ -465,7 +489,14 @@ app.get("/api/auth/session", attachTenantContext(), async (req, res) => {
         }
         auditLog("session_loaded", { uid: auth.uid, email: auth.email });
         const sessionId = trackSession(auth.uid, { userAgent: req.get("user-agent") });
-        res.json(buildSessionResponse(auth, { sessionId }));
+        const { getPlatformRoles, permissionsForRoles } = await import("../services/auth/platformRbac.js");
+        const platformRoles = await getPlatformRoles(auth.uid);
+        const platformPermissions = permissionsForRoles(platformRoles);
+        res.json({
+            ...buildSessionResponse(auth, { sessionId }),
+            platformRoles,
+            platformPermissions,
+        });
     } catch (err) {
         console.error("[api/auth/session] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load session" });
@@ -2704,6 +2735,27 @@ if (isFinanceAcceptanceRuntimeActive()) {
     console.error("[startup] Finance acceptance loopback mode active (memory + mock auth)");
 }
 
+mountConsumerRoutes(app);
+mountRevenueRoutes(app);
+mountPlatformRevenueRoutes(app);
+mountSarahNetworkRoutes(app);
+mountNetworkEntityRoutes(app);
+mountNetworkListingRoutes(app);
+mountNetworkVerificationRoutes(app);
+mountNetworkSearchRoutes(app);
+mountNetworkAgentRoutes(app);
+mountNetworkConnectionRoutes(app);
+mountNetworkPlatformRoutes(app);
+mountNetworkTrustRoutes(app);
+mountUserConversationRoutes(app);
+mountChatPersonRoutes(app);
+mountChatGroupRoutes(app);
+mountChatIndexRoutes(app);
+mountChatHandoverRoutes(app);
+mountChatWorkRoutes(app);
+mountChatUxRoutes(app);
+mountPersonalSarahRoutes(app);
+mountPersonalKnowledgeRoutes(app);
 mountCustomerOpsRoutes(app);
 mountAutomotiveRoutes(app);
 }

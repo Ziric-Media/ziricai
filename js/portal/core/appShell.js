@@ -51,6 +51,7 @@ export const NAV_SECTIONS = [
       { id: 'billing', label: 'Billing', icon: 'fa-credit-card' },
       { id: 'integrations', label: 'Integrations', icon: 'fa-plug' },
       { id: 'team', label: 'Team', icon: 'fa-user-group' },
+      { id: 'network', label: 'Sarah Network', icon: 'fa-globe' },
       { id: 'notifications', label: 'Notifications', icon: 'fa-bell', badgeKey: 'notifications' },
       { id: 'activity', label: 'Activity Log', icon: 'fa-clock-rotate-left' },
       { id: 'settings', label: 'Settings', icon: 'fa-gear' },

@@ -17,6 +17,7 @@ import { computeInboxMetrics } from './modules/inbox-ui.js';
 export const SALES_SECTIONS = [
   { id: 'overview', label: 'Overview', icon: 'fa-chart-pie' },
   { id: 'sarah', label: 'Sarah', sarah: true },
+  { id: 'sarah_app', label: 'Sarah Inbox', icon: 'fa-mobile-screen' },
   { id: 'whatsapp', label: 'WhatsApp', icon: 'fa-brands fa-whatsapp' },
   { id: 'email', label: 'Email', icon: 'fa-envelope' },
   { id: 'messenger', label: 'Facebook Messenger', icon: 'fa-brands fa-facebook-messenger' },
@@ -24,6 +25,7 @@ export const SALES_SECTIONS = [
 ];
 
 export const SALES_CHANNEL_GROUPS = {
+  sarah_app: new Set(['sarah_app', 'sarah-app']),
   whatsapp: new Set(['whatsapp']),
   email: new Set(['email']),
   messenger: new Set(['facebook', 'messenger', 'facebook_messenger', 'instagram']),
@@ -31,6 +33,7 @@ export const SALES_CHANNEL_GROUPS = {
 };
 
 const CHANNEL_COLORS = {
+  sarah_app: '#8b5cf6',
   whatsapp: '#25D366',
   email: '#6366f1',
   messenger: '#0084ff',
@@ -38,11 +41,11 @@ const CHANNEL_COLORS = {
 };
 
 export function conversationSalesChannel(conv) {
-  const raw = String(conv?.channel || 'whatsapp').toLowerCase();
+  const raw = String(conv?.channel || '').toLowerCase();
   for (const [key, set] of Object.entries(SALES_CHANNEL_GROUPS)) {
     if (set.has(raw)) return key;
   }
-  return 'whatsapp';
+  return raw ? 'whatsapp' : 'whatsapp';
 }
 
 export function filterConversationsForSalesSection(conversations, section) {
@@ -51,7 +54,7 @@ export function filterConversationsForSalesSection(conversations, section) {
 }
 
 export function computeSalesChannelStats(conversations = []) {
-  const counts = { whatsapp: 0, email: 0, messenger: 0, webchat: 0 };
+  const counts = { sarah_app: 0, whatsapp: 0, email: 0, messenger: 0, webchat: 0 };
   let unread = 0;
   let active = 0;
   for (const c of conversations) {
@@ -67,6 +70,10 @@ export function salesSectionMeta(section) {
   const map = {
     overview: { title: 'Overview', subtitle: 'Sarah Sales performance across channels' },
     sarah: { title: 'Sarah', subtitle: 'Sales assistant — quotes, leads, and channel guidance' },
+    sarah_app: {
+      title: 'Sarah App · Sarah Inbox',
+      subtitle: 'Consumer Sarah App threads mirrored from Company Sarah chat',
+    },
     whatsapp: { title: 'WhatsApp', subtitle: 'Live and AI-assisted WhatsApp conversations' },
     email: { title: 'Email', subtitle: 'Sales inbox — email threads handled by Sarah' },
     messenger: { title: 'Facebook Messenger', subtitle: 'Messenger threads routed to Sarah Sales' },
@@ -94,6 +101,7 @@ export function renderSalesOverview(conversations) {
         'Conversation volume',
         renderDonutChart(
           [
+            { label: 'Sarah Inbox', value: stats.sarah_app, color: CHANNEL_COLORS.sarah_app },
             { label: 'WhatsApp', value: stats.whatsapp, color: CHANNEL_COLORS.whatsapp },
             { label: 'Messenger', value: stats.messenger, color: CHANNEL_COLORS.messenger },
             { label: 'Webchat', value: stats.webchat, color: CHANNEL_COLORS.webchat },
@@ -135,6 +143,7 @@ export function renderSalesOverview(conversations) {
   );
 
   return `${renderSwKpiGrid([
+    { label: 'Sarah Inbox', value: stats.sarah_app, icon: 'fa-mobile-screen', tone: 'accent' },
     { label: 'WhatsApp', value: stats.whatsapp, icon: 'fa-brands fa-whatsapp', tone: 'wa' },
     { label: 'Messenger', value: stats.messenger, icon: 'fa-brands fa-facebook-messenger', tone: 'fb' },
     { label: 'Website live', value: stats.webchat, icon: 'fa-globe', tone: 'web' },

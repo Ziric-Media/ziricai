@@ -35,6 +35,8 @@ const PERMISSION_MATRIX = {
     canExportData: ["owner", "manager", "finance"],
     canManageWorkspace: ["owner", "manager"],
     canManageIntegrations: ["owner", "manager"],
+    /** Sarah Network presence (listing, verification evidence, subscriber events). Same roles as canManageWorkspace today; separate key so it can diverge. */
+    canManageNetwork: ["owner", "manager"],
     canUploadKnowledge: ["owner"],
     canRunAutomations: ["owner", "manager", "marketing"],
     canViewTasks: ["owner", "manager", "finance", "hr", "sales", "support", "reception", "marketing", "viewer"],

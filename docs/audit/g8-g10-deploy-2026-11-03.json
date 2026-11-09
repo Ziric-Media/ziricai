@@ -1,0 +1,23 @@
+{
+  "gates": ["G8", "G9", "G10"],
+  "deployedAt": "2026-11-03",
+  "railway": {
+    "deploymentId": "dcef4f21-9b47-441d-9365-df3b912778ae",
+    "WHATSAPP_GATEWAY_PORTAL_MANAGED_ASSIGN": "true",
+    "WHATSAPP_GATEWAY_LIVE_PROBE_AUTHORIZED": "true",
+    "WHATSAPP_GATEWAY_PROBE_RECIPIENTS": "NOT_SET — required before live-probe sends"
+  },
+  "netlifyApp": {
+    "deployId": "6ae9beb458f263980dad0b0e",
+    "url": "https://app.ziricai.com",
+    "note": "G8 portal UX included via prepare-sites"
+  },
+  "netlifyAdmin": {
+    "deployId": "6ae9dc729ce0c7649839f519",
+    "url": "https://admin.ziricai.com",
+    "status": "live",
+    "note": "Full build (npm ci + prepare-sites admin); Firebase env from Netlify"
+  },
+  "onboardingReady": "Operator-led + portal managed accept when pool has AVAILABLE numbers",
+  "liveVerification": "POST …/live-probe after WHATSAPP_GATEWAY_PROBE_RECIPIENTS set"
+}

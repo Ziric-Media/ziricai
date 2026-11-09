@@ -74,6 +74,9 @@ const PERMISSION_MATRIX = {
   /** WhatsApp and third-party channel configuration. */
   canManageIntegrations: ['owner', 'manager'],
 
+  /** Sarah Network presence — listing, verification evidence, subscriber events (mirrors services/auth/permissionsService.js). */
+  canManageNetwork: ['owner', 'manager'],
+
   /** Portal knowledge write — owners only. */
   canUploadKnowledge: ['owner'],
 
@@ -157,6 +160,12 @@ export const MODULE_PERMISSIONS = {
 
   /** Sarah HR — people-management workspace (preview-first). */
   hr: 'canViewHr',
+
+  /**
+   * Sarah Network listing (SNET-03). Uses canManageNetwork — the same key the server enforces on
+   * /api/network/v1/orgs/:companyId/* writes (defaultAuthorize in networkListingRoutes.js).
+   */
+  network: 'canManageNetwork',
 
 };
 
@@ -302,6 +311,8 @@ export const PERMISSION_LABELS = {
   canManageWorkspace: 'Can Manage Workspace Settings',
 
   canManageIntegrations: 'Can Manage Integrations',
+
+  canManageNetwork: 'Can Manage Sarah Network',
 
   canViewBilling: 'Can View Billing',
 

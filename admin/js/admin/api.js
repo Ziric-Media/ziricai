@@ -1,6 +1,6 @@
 /** Backend API client — read-only admin + knowledge upload endpoints. */
 
-import { apiRequest } from '../shared/apiRequest.js';
+import { apiRequest, getApiBase, withAuthHeaders } from '../shared/apiRequest.js';
 
 async function request(path, options = {}) {
   return apiRequest(path, options);
@@ -370,4 +370,132 @@ export async function installMarketplacePack(companyId, packId, options = {}) {
 export async function fetchSupervisorReviews(companyId, limit = 10) {
   const qs = limit ? `?limit=${limit}` : '';
   return request(`/api/supervisor/reviews/${encodeURIComponent(companyId)}${qs}`);
+}
+
+/* ---------- Sarah Network (SNET-09) — platform APIs ---------- */
+export async function fetchNetworkStats() {
+  return request('/api/platform/network/v1/stats', { silent: true });
+}
+
+export async function fetchNetworkEntities({ q = '', status = '' } = {}) {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (status) params.set('status', status);
+  const qs = params.toString();
+  return request(`/api/platform/network/v1/entities${qs ? `?${qs}` : ''}`, { silent: true });
+}
+
+export async function fetchNetworkEntity(snId) {
+  return request(`/api/platform/network/v1/entities/${encodeURIComponent(snId)}`, { silent: true });
+}
+
+/** body: { action: 'suspend' | 'reinstate', reason } */
+export async function changeNetworkEntityStatus(snId, body) {
+  return request(`/api/platform/network/v1/entities/${encodeURIComponent(snId)}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    silent: true,
+  });
+}
+
+export async function fetchNetworkVerificationQueue(status = '') {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request(`/api/platform/network/v1/verification${qs}`, { silent: true });
+}
+
+/** Case detail incl. attached evidence references (`evidenceRefs`). */
+export async function fetchNetworkVerificationCase(caseId) {
+  return request(`/api/platform/network/v1/verification/${encodeURIComponent(caseId)}`, { silent: true });
+}
+
+/** body: { action: 'start_review' | 'request_info' | 'verify' (alias approve) | 'reject' | 'restrict', note?, checks? } */
+export async function decideNetworkVerification(caseId, body) {
+  return request(`/api/platform/network/v1/verification/${encodeURIComponent(caseId)}/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    silent: true,
+  });
+}
+
+export async function fetchNetworkModeration(status = '') {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request(`/api/platform/network/v1/moderation${qs}`, { silent: true });
+}
+
+/** body: { action: 'start_review' | 'dismiss' | 'suspend_entity', note? } */
+export async function decideNetworkModeration(caseId, body) {
+  return request(`/api/platform/network/v1/moderation/${encodeURIComponent(caseId)}/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    silent: true,
+  });
+}
+
+/* ---------- Sarah Network Phase 2.0 — evidence download, Search administration, platform roles ---------- */
+
+/**
+ * Download one stored verification evidence file (verification officer). Authenticated fetch -> blob -> save.
+ * Resolves { ok: true, fileName } or { error }.
+ */
+export async function downloadNetworkEvidenceFile(caseId, evidenceId, fileName = 'evidence') {
+  try {
+    const path = `/api/platform/network/v1/verification/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(evidenceId)}/download`;
+    const opts = await withAuthHeaders({ method: 'GET' });
+    const res = await fetch(`${getApiBase()}${path}`, opts);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const e = data.error;
+      return { error: (typeof e === 'object' && e ? e.message || e.code : e) || `Download failed (${res.status})`, status: res.status };
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const named = /filename="([^"]+)"/.exec(disposition)?.[1] || fileName;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = named;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    return { ok: true, fileName: named };
+  } catch (err) {
+    return { error: err?.message || 'Download failed' };
+  }
+}
+
+export async function fetchNetworkSearchConfig() {
+  return request('/api/platform/network/v1/search-config', { silent: true });
+}
+
+/** body: { categories?: [{ id, label, keywords[] }], synonyms?: { term: [words] } } */
+export async function saveNetworkSearchConfig(body) {
+  return request('/api/platform/network/v1/search-config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    silent: true,
+  });
+}
+
+export async function resetNetworkSearchConfig() {
+  return request('/api/platform/network/v1/search-config/reset', { method: 'POST', silent: true });
+}
+
+/** Super admin only. */
+export async function fetchNetworkRoles() {
+  return request('/api/platform/network/v1/roles', { silent: true });
+}
+
+/** body: { roles: string[] } (empty list revokes). Super admin only. */
+export async function setNetworkRoles(uid, body) {
+  return request(`/api/platform/network/v1/roles/${encodeURIComponent(uid)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    silent: true,
+  });
 }

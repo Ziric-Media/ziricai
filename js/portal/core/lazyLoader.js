@@ -28,6 +28,7 @@ const MODULE_IDS = [
   'support',
   'team',
   'activity',
+  'network',
 ];
 
 function portalAssetVersion() {
@@ -57,6 +58,7 @@ const EXPORT_MAP = {
   support: 'renderSupport',
   team: 'renderTeam',
   activity: 'renderActivity',
+  network: 'renderNetwork',
 };
 
 /**

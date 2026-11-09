@@ -10,6 +10,7 @@ import { isDemoDataAllowed, resolveListItems } from './services/dataMode.js';
 import { formatScopeOptionLabel } from './services/scopeDisplay.js';
 import { countCompaniesByOrganisationType } from './services/companyOrganisationCounts.js';
 import { ORGANISATION_TYPE } from '../shared/organisationTaxonomy.js';
+import { isSuperAdminRole } from '../auth.js';
 
 export async function bootstrap() {
   if (location.protocol === 'file:') {
@@ -32,8 +33,15 @@ export async function bootstrap() {
     initAuthGuard({
       onReady: () => {
         setState({ companies: isDemoDataAllowed() ? DEMO_COMPANIES : [] });
-        // Render dashboard immediately — do not block on Firestore (can hang when billing/rules fail)
-        navigateTo('dashboard');
+        const perms = state.profile?.platformPermissions || [];
+        const officerLanding =
+          !isSuperAdminRole(state.profile?.role) && perms.includes('network.verification.read');
+        if (officerLanding) {
+          setState({ snetDefaultTab: 'verification' });
+          navigateTo('sarahNetwork');
+        } else {
+          navigateTo('dashboard');
+        }
         refreshCompanies().catch((err) => console.warn('Companies refresh:', err));
       },
     });

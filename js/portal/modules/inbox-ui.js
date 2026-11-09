@@ -2,6 +2,7 @@ import { escapeHtml } from '../../admin/ui.js';
 
 const CHANNEL_LABELS = {
   whatsapp: 'WhatsApp',
+  sarah_app: 'Sarah App · Sarah Inbox',
   facebook: 'Facebook',
   instagram: 'Instagram',
   telegram: 'Telegram',
@@ -9,6 +10,12 @@ const CHANNEL_LABELS = {
   email: 'Email',
   sms: 'SMS',
 };
+
+/** @param {string} [channel] */
+export function inboxChannelLabel(channel) {
+  if (!channel) return 'Unknown';
+  return CHANNEL_LABELS[channel] || String(channel).replace(/_/g, ' ');
+}
 
 const FILTER_OPTIONS = [
   { id: 'all', label: 'All' },
@@ -76,7 +83,7 @@ export function formatMessageTime(createdAt) {
 }
 
 function channelLabel(channel) {
-  return CHANNEL_LABELS[channel] || CHANNEL_LABELS.whatsapp;
+  return inboxChannelLabel(channel);
 }
 
 function listSubtitle(conversation) {
@@ -183,7 +190,9 @@ export function renderInboxThread(conversation, messages, { canReply, aiEmployee
   const modeLabel = human ? 'Human' : `AI · ${aiEmployeeName || 'Assistant'}`;
   const channelIcon = conversation.channel === 'whatsapp'
     ? '<i class="fa-brands fa-whatsapp" style="color:#25D366"></i>'
-    : '<i class="fa-solid fa-globe"></i>';
+    : conversation.channel === 'sarah_app'
+      ? '<i class="fa-solid fa-mobile-screen" style="color:#8b5cf6" aria-hidden="true"></i>'
+      : '<i class="fa-solid fa-globe"></i>';
 
   const msgHtml = threadError
     ? `<div class="inbox-thread-error">${escapeHtml(threadError)}</div>`
@@ -207,15 +216,27 @@ export function renderInboxThread(conversation, messages, { canReply, aiEmployee
         </div>
       </div>
       <div class="thread-messages" id="threadMessages">${msgHtml}</div>
+      ${
+        conversation.channel === 'sarah_app'
+          ? `<div class="thread-handover-ops" id="handoverOpsBar">
+        <button class="btn btn-secondary btn-sm" type="button" id="assignBtn" title="Assign employee">Assign</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="acceptBtn" title="Accept into queue">Accept</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="transferBtn" title="Transfer">Transfer</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="escalateBtn" title="Escalate">Escalate</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="handoverSummaryBtn" title="Sarah handover summary">Summary</button>
+      </div>`
+          : ''
+      }
       ${canReply ? `
         <div class="thread-compose portal-inbox-compose">
           <input type="text" id="replyInput" placeholder="Type a message..." autocomplete="off" />
-          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">${human ? 'Release to AI' : 'Take over'}</button>
+          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">${human ? 'Return to Sarah' : 'Take over'}</button>
           <button class="btn btn-primary btn-sm" type="button" id="sendReplyBtn">
             <i class="fa-solid fa-paper-plane"></i> Send
           </button>
         </div>
       ` : ''}
+      <div class="inbox-handover-summary hidden" id="handoverSummaryPanel"></div>
     </div>
   `;
 }

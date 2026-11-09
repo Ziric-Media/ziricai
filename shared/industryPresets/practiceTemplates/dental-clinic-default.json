@@ -1,0 +1,33 @@
+{
+  "timezone": "Africa/Johannesburg",
+  "slotMinutes": 30,
+  "locations": [
+    {
+      "id": "main-practice",
+      "label": "Main practice — update address in Settings"
+    }
+  ],
+  "services": [
+    { "id": "consultation", "label": "Consultation" },
+    { "id": "cleaning-polish", "label": "Cleaning and polish" },
+    { "id": "filling", "label": "Filling" },
+    { "id": "emergency", "label": "Emergency visit" }
+  ],
+  "channels": [
+    { "id": "whatsapp", "label": "WhatsApp" },
+    { "id": "phone", "label": "Phone" },
+    { "id": "walk-in", "label": "Walk-in" },
+    { "id": "portal", "label": "Practice desk" },
+    { "id": "sarah-sales", "label": "Sarah Sales" },
+    { "id": "other", "label": "Other" }
+  ],
+  "openMinutesByWeekday": {
+    "Mon": [540, 1020],
+    "Tue": [540, 1020],
+    "Wed": [540, 1020],
+    "Thu": [540, 1020],
+    "Fri": [540, 1020],
+    "Sat": [540, 780]
+  },
+  "bookingStatuses": ["requested", "confirmed", "checked_in", "completed", "cancelled", "no_show"]
+}
