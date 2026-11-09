@@ -19,6 +19,7 @@
 import { createHash } from "node:crypto";
 import { NETWORK_COLLECTIONS } from "../database/schema.js";
 import { createNetworkCollection } from "./networkCollectionStore.js";
+import { assertAllowedEvidenceMime, scanEvidenceBytes } from "./evidenceScan.js";
 
 const blobs = createNetworkCollection(NETWORK_COLLECTIONS.EVIDENCE_BLOBS);
 const chunks = createNetworkCollection(NETWORK_COLLECTIONS.EVIDENCE_BLOB_CHUNKS);
@@ -58,9 +59,12 @@ export async function putEvidenceBlob(meta, bytes) {
     if (!meta?.uploadId || !meta?.companyId) throw err(500, "EVIDENCE_BLOB_INVALID", "uploadId and companyId are required.");
     if (!Buffer.isBuffer(bytes) || !bytes.length) throw err(400, "FILE_EMPTY", "File is empty");
     if (bytes.length > EVIDENCE_MAX_BYTES) throw err(400, "FILE_TOO_LARGE", "File exceeds 5MB limit");
+    assertAllowedEvidenceMime(meta.mimeType);
     if (!signatureMatches(meta.mimeType, bytes)) {
         throw err(415, "FILE_CONTENT_MISMATCH", "The file content does not match its declared type (PDF / PNG / JPEG / WebP).");
     }
+    const scan = await scanEvidenceBytes(bytes, { mimeType: meta.mimeType });
+    if (!scan.clean) throw err(415, "FILE_SCAN_REJECTED", "The file was rejected by malware scanning.");
     const sha256 = createHash("sha256").update(bytes).digest("hex");
     if (meta.sha256 && meta.sha256 !== sha256) throw err(500, "EVIDENCE_BLOB_CHECKSUM", "Checksum mismatch while storing the file.");
     const count = Math.ceil(bytes.length / EVIDENCE_CHUNK_BYTES);
