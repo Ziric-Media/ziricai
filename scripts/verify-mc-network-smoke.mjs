@@ -208,6 +208,8 @@ ok("geo discover: near + radius, city and region filters work");
 // 7d. clients wired
 const bridge = read("prototype/sarah-app-ux/js/live-bridge.mjs");
 assert(/\/api\/network\/v1\/my-notifications/.test(bridge) && /params\.set\('city', city\)/.test(bridge), "Sarah App bridge: notifications + geo");
+assert(/registerPushDevice/.test(bridge), "Sarah App bridge: push token register");
+assert(/mcPermSet/.test(mod), "MC sarah-network: platform permission gating");
 assert(read("prototype/sarah-app-ux/index.html").includes('id="discoverPlaceInput"'), "Sarah App discover place filter");
 assert(read("js/admin/api.js").includes("/search-config") && mod.includes("data-snet-download"), "MC client: search config + evidence download");
 ok("Sarah App (geo filter, notification bell) and MC (Search, Access, evidence download) are wired to the Phase 2.0 APIs");
