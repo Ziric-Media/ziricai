@@ -96,4 +96,16 @@ upload token and bytes lived only in process memory (`chatMediaService`).
 - Anonymous Discover/search stays rate-limited and exposes listed, non-suspended entries only.
 
 ## Deploy log
-See the final section of the programme report (Railway deployment id, Netlify deploy ids) — recorded here after release.
+Built from a clean detached `git worktree` at `bf2986b`. `npm run test:snet-programme` green (148/148 tests + MC console + MC smoke) before deploy.
+
+| Target | Id / result |
+|---|---|
+| Railway production (`independent-trust` / production / service `ziricai`) | `160a20a0-82d1-47d9-abf3-a7ca9dc18349` — SUCCESS |
+| Netlify sarah (`sarah.ziricai.com`, site `6200fa94-47d4-4486-a21f-8bdfbedcdf83`) | `6af11194f268f8f154ec64a5` |
+| Netlify app (`app.ziricai.com`, site `5eb02040-0849-442a-bfcf-265fae7d397c`) | `6af111c680c84355340caa50` |
+| Netlify admin (`admin.ziricai.com`, site `ed3936c0-c861-48f4-ae23-13740ca8f9bd`) | `6af111d93433c7fcccc4f38e` |
+
+Post-deploy anonymous smoke: `/api/health` 200; `GET /api/network/v1/my-notifications` 401; `GET /api/platform/network/v1/search-config` 401;
+`/api/discover/companies?city=Pretoria` 200 with a `geo` block; `?near=Atlantis` 422; sarah index and every local script/stylesheet/manifest it references return 200 with the right content type
+(`app.js` carries the Place filter + notification bell); app CSS carries the redesigned `snet-*` styles; admin `api.js` carries the search-config client.
+Not done: authenticated browser smokes (Portal evidence upload, MC download as an officer, Sarah App bell with a real subscription).
