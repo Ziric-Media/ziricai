@@ -47,10 +47,50 @@ function registerCompanyPlans() {
 
 function registerSarahPlans() {
     const sarahTiers = [
-        { id: "free", name: "Sarah Free", price: 0, dailyChats: 20, knowledgeBytes: 512 * 1024 },
-        { id: "plus", name: "Sarah Plus", price: 99, dailyChats: 100, knowledgeBytes: 5 * 1024 * 1024 },
-        { id: "premium", name: "Sarah Premium", price: 199, dailyChats: 300, knowledgeBytes: 20 * 1024 * 1024 },
-        { id: "ultimate", name: "Sarah Ultimate", price: 399, dailyChats: 1000, knowledgeBytes: 100 * 1024 * 1024 },
+        {
+            id: "free",
+            name: "Sarah Free",
+            price: 0,
+            dailyChats: 20,
+            workTasksPerDay: 1,
+            workConcurrentCap: 1,
+            knowledgeBytes: 512 * 1024,
+            monthlyCredits: 250,
+            dailyCreditSoftCap: 50,
+        },
+        {
+            id: "plus",
+            name: "Sarah Plus",
+            price: 99,
+            dailyChats: 100,
+            workTasksPerDay: 100,
+            workConcurrentCap: 2,
+            knowledgeBytes: 5 * 1024 * 1024,
+            monthlyCredits: 2800,
+            dailyCreditSoftCap: 400,
+        },
+        {
+            id: "premium",
+            name: "Sarah Premium",
+            price: 199,
+            dailyChats: 300,
+            workTasksPerDay: 300,
+            workConcurrentCap: 3,
+            knowledgeBytes: 20 * 1024 * 1024,
+            monthlyCredits: 5500,
+            dailyCreditSoftCap: 800,
+        },
+        {
+            id: "ultimate",
+            name: "Sarah Ultimate",
+            price: 399,
+            dailyChats: 1000,
+            workTasksPerDay: 1000,
+            workConcurrentCap: 5,
+            knowledgeBytes: 100 * 1024 * 1024,
+            monthlyCredits: 11000,
+            dailyCreditSoftCap: 1600,
+        },
     ];
     for (const tier of sarahTiers) {
         const skuId = `rs02.sarah.${tier.id}.zar.monthly`;
@@ -60,8 +100,12 @@ function registerSarahPlans() {
             accountType: "consumer",
             sarahLimits: {
                 dailyChats: tier.dailyChats,
+                workTasksPerDay: tier.workTasksPerDay,
+                workConcurrentCap: tier.workConcurrentCap,
                 knowledgeBytes: tier.knowledgeBytes,
                 premiumModels: tier.id !== "free",
+                monthlyCredits: tier.monthlyCredits,
+                dailyCreditSoftCap: tier.dailyCreditSoftCap,
             },
             features: {
                 discoverAccess: true,
@@ -87,7 +131,14 @@ function registerPlaceholderSkus() {
     const placeholders = [
         { skuId: "rs03.status.boost.starter.zar", revenueStreamId: "RS03", name: "Starter Boost", amountCents: 5000 },
         { skuId: "rs04.discover.featured.basic.zar.monthly", revenueStreamId: "RS04", name: "Featured Basic", amountCents: 19900 },
-        { skuId: "rs06.credits.consumer.500.zar", revenueStreamId: "RS06", name: "500 AI Credits", amountCents: 9900 },
+        {
+            skuId: "rs06.credits.consumer.500.zar",
+            revenueStreamId: "RS06",
+            name: "500 AI Credits",
+            amountCents: 9900,
+            creditPackCredits: 500,
+            public: true,
+        },
         { skuId: "rs07.addon.whatsapp_business.zar.monthly", revenueStreamId: "RS07", name: "WhatsApp Business Add-on", amountCents: 29900 },
         { skuId: "rs08.service.standard_onboarding.zar", revenueStreamId: "RS08", name: "Standard onboarding", amountCents: 250000 },
     ];
@@ -99,9 +150,29 @@ function registerPlaceholderSkus() {
             currency: "ZAR",
             billingPeriod: p.skuId.includes("monthly") ? "monthly" : "once",
             entitlementTemplateId: null,
-            public: false,
+            public: p.public === true,
+            creditPackCredits: Number(p.creditPackCredits) || 0,
         });
     }
+}
+
+/** @param {{ revenueStreamId?: string, creditPackCredits?: number, public?: boolean, accountTypes?: string[] }} sku */
+export function isConsumerCreditPackSku(sku) {
+    return Boolean(
+        sku &&
+            sku.revenueStreamId === "RS06" &&
+            sku.public &&
+            sku.accountTypes?.includes("consumer") &&
+            Number(sku.creditPackCredits) > 0
+    );
+}
+
+/**
+ * @param {string} skuId
+ */
+export function getCreditPackCreditsForSku(skuId) {
+    const sku = getCatalogueSku(skuId);
+    return isConsumerCreditPackSku(sku) ? Number(sku.creditPackCredits) : 0;
 }
 
 let initialized = false;

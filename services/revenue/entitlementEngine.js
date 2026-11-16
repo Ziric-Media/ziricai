@@ -6,6 +6,7 @@ import { checkPlanLimit } from "../platform/billingPlans.js";
 import { getCatalogueSku, getEntitlementTemplate, getCatalogueVersionId } from "./catalogueService.js";
 import { legacyPlanIdToSku, DEFAULT_CONSUMER_SKU } from "./legacyPlanAliases.js";
 import { getEnforcementMode } from "./revenueConfig.js";
+import { getConsumerSubscription } from "./consumerSubscriptionService.js";
 
 /**
  * @typedef {object} EntitlementSnapshot
@@ -25,7 +26,9 @@ import { getEnforcementMode } from "./revenueConfig.js";
  * @returns {Promise<EntitlementSnapshot>}
  */
 export async function getConsumerEntitlements(uid, options = {}) {
-    const skuId = options.skuId || DEFAULT_CONSUMER_SKU;
+    const sub = uid ? await getConsumerSubscription(uid) : null;
+    const envSku = String(process.env.RS02_CONSUMER_SKU || "").trim();
+    const skuId = options.skuId || sub?.skuId || envSku || DEFAULT_CONSUMER_SKU;
     const sku = getCatalogueSku(skuId);
     const template = sku?.entitlementTemplateId
         ? getEntitlementTemplate(sku.entitlementTemplateId)

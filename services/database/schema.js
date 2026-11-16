@@ -224,6 +224,13 @@ export const NETWORK_COLLECTIONS = {
     PLATFORM_ROLES: "networkPlatformRoles",
     /** Phase 2.1 — consumer FCM/web push tokens (`consent` required for delivery). */
     PUSH_DEVICES: "networkPushDevices",
+    /** RS02 — consumer Sarah subscription (sku + billing period). */
+    CONSUMER_SUBSCRIPTIONS: "networkConsumerSubscriptions",
+    CONSUMER_CHECKOUT_SESSIONS: "networkConsumerCheckoutSessions",
+    /** RS02 — processed payment webhook event ids (idempotency). */
+    CONSUMER_CHECKOUT_WEBHOOK_EVENTS: "networkConsumerCheckoutWebhookEvents",
+    /** RS02 — immutable consumer payment records. */
+    CONSUMER_PAYMENT_LEDGER: "networkConsumerPaymentLedger",
 };
 
 /** Optional future platform person link index. */

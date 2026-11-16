@@ -66,6 +66,12 @@ export function resetRevenueConfigCacheForTests() {
  * @param {keyof typeof DEFAULT_CONFIG.commercialActivation} key
  */
 export async function isCommercialActive(key) {
+    if (key === "rs02SarahCheckout" && ["1", "true", "yes"].includes(String(process.env.RS02_SARAH_CHECKOUT || "").toLowerCase())) {
+        return true;
+    }
+    if (key === "rs06Credits" && ["1", "true", "yes"].includes(String(process.env.RS06_CREDITS_CHECKOUT || "").toLowerCase())) {
+        return true;
+    }
     const cfg = await getRevenueConfig();
     return Boolean(cfg.commercialActivation[key]);
 }
@@ -74,6 +80,14 @@ export async function isCommercialActive(key) {
  * @param {'rs01Limits'|'rs02Limits'|'rs06Credits'} key
  */
 export async function getEnforcementMode(key) {
+    if (key === "rs02Limits") {
+        const env = String(process.env.RS02_LIMITS_ENFORCE || "").toLowerCase();
+        if (["1", "true", "yes", "enforce"].includes(env)) return "enforce";
+        if (["0", "false", "no", "shadow"].includes(env)) return "shadow";
+        if (String(process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV || "").toLowerCase() === "production") {
+            return "enforce";
+        }
+    }
     const cfg = await getRevenueConfig();
     return cfg.enforcement[key] || "shadow";
 }

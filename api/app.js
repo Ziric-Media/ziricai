@@ -369,10 +369,21 @@ app.use((req, res, next) => {
     next();
 });
 
-/** Capture raw Meta webhook bytes before JSON parsing (required for HMAC signature). */
+function isPaystackRevenueWebhookPath(path) {
+    return path === "/api/revenue/webhooks/paystack";
+}
+
+function isStripeRevenueWebhookPath(path) {
+    return path === "/api/revenue/webhooks/stripe";
+}
+
+/** Capture raw webhook bytes before JSON parsing (HMAC signature verification). */
 app.use((req, res, next) => {
     const path = normalizeWebhookPath(req);
-    if (!isMetaWebhookPath(path) || req.method !== "POST") {
+    const needsRaw =
+        req.method === "POST" &&
+        (isMetaWebhookPath(path) || isPaystackRevenueWebhookPath(path) || isStripeRevenueWebhookPath(path));
+    if (!needsRaw) {
         return next();
     }
 
