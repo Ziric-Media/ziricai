@@ -33,6 +33,8 @@ On **duplicate / idempotent** paths (`existingPay?.status === "captured"` or `ro
 
 **Requirement:** Idempotent completion must **not** double-grant subscription or ledger entries, but **should** repair session status when ledger is already `captured`.
 
+**Captured ledger invariant (repair scope):** `CONSUMER_PAYMENT_LEDGER` rows with `status: captured` are only created on the primary completion path after provider verification and `assertReconcileSession` (catalogue price/currency reconciliation). Session repair (`ensureSessionCompleted`) treats the ledger as payment source of truth: it checks ledger ↔ session field alignment and catalogue SKU/currency validity; it does **not** re-compare amounts to the catalogue price (that remains the capture path’s responsibility).
+
 ---
 
 ## Acceptance criteria

@@ -398,6 +398,9 @@ export async function runAdminFirestoreTransaction(fn) {
             update(ref, data) {
                 transaction.update(ref.__admin ?? ref, data);
             },
+            set(ref, data) {
+                transaction.set(ref.__admin ?? ref, data);
+            },
         };
         return fn(tx);
     });

@@ -385,25 +385,39 @@ async function ensureSessionCompleted(reference, paymentProvider) {
     return { repaired: true, row: next, reason: "SESSION_REPAIRED" };
 }
 
-async function markSessionCompletedFirestore(reference, row, provider, completedAt) {
+/**
+ * Firestore transaction body for checkout session completion (exported for transaction test double).
+ * @param {{ get: Function, set: Function }} tx
+ */
+function checkoutSessionTxRef(reference) {
     const col = NETWORK_COLLECTIONS.CONSUMER_CHECKOUT_SESSIONS;
-    return runAdminFirestoreTransaction(async (tx) => {
-        const ref = networkDocRef(col, reference);
-        const snap = await tx.get(ref);
-        if (!snap.exists()) throw err(404, "CHECKOUT_NOT_FOUND", "Checkout session not found.");
-        const current = snap.data();
-        if (current.status === "completed") return { duplicate: true, row: current };
-        const completedAtTs = completedAt || new Date().toISOString();
-        const next = {
-            ...current,
-            status: "completed",
-            completedAt: completedAtTs,
-            paymentReference: reference,
-            paymentProvider: provider,
-        };
-        tx.set(ref, next);
-        return { duplicate: false, row: next };
-    });
+    const id = String(reference || "").trim();
+    if (useAdminBackend()) return networkDocRef(col, id);
+    return { id };
+}
+
+export async function markSessionCompletedInTransaction(tx, reference, provider, completedAt) {
+    const ref = checkoutSessionTxRef(reference);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw err(404, "CHECKOUT_NOT_FOUND", "Checkout session not found.");
+    const current = snap.data();
+    if (current.status === "completed") return { duplicate: true, row: current };
+    const completedAtTs = completedAt || new Date().toISOString();
+    const next = {
+        ...current,
+        status: "completed",
+        completedAt: completedAtTs,
+        paymentReference: reference,
+        paymentProvider: provider,
+    };
+    tx.set(ref, next);
+    return { duplicate: false, row: next };
+}
+
+async function markSessionCompletedFirestore(reference, row, provider, completedAt) {
+    return runAdminFirestoreTransaction((tx) =>
+        markSessionCompletedInTransaction(tx, reference, provider, completedAt)
+    );
 }
 
 async function completeSession(reference, uidFromSession, paymentProvider) {

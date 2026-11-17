@@ -2,6 +2,7 @@
  * PAY-02E — checkout session repair when ledger is captured but session is pending.
  */
 process.env.STORAGE_BACKEND = "memory";
+process.env.PAY_REVENUE_TEST_HOOKS = "1";
 process.env.RS02_SARAH_CHECKOUT = "true";
 process.env.RS06_CREDITS_CHECKOUT = "true";
 process.env.PAYSTACK_SECRET_KEY = "sk_test_pay02e_fake_key_abcdefghij";
@@ -161,24 +162,44 @@ const ev1Dup = await paystackWebhook({
 assert.equal(ev1Dup.duplicate, true);
 assert.equal((await sessionCol.get(whFirst.reference)).status, "completed");
 
-// --- RS02: duplicate webhook repairs pending session when ledger already captured ---
+// --- RS02: duplicate-claim webhook repairs pending session when ledger already captured ---
 resetAll();
 metaByRef.clear();
+let whRepairVerifyCalls = 0;
+paystackMock(metaByRef);
+const wrappedWhFetch = globalThis.fetch;
+globalThis.fetch = async (url, init) => {
+    const u = String(url);
+    if (u.includes("/transaction/verify/")) whRepairVerifyCalls += 1;
+    return wrappedWhFetch(url, init);
+};
 const whRepair = await initConsumerCheckout(uidRs02, RS02_SKU, { email, provider: "paystack" });
 const whRow = await sessionCol.get(whRepair.reference);
+assert.equal(whRow.status, "pending");
 await seedCapturedLedger(whRepair.reference, whRow);
+const claimedEventId = "pay02e_wh_repair_claimed";
+await webhookCol.put(
+    `paystack_${claimedEventId}`,
+    {
+        provider: "paystack",
+        eventId: claimedEventId,
+        processedAt: new Date().toISOString(),
+    },
+    { merge: false }
+);
+assert.equal(whRepairVerifyCalls, 0);
 const whEv = await paystackWebhook({
     event: "charge.success",
-    data: { id: "pay02e_wh_repair", reference: whRepair.reference },
+    data: { id: claimedEventId, reference: whRepair.reference },
 });
 assert.equal(whEv.handled, true);
+assert.equal(whEv.duplicate, true);
+assert.equal(whRepairVerifyCalls, 0, "duplicate-claim webhook must not call Paystack verify");
 assert.equal((await sessionCol.get(whRepair.reference)).status, "completed");
-const whEvDup = await paystackWebhook({
-    event: "charge.success",
-    data: { id: "pay02e_wh_repair", reference: whRepair.reference },
-});
-assert.equal(whEvDup.duplicate, true);
-assert.equal((await getConsumerSubscription(uidRs02))?.paymentReference, undefined);
+const subAfterWhRepair = await getConsumerSubscription(uidRs02);
+assert.notEqual(subAfterWhRepair?.skuId, RS02_SKU, "repair must not grant subscription");
+assert.equal((await getConsumerSarahCreditShadowSummary(uidRs06)).topUpBalanceCredits, 0);
+globalThis.fetch = wrappedWhFetch;
 
 // --- RS02: concurrent duplicate verify (single ledger, session completed once) ---
 resetAll();
