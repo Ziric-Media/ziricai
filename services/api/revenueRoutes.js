@@ -4,7 +4,7 @@
 import { requireConsumerScope } from "../auth/consumerAuth.js";
 import { getConsumerEntitlements } from "../revenue/entitlementEngine.js";
 import { listCatalogueSkus, getCatalogueSku, getCatalogueVersionId } from "../revenue/catalogueService.js";
-import { getRevenueConfig, isCommercialActive } from "../revenue/revenueConfig.js";
+import { getRevenueConfig, isCommercialActive, isRs02CheckoutUidAllowed } from "../revenue/revenueConfig.js";
 import { getConsumerSubscription } from "../revenue/consumerSubscriptionService.js";
 import {
     initConsumerCheckout,
@@ -78,6 +78,12 @@ export function mountRevenueRoutes(app) {
                         ? "Credit top-up checkout is not enabled yet."
                         : "Sarah checkout is not enabled yet.",
                     code: "CHECKOUT_DISABLED",
+                });
+            }
+            if (!creditPack && !isRs02CheckoutUidAllowed(req.consumerAuth.uid)) {
+                return res.status(403).json({
+                    error: "Sarah checkout is restricted to authorised test accounts.",
+                    code: "CHECKOUT_NOT_ALLOWED",
                 });
             }
             const result = await initConsumerCheckout(req.consumerAuth.uid, skuId, {

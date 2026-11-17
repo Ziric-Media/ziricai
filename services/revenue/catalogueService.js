@@ -207,6 +207,20 @@ export function getCatalogueSku(skuId) {
 }
 
 /**
+ * Test-only catalogue injection (requires PAY_REVENUE_TEST_HOOKS=1).
+ * @param {object} sku
+ */
+export function registerCatalogueSkuForTests(sku) {
+    if (process.env.PAY_REVENUE_TEST_HOOKS !== "1") {
+        throw new Error("registerCatalogueSkuForTests requires PAY_REVENUE_TEST_HOOKS=1");
+    }
+    ensureCatalogue();
+    const id = String(sku?.skuId || "").trim();
+    if (!id) throw new Error("registerCatalogueSkuForTests: skuId required");
+    skuById.set(id, { ...sku, skuId: id });
+}
+
+/**
  * @param {string} templateId
  */
 export function getEntitlementTemplate(templateId) {
