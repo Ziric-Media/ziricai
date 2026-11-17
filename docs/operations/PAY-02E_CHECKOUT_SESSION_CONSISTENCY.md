@@ -65,6 +65,8 @@ On **duplicate / idempotent** paths (`existingPay?.status === "captured"` or `ro
 
 **Not changed:** production R99 reference, Paystack keys, checkout kill-switches, Railway.
 
+**RS02 checkout allowlist (fail-closed):** `RS02_CHECKOUT_ALLOW_UIDS` must be a **non-empty** list before RS02 plan checkout can succeed for any uid. Missing, empty, or whitespace-only values deny all RS02 plan checkouts (`CHECKOUT_NOT_ALLOWED`). RS06 credit-pack checkout is not gated by this variable. `RS02_SARAH_CHECKOUT` / `RS06_CREDITS_CHECKOUT` kill-switches remain the primary commercial gates.
+
 ---
 
 ## Out of scope for PAY-02E

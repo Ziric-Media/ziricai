@@ -77,18 +77,19 @@ export async function isCommercialActive(key) {
 }
 
 /**
- * When `RS02_CHECKOUT_ALLOW_UIDS` is set, RS02 plan checkout is limited to those uids (comma/semicolon/space separated).
- * Empty/unset env preserves prior behaviour (any consumer when RS02 checkout is enabled).
+ * RS02 plan checkout requires a non-empty `RS02_CHECKOUT_ALLOW_UIDS` (comma/semicolon/space separated).
+ * Missing, empty, or whitespace-only config denies all RS02 plan checkouts (fail-closed).
+ * RS06 credit packs do not use this gate.
  * @param {string} uid
  */
 export function isRs02CheckoutUidAllowed(uid) {
     const raw = String(process.env.RS02_CHECKOUT_ALLOW_UIDS || "").trim();
-    if (!raw) return true;
+    if (!raw) return false;
     const allowed = raw
         .split(/[,;\s]+/)
         .map((s) => s.trim())
         .filter(Boolean);
-    if (allowed.length === 0) return true;
+    if (allowed.length === 0) return false;
     const id = String(uid || "").trim();
     return id.length > 0 && allowed.includes(id);
 }
