@@ -9,6 +9,7 @@ const {
   MOCK_MY_SARAH_HISTORY,
   MOCK_MY_SARAH_PERSONAL_THREADS,
   MOCK_MY_SARAH_QUICK,
+  MOCK_MY_SARAH_QUICK_EXTRA,
   MOCK_FEED,
   MOCK_FEED_TABS,
   MOCK_DISCOVER_CATEGORIES,
@@ -55,10 +56,51 @@ function resolveItemAvatar(item) {
   return MOCK_USER.avatar;
 }
 
+const FEED_ENGAGEMENT_STORAGE_KEY = 'sarah.feed.engagement.v2';
+
+function loadPersistedFeedEngagement() {
+  try {
+    return JSON.parse(localStorage.getItem(FEED_ENGAGEMENT_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function persistFeedEngagement() {
+  const eng = getFeedEngagement();
+  try {
+    localStorage.setItem(
+      FEED_ENGAGEMENT_STORAGE_KEY,
+      JSON.stringify({
+        liked: eng.liked,
+        likeBump: eng.likeBump,
+        likeApiSent: eng.likeApiSent,
+        saved: eng.saved,
+        commentExtra: eng.commentExtra,
+        commentLiked: eng.commentLiked,
+        userComments: eng.userComments,
+        commentReplies: eng.commentReplies,
+      })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 function getFeedEngagement() {
   const rt = getSarahRuntime();
   if (!rt.feedEngagement) {
-    rt.feedEngagement = { liked: {}, saved: {}, commentExtra: {} };
+    const saved = loadPersistedFeedEngagement();
+    rt.feedEngagement = {
+      liked: saved.liked || {},
+      likeBump: saved.likeBump || {},
+      likeApiSent: saved.likeApiSent || {},
+      saved: saved.saved || {},
+      commentExtra: saved.commentExtra || {},
+      commentLiked: saved.commentLiked || {},
+      userComments: saved.userComments || {},
+      commentReplies: saved.commentReplies || {},
+    };
   }
   return rt.feedEngagement;
 }
@@ -66,27 +108,373 @@ function getFeedEngagement() {
 function feedEngagementCounts(item) {
   const eng = getFeedEngagement();
   const id = item.id || '';
+  const bump = Number(eng.likeBump?.[id]) || 0;
+  const liked = Boolean(eng.liked[id]) || Boolean(item.viewerReacted);
   return {
-    likes: (item.likes ?? 0) + (eng.liked[id] ? 1 : 0),
-    comments: (item.comments ?? 0) + (eng.commentExtra[id] || 0),
-    liked: Boolean(eng.liked[id]),
+    likes: Math.max(0, (Number(item.likes) || 0) + bump),
+    comments: (Number(item.comments) || 0) + (Number(eng.commentExtra[id]) || 0),
+    liked,
     saved: Boolean(eng.saved[id]),
   };
+}
+
+function updateLivePostReactions(postId, reactions) {
+  if (!postId || liveStatusPosts == null) return;
+  const next = Number(reactions);
+  if (Number.isNaN(next)) return;
+  liveStatusPosts = liveStatusPosts.map((p) => (p.id === postId ? { ...p, likes: next } : p));
+  const eng = getFeedEngagement();
+  eng.likeBump[postId] = 0;
+  persistFeedEngagement();
+}
+
+function refreshFeedEngageSurfaces(postId = '') {
+  if (postId) patchFeedCardEngage(postId);
+}
+
+let feedCommentTarget = { postId: '', replyToId: '' };
+
+function openFeedCommentSheet(postId, replyToId = '') {
+  if (!postId) return;
+  feedCommentTarget = { postId, replyToId: replyToId || '' };
+  const sheet = document.getElementById('feedCommentSheet');
+  const input = document.getElementById('feedCommentInput');
+  const title = document.getElementById('feedCommentTitle');
+  if (!sheet || !input) return;
+  syncUserAvatars();
+  if (title) title.textContent = replyToId ? 'Write a reply' : 'Write a comment';
+  input.value = '';
+  input.removeAttribute('readonly');
+  blurActiveInput();
+  sheet.classList.remove('hidden');
+  sheet.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('is-feed-comment-open');
+  if (!shouldDeferSheetAutofocus()) {
+    requestAnimationFrame(() => input.focus({ preventScroll: true }));
+  }
+}
+
+function closeFeedCommentSheet() {
+  const sheet = document.getElementById('feedCommentSheet');
+  sheet?.classList.add('hidden');
+  sheet?.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('is-feed-comment-open');
+  document.getElementById('feedCommentInput')?.blur();
+  feedCommentTarget = { postId: '', replyToId: '' };
+}
+
+async function submitFeedCommentFromSheet() {
+  const input = document.getElementById('feedCommentInput');
+  const submit = document.getElementById('feedCommentSubmit');
+  const text = input?.value.trim() || '';
+  const { postId, replyToId } = feedCommentTarget;
+  if (!text || !postId) return;
+  if (submit) submit.disabled = true;
+  const isLivePost = /^(stp_|csp_)/.test(postId);
+  try {
+    if (isLivePost && window.SarahLive?.createStatusFeedComment) {
+      const res = await window.SarahLive.createStatusFeedComment(postId, {
+        body: text,
+        parentCommentId: replyToId || null,
+      });
+      if (res.error) {
+        showProtoToast(window.SarahLive.formatSarahApiError?.(res.error) || 'Could not post comment');
+        return;
+      }
+      const raw = res.data?.comment ?? res.data?.data?.comment;
+      if (raw && liveStatusPosts) {
+        const mapped = {
+          id: raw.commentId,
+          author: raw.authorName || 'Member',
+          text: raw.body || text,
+          avatarUrl: raw.authorPhotoUrl,
+          parentId: raw.parentCommentId || null,
+        };
+        liveStatusPosts = liveStatusPosts.map((p) => {
+          if (p.id !== postId) return p;
+          const preview = [...(p.previewComments || []), mapped];
+          return {
+            ...p,
+            comments: (Number(p.comments) || 0) + 1,
+            previewComments: preview,
+          };
+        });
+      }
+      closeFeedCommentSheet();
+      showProtoToast(replyToId ? 'Reply posted' : 'Comment posted');
+      patchFeedCardEngage(postId);
+      return;
+    }
+    const eng = getFeedEngagement();
+    const author = consumerDisplayFirstName(window.SarahLive?.getConsumerProfile?.()) || MOCK_USER.name;
+    const avatarUrl = getEffectiveUserAvatar();
+    if (replyToId) {
+      if (!eng.commentReplies[postId]) eng.commentReplies[postId] = [];
+      eng.commentReplies[postId].push({
+        id: `ur_${Date.now()}`,
+        parentId: replyToId,
+        author,
+        text,
+        avatarUrl,
+      });
+    } else {
+      if (!eng.userComments[postId]) eng.userComments[postId] = [];
+      eng.userComments[postId].push({
+        id: `uc_${Date.now()}`,
+        author,
+        text,
+        avatarUrl,
+      });
+    }
+    eng.commentExtra[postId] = (Number(eng.commentExtra[postId]) || 0) + 1;
+    persistFeedEngagement();
+    closeFeedCommentSheet();
+    showProtoToast(replyToId ? 'Reply posted' : 'Comment posted');
+    patchFeedCardEngage(postId);
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
+/** Live Status posts from Company Portal (GET /api/network/v1/status-feed). */
+let liveStatusPosts = null;
+let liveStatusFeedPromise = null;
+const statusFeedLive = { loading: false, loaded: false, error: '' };
+
+function statusPostTimeLabel(iso) {
+  if (!iso) return 'Just now';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return 'Recently';
+  if (ms < 60_000) return 'Just now';
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function mapLivePreviewComments(preview) {
+  return (preview || []).map((c) => ({
+    id: c.commentId,
+    author: c.authorName || 'Member',
+    text: c.body || '',
+    avatarUrl: c.authorPhotoUrl,
+    parentId: c.parentCommentId || null,
+  }));
+}
+
+function syncFeedEngagementFromApiPosts(rawPosts) {
+  const eng = getFeedEngagement();
+  for (const p of rawPosts || []) {
+    const id = p.postId;
+    if (!id) continue;
+    if (p.viewerReacted) {
+      eng.liked[id] = true;
+      eng.likeApiSent = eng.likeApiSent || {};
+      eng.likeApiSent[id] = true;
+      eng.likeBump[id] = 0;
+    }
+  }
+  persistFeedEngagement();
+}
+
+function mapLiveStatusPost(p) {
+  const previewComments = mapLivePreviewComments(p.previewComments);
+  const commentCount = Math.max(Number(p.commentCount) || 0, previewComments.length);
+  const base = {
+    viewerReacted: Boolean(p.viewerReacted),
+    previewComments,
+    likes: Number(p.reactions) || 0,
+    comments: commentCount,
+  };
+  const isUser = p.publisherType === 'user' || String(p.postId || '').startsWith('csp_');
+  if (isUser && !p.companyId) {
+    return {
+      ...base,
+      id: p.postId,
+      authorUid: p.authorUid || null,
+      author: p.authorName || 'Member',
+      authorType: 'user',
+      body: p.body || '',
+      image: p.imageUrl ? resolveApiMediaUrl(p.imageUrl) : null,
+      video: p.videoUrl ? resolveApiMediaUrl(p.videoUrl) : null,
+      avatar: p.authorPhotoUrl
+        ? /^https?:\/\//i.test(String(p.authorPhotoUrl))
+          ? String(p.authorPhotoUrl).trim()
+          : resolveApiMediaUrl(p.authorPhotoUrl)
+        : null,
+      time: statusPostTimeLabel(p.publishedAt || p.createdAt),
+      tab: 'for-you',
+      sponsored: false,
+      verified: false,
+      liveStatus: true,
+    };
+  }
+  return {
+    ...base,
+    id: p.postId,
+    author: p.companyName || 'Business',
+    authorType: 'company',
+    body: p.body || '',
+    image: p.imageUrl ? resolveListingMediaUrl(p.imageUrl) : null,
+    video: p.videoUrl ? resolveApiMediaUrl(p.videoUrl) : null,
+    avatar: p.logoUrl ? resolveListingMediaUrl(p.logoUrl) : null,
+    time: statusPostTimeLabel(p.createdAt),
+    tab: 'for-you',
+    sponsored: Boolean(p.boosted),
+    verified: true,
+    liveStatus: true,
+  };
+}
+
+function resetLiveStatusFeedCache() {
+  liveStatusPosts = null;
+  liveStatusFeedPromise = null;
+  statusFeedLive.loading = false;
+  statusFeedLive.loaded = false;
+  statusFeedLive.error = '';
+}
+
+function statusFeedLiveMode() {
+  return Boolean(window.SarahLive?.isLiveEnabled?.());
+}
+
+function statusFeedMockForTab(tabId) {
+  const items = MOCK_FEED.filter((p) => {
+    if (tabId === 'for-you') return p.tab === 'for-you';
+    if (tabId === 'following') return p.tab === 'following';
+    if (tabId === 'companies') return p.authorType === 'company';
+    if (tabId === 'creators') return p.authorType === 'creator';
+    if (tabId === 'videos') return Boolean(p.image || p.video);
+    return true;
+  });
+  return items.length ? items : MOCK_FEED.filter((p) => p.tab === 'for-you');
+}
+
+function statusFeedEmptyMarkup({ error = '', loading = false, signedOut = false } = {}) {
+  if (loading) {
+    return '<p class="feed-empty-search">Loading your Status feed…</p>';
+  }
+  if (signedOut) {
+    return '<p class="feed-empty-search">Sign in to see live posts from Sarah Network businesses and people you follow.</p>';
+  }
+  if (error) {
+    return `<p class="feed-empty-search">Couldn't load Status: ${escapeHtml(error)}</p><button type="button" class="btn btn-secondary feed-retry-btn" data-status-feed-retry>Try again</button>`;
+  }
+  return `<p class="feed-empty-search">Nothing here yet. Tap <strong>Share an update on Status…</strong> to post your first update, or open <button type="button" class="link-inline" data-route-jump="discover">Discover</button> to follow businesses.</p>`;
+}
+
+function statusFeedHasSession() {
+  return Boolean(window.SarahLive?.hasLiveSession?.() || window.SarahLive?.isSignedIn?.());
+}
+
+function ensureLiveStatusFeed() {
+  return;
+  if (!window.SarahLive?.isLiveEnabled?.() || !window.SarahLive?.fetchStatusFeed) return;
+  if (liveStatusFeedPromise) return;
+  if (!statusFeedHasSession()) {
+    if (window.SarahLive?.isAuthReady?.() === false) {
+      statusFeedLive.loading = true;
+      return;
+    }
+    statusFeedLive.loading = false;
+    statusFeedLive.loaded = false;
+    statusFeedLive.error = '';
+    return;
+  }
+  statusFeedLive.loading = true;
+  statusFeedLive.error = '';
+  if (parseLocationHash().route === 'status') renderHome();
+  liveStatusFeedPromise = window.SarahLive.fetchStatusFeed({ limit: 40 })
+    .then((res) => {
+      statusFeedLive.loading = false;
+      statusFeedLive.loaded = true;
+      if (res.error) {
+        statusFeedLive.error = res.error || 'Request failed';
+        if (res.status === 401 || res.code === 'UNAUTHORIZED') {
+          resetLiveStatusFeedCache();
+        }
+        liveStatusPosts = null;
+        return;
+      }
+      const posts = res.data?.posts ?? res.data?.data?.posts ?? [];
+      syncFeedEngagementFromApiPosts(posts);
+      liveStatusPosts = posts.map(mapLiveStatusPost);
+      statusFeedLive.error = '';
+      const route = parseLocationHash().route;
+      if (route === 'status' || route === 'home') renderHome();
+      else if (route === 'profile') renderProfile(activeProfilePanel, activeProfileKind);
+    })
+    .finally(() => {
+      liveStatusFeedPromise = null;
+      statusFeedLive.loading = false;
+    });
 }
 
 function feedEngageButton(iconKey, label, postId, kind, active) {
   const icon = SARAH_ICONS[iconKey] || '';
   const activeClass = active ? ' is-active' : '';
-  return `<button type="button" class="feed-engage-btn${activeClass}" data-feed-engage="${escapeHtml(kind)}" data-post-id="${escapeHtml(postId)}"><span class="feed-engage-icon" aria-hidden="true">${icon}</span><span class="feed-engage-label">${escapeHtml(label)}</span></button>`;
+  const activeKind = kind === 'like' && active ? ' is-liked' : '';
+  return `<button type="button" class="feed-engage-btn${activeClass}${activeKind}" data-feed-engage="${escapeHtml(kind)}" data-post-id="${escapeHtml(postId)}" aria-pressed="${active ? 'true' : 'false'}"><span class="feed-engage-icon" aria-hidden="true">${icon}</span><span class="feed-engage-label">${escapeHtml(label)}</span></button>`;
 }
 
-function showProtoToast(message) {
+function findFeedItemById(postId) {
+  const live = liveStatusPosts?.find((p) => p.id === postId);
+  if (live) return live;
+  const user = getUserCreatedPosts().find((p) => p.id === postId);
+  if (user) return user;
+  return MOCK_FEED.find((p) => p.id === postId) || null;
+}
+
+function patchFeedCardEngage(postId) {
+  const esc = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(postId) : postId.replace(/"/g, '\\"');
+  const card = document.querySelector(`.feed-card[data-feed-post-id="${esc}"]`);
+  const item = findFeedItemById(postId);
+  if (!card || !item) {
+    refreshFeedEngageSurfaces();
+    return;
+  }
+  const counts = feedEngagementCounts(item);
+  const stats = card.querySelector('.feed-stats');
+  if (stats) stats.outerHTML = renderFeedStatsRow(counts);
+  const footer = card.querySelector('.feed-engage');
+  if (footer) {
+    const likeLabel = counts.liked ? 'Liked' : 'Like';
+    footer.innerHTML = `${feedEngageButton('iconHeart', likeLabel, postId, 'like', counts.liked)}${feedEngageButton('iconComment', 'Comment', postId, 'comment', false)}${feedEngageButton('iconShare', 'Share', postId, 'share', false)}`;
+  }
+  const commentsWrap = card.querySelector('.feed-comments');
+  if (commentsWrap) commentsWrap.outerHTML = renderFeedCommentsSection(item, counts.comments, postId);
+  wireFeedEngageButtons(card);
+}
+
+function shouldDeferSheetAutofocus() {
+  return window.matchMedia('(pointer: coarse)').matches;
+}
+
+function blurActiveInput() {
+  const el = document.activeElement;
+  if (el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+    el.blur();
+  }
+}
+
+function showProtoToast(message, { ms = 2800 } = {}) {
   const el = document.getElementById('protoToast');
   if (!el) return;
   el.textContent = message;
   el.classList.remove('hidden');
   clearTimeout(showProtoToast._t);
-  showProtoToast._t = setTimeout(() => el.classList.add('hidden'), 2200);
+  showProtoToast._t = setTimeout(() => el.classList.add('hidden'), Math.max(1500, ms));
+}
+
+function setCreatePostStatus(message) {
+  const el = document.getElementById('createPostStatus');
+  if (!el) return;
+  if (!message) {
+    el.textContent = '';
+    el.classList.add('hidden');
+    return;
+  }
+  el.textContent = message;
+  el.classList.remove('hidden');
 }
 
 function handleFeedEngageClick(btn) {
@@ -95,20 +483,98 @@ function handleFeedEngageClick(btn) {
   if (!kind || !postId) return;
   const eng = getFeedEngagement();
   if (kind === 'like') {
-    eng.liked[postId] = !eng.liked[postId];
-    showProtoToast(eng.liked[postId] ? 'Added to your likes' : 'Like removed');
-  } else if (kind === 'comment') {
-    eng.commentExtra[postId] = (eng.commentExtra[postId] || 0) + 1;
-    showProtoToast('Comment added (prototype)');
-  } else if (kind === 'share') {
-    showProtoToast('Link copied — ready to share');
-  } else if (kind === 'save') {
-    eng.saved[postId] = !eng.saved[postId];
-    showProtoToast(eng.saved[postId] ? 'Saved to your list' : 'Removed from saved');
+    const liveItem = liveStatusPosts?.find((p) => p.id === postId);
+    const serverLiked = Boolean(liveItem?.viewerReacted);
+    const wasLiked = Boolean(eng.liked[postId]) || serverLiked;
+    if (wasLiked) {
+      eng.liked[postId] = false;
+      if (!serverLiked && !eng.likeApiSent?.[postId]) {
+        eng.likeBump[postId] = (Number(eng.likeBump[postId]) || 0) - 1;
+      } else {
+        eng.likeBump[postId] = 0;
+      }
+      persistFeedEngagement();
+      patchFeedCardEngage(postId);
+      return;
+    }
+    if (eng.likeApiSent?.[postId] || serverLiked) {
+      eng.liked[postId] = true;
+      eng.likeBump[postId] = 0;
+      persistFeedEngagement();
+      patchFeedCardEngage(postId);
+      return;
+    }
+    eng.liked[postId] = true;
+    eng.likeBump[postId] = (Number(eng.likeBump[postId]) || 0) + 1;
+    persistFeedEngagement();
+    patchFeedCardEngage(postId);
+    const isLivePost = /^(stp_|csp_)/.test(postId);
+    if (isLivePost && window.SarahLive?.reactToStatusFeedPost && !eng.likeApiSent?.[postId]) {
+      void window.SarahLive.reactToStatusFeedPost(postId).then((res) => {
+        if (res?.error) {
+          eng.liked[postId] = false;
+          eng.likeBump[postId] = (Number(eng.likeBump[postId]) || 0) - 1;
+          showProtoToast(window.SarahLive.formatSarahApiError?.(res.error) || 'Could not like this post');
+        } else {
+          eng.likeApiSent = eng.likeApiSent || {};
+          eng.likeApiSent[postId] = true;
+          const payload = res.data?.data ?? res.data;
+          const reactions = payload?.reactions;
+          if (reactions != null) updateLivePostReactions(postId, reactions);
+          if (liveStatusPosts) {
+            liveStatusPosts = liveStatusPosts.map((p) =>
+              p.id === postId ? { ...p, viewerReacted: true, likes: reactions != null ? reactions : p.likes } : p
+            );
+          }
+          if (payload?.alreadyReacted && reactions == null) {
+            eng.likeApiSent[postId] = true;
+          }
+        }
+        persistFeedEngagement();
+        patchFeedCardEngage(postId);
+      });
+    }
+    return;
   }
-  const { route } = parseLocationHash();
-  if (route === 'status') renderHome();
-  if (route === 'profile' && activeProfileSocialTab === 'posts') renderProfileSocialTab();
+  if (kind === 'comment') {
+    blurActiveInput();
+    openFeedCommentSheet(postId);
+    return;
+  }
+  if (kind === 'comment-like') {
+    const commentId = btn.dataset.commentId;
+    if (!commentId) return;
+    const key = `${postId}:${commentId}`;
+    eng.commentLiked[key] = !eng.commentLiked[key];
+    persistFeedEngagement();
+    patchFeedCardEngage(postId);
+    return;
+  }
+  if (kind === 'comment-reply') {
+    const parentId = btn.dataset.commentId;
+    if (!parentId) return;
+    openFeedCommentSheet(postId, parentId);
+    return;
+  }
+  if (kind === 'share') {
+    const origin = typeof location !== 'undefined' ? location.origin : 'https://sarah.ziricai.com';
+    const link = `${origin}/#home`;
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(link).then(
+        () => showProtoToast('Link copied'),
+        () => showProtoToast('Ready to share')
+      );
+    } else {
+      showProtoToast('Ready to share');
+    }
+    return;
+  }
+  if (kind === 'save') {
+    eng.saved[postId] = !eng.saved[postId];
+    persistFeedEngagement();
+    showProtoToast(eng.saved[postId] ? 'Saved to your list' : 'Removed from saved');
+    refreshFeedEngageSurfaces();
+  }
 }
 
 function profileImgOnError(fallback) {
@@ -126,23 +592,84 @@ function formatFeedStatCount(n) {
 const FEED_STATS_HEART =
   '<svg class="feed-stats-heart" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-4.5-3-6-5.5C.5 6.5 1.5 4 4 3c1.2-.5 2.5 0 3.5 1 1-1 2.3-1.5 3.5-1 2.5 1 3.5 3.5 2 5.5C12.5 11 8 14 8 14z"/></svg>';
 
-function feedCommentAvatarUrl(author) {
+function isCurrentFeedAuthor(author) {
+  const a = String(author || '').trim();
+  if (!a) return false;
+  const prof = window.SarahLive?.getConsumerProfile?.();
+  const names = new Set(
+    [MOCK_USER.name, prof?.preferredName, prof?.firstName, prof?.fullName].filter(Boolean).map((n) => String(n).trim())
+  );
+  return names.has(a);
+}
+
+function feedCommentAvatarUrl(author, comment) {
+  const explicit = comment?.avatarUrl || comment?.avatar;
+  if (explicit) return prototypeAsset(explicit);
+  if (isCurrentFeedAuthor(author)) return prototypeAsset(getEffectiveUserAvatar());
   const seed = encodeURIComponent(String(author || 'user').replace(/\s+/g, ''));
   return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
 }
 
-function renderFeedCommentLine(c) {
+function feedCommentStableId(postId, c, index) {
+  return String(c.id || `${postId}__${index}__${String(c.author || '').slice(0, 24)}`);
+}
+
+function feedCommentLikeCount(postId, commentId, seed = 0) {
+  const eng = getFeedEngagement();
+  const key = `${postId}:${commentId}`;
+  return seed + (eng.commentLiked[key] ? 1 : 0);
+}
+
+function feedCommentIsLiked(postId, commentId) {
+  return Boolean(getFeedEngagement().commentLiked[`${postId}:${commentId}`]);
+}
+
+function renderFeedCommentLine(c, postId, commentId, { isReply = false, likeSeed = 0 } = {}) {
   const author = c.author || 'Someone';
-  const avatar = escapeHtml(feedCommentAvatarUrl(author));
-  return `<div class="feed-comment">
+  const avatar = escapeHtml(feedCommentAvatarUrl(author, c));
+  const liked = feedCommentIsLiked(postId, commentId);
+  const likes = feedCommentLikeCount(postId, commentId, likeSeed);
+  const likeLabel = likes > 0 ? `Like · ${likes}` : 'Like';
+  return `<div class="feed-comment${isReply ? ' feed-comment--reply' : ''}" data-comment-id="${escapeHtml(commentId)}">
     <img class="avatar avatar-xs feed-comment-avatar" src="${avatar}" alt="" width="32" height="32" loading="lazy" />
-    <div class="feed-comment-bubble">
-      <div class="feed-comment-bubble-inner">
-        <span class="feed-comment-author text-comment-user">${escapeHtml(author)}</span>
-        <span class="feed-comment-text text-comment">${escapeHtml(c.text || '')}</span>
+    <div class="feed-comment-main">
+      <div class="feed-comment-bubble">
+        <div class="feed-comment-bubble-inner">
+          <span class="feed-comment-author text-comment-user">${escapeHtml(author)}</span>
+          <span class="feed-comment-text text-comment">${escapeHtml(c.text || c.body || '')}</span>
+        </div>
+      </div>
+      <div class="feed-comment-actions text-action">
+        <button type="button" class="feed-comment-action${liked ? ' is-active' : ''}" data-feed-engage="comment-like" data-post-id="${escapeHtml(postId)}" data-comment-id="${escapeHtml(commentId)}">${escapeHtml(likeLabel)}</button>
+        <button type="button" class="feed-comment-action" data-feed-engage="comment-reply" data-post-id="${escapeHtml(postId)}" data-comment-id="${escapeHtml(commentId)}">Reply</button>
       </div>
     </div>
   </div>`;
+}
+
+function renderFeedCommentThread(postId, comments) {
+  const eng = getFeedEngagement();
+  const replies = eng.commentReplies[postId] || [];
+  const byParent = new Map();
+  replies.forEach((r) => {
+    const pid = r.parentId || '';
+    if (!byParent.has(pid)) byParent.set(pid, []);
+    byParent.get(pid).push(r);
+  });
+  function renderWithReplies(c, commentId, opts) {
+    let html = renderFeedCommentLine(c, postId, commentId, opts);
+    const children = byParent.get(commentId) || [];
+    children.forEach((r) => {
+      html += renderFeedCommentLine(r, postId, r.id, { isReply: true });
+    });
+    return html;
+  }
+  return comments
+    .map((c, i) => {
+      const commentId = feedCommentStableId(postId, c, i);
+      return renderWithReplies(c, commentId, { likeSeed: c.likes || 0 });
+    })
+    .join('');
 }
 
 function renderFeedStatsRow(counts) {
@@ -158,20 +685,24 @@ function renderFeedStatsRow(counts) {
 }
 
 function renderFeedCommentCompose(postId) {
-  const avatarSrc = escapeHtml(prototypeAsset(MOCK_USER.avatar));
+  const avatarSrc = escapeHtml(prototypeAsset(getEffectiveUserAvatar()));
   return `<div class="feed-comment-compose">
-    <img class="avatar avatar-xs feed-comment-compose-avatar" src="${avatarSrc}" alt="" width="32" height="32" ${profileImgOnError(MOCK_PROFILE.avatarFallback || '')} />
+    <img class="avatar avatar-xs feed-comment-compose-avatar" data-user-avatar src="${avatarSrc}" alt="" width="32" height="32" ${profileImgOnError(MOCK_PROFILE.avatarFallback || '')} />
     <button type="button" class="feed-comment-compose-field" data-feed-engage="comment" data-post-id="${escapeHtml(postId)}">Write a comment…</button>
   </div>`;
 }
 
 function renderFeedCommentsSection(item, totalComments, postId) {
-  const previews = Array.isArray(item.previewComments) ? item.previewComments : [];
+  const eng = getFeedEngagement();
+  const previews = [
+    ...(Array.isArray(item.previewComments) ? item.previewComments : []),
+    ...(eng.userComments[postId] || []),
+  ];
   const hasComments = previews.length > 0 || totalComments > 0;
   if (!hasComments) {
     return `<div class="feed-comments">${renderFeedCommentCompose(postId)}</div>`;
   }
-  const lines = previews.slice(0, 2).map((c) => renderFeedCommentLine(c)).join('');
+  const lines = renderFeedCommentThread(postId, previews.slice(0, 4));
   let viewMore = '';
   if (totalComments > previews.length) {
     const label =
@@ -305,6 +836,8 @@ function renderProtoSearchResults(query) {
     host.innerHTML = all.length
       ? `<p class="proto-search-meta">${all.length} result${all.length === 1 ? '' : 's'}</p><div class="feed-list proto-search-feed">${all.map((p) => renderFeedCard(p)).join('')}</div>`
       : '<p class="proto-search-empty">No posts match that search.</p>';
+    const searchFeed = host.querySelector('.proto-search-feed');
+    if (searchFeed) wireFeedEngageButtons(searchFeed);
     if (parseLocationHash().route === 'status') renderHome();
     return;
   }
@@ -341,7 +874,17 @@ function renderProtoSearchResults(query) {
  * Phase 2.0: in live mode the bell shows the server inbox (GET /api/network/v1/my-notifications — subscriber
  * announcements / reminders from organisations the user subscribed to). Fixtures only render when live mode is off.
  */
-const liveNotifs = { items: [], unread: 0, loaded: false, loading: false, error: '', timer: null };
+const liveNotifs = {
+  items: [],
+  unread: 0,
+  loaded: false,
+  loading: false,
+  error: '',
+  timer: null,
+  /** @type {Set<string>} */
+  knownIds: new Set(),
+  sawInitialInbox: false,
+};
 
 function notifLiveActive() {
   return Boolean(window.SarahLive?.isLiveEnabled?.() && window.SarahLive?.fetchMyNotifications);
@@ -358,6 +901,50 @@ function formatNotifTime(iso) {
   return new Date(t).toLocaleDateString();
 }
 
+async function attentionForSubscriberNotif(kind, { id, title, body, org }) {
+  const prefs = { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
+  const mod = await import('./sna-reminders.mjs').catch(() => null);
+  if (kind === 'reminder' && prefs.reminders !== false) {
+    tryOsPushAlert(title, body);
+    mod?.triggerServerReminderAlarm?.({ id, title, body });
+    return;
+  }
+  if (kind === 'announcement' && prefs.announcements !== false) {
+    tryOsPushAlert(title, body);
+    mod?.triggerSchoolAttentionAlert?.({
+      id,
+      title,
+      body,
+      label: org ? `${org} — announcement` : 'School announcement',
+    });
+    return;
+  }
+  if (kind === 'notification' && prefs.orgNotifications !== false) {
+    tryOsPushAlert(title, body);
+  }
+}
+
+function scanNewLiveNotifications(items) {
+  if (!Array.isArray(items) || !items.length) return;
+  const known = liveNotifs.knownIds || new Set();
+  const announce = liveNotifs.sawInitialInbox;
+  for (const n of items) {
+    const id = String(n.notificationId || '');
+    if (!id || known.has(id)) continue;
+    known.add(id);
+    if (!announce || n.read) continue;
+    const row = mapLiveNotifToRow(n);
+    void attentionForSubscriberNotif(row.kind, {
+      id: row.id,
+      title: row.title,
+      body: row.body,
+      org: row.org,
+    });
+  }
+  liveNotifs.knownIds = known;
+  liveNotifs.sawInitialInbox = true;
+}
+
 async function refreshLiveNotifications() {
   if (!notifLiveActive() || liveNotifs.loading) return;
   liveNotifs.loading = true;
@@ -372,9 +959,11 @@ async function refreshLiveNotifications() {
     liveNotifs.error = '';
     liveNotifs.items = res.notifications || [];
     liveNotifs.unread = Number(res.unread) || 0;
+    scanNewLiveNotifications(liveNotifs.items);
   }
   syncNotificationBadge();
   if (!document.getElementById('protoNotifSheet')?.classList.contains('hidden')) renderProtoNotifications();
+  if (isMyNotificationsOpen()) renderMyNotificationsPanel();
 }
 
 function startLiveNotificationPolling() {
@@ -382,7 +971,7 @@ function startLiveNotificationPolling() {
   void refreshLiveNotifications();
   liveNotifs.timer = setInterval(() => {
     if (!document.hidden) void refreshLiveNotifications();
-  }, 60000);
+  }, 30000);
 }
 
 /** Phase 2.1/2.2 — FCM token when available; else stable web_* token for server fan-out. */
@@ -404,32 +993,637 @@ async function maybeRegisterWebPush() {
   }
   const res = await window.SarahLive.registerPushDevice({ token, consent: true, platform: 'web' });
   if (!res?.error) localStorage.setItem('sarah.pushDeviceToken', token);
+  bindPushDeliveryChannels();
 }
 
 function unreadNotificationCount() {
-  if (notifLiveActive()) return liveNotifs.unread;
-  const dismissed = getSarahRuntime().notifDismissed || {};
-  return (MOCK_NOTIFICATIONS || []).filter((n) => n.unread && !dismissed[n.id]).length;
+  const extrasUnread = loadSnaInboxExtras().filter((n) => n.unread).length;
+  if (notifLiveActive()) return Number(liveNotifs.unread || 0) + extrasUnread;
+  return collectInboxNotifications().filter((n) => n.unread).length;
 }
 
 function syncNotificationBadge() {
   const count = unreadNotificationCount();
-  const badge = document.getElementById('statusNotifBadge');
-  if (!badge) return;
-  badge.textContent = count > 99 ? '99+' : String(count);
-  badge.hidden = count <= 0;
+  const drawerBadge = document.getElementById('msNotifBadge');
+  if (drawerBadge) {
+    drawerBadge.textContent = count > 99 ? '99+' : String(count);
+    drawerBadge.classList.toggle('hidden', count <= 0);
+    document.querySelector('.ms-drawer-link--notif')?.classList.toggle('has-unread', count > 0);
+  }
+  const homeBadge = document.getElementById('homeNotifBadge');
+  const homeBtn = document.getElementById('homeNotifBtn');
+  if (homeBadge) {
+    homeBadge.textContent = count > 99 ? '99+' : String(count);
+    homeBadge.classList.toggle('hidden', count <= 0);
+    homeBadge.setAttribute('aria-hidden', count <= 0 ? 'true' : 'false');
+  }
+  if (homeBtn) {
+    homeBtn.classList.toggle('has-unread', count > 0);
+    homeBtn.setAttribute('aria-label', count > 0 ? `Notifications, ${count} unread` : 'Notifications');
+  }
+  const legacyBadge = document.getElementById('statusNotifBadge');
+  if (legacyBadge) {
+    legacyBadge.textContent = count > 99 ? '99+' : String(count);
+    legacyBadge.hidden = count <= 0;
+  }
   if (notifLiveActive()) {
     startLiveNotificationPolling();
     void maybeRegisterWebPush();
   }
 }
 
+function bindPushDeliveryChannels() {
+  if (window.__sarahPushChannelsBound) return;
+  window.__sarahPushChannelsBound = true;
+  navigator.serviceWorker?.addEventListener('message', (event) => {
+    if (event?.data?.type === 'sarah-push') handlePushPayload(event.data.payload || {});
+  });
+  import('./push-fcm.mjs')
+    .then((m) => m.bindFcmForegroundMessages((payload) => handlePushPayload(payload)))
+    .catch(() => {});
+}
+
+function openMyNotifications() {
+  setMySarahPanel('notifications');
+}
+
 function openProtoNotifSheet() {
-  const sheet = document.getElementById('protoNotifSheet');
+  openMyNotifications();
+}
+
+function isMyNotificationsOpen() {
+  return document.querySelector('.my-sarah-view')?.dataset.msPanel === 'notifications';
+}
+
+const SNA_INBOX_EXTRA_KEY = 'sarah.sna.inboxExtra.v1';
+const SNA_PUSH_STAR_KEY = 'sarah.sna.pushStarred.v1';
+const WORK_USAGE_KEY = 'sarah.swp.workUsageDay.v1';
+let snaActiveTab = 'all';
+const workQuotaState = {
+  used: 0,
+  limit: 0,
+  dayKey: '',
+  loaded: false,
+  availableCredits: null,
+  periodScoped: false,
+  enforcementMode: 'shadow',
+};
+const WORK_ESTIMATE_TTL_MS = 45_000;
+/** @type {Map<string, { at: number, plan: object }>} */
+const workEstimateByThread = new Map();
+let sarahUsageSurfaceFilter = 'all';
+/** @type {Map<string, string>} */
+const workWsTabByThread = new Map();
+const WORK_WS_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'conversation', label: 'Conversation' },
+  { id: 'milestones', label: 'Milestones' },
+  { id: 'deliverables', label: 'Deliverables' },
+  { id: 'files', label: 'Files' },
+  { id: 'approvals', label: 'Approvals' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'settings', label: 'Settings' },
+];
+const WORK_ASSIGNMENT_STATUS_LABEL = {
+  draft: 'Draft',
+  running: 'In progress',
+  paused: 'Paused',
+  completed: 'Complete',
+  cancelled: 'Cancelled',
+};
+
+function loadSnaInboxExtras() {
+  try {
+    const raw = localStorage.getItem(SNA_INBOX_EXTRA_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSnaInboxExtras(rows) {
+  try {
+    localStorage.setItem(SNA_INBOX_EXTRA_KEY, JSON.stringify(rows.slice(0, 200)));
+  } catch {
+    /* ignore */
+  }
+}
+
+function classifyLiveNotif(n) {
+  const ch = String(n.channel || '').toLowerCase();
+  const type = String(n.type || '').toLowerCase();
+  if (ch === 'announcements' || type.includes('announcement')) return 'announcement';
+  if (type.includes('work') || ch === 'sarah_work') return 'work';
+  if (type.includes('reminder') || ch === 'reminders' || ch === 'sarah_reminders') return 'reminder';
+  if (type.includes('usage') || ch === 'sarah_usage' || type === 'usage_alert') return 'usage';
+  return 'notification';
+}
+
+function loadPushStarredIds() {
+  try {
+    const raw = localStorage.getItem(SNA_PUSH_STAR_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function markPushStarred(id) {
+  if (!id) return;
+  const ids = loadPushStarredIds();
+  const next = [String(id), ...ids.filter((x) => x !== String(id))].slice(0, 200);
+  try {
+    localStorage.setItem(SNA_PUSH_STAR_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+}
+
+function isPushStarred(id) {
+  return loadPushStarredIds().includes(String(id));
+}
+
+function handlePushPayload(payload = {}) {
+  const data = payload.data || {};
+  const title = payload.notification?.title || data.title || 'Sarah';
+  const body = payload.notification?.body || data.body || '';
+  const id = data.notificationId || data.reminderId || data.id || `push-${Date.now()}`;
+  markPushStarred(id);
+  const rawType = String(data.type || data.pushType || '').toLowerCase();
+  const channel = String(data.channel || '').toLowerCase();
+  const kind =
+    rawType === 'sarah_reminder' || rawType === 'reminders' || rawType.includes('reminder') || channel === 'reminders'
+      ? 'reminder'
+      : rawType.includes('announcement') || channel === 'announcements'
+        ? 'announcement'
+        : rawType === 'sarah_usage' || rawType.includes('usage')
+          ? 'usage'
+          : 'notification';
+  const prefs = { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
+  const org = data.orgName || data.organisationName || '';
+  if (kind === 'reminder' && prefs.reminders !== false) {
+    void attentionForSubscriberNotif('reminder', { id, title, body: body || title, org });
+  } else if (kind === 'announcement' && prefs.announcements !== false) {
+    void attentionForSubscriberNotif('announcement', { id, title, body: body || title, org });
+  } else if (kind === 'usage' && prefs.usageAlerts !== false) {
+    tryOsPushAlert(title, body);
+  } else if (kind === 'notification' && prefs.orgNotifications !== false) {
+    tryOsPushAlert(title, body);
+  }
+  const extras = loadSnaInboxExtras();
+  extras.unshift({
+    id: String(id),
+    kind,
+    org: data.orgName || data.organisationName || (kind === 'reminder' ? 'Sarah Reminders' : 'Sarah Network'),
+    title: title || (kind === 'reminder' ? 'Reminder' : 'Notification'),
+    body,
+    createdAt: Date.now(),
+    time: 'Just now',
+    unread: true,
+    viaPush: true,
+  });
+  saveSnaInboxExtras(extras);
+  void refreshLiveNotifications();
+  syncNotificationBadge();
+  if (isMyNotificationsOpen()) renderMyNotificationsPanel();
+}
+
+function mapLiveNotifToRow(n) {
+  const org = n.organisation?.displayName || 'Organisation';
+  const kind = classifyLiveNotif(n);
+  const id = n.notificationId;
+  return {
+    id,
+    kind,
+    org,
+    title: n.title || 'Update',
+    body: n.body || '',
+    createdAt: Date.parse(n.createdAt) || Date.now(),
+    time: formatNotifTime(n.createdAt),
+    unread: !n.read,
+    live: true,
+    viaPush: isPushStarred(id),
+    actionLabel:
+      kind === 'work'
+        ? 'View report'
+        : kind === 'reminder'
+          ? 'Open reminder'
+          : kind === 'usage'
+            ? 'View plan'
+            : 'View details',
+    threadId: n.workSessionId || null,
+  };
+}
+
+function mapMockNotifToRow(n) {
+  const rt = getSarahRuntime();
+  const dismissed = rt.notifDismissed || {};
+  return {
+    ...n,
+    unread: Boolean(n.unread && !dismissed[n.id]),
+    createdAt: n.createdAt || Date.now(),
+    time: n.time || formatNotifTime(n.createdAt),
+  };
+}
+
+function collectInboxNotifications() {
+  const extras = loadSnaInboxExtras();
+  if (notifLiveActive() && liveNotifs.items.length) {
+    return [...liveNotifs.items.map(mapLiveNotifToRow), ...extras];
+  }
+  return [...(MOCK_NOTIFICATIONS || []).map(mapMockNotifToRow), ...extras];
+}
+
+function snaGroupLabel(ts) {
+  const age = Date.now() - ts;
+  if (age < 86400000) return 'Today';
+  if (age < 7 * 86400000) return 'Last 7 days';
+  return 'Last 30 days';
+}
+
+function filterInboxRows(rows, tab) {
+  if (tab === 'unread') return rows.filter((r) => r.unread);
+  if (tab === 'notifications')
+    return rows.filter((r) => r.kind === 'notification' || r.kind === 'usage' || r.kind === 'announcement');
+  if (tab === 'reminders') return rows.filter((r) => r.kind === 'reminder');
+  if (tab === 'organisations') return rows.filter((r) => r.kind === 'notification' || r.kind === 'announcement');
+  if (tab === 'work') return rows.filter((r) => r.kind === 'work');
+  return rows;
+}
+
+function rowKindBadge(n) {
+  if (n.kind === 'announcement') return '<span class="sna-row-badge">Announcement</span>';
+  if (n.kind === 'work') return '<span class="sna-row-badge">Sarah Work</span>';
+  if (n.kind === 'reminder') return '<span class="sna-row-badge sna-row-badge--reminder">Reminder</span>';
+  if (n.kind === 'usage') return '<span class="sna-row-badge">Plan usage</span>';
+  if (n.kind === 'notification') {
+    const highlight = n.viaPush || isPushStarred(n.id) ? ' sna-row-badge--star-pulse' : '';
+    return `<span class="sna-row-badge sna-row-badge--star${highlight}" title="Notification">★ Notification</span>`;
+  }
+  return '';
+}
+
+function inboxOrgInitial(org) {
+  const t = String(org || '?').trim();
+  return t ? t.charAt(0).toUpperCase() : '?';
+}
+
+function renderMyNotificationsPanel() {
+  const host = document.getElementById('snaNotifList');
+  if (!host) return;
+  if (notifLiveActive() && !liveNotifs.loaded && !liveNotifs.loading) void refreshLiveNotifications();
+  const rows = filterInboxRows(
+    collectInboxNotifications().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
+    snaActiveTab
+  );
+  if (notifLiveActive() && liveNotifs.error) {
+    host.innerHTML = `<p class="proto-search-empty">${escapeHtml(
+      /sign/i.test(liveNotifs.error) ? 'Sign in to see notifications from businesses you subscribe to.' : 'Notifications are unavailable right now.'
+    )}</p>`;
+    return;
+  }
+  if (!rows.length) {
+    host.innerHTML = `<p class="proto-search-empty">No notifications in this view yet.</p>`;
+    return;
+  }
+  let lastGroup = '';
+  host.innerHTML = rows
+    .map((n) => {
+      const group = snaGroupLabel(n.createdAt || Date.now());
+      const groupHtml = group !== lastGroup ? `<h3 class="sna-group-label">${escapeHtml(group)}</h3>` : '';
+      lastGroup = group;
+      const badge = rowKindBadge(n);
+      return `${groupHtml}
+    <button type="button" class="sna-row ${n.unread ? 'is-unread' : ''}" data-sna-id="${escapeHtml(n.id)}" data-sna-kind="${escapeHtml(n.kind)}">
+      <span class="sna-row-avatar" aria-hidden="true">${escapeHtml(inboxOrgInitial(n.org))}</span>
+      <span class="sna-row-body">
+        <span class="sna-row-org">${escapeHtml(n.org || '')}</span>
+        <span class="sna-row-title">${escapeHtml(n.title || '')}</span>
+        <span class="sna-row-preview">${escapeHtml(n.body || '')}</span>
+        ${badge}
+      </span>
+      <span class="sna-row-meta">${escapeHtml(n.time || '')}</span>
+    </button>`;
+    })
+    .join('');
+  host.querySelectorAll('[data-sna-id]').forEach((btn) => {
+    btn.addEventListener('click', () => void openInboxNotification(btn.dataset.snaId, btn.dataset.snaKind));
+  });
+}
+
+let snaDetailRow = null;
+
+function hideNotificationDetail() {
+  snaDetailRow = null;
+  document.getElementById('snaNotifDetail')?.classList.add('hidden');
+  document.getElementById('snaNotifBrowse')?.classList.remove('hidden');
+}
+
+function showNotificationDetail(row) {
+  if (!row) return;
+  snaDetailRow = row;
+  document.getElementById('snaNotifBrowse')?.classList.add('hidden');
+  const detail = document.getElementById('snaNotifDetail');
+  detail?.classList.remove('hidden');
+  const orgEl = document.getElementById('snaDetailOrg');
+  const titleEl = document.getElementById('snaDetailTitle');
+  const timeEl = document.getElementById('snaDetailTime');
+  const bodyEl = document.getElementById('snaDetailBody');
+  const actionBtn = document.getElementById('snaDetailAction');
+  if (orgEl) orgEl.textContent = row.org || '';
+  if (titleEl) titleEl.textContent = row.title || 'Notification';
+  if (timeEl) timeEl.textContent = row.time || '';
+  if (bodyEl) {
+    const report = Array.isArray(row.reportLines) ? row.reportLines.map((l) => `• ${l}`).join('\n') : '';
+    bodyEl.textContent = [row.body || '', report].filter(Boolean).join('\n\n');
+  }
+  if (actionBtn) {
+    const isWork = row.kind === 'work';
+    const label = isWork ? 'View completed work' : row.actionLabel || 'Open';
+    actionBtn.textContent = label;
+    actionBtn.classList.toggle('hidden', false);
+    actionBtn.onclick = async () => {
+      if (isWork) {
+        const sessionId = row.threadId || row.workSessionId;
+        if (sessionId) await openWorkReport(sessionId);
+        return;
+      }
+      if (row.kind === 'usage') {
+        closeMsDrawer();
+        setRoute('home');
+        setMySarahPanel('billing');
+        hideNotificationDetail();
+        return;
+      }
+      if (row.id === 'n1') {
+        getSarahRuntime().activeThreadId = 'smilemore-demo';
+        setRoute('chat-thread');
+      } else if (row.id === 'n2') {
+        if (consumerChatLiveActive()) showProtoToast('That business is not on Sarah Network yet.');
+        else {
+          getSarahRuntime().activeThreadId = 'central-motors';
+          setRoute('chat-thread');
+        }
+      } else {
+        showProtoToast(`${label} (prototype)`);
+      }
+    };
+  }
+}
+
+async function openWorkReport(sessionId) {
+  const id = String(sessionId || '').trim();
+  if (!id) return;
+  const sheet = document.getElementById('workReportSheet');
+  const bodyEl = document.getElementById('workReportBody');
+  if (personalSarahLiveActive() && window.SarahLive?.fetchPersonalWorkReport) {
+    const res = await window.SarahLive.fetchPersonalWorkReport(id);
+    if (res.error) {
+      if (res.code === 'WORK_REPORT_PENDING') showProtoToast('Sarah is still working on this report…');
+      else showProtoToast(res.error);
+      await openPersonalSarahThread(id);
+      return;
+    }
+    let body = res.report?.markdown || res.report?.summary || 'Report ready.';
+    const b = res.report?.budget;
+    if (b && typeof b === 'object') {
+      const est =
+        b.estimateMin != null && b.estimateMax != null
+          ? `${formatSarahCredits(b.estimateMin)}–${formatSarahCredits(b.estimateMax)}`
+          : '—';
+      const cap = b.capCredits != null ? formatSarahCredits(b.capCredits) : '—';
+      const used = formatSarahCredits(b.actualCredits ?? b.usedCredits ?? 0);
+      body += `\n\n---\n**Credits ·** estimate ${est} · fair-share cap ${cap} · used ${used}`;
+    }
+    if (bodyEl) bodyEl.textContent = body;
+    sheet?.classList.remove('hidden');
+    sheet?.setAttribute('aria-hidden', 'false');
+    return;
+  }
+  await openPersonalSarahThread(id);
+  showProtoToast('Work report (prototype) — open the thread for details.');
+}
+
+async function openInboxNotification(id, kind) {
+  const rt = getSarahRuntime();
+  if (!rt.notifDismissed) rt.notifDismissed = {};
+  rt.notifDismissed[id] = true;
+  const row =
+    collectInboxNotifications().find((n) => n.id === id) || loadSnaInboxExtras().find((n) => n.id === id);
+  if (row?.live && window.SarahLive?.markNotificationsRead) {
+    const res = await window.SarahLive.markNotificationsRead({ ids: [id] });
+    const item = liveNotifs.items.find((n) => n.notificationId === id);
+    if (item) item.read = true;
+    if (!res?.error && typeof res.unread === 'number') liveNotifs.unread = res.unread;
+  }
+  syncNotificationBadge();
+  if (row) {
+    if (row.live && kind === 'work') {
+      const liveRow = liveNotifs.items.find((n) => n.notificationId === id);
+      row.workSessionId = row.threadId || liveRow?.workSessionId;
+    }
+    showNotificationDetail(row);
+    return;
+  }
+  renderMyNotificationsPanel();
+}
+
+function bindMyNotificationsUi() {
+  if (window.__snaUiBound) return;
+  window.__snaUiBound = true;
+  document.getElementById('snaDetailBack')?.addEventListener('click', () => {
+    hideNotificationDetail();
+    renderMyNotificationsPanel();
+  });
+  document.querySelectorAll('[data-sna-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      snaActiveTab = btn.dataset.snaTab || 'all';
+      document.querySelectorAll('[data-sna-tab]').forEach((tab) => {
+        const active = tab.dataset.snaTab === snaActiveTab;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      renderMyNotificationsPanel();
+    });
+  });
+}
+
+const SNA_PREFS_KEY = 'sarah.sna.globalPrefs.v1';
+
+function loadSnaGlobalPrefs() {
+  try {
+    const raw = localStorage.getItem(SNA_PREFS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveSnaGlobalPrefs(prefs) {
+  try {
+    localStorage.setItem(SNA_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    /* ignore */
+  }
+  void syncSnaPrefsToServer(prefs);
+}
+
+async function syncSnaPrefsToServer(prefs) {
+  if (!personalSarahLiveActive() || !window.SarahLive?.updateMyNotificationPreferences) return;
+  const p = prefs || { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
+  try {
+    await window.SarahLive.updateMyNotificationPreferences({
+      orgNotifications: p.orgNotifications !== false,
+      announcements: p.announcements !== false,
+      workCompletions: p.workCompletions !== false,
+      reminders: p.reminders !== false,
+      usageAlerts: p.usageAlerts !== false,
+      quietHours: Boolean(p.quietHours),
+      timezoneOffsetMinutes: -new Date().getTimezoneOffset(),
+    });
+  } catch {
+    /* offline — local prefs still apply for tryOsPushAlert */
+  }
+}
+
+async function pullSnaPrefsFromServer() {
+  if (!personalSarahLiveActive() || !window.SarahLive?.fetchMyNotificationPreferences) return;
+  try {
+    const res = await window.SarahLive.fetchMyNotificationPreferences();
+    if (res.error || !res.prefs) return;
+    const merged = { ...defaultSnaGlobalPrefs(), ...res.prefs };
+    try {
+      localStorage.setItem(SNA_PREFS_KEY, JSON.stringify(merged));
+    } catch {
+      /* ignore */
+    }
+    syncSnaPrefsForm();
+  } catch {
+    /* ignore */
+  }
+}
+
+function defaultSnaGlobalPrefs() {
+  return {
+    orgNotifications: true,
+    announcements: true,
+    workCompletions: true,
+    reminders: true,
+    usageAlerts: true,
+    quietHours: false,
+  };
+}
+
+function syncSnaPrefsForm() {
+  const p = { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
+  document.getElementById('snaPrefOrgNotif') && (document.getElementById('snaPrefOrgNotif').checked = p.orgNotifications !== false);
+  document.getElementById('snaPrefAnnounce') && (document.getElementById('snaPrefAnnounce').checked = p.announcements !== false);
+  document.getElementById('snaPrefWork') && (document.getElementById('snaPrefWork').checked = p.workCompletions !== false);
+  document.getElementById('snaPrefReminders') && (document.getElementById('snaPrefReminders').checked = p.reminders !== false);
+  document.getElementById('snaPrefUsage') && (document.getElementById('snaPrefUsage').checked = p.usageAlerts !== false);
+  document.getElementById('snaPrefQuiet') && (document.getElementById('snaPrefQuiet').checked = Boolean(p.quietHours));
+  const status = document.getElementById('snaPushStatus');
+  if (status && 'Notification' in window) {
+    status.textContent =
+      Notification.permission === 'granted'
+        ? 'Push is enabled on this device.'
+        : Notification.permission === 'denied'
+          ? 'Push is blocked in browser settings.'
+          : 'Push is not enabled yet.';
+  }
+}
+
+function readSnaPrefsForm() {
+  return {
+    orgNotifications: Boolean(document.getElementById('snaPrefOrgNotif')?.checked),
+    announcements: Boolean(document.getElementById('snaPrefAnnounce')?.checked),
+    workCompletions: Boolean(document.getElementById('snaPrefWork')?.checked),
+    reminders: Boolean(document.getElementById('snaPrefReminders')?.checked),
+    usageAlerts: Boolean(document.getElementById('snaPrefUsage')?.checked),
+    quietHours: Boolean(document.getElementById('snaPrefQuiet')?.checked),
+  };
+}
+
+function openSnaPrefsSheet() {
+  const sheet = document.getElementById('snaPrefsSheet');
   sheet?.classList.remove('hidden');
   sheet?.setAttribute('aria-hidden', 'false');
-  renderProtoNotifications();
-  if (notifLiveActive()) void refreshLiveNotifications();
+  syncSnaPrefsForm();
+}
+
+function closeSnaPrefsSheet() {
+  document.getElementById('snaPrefsSheet')?.classList.add('hidden');
+  document.getElementById('snaPrefsSheet')?.setAttribute('aria-hidden', 'true');
+}
+
+function bindSnaPrefsUi() {
+  if (window.__snaPrefsBound) return;
+  window.__snaPrefsBound = true;
+  document.querySelectorAll('[data-proto-sheet-close="sna-prefs"]').forEach((el) => {
+    el.addEventListener('click', () => {
+      saveSnaGlobalPrefs(readSnaPrefsForm());
+      closeSnaPrefsSheet();
+    });
+  });
+  ['snaPrefOrgNotif', 'snaPrefAnnounce', 'snaPrefWork', 'snaPrefReminders', 'snaPrefUsage', 'snaPrefQuiet'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', () => saveSnaGlobalPrefs(readSnaPrefsForm()));
+  });
+  document.getElementById('snaEnablePushBtn')?.addEventListener('click', async () => {
+    if (!('Notification' in window)) {
+      showProtoToast('This browser does not support notifications.');
+      return;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') await maybeRegisterWebPush();
+      syncSnaPrefsForm();
+      showProtoToast(perm === 'granted' ? 'Push enabled for this device.' : 'Push permission not granted.');
+    } catch {
+      showProtoToast('Could not request push permission.');
+    }
+  });
+}
+
+function tryOsPushAlert(title, body) {
+  const prefs = { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
+  if (prefs.quietHours) {
+    const h = new Date().getHours();
+    if (h >= 22 || h < 7) return;
+  }
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    new Notification(title, { body, tag: `sarah-${Date.now()}` });
+  } catch {
+    /* ignore */
+  }
+}
+
+function appendSarahWorkInboxNotification({ threadId, taskTitle, reportLines }) {
+  const id = `work-${threadId}-${Date.now()}`;
+  const body = `Sarah completed: ${taskTitle}`;
+  const row = {
+    id,
+    kind: 'work',
+    org: 'Sarah Work',
+    title: 'Task completed',
+    body,
+    createdAt: Date.now(),
+    time: 'Just now',
+    unread: true,
+    threadId,
+    reportLines: reportLines || [],
+  };
+  const extras = loadSnaInboxExtras();
+  extras.unshift(row);
+  saveSnaInboxExtras(extras);
+  syncNotificationBadge();
+  if (isMyNotificationsOpen()) renderMyNotificationsPanel();
+  const prefs = { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
+  if (prefs.workCompletions !== false) tryOsPushAlert('Sarah Work', body);
 }
 
 function renderLiveNotifications(host) {
@@ -525,71 +1719,103 @@ function renderProtoNotifications() {
 function bindProtoSearchAndNotif() {
   if (window.__protoSearchNotifBound) return;
   window.__protoSearchNotifBound = true;
+  bindThreadComposeMedia();
 
-  document.getElementById('homeChatSearchBtn')?.addEventListener('click', () => openProtoSearchSheet('chats'));
-  document.getElementById('statusSearchBtn')?.addEventListener('click', () => openProtoSearchSheet('feed'));
-  document.getElementById('statusNotifBtn')?.addEventListener('click', openProtoNotifSheet);
-
+  document.getElementById('homeNotifBtn')?.addEventListener('click', () => {
+    void refreshLiveNotifications();
+    openMyNotifications();
+  });
   document.getElementById('protoSearchInput')?.addEventListener('input', (e) => {
     renderProtoSearchResults(e.target.value.trim().toLowerCase());
   });
 
-  document.getElementById('chatsTabSearchInput')?.addEventListener('input', () => renderChatsList());
+  const chatsTabSearchEl = document.getElementById('chatsTabSearchInput');
+  chatsTabSearchEl?.addEventListener('input', () => {
+    if (chatsTabSearchDebounceTimer) clearTimeout(chatsTabSearchDebounceTimer);
+    chatsTabSearchDebounceTimer = setTimeout(() => void renderChatsList(), 200);
+  });
+  chatsTabSearchEl?.addEventListener('search', () => {
+    if (chatsTabSearchDebounceTimer) clearTimeout(chatsTabSearchDebounceTimer);
+    void renderChatsList();
+  });
 
   const discoverSearchEl = document.getElementById('discoverSearchInput');
+  const applyDiscoverSearch = (raw) => {
+    discoverSearchRaw = String(raw || '').trim();
+    const split = splitDiscoverSearchInput(discoverSearchRaw);
+    discoverSearchQuery = split.q;
+    discoverPlaceQuery = split.place;
+    renderDiscover();
+  };
   discoverSearchEl?.addEventListener('input', (e) => {
     const next = (e.target.value || '').trim();
     if (discoverSearchDebounceTimer) clearTimeout(discoverSearchDebounceTimer);
-    discoverSearchDebounceTimer = setTimeout(() => {
-      discoverSearchQuery = next;
-      renderDiscover();
-    }, 180);
+    discoverSearchDebounceTimer = setTimeout(() => applyDiscoverSearch(next), 220);
   });
   discoverSearchEl?.addEventListener('search', (e) => {
     if (discoverSearchDebounceTimer) clearTimeout(discoverSearchDebounceTimer);
-    discoverSearchQuery = (e.target.value || '').trim();
-    renderDiscover();
+    applyDiscoverSearch(e.target.value);
   });
 
-  // Phase 2.0 geo: place filter (city or province) → /api/discover/companies?city=|region=
-  const discoverPlaceEl = document.getElementById('discoverPlaceInput');
-  const applyDiscoverPlace = (value) => {
-    discoverPlaceQuery = String(value || '').trim();
-    renderDiscover();
-  };
-  discoverPlaceEl?.addEventListener('input', (e) => {
-    if (discoverPlaceDebounceTimer) clearTimeout(discoverPlaceDebounceTimer);
-    const next = e.target.value;
-    discoverPlaceDebounceTimer = setTimeout(() => applyDiscoverPlace(next), 250);
-  });
-  discoverPlaceEl?.addEventListener('search', (e) => {
-    if (discoverPlaceDebounceTimer) clearTimeout(discoverPlaceDebounceTimer);
-    applyDiscoverPlace(e.target.value);
-  });
+  bindDiscoverCatsOnce();
 
   document.querySelectorAll('[data-proto-sheet-close]').forEach((el) => {
     el.addEventListener('click', () => {
       const which = el.getAttribute('data-proto-sheet-close');
       if (which === 'search') closeProtoSearchSheet();
       if (which === 'notif') closeProtoNotifSheet();
+      if (which === 'work-report') {
+        document.getElementById('workReportSheet')?.classList.add('hidden');
+        document.getElementById('workReportSheet')?.setAttribute('aria-hidden', 'true');
+      }
     });
   });
 
-  document.addEventListener('click', (e) => {
-    const engage = e.target.closest('[data-feed-engage]');
-    if (engage) {
+}
+
+/** Direct button listeners (pre-PWA / TWA behaviour — each tap hits its own control). */
+function wireFeedEngageButtons(root) {
+  if (!root) return;
+  root.querySelectorAll('[data-feed-engage]').forEach((btn) => {
+    if (btn.dataset.engageWired === '1') return;
+    btn.dataset.engageWired = '1';
+    btn.addEventListener('click', (e) => {
       e.preventDefault();
-      handleFeedEngageClick(engage);
-    }
+      try {
+        handleFeedEngageClick(btn);
+      } catch (err) {
+        console.warn('[Status] engage', err);
+        showProtoToast('Could not complete that action. Try again.', { ms: 4000 });
+      }
+    });
   });
+}
+
+function bindAppPrimaryTap(el, handler) {
+  if (!el || el.dataset.tapBound === '1') return;
+  el.dataset.tapBound = '1';
+  let lastAt = 0;
+  const run = (e) => {
+    const now = Date.now();
+    if (now - lastAt < 350) return;
+    lastAt = now;
+    if (e.type === 'touchend') e.preventDefault();
+    handler(e);
+  };
+  el.addEventListener('click', run);
+  el.addEventListener('touchend', run, { passive: false });
+}
+
+function bindStatusInteractionDelegates() {
+  /* no-op — feed engage is wired per card via wireFeedEngageButtons */
 }
 
 let activeFeedTab = 'for-you';
 let activeDiscoverCategory = 'all';
 let discoverSearchQuery = '';
+let discoverSearchRaw = '';
 let discoverSearchDebounceTimer = null;
 let discoverPlaceQuery = '';
-let discoverPlaceDebounceTimer = null;
 const DISCOVER_PROVINCES = [
   'eastern cape',
   'free state',
@@ -609,6 +1835,7 @@ let pendingDiscoverSearchFromOrg = '';
 const liveDiscover = {
   loaded: false,
   loading: false,
+  pendingRefetch: false,
   error: '',
   companies: [],
   facets: [],
@@ -618,7 +1845,7 @@ const liveDiscover = {
   /** every live card seen this session, keyed by companyId (detail pages / chat headers survive new searches) */
   byId: new Map(),
 };
-let activeProfileSocialTab = 'posts';
+let activeProfileSocialTab = 'photos';
 /** BP-01: 'posts' | 'about' for Business Profile public tab */
 let activeProfileBusinessSocialTab = 'posts';
 let activeProfilePanel = 'public';
@@ -626,6 +1853,7 @@ let activeProfilePanel = 'public';
 let activeProfileKind = 'persona';
 const PROFILE_KIND_STORAGE_KEY = 'sarah.prototype.profile.activeKind.v1';
 const PROFILE_AVATAR_STORAGE_KEY = 'sarah.prototype.profile.avatar.v1';
+const PROFILE_PHOTO_URL_CACHE_KEY = 'sarah.app.profile.photoURL';
 const PROFILE_COVER_STORAGE_KEY = 'sarah.prototype.profile.cover.v1';
 const PROFILE_UPLOAD_MAX_BYTES = 2_500_000;
 const CREATE_POST_IMAGE_MAX_BYTES = 5_000_000;
@@ -636,16 +1864,16 @@ let createPostMediaPick = 'image';
 const VIEWS = [
   'welcome',
   'auth',
+  'register-details',
   'home',
-  'status',
   'discover',
   'discover-company',
   'chats',
   'chat-thread',
   'profile',
 ];
-const NAV_ROUTES = ['home', 'status', 'discover', 'chats', 'profile'];
-const MY_SARAH_PANELS = ['home', 'tasks', 'knowledge', 'organisations', 'wallet', 'pay', 'billing'];
+const NAV_ROUTES = ['home', 'discover', 'chats', 'profile'];
+const MY_SARAH_PANELS = ['home', 'tasks', 'knowledge', 'organisations', 'wallet', 'pay', 'billing', 'notifications'];
 
 const MW01_DEMO_STORAGE_KEY = 'sarah.prototype.myWallet.demo.v1';
 const SYP01_DEMO_STORAGE_KEY = 'sarah.prototype.sarahPay.demo.v1';
@@ -688,6 +1916,99 @@ function saveMw01DemoState(next) {
 const SUB01_SUBSCRIBERS_V1_KEY = 'sarah.prototype.myOrganisations.subscribers.v1';
 /** @deprecated Migrated into SUB01_SUBSCRIBERS_V1_KEY — remove after all clients upgraded */
 const SUB01_SUBSCRIBED_ORGS_STORAGE_KEY = 'sarah.prototype.myOrganisations.subscribedIds.v1';
+
+const EDUCARE_SCHOOL_COMPANY_ID = 'educare-christian-combined';
+
+function isSchoolOrganisation(company) {
+  if (!company) return false;
+  const id = String(company.id || company.companyId || '').trim();
+  if (id === EDUCARE_SCHOOL_COMPANY_ID) return true;
+  if (company.settings?.education?.requireVerifiedGuardians === true) return true;
+  return String(company.categoryLabel || company.industry || '').toLowerCase().includes('education');
+}
+
+function renderSub01LearnerRow(index, campuses, values = {}) {
+  const campusOpts = (campuses || [])
+    .map((c) => `<option value="${c.id}" ${values.campusId === c.id ? 'selected' : ''}>${c.name || c.id}</option>`)
+    .join('');
+  return `
+    <div class="sub01-learner-row" data-learner-index="${index}">
+      <input class="ms-knowledge-input" data-learner-name placeholder="Learner first name" value="${values.name || ''}" />
+      <input class="ms-knowledge-input" data-learner-grade placeholder="Grade" value="${values.grade || ''}" style="margin-top:6px" />
+      <select class="ms-knowledge-input" data-learner-campus style="margin-top:6px">
+        <option value="">Select campus</option>
+        ${campusOpts}
+      </select>
+    </div>`;
+}
+
+async function fetchSchoolCampuses(companyId) {
+  try {
+    const res = await fetch(`/api/education/v1/orgs/${encodeURIComponent(companyId)}/campuses`);
+    const json = await res.json();
+    if (json?.ok && json.data?.campuses?.length) return json.data.campuses;
+  } catch {
+    /* fallback */
+  }
+  try {
+    const res = await fetch('/api/education/v1/educare/campus-catalog');
+    const json = await res.json();
+    return json?.data?.campuses || [];
+  } catch {
+    return [];
+  }
+}
+
+async function submitSchoolGuardianApplicationLive(companyId) {
+  const campuses = await fetchSchoolCampuses(companyId);
+  const host = document.getElementById('sub01LearnersHost');
+  const learners = [];
+  host?.querySelectorAll('.sub01-learner-row').forEach((row) => {
+    const name = row.querySelector('[data-learner-name]')?.value?.trim();
+    const grade = row.querySelector('[data-learner-grade]')?.value?.trim();
+    const campusId = row.querySelector('[data-learner-campus]')?.value?.trim();
+    if (name && grade && campusId) learners.push({ name, grade, campusId });
+  });
+  if (!learners.length) {
+    showProtoToast('Add at least one learner with campus and grade');
+    return false;
+  }
+  if (!document.getElementById('sub01CompetentConsent')?.checked) {
+    showProtoToast('Competent-person consent is required');
+    return false;
+  }
+  const token = await window.SarahLive?.getIdToken?.();
+  if (!token) {
+    showProtoToast('Sign in required');
+    return false;
+  }
+  const prefs = {
+    notifications: Boolean(document.getElementById('sub01PrefNotify')?.checked),
+    announcements: Boolean(document.getElementById('sub01PrefAnnounce')?.checked),
+    reminders: Boolean(document.getElementById('sub01PrefRemind')?.checked),
+  };
+  const body = {
+    learners,
+    relationship: document.getElementById('sub01Relationship')?.value || 'parent',
+    prefs,
+    competentPersonConsent: true,
+    parentName: document.getElementById('sub01ParentName')?.value?.trim() || '',
+    parentEmail: document.getElementById('sub01ParentEmail')?.value?.trim() || '',
+    parentPhone: document.getElementById('sub01ParentPhone')?.value?.trim() || '',
+  };
+  const res = await fetch(`/api/education/v1/orgs/${encodeURIComponent(companyId)}/guardian-application`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.ok) {
+    showProtoToast(json?.error?.message || 'Application failed');
+    return false;
+  }
+  showProtoToast(json.data?.message || 'Application submitted — pending school verification');
+  return true;
+}
 
 function loadSub01SubscribersMap() {
   try {
@@ -806,11 +2127,16 @@ function bindSub01RegisterModalOnce() {
     const companyId = idEl && 'value' in idEl ? String(idEl.value || '').trim() : '';
     if (!companyId) return;
     if (discoverFind(companyId)?.live) {
-      // SNET-11: live businesses subscribe through the connections API (consent grant + subscribe).
       const submitBtn = document.getElementById('sub01RegisterSubmit');
       if (submitBtn) submitBtn.disabled = true;
-      const already = isOrgSubscribedSub01(companyId);
-      const ok = already ? true : await handleLiveSubscribe(companyId);
+      const company = discoverFind(companyId);
+      let ok = false;
+      if (isSchoolOrganisation(company)) {
+        ok = await submitSchoolGuardianApplicationLive(companyId);
+      } else {
+        const already = isOrgSubscribedSub01(companyId);
+        ok = already ? true : await handleLiveSubscribe(companyId);
+      }
       if (submitBtn) submitBtn.disabled = false;
       if (ok) close();
       return;
@@ -888,23 +2214,54 @@ function openSub01RegisterModal(companyId, opts) {
 
   document.getElementById('sub01RegisterRemove')?.classList.toggle('hidden', !rec && !isOrgSubscribedSub01(id));
 
-  // SNET-11: live businesses use real consent + the connections API; the prototype-only fields do not apply.
   const live = Boolean(company.live);
-  modal.querySelectorAll('.ms-knowledge-field-row').forEach((row) => row.classList.toggle('hidden', live));
+  const schoolLive = live && isSchoolOrganisation(company);
+  modal.querySelectorAll('.ms-knowledge-field-row').forEach((row) => {
+    if (row.closest('#sub01SchoolFields')) return;
+    row.classList.toggle('hidden', live && !schoolLive);
+  });
+  const schoolFields = document.getElementById('sub01SchoolFields');
+  schoolFields?.classList.toggle('hidden', !schoolLive);
+  if (schoolLive) {
+    fetchSchoolCampuses(id).then((campuses) => {
+      const host = document.getElementById('sub01LearnersHost');
+      if (host && !host.querySelector('.sub01-learner-row')) {
+        host.innerHTML = renderSub01LearnerRow(0, campuses);
+      }
+      document.getElementById('sub01AddLearner')?.addEventListener('click', () => {
+        const n = host.querySelectorAll('.sub01-learner-row').length;
+        host.insertAdjacentHTML('beforeend', renderSub01LearnerRow(n, campuses));
+      });
+    });
+  }
   const leadEl = document.getElementById('sub01RegisterLead');
   if (leadEl) {
     if (leadEl.dataset.protoLead === undefined) leadEl.dataset.protoLead = leadEl.textContent || '';
-    leadEl.textContent = live
-      ? `Subscribing records your consent for ${company.name} to send you updates. No personal details are shared. You can unsubscribe any time.`
-      : leadEl.dataset.protoLead;
+    leadEl.textContent = schoolLive
+      ? `Submit a parent/guardian application for ${company.name}. Communications activate only after school staff verify your learner links.`
+      : live
+        ? `Subscribing records your consent for ${company.name} to send you updates. No personal details are shared. You can unsubscribe any time.`
+        : leadEl.dataset.protoLead;
   }
   const footEl = modal.querySelector('.sub01-register-foot');
   if (footEl) {
     if (footEl.dataset.protoFoot === undefined) footEl.dataset.protoFoot = footEl.textContent || '';
-    footEl.textContent = live ? 'Sarah Network · consent-linked subscription' : footEl.dataset.protoFoot;
+    footEl.textContent = schoolLive
+      ? 'EDU-04 · Guardian verification required before school communications.'
+      : live
+        ? 'Sarah Network · consent-linked subscription'
+        : footEl.dataset.protoFoot;
   }
   const submitEl = document.getElementById('sub01RegisterSubmit');
-  if (submitEl) submitEl.textContent = live ? (isOrgSubscribedSub01(id) ? 'Subscribed' : 'Subscribe') : 'Save subscription';
+  if (submitEl) {
+    submitEl.textContent = schoolLive
+      ? 'Submit application'
+      : live
+        ? isOrgSubscribedSub01(id)
+          ? 'Subscribed'
+          : 'Subscribe'
+        : 'Save subscription';
+  }
 
   modal.classList.remove('hidden');
   modal.setAttribute('aria-hidden', 'false');
@@ -920,6 +2277,9 @@ function sub01OpenSubscribeFlow(companyId) {
 
 function parseHomeSubRoute(raw) {
   const legacy = raw.replace(/^my-sarah/, 'home');
+  if (raw === 'chat' || legacy === 'chat') {
+    return { route: 'home', msPanel: 'home' };
+  }
   if (legacy === 'knowledge' || legacy === 'home/knowledge') {
     return { route: 'home', msPanel: 'knowledge', knowledgeCategory: null };
   }
@@ -940,11 +2300,15 @@ function parseHomeSubRoute(raw) {
 }
 
 function parseLocationHash() {
-  const raw = (location.hash || '#welcome').replace(/^#/, '') || 'welcome';
+  let raw = (location.hash || '#welcome').replace(/^#/, '') || 'welcome';
+  if (raw === 'status' || raw.startsWith('status/')) raw = 'home';
   const homeRoute = parseHomeSubRoute(raw);
   if (homeRoute) return homeRoute;
   if (raw === 'knowledge') {
     return { route: 'home', msPanel: 'knowledge', knowledgeCategory: null };
+  }
+  if (raw === 'notifications') {
+    return { route: 'home', msPanel: 'notifications' };
   }
   if (raw.startsWith('discover/')) {
     const companyId = raw.slice('discover/'.length);
@@ -1000,10 +2364,10 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
-function renderThreadMessageMarkup(message, isPersonal) {
+function renderThreadMessageMarkup(message, isPersonal, ctx = null) {
   const fmt = window.SARAH_THREAD_FORMAT;
   if (message.thinking) {
-    return `<article class="thread-turn thread-turn--assistant thread-turn--thinking" aria-live="polite">
+    return `<article class="thread-turn thread-turn--assistant thread-turn--thinking" aria-live="polite" aria-busy="true" aria-label="Sarah is typing">
       <div class="thread-msg thread-msg--assistant">
         <div class="thread-typing" aria-hidden="true">
           <span class="thread-typing-dot"></span>
@@ -1014,7 +2378,9 @@ function renderThreadMessageMarkup(message, isPersonal) {
     </article>`;
   }
   if (message.role === 'user') {
-    const userHtml = fmt ? fmt.formatUserPlain(message.content) : escapeHtml(message.content || '');
+    const userHtml = fmt?.formatUserMessage
+      ? fmt.formatUserMessage(message)
+      : escapeHtml(message.content || '');
     return `<article class="thread-turn thread-turn--user">
       <div class="thread-msg thread-msg--user">${userHtml}</div>
     </article>`;
@@ -1025,9 +2391,14 @@ function renderThreadMessageMarkup(message, isPersonal) {
   if (message.retryable && message.retryText) {
     retry = `<button type="button" class="thread-retry-btn" data-retry-send="${escapeHtml(message.retryText)}">Retry</button>`;
   }
+  const creditNote =
+    isPersonal && Number.isFinite(Number(message.creditsUsed))
+      ? `<p class="thread-credit-footnote" title="Credits metered for this Sarah reply">−${escapeHtml(formatSarahCredits(message.creditsUsed))} credits</p>`
+      : '';
   return `<article class="thread-turn thread-turn--assistant">
     <div class="thread-msg thread-msg--assistant">
       <div class="thread-prose thread-prose--rich ${proseKind}">${body}</div>
+      ${creditNote}
       ${retry}
     </div>
   </article>`;
@@ -1038,7 +2409,18 @@ function setRoute(route) {
     setMySarahPanel('knowledge');
     return;
   }
+  if (route === 'status') route = 'home';
   if (!VIEWS.includes(route)) route = 'welcome';
+  const prev = parseLocationHash();
+  if (route === 'chat-thread' && prev.route !== 'chat-thread') {
+    const rt = getSarahRuntime();
+    rt.threadReturnRoute =
+      prev.route === 'discover-company'
+        ? 'discover'
+        : prev.route === 'home' || prev.route === 'chats' || prev.route === 'discover' || prev.route === 'profile'
+          ? prev.route
+          : 'chats';
+  }
   let hash = route;
   if (route === 'chat-thread') {
     const rt = getSarahRuntime();
@@ -1081,11 +2463,24 @@ function mySarahHashForPanel(panel, opts = {}) {
   if (panel === 'organisations') return 'home/organisations';
   if (panel === 'wallet') return 'home/wallet';
   if (panel === 'pay') return 'home/pay';
+  if (panel === 'notifications') return 'home/notifications';
   return `home/${panel}`;
 }
 
+const MS_HOME_CARD_MODE_KEY = 'sarah.home.cardMode';
+
+function msHomeCardMode() {
+  return sessionStorage.getItem(MS_HOME_CARD_MODE_KEY) === 'work' ? 'work' : 'chat';
+}
+
+function setMsHomeCardMode(mode) {
+  sessionStorage.setItem(MS_HOME_CARD_MODE_KEY, mode === 'work' ? 'work' : 'chat');
+}
+
 function msModeForPanel(panel) {
-  return panel === 'tasks' ? 'work' : 'chat';
+  if (panel === 'tasks') return 'work';
+  if (panel === 'home') return msHomeCardMode();
+  return 'chat';
 }
 
 function openMsDrawer() {
@@ -1120,6 +2515,15 @@ function syncMsSegment(panel) {
 
 function setMySarahPanel(panel, prompt) {
   const p = MY_SARAH_PANELS.includes(panel) ? panel : 'home';
+  if (p === 'tasks') {
+    showWorkTasksHub(prompt || '');
+    return;
+  }
+  try {
+    sessionStorage.setItem(MS_LAST_PANEL_KEY, p);
+  } catch {
+    /* ignore */
+  }
   const { knowledgeCategory } = parseLocationHash();
   const hash = mySarahHashForPanel(p, { knowledgeCategory: p === 'knowledge' ? knowledgeCategory : null });
   const current = location.hash.replace(/^#/, '');
@@ -1148,7 +2552,7 @@ function closeMyKnowledgeCategory() {
   }
 }
 
-const MS_SUBMODULE_PANELS = new Set(['knowledge', 'wallet', 'pay', 'organisations', 'tasks', 'billing']);
+const MS_SUBMODULE_PANELS = new Set(['knowledge', 'wallet', 'pay', 'organisations', 'tasks', 'billing', 'notifications']);
 const MS_PANEL_DISPLAY_TITLES = {
   knowledge: 'Knowledge',
   wallet: 'Wallet',
@@ -1156,6 +2560,7 @@ const MS_PANEL_DISPLAY_TITLES = {
   organisations: 'Organisations',
   tasks: 'Work',
   billing: 'Billing',
+  notifications: 'My Notifications',
 };
 
 function applyMySarahPanel(panel, prompt) {
@@ -1197,6 +2602,19 @@ function applyMySarahPanel(panel, prompt) {
   if (panel === 'wallet') renderMyWalletPanel();
   if (panel === 'pay') renderSarahPayPanel();
   if (panel === 'billing') renderMySarahBilling();
+  if (panel === 'notifications') {
+    hideNotificationDetail();
+    void refreshLiveNotifications().then(() => renderMyNotificationsPanel());
+    renderMyNotificationsPanel();
+  } else {
+    hideNotificationDetail();
+  }
+  if (panel === 'tasks') {
+    void refreshWorkQuotaState().then(() => {
+      renderWorkQuotaBanner();
+      void renderSarahWorkHomeDashboard();
+    });
+  }
   if (panel === 'home' || panel === 'tasks') renderMsDrawerRecents();
 
   if (prompt && composeInput) {
@@ -1216,11 +2634,27 @@ function getRoute() {
 }
 
 function goToMySarahHome(prompt) {
+  snaActiveTab = 'all';
   setMySarahPanel('home', prompt || '');
 }
 
+const MS_LAST_PANEL_KEY = 'sarah.home.lastMsPanel';
+
+function showWorkTasksHub(prompt = '') {
+  try {
+    sessionStorage.setItem(MS_LAST_PANEL_KEY, 'tasks');
+  } catch {
+    /* ignore */
+  }
+  const hash = mySarahHashForPanel('tasks');
+  if (location.hash.replace(/^#/, '') !== hash) {
+    location.hash = hash;
+  }
+  applyMySarahPanel('tasks', prompt || '');
+}
+
 function goToMySarahWork(prompt) {
-  setMySarahPanel('tasks', prompt || '');
+  showWorkTasksHub(prompt || '');
 }
 
 function showNav(show) {
@@ -1247,6 +2681,33 @@ function getSarahRuntime() {
 
 function getUserCreatedPosts() {
   return getSarahRuntime().userPosts;
+}
+
+function getViewerUid() {
+  const fromAuth = window.SarahLive?.getAuthUid?.();
+  if (fromAuth) return String(fromAuth);
+  const prof = window.SarahLive?.getConsumerProfile?.();
+  if (prof?.uid) return String(prof.uid);
+  return '';
+}
+
+function getMyLiveStatusPostsForProfile() {
+  const posts = liveStatusPosts || [];
+  const uid = getViewerUid();
+  if (uid) {
+    return posts.filter((p) => p.authorUid === uid || (p.optimistic && p.authorType === 'user'));
+  }
+  return posts.filter((p) => p.optimistic && p.authorType === 'user');
+}
+
+function countProfilePosts() {
+  if (isLiveEnabled()) return getMyLiveStatusPostsForProfile().length;
+  return getUserCreatedPosts().length;
+}
+
+function refreshHomeAndProfileAfterPost() {
+  const route = parseLocationHash().route;
+  if (route === 'profile') renderProfile(activeProfilePanel, activeProfileKind);
 }
 
 function buildUserFeedPost(body, media) {
@@ -1303,19 +2764,124 @@ function saveStoredProfileDataUrl(key, dataUrl) {
   }
 }
 
+function loadCachedProfilePhotoUrl() {
+  try {
+    const url = String(localStorage.getItem(PROFILE_PHOTO_URL_CACHE_KEY) || '').trim();
+    return url && /^https?:\/\//i.test(url) ? url : '';
+  } catch {
+    return '';
+  }
+}
+
+function saveCachedProfilePhotoUrl(url) {
+  try {
+    const trimmed = String(url || '').trim();
+    if (!trimmed) localStorage.removeItem(PROFILE_PHOTO_URL_CACHE_KEY);
+    else if (/^https?:\/\//i.test(trimmed)) localStorage.setItem(PROFILE_PHOTO_URL_CACHE_KEY, trimmed);
+  } catch {
+    /* ignore */
+  }
+}
+
 function getEffectiveUserAvatar() {
-  return loadStoredProfileDataUrl(PROFILE_AVATAR_STORAGE_KEY) || MOCK_USER.avatar;
+  const photoURL = String(window.SarahLive?.getConsumerProfile?.()?.photoURL || '').trim();
+  if (photoURL) {
+    saveCachedProfilePhotoUrl(photoURL);
+    return photoURL;
+  }
+  const cached = loadCachedProfilePhotoUrl();
+  if (cached) return cached;
+  const local = loadStoredProfileDataUrl(PROFILE_AVATAR_STORAGE_KEY);
+  if (local) return local;
+  return MOCK_USER.avatar;
 }
 
 function getEffectiveProfileCover() {
-  return loadStoredProfileDataUrl(PROFILE_COVER_STORAGE_KEY) || MOCK_PROFILE?.cover || 'assets/profile/spencer-cover.jpg';
+  const coverURL = String(window.SarahLive?.getConsumerProfile?.()?.coverURL || '').trim();
+  if (coverURL) return coverURL;
+  const local = loadStoredProfileDataUrl(PROFILE_COVER_STORAGE_KEY);
+  if (local) return local;
+  return MOCK_PROFILE?.cover || 'assets/profile/spencer-cover.jpg';
+}
+
+let createPostBusy = false;
+
+function setCreatePostBusy(busy, label = 'Post') {
+  createPostBusy = Boolean(busy);
+  const submit = document.getElementById('createPostSubmit');
+  if (!submit) return;
+  submit.disabled = busy || (!document.getElementById('createPostInput')?.value.trim() && !createPostPendingMedia);
+  submit.textContent = label;
+  submit.setAttribute('aria-busy', busy ? 'true' : 'false');
 }
 
 function updateCreatePostSubmitState() {
+  if (createPostBusy) return;
   const input = document.getElementById('createPostInput');
   const submit = document.getElementById('createPostSubmit');
   const text = input?.value.trim() || '';
-  if (submit) submit.disabled = !text && !createPostPendingMedia;
+  const hasMedia = Boolean(createPostPendingMedia?.file || createPostPendingMedia?.dataUrl);
+  if (submit) {
+    submit.disabled = !text && !hasMedia;
+    submit.textContent = 'Post';
+  }
+}
+
+async function compressImageForStatusUpload(file, { maxEdge = 1600, quality = 0.82 } = {}) {
+  if (!file || !(file.type || '').startsWith('image/')) return file;
+  try {
+    const dataUrl = await readFileAsDataUrl(file);
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('decode failed'));
+      el.src = dataUrl;
+    });
+    const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight, 1));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, w, h);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], (file.name || 'photo').replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+  } catch {
+    return file;
+  }
+}
+
+function removeOptimisticStatusPost(optimisticId) {
+  if (!optimisticId || !liveStatusPosts) return;
+  liveStatusPosts = liveStatusPosts.filter((p) => p.id !== optimisticId);
+}
+
+function prependOptimisticStatusPost({ text, media }) {
+  const id = `optimistic_${Date.now()}`;
+  const prof = window.SarahLive?.getConsumerProfile?.();
+  const mapped = {
+    id,
+    authorUid: getViewerUid() || null,
+    author: consumerDisplayFirstName(prof) || MOCK_USER.name,
+    authorType: 'user',
+    body: text || '',
+    image: media?.type === 'image' ? media.dataUrl : null,
+    video: media?.type === 'video' ? media.dataUrl : null,
+    avatar: getEffectiveUserAvatar(),
+    likes: 0,
+    comments: 0,
+    time: 'Just now',
+    tab: 'for-you',
+    sponsored: false,
+    verified: false,
+    liveStatus: true,
+    optimistic: true,
+  };
+  liveStatusPosts = [mapped, ...(liveStatusPosts || [])];
+  return id;
 }
 
 function renderCreatePostPreview() {
@@ -1360,7 +2926,7 @@ async function attachCreatePostMediaFile(file) {
   }
   try {
     const dataUrl = await readFileAsDataUrl(file);
-    createPostPendingMedia = { type: isVideo ? 'video' : 'image', dataUrl, name: file.name };
+    createPostPendingMedia = { type: isVideo ? 'video' : 'image', dataUrl, name: file.name, file };
     renderCreatePostPreview();
     updateCreatePostSubmitState();
   } catch {
@@ -1377,23 +2943,61 @@ async function saveProfileImageFile(file, kind) {
     showProtoToast('Image is too large — try under 2.5 MB.');
     return;
   }
+  if (kind === 'avatar') setProfileAvatarUploading(true);
   let dataUrl = '';
   try {
     dataUrl = await readFileAsDataUrl(file);
   } catch {
     showProtoToast('Could not read that image.');
+    if (kind === 'avatar') setProfileAvatarUploading(false);
     return;
   }
   const key = kind === 'cover' ? PROFILE_COVER_STORAGE_KEY : PROFILE_AVATAR_STORAGE_KEY;
   if (!saveStoredProfileDataUrl(key, dataUrl)) {
     showProtoToast('Could not save — browser storage may be full.');
+    if (kind === 'avatar') setProfileAvatarUploading(false);
     return;
   }
   applyStoredProfileMedia();
   syncUserAvatars();
+  if (kind === 'avatar' && isLiveEnabled() && window.SarahLive?.uploadProfilePhoto) {
+    const res = await window.SarahLive.uploadProfilePhoto(file);
+    if (res?.error) {
+      showProtoToast(window.SarahLive.formatSarahApiError?.(res.error) || res.error);
+      setProfileAvatarUploading(false);
+    } else {
+      await window.SarahLive.refreshConsumerProfile?.();
+      const remote = String(window.SarahLive.getConsumerProfile?.()?.photoURL || '').trim();
+      if (remote) {
+        saveCachedProfilePhotoUrl(remote);
+        saveStoredProfileDataUrl(PROFILE_AVATAR_STORAGE_KEY, '');
+      }
+      applyStoredProfileMedia();
+      syncUserAvatars();
+      showProtoToast('Profile photo saved to your account.');
+      const { route } = parseLocationHash();
+      if (route === 'profile') renderProfile(activeProfilePanel, 'persona');
+      setProfileAvatarUploading(false);
+      return;
+    }
+  }
+  if (kind === 'cover' && isLiveEnabled() && window.SarahLive?.uploadProfileCover) {
+    const res = await window.SarahLive.uploadProfileCover(file);
+    if (res?.error) {
+      showProtoToast(res.error);
+    } else {
+      saveStoredProfileDataUrl(PROFILE_COVER_STORAGE_KEY, '');
+      applyStoredProfileMedia();
+      showProtoToast('Cover photo saved to your account.');
+      const { route } = parseLocationHash();
+      if (route === 'profile') renderProfile(activeProfilePanel, 'persona');
+      return;
+    }
+  }
   const { route } = parseLocationHash();
   if (route === 'profile') renderProfile(activeProfilePanel, 'persona');
   showProtoToast(kind === 'cover' ? 'Cover photo updated.' : 'Profile photo updated.');
+  if (kind === 'avatar') setProfileAvatarUploading(false);
 }
 
 function applyStoredProfileMedia() {
@@ -1410,30 +3014,43 @@ function applyStoredProfileMedia() {
       };
     }
   }
-  document.querySelectorAll('.profile-avatar[data-profile-kind="persona"]').forEach((img) => {
-    const av = getEffectiveUserAvatar();
-    img.removeAttribute('data-fb');
-    img.src = prototypeAsset(av);
-    img.onerror = function onAvatarErr() {
-      if (this.dataset.fb) return;
-      this.dataset.fb = '1';
-      this.src = prototypeAsset(MOCK_PROFILE?.avatarFallback || 'assets/discover/green-haven-fallback.svg');
-    };
-  });
+  document
+    .querySelectorAll('[data-profile-avatar][data-profile-kind="persona"], .profile-avatar[data-profile-kind="persona"]')
+    .forEach((img) => {
+      const av = getEffectiveUserAvatar();
+      img.removeAttribute('data-fb');
+      img.src = prototypeAsset(av);
+      img.onerror = function onAvatarErr() {
+        if (this.dataset.fb) return;
+        this.dataset.fb = '1';
+        this.src = prototypeAsset(MOCK_PROFILE?.avatarFallback || 'assets/discover/green-haven-fallback.svg');
+      };
+    });
+}
+
+function setProfileAvatarUploading(uploading) {
+  document.getElementById('profileAvatarPick')?.classList.toggle('is-uploading', Boolean(uploading));
 }
 
 function openCreatePostSheet() {
   const sheet = document.getElementById('createPostSheet');
   if (!sheet) return;
   syncUserAvatars();
+  createPostSubmitLock = false;
+  setCreatePostBusy(false);
+  setCreatePostStatus('');
   clearCreatePostMedia();
+  blurActiveInput();
   sheet.classList.remove('hidden');
   sheet.setAttribute('aria-hidden', 'false');
   document.body.classList.add('is-create-post-open');
   const input = document.getElementById('createPostInput');
   if (input) {
     input.value = '';
-    requestAnimationFrame(() => input.focus({ preventScroll: true }));
+    input.removeAttribute('readonly');
+    if (!shouldDeferSheetAutofocus()) {
+      requestAnimationFrame(() => input.focus({ preventScroll: true }));
+    }
   }
   updateCreatePostSubmitState();
 }
@@ -1444,20 +3061,146 @@ function closeCreatePostSheet() {
   sheet.classList.add('hidden');
   sheet.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('is-create-post-open');
+  document.getElementById('createPostInput')?.blur();
   clearCreatePostMedia();
 }
 
-function submitCreatePost() {
+function prependLiveStatusPostFromApi(res) {
+  const raw = res?.data?.post ?? res?.data?.data?.post;
+  if (!raw?.postId) return false;
+  const mapped = mapLiveStatusPost(raw);
+  const existing = liveStatusPosts || [];
+  liveStatusPosts = [mapped, ...existing.filter((p) => p.id !== mapped.id)];
+  return true;
+}
+
+let createPostSubmitLock = false;
+
+async function submitCreatePost() {
+  if (createPostSubmitLock) {
+    showProtoToast('Still working on your post…');
+    return;
+  }
   const input = document.getElementById('createPostInput');
   const text = input?.value.trim() || '';
-  if (!text && !createPostPendingMedia) return;
+  const hasMedia = Boolean(createPostPendingMedia?.file || createPostPendingMedia?.dataUrl);
+  if (!text && !hasMedia) {
+    showProtoToast('Add text or a photo to post.');
+    return;
+  }
+
+  if (isLiveEnabled()) {
+    if (!window.SarahLive?.createConsumerStatusPost) {
+      showProtoToast('Still connecting… wait a moment and try again.');
+      return;
+    }
+    createPostSubmitLock = true;
+    setCreatePostBusy(true, 'Posting…');
+    setCreatePostStatus('Connecting…');
+    showProtoToast('Posting…', { ms: 5000 });
+    let imageUrl = null;
+    let videoUrl = null;
+    let optimisticId = '';
+    const work = async () => {
+      setCreatePostStatus('Checking sign-in…');
+      const session = await window.SarahLive.waitForLiveSession?.(12000);
+      if (session?.error) {
+        const msg = window.SarahLive.formatSarahApiError?.(session.error) || session.error;
+        setCreatePostStatus(msg);
+        showProtoToast(msg, { ms: 6000 });
+        if (session.code === 'AUTH_REQUIRED') setRoute('auth');
+        return;
+      }
+      setCreatePostStatus('Refreshing session…');
+      const tokenRefresh = await window.SarahLive.ensureFreshAuthToken?.();
+      if (tokenRefresh?.error) {
+        const msg = window.SarahLive.formatSarahApiError?.(tokenRefresh.error) || tokenRefresh.error;
+        setCreatePostStatus(msg);
+        showProtoToast(msg, { ms: 6000 });
+        if (tokenRefresh.code === 'AUTH_REQUIRED') setRoute('auth');
+        return;
+      }
+      setCreatePostStatus('Preparing your profile…');
+      const ready = await window.SarahLive.ensureConsumerReady?.();
+      if (ready?.error) {
+        const msg = window.SarahLive.formatSarahApiError?.(ready.error) || ready.error;
+        setCreatePostStatus(msg);
+        showProtoToast(msg || 'Sign in and complete your Sarah profile first.', { ms: 6000 });
+        if (ready.code === 'CONSUMER_PROFILE_REQUIRED') setRoute('register-details');
+        return;
+      }
+      setCreatePostStatus('');
+      const mediaSnapshot = createPostPendingMedia
+        ? { type: createPostPendingMedia.type, dataUrl: createPostPendingMedia.dataUrl, file: createPostPendingMedia.file }
+        : null;
+      optimisticId = prependOptimisticStatusPost({ text, media: mediaSnapshot });
+      closeCreatePostSheet();
+      refreshHomeAndProfileAfterPost();
+      showProtoToast('Posting…');
+      let mediaFile = mediaSnapshot?.file;
+      if (mediaFile && mediaSnapshot?.type === 'image') {
+        try {
+          mediaFile = await compressImageForStatusUpload(mediaFile);
+        } catch {
+          mediaFile = mediaSnapshot.file;
+        }
+      }
+      if (mediaFile && window.SarahLive.uploadChatMedia) {
+        const up = await window.SarahLive.uploadChatMedia(mediaFile);
+        if (up.error) {
+          removeOptimisticStatusPost(optimisticId);
+          renderHome();
+          showProtoToast(window.SarahLive.formatSarahApiError?.(up.error) || up.error);
+          return;
+        }
+        const url = up.attachment?.url || '';
+        const kind = up.attachment?.kind || mediaSnapshot?.type;
+        if (kind === 'video') videoUrl = url;
+        else imageUrl = url;
+      }
+      const res = await window.SarahLive.createConsumerStatusPost({ body: text, imageUrl, videoUrl });
+      if (res.error) {
+        removeOptimisticStatusPost(optimisticId);
+        renderHome();
+        const msg = window.SarahLive.formatSarahApiError?.(res.error) || res.error;
+        showProtoToast(msg || 'Could not post');
+        if (res.code === 'CONSUMER_PROFILE_REQUIRED') setRoute('register-details');
+        return;
+      }
+      removeOptimisticStatusPost(optimisticId);
+      if (!prependLiveStatusPostFromApi(res)) {
+        liveStatusFeedPromise = null;
+        ensureLiveStatusFeed();
+      }
+      refreshHomeAndProfileAfterPost();
+      showProtoToast('Posted to Status and your profile.');
+    };
+
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Posting timed out. Check connection and try again.')), 45000)
+    );
+
+    try {
+      await Promise.race([work(), timeout]);
+    } catch (err) {
+      removeOptimisticStatusPost(optimisticId);
+      renderHome();
+      const msg = err?.message || 'Could not post. Check your connection.';
+      setCreatePostStatus(msg);
+      showProtoToast(msg, { ms: 6000 });
+    } finally {
+      createPostSubmitLock = false;
+      setCreatePostBusy(false);
+      updateCreatePostSubmitState();
+    }
+    return;
+  }
+
   const media = createPostPendingMedia ? { ...createPostPendingMedia } : null;
   getUserCreatedPosts().unshift(buildUserFeedPost(text, media));
   closeCreatePostSheet();
-  const { route } = parseLocationHash();
-  if (route === 'status' || route === 'home') renderHome();
-  if (route === 'profile') renderProfile(activeProfilePanel, activeProfileKind);
-  showProtoToast('Posted to Status.');
+  refreshHomeAndProfileAfterPost();
+  showProtoToast('Posted to Status and your profile.');
 }
 
 function bindCreatePostUi() {
@@ -1465,19 +3208,40 @@ function bindCreatePostUi() {
   window.__createPostBound = true;
 
   document.querySelectorAll('[data-create-post-open]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      openCreatePostSheet();
-    });
+    bindAppPrimaryTap(el, () => openCreatePostSheet());
   });
 
-  document.getElementById('createPostSubmit')?.addEventListener('click', submitCreatePost);
+  document.querySelectorAll('[data-feed-comment-close]').forEach((el) => {
+    el.addEventListener('click', closeFeedCommentSheet);
+  });
+  document.getElementById('feedCommentInput')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submitFeedCommentFromSheet();
+    }
+  });
   document.getElementById('createPostInput')?.addEventListener('input', () => updateCreatePostSubmitState());
   document.getElementById('createPostInput')?.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       submitCreatePost();
     }
+  });
+
+  const submitBtn = document.getElementById('createPostSubmit');
+  bindAppPrimaryTap(submitBtn, () => {
+    if (createPostSubmitLock || createPostBusy) return;
+    if (submitBtn.disabled) {
+      updateCreatePostSubmitState();
+      setCreatePostStatus('Add text or a photo, then tap Post.');
+      showProtoToast('Add text or a photo to post.', { ms: 4000 });
+      return;
+    }
+    void submitCreatePost();
+  });
+
+  bindAppPrimaryTap(document.getElementById('feedCommentSubmit'), () => {
+    void submitFeedCommentFromSheet();
   });
 
   document.getElementById('createPostPickImage')?.addEventListener('click', () => {
@@ -1505,6 +3269,68 @@ function bindCreatePostUi() {
   document.querySelectorAll('[data-create-post-close]').forEach((el) => {
     el.addEventListener('click', closeCreatePostSheet);
   });
+}
+
+function bindStatusSheetKeyboardPin() {
+  if (window.__statusSheetKbPin || !window.visualViewport) return;
+  window.__statusSheetKbPin = true;
+  const panels = () => {
+    const out = [];
+    const createOpen = document.getElementById('createPostSheet') && !document.getElementById('createPostSheet').classList.contains('hidden');
+    const commentOpen = document.getElementById('feedCommentSheet') && !document.getElementById('feedCommentSheet').classList.contains('hidden');
+    if (createOpen) {
+      const p = document.querySelector('#createPostSheet .create-post-panel');
+      if (p) out.push(p);
+    }
+    if (commentOpen) {
+      const p = document.querySelector('#feedCommentSheet .feed-comment-panel');
+      if (p) out.push(p);
+    }
+    return out;
+  };
+  const update = () => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    panels().forEach((panel) => {
+      panel.style.paddingBottom = kb > 0 ? `calc(${kb}px + env(safe-area-inset-bottom, 0))` : '';
+    });
+  };
+  window.visualViewport.addEventListener('resize', update);
+  window.visualViewport.addEventListener('scroll', update);
+  window.addEventListener('hashchange', update);
+  update();
+}
+
+function bindMsComposeViewportPin() {
+  if (window.__msComposeViewportBound || !window.visualViewport) return;
+  window.__msComposeViewportBound = true;
+  const composeEls = () =>
+    [...document.querySelectorAll('.ms-compose, .thread-compose')].filter(
+      (el) => el instanceof HTMLElement
+    );
+  const composeBaseBottom = () => {
+    const onThread = parseLocationHash().route === 'chat-thread';
+    return onThread
+      ? 'calc(12px + env(safe-area-inset-bottom, 0))'
+      : 'calc(var(--nav-h) + 12px + env(safe-area-inset-bottom, 0))';
+  };
+  const update = () => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const keyboardOffset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    const baseBottom = composeBaseBottom();
+    const bottom =
+      keyboardOffset > 0 ? `calc(${baseBottom} + ${Math.round(keyboardOffset)}px)` : baseBottom;
+    composeEls().forEach((el) => {
+      el.style.bottom = bottom;
+    });
+  };
+  window.visualViewport.addEventListener('resize', update);
+  window.visualViewport.addEventListener('scroll', update);
+  window.addEventListener('orientationchange', update);
+  window.addEventListener('hashchange', update);
+  update();
 }
 
 function bindProfileMediaUiOnce() {
@@ -1656,9 +3482,34 @@ function formatPersonalThreadTime(ts) {
 }
 
 function mapApiMessagesToThread(messages) {
-  return (messages || []).map((m) =>
-    m.role === 'assistant' ? { role: 'assistant', markdown: m.content } : { role: 'user', content: m.content }
-  );
+  return (messages || []).map((m) => {
+    if (m.role === 'assistant') {
+      return {
+        role: 'assistant',
+        markdown: m.content,
+        content: m.content,
+        authorDisplayName: m.authorDisplayName || null,
+        authorName: m.authorDisplayName || m.senderName || null,
+        authorKind: m.source === 'human' ? 'human' : 'sarah',
+        source: m.source || null,
+        attachments: Array.isArray(m.attachments) ? m.attachments : [],
+      };
+    }
+    return {
+      role: 'user',
+      content: m.content,
+      attachments: m.attachments || [],
+    };
+  });
+}
+
+function mergeWorkThreadField(session, existing, key, sessionKey, { asBool = false } = {}) {
+  const sk = sessionKey || key;
+  if (Object.prototype.hasOwnProperty.call(session, sk)) {
+    return asBool ? Boolean(session[sk]) : session[sk] ?? null;
+  }
+  if (existing && existing[key] !== undefined) return existing[key];
+  return asBool ? false : null;
 }
 
 function upsertPersonalThreadFromSession(session, { partial = false } = {}) {
@@ -1671,18 +3522,53 @@ function upsertPersonalThreadFromSession(session, { partial = false } = {}) {
   if (!messages.length && !partial && personalSarahUsesMockThreads()) {
     messages.push({ role: 'assistant', markdown: SARAH_CHAT_GREETING });
   }
+  const isWork =
+    session.mode != null
+      ? String(session.mode).toLowerCase() === 'work'
+      : Boolean(existing?.work);
   rt.threads[session.id] = {
     kind: 'personal',
-    work: false,
+    work: isWork,
+    workSubmitted: mergeWorkThreadField(session, existing, 'workSubmitted', 'workSubmittedAt', { asBool: true }),
+    workSubmittedAt: mergeWorkThreadField(session, existing, 'workSubmittedAt'),
+    workCompleted: mergeWorkThreadField(session, existing, 'workCompleted', 'workCompletedAt', { asBool: true }),
+    workCompletedAt: mergeWorkThreadField(session, existing, 'workCompletedAt'),
+    workCancelled: mergeWorkThreadField(session, existing, 'workCancelled', 'workCancelledAt', { asBool: true }),
+    workCancelledAt: mergeWorkThreadField(session, existing, 'workCancelledAt'),
+    workPaused: mergeWorkThreadField(session, existing, 'workPaused', 'workPausedAt', { asBool: true }),
+    workPausedAt: mergeWorkThreadField(session, existing, 'workPausedAt'),
+    workPauseReason: mergeWorkThreadField(session, existing, 'workPauseReason'),
+    workBudgetBand: mergeWorkThreadField(session, existing, 'workBudgetBand'),
+    workBudgetCapCredits:
+      session.workBudgetCapCredits !== undefined && session.workBudgetCapCredits !== null
+        ? session.workBudgetCapCredits
+        : (existing?.workBudgetCapCredits ?? null),
+    workBudgetEstimateMin:
+      session.workBudgetEstimateMin !== undefined && session.workBudgetEstimateMin !== null
+        ? session.workBudgetEstimateMin
+        : (existing?.workBudgetEstimateMin ?? null),
+    workBudgetEstimateMax:
+      session.workBudgetEstimateMax !== undefined && session.workBudgetEstimateMax !== null
+        ? session.workBudgetEstimateMax
+        : (existing?.workBudgetEstimateMax ?? null),
+    workCreditsUsedCredits:
+      session.workCreditsUsedCredits !== undefined && session.workCreditsUsedCredits !== null
+        ? session.workCreditsUsedCredits
+        : (existing?.workCreditsUsedCredits ?? 0),
+    workReport: session.workReport != null ? session.workReport : (existing?.workReport ?? null),
+    workWorkspace:
+      session.workWorkspace != null && typeof session.workWorkspace === 'object'
+        ? session.workWorkspace
+        : (existing?.workWorkspace ?? null),
     api: true,
-    messagesLoaded: !partial,
-    title: session.title || 'My Sarah',
+    messagesLoaded: partial ? Boolean(existing?.messagesLoaded) : true,
+    title: session.title || existing?.title || 'My Sarah',
     lastMessagePreview: session.lastMessagePreview || existing?.lastMessagePreview || '',
-    timeLabel: formatPersonalThreadTime(session.lastMessageAt || session.updatedAt),
-    name: session.title || 'My Sarah',
+    timeLabel: formatPersonalThreadTime(session.lastMessageAt || session.updatedAt || existing?.lastMessageAt),
+    name: session.title || existing?.name || 'My Sarah',
     avatar: SARAH_AVATAR_SRC,
     verified: false,
-    lastMessageAt: session.lastMessageAt || session.updatedAt || Date.now(),
+    lastMessageAt: session.lastMessageAt || session.updatedAt || existing?.lastMessageAt || Date.now(),
     messages,
   };
   const order = rt.personalThreadOrder || [];
@@ -1745,7 +3631,13 @@ function assistantReplyForThread(work, userText) {
 }
 
 let personalSarahSending = false;
+const threadComposePending = { items: [] };
+const personalComposePending = { items: [] };
+let threadVoiceRecorder = null;
 let personalSarahSessionsLoading = false;
+let personalSarahSessionsSyncGen = 0;
+let personalSarahSessionsLastSyncAt = 0;
+const PERSONAL_SESSIONS_SYNC_MIN_MS = 60_000;
 let msLiveStatusDismissTimer = null;
 
 function clearMsLiveStatusDismissTimer() {
@@ -1823,12 +3715,20 @@ function resolveCompanyIdForActiveThread(threadId) {
   return null;
 }
 
+function resolveLiveCompanySarahId(companyId) {
+  const id = String(companyId || '').trim();
+  if (!id) return id;
+  if (window.SarahLive?.resolveLiveCompanySarahId) return window.SarahLive.resolveLiveCompanySarahId(id);
+  if (id === 'central-motors' || id === 'central_motors') return 'central-motors-rtb';
+  return id;
+}
+
 async function loadCompanyThreadFromApiIfNeeded() {
   if (!consumerChatLiveActive()) return false;
   const rt = getSarahRuntime();
   const id = String(rt.activeThreadId || '').trim();
   if (!id) return false;
-  const companyId = resolveCompanyIdForActiveThread(id);
+  const companyId = resolveLiveCompanySarahId(resolveCompanyIdForActiveThread(id));
   if (!companyId) return false;
 
   const existing = rt.threads[companyId] || rt.threads[id];
@@ -1860,6 +3760,11 @@ async function loadCompanyThreadFromApiIfNeeded() {
 }
 
 let chatsListLoadGen = 0;
+let chatsListLastFetchAt = 0;
+const CHATS_LIST_FETCH_MIN_MS = 30_000;
+let chatsTabSearchDebounceTimer = null;
+/** Discover businesses matching the Chats tab query (for starting new Company Sarah threads). */
+const chatsTabOrgSearch = { query: '', loading: false, companies: [] };
 
 async function loadNonCompanyThreadFromApi(convId, kind) {
   if (!consumerChatLiveActive() || !convId) return false;
@@ -1965,7 +3870,7 @@ function updatePersonalSarahLiveUi() {
   document.getElementById('msLiveRetry')?.addEventListener('click', () => {
     window.SarahLive?.checkApiHealth?.().then(() => {
       updatePersonalSarahLiveUi();
-      if (personalSarahLiveActive()) syncPersonalSarahSessionsFromServer();
+      if (personalSarahLiveActive()) syncPersonalSarahSessionsFromServer({ force: true });
     });
   });
 }
@@ -1980,6 +3885,125 @@ function setPersonalSarahComposeBusy(busy) {
   if (pi) pi.disabled = busy;
 }
 
+function sarahTimeGreetingPart(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function sarahHomeGreetingText(name) {
+  const part = sarahTimeGreetingPart();
+  const first = String(name || '').trim().split(/\s+/)[0];
+  if (first) return `${part}, ${first}. How can I help you today?`;
+  return `${part}. How can I help you today?`;
+}
+
+function sarahStatusFeedGreetingText(name) {
+  const part = sarahTimeGreetingPart();
+  const first = String(name || '').trim().split(/\s+/)[0];
+  if (first) return `${part}, ${first}`;
+  return part;
+}
+
+function syncSarahTimeGreetings() {
+  const prof = window.SarahLive?.getConsumerProfile?.();
+  const first = consumerDisplayFirstName(prof) || MOCK_USER.name;
+  const statusEl = document.getElementById('homeGreeting');
+  if (statusEl) statusEl.textContent = sarahStatusFeedGreetingText(first);
+  const bubble = document.querySelector('.ms-greeting-bubble');
+  if (bubble) bubble.textContent = sarahHomeGreetingText(first);
+}
+
+function consumerDisplayFirstName(profile) {
+  if (!profile) return '';
+  return String(
+    profile.preferredName || profile.firstName || profile.displayName || profile.fullName || profile.name || ''
+  )
+    .trim()
+    .split(/\s+/)[0];
+}
+
+function consumerRegistrationComplete(profile) {
+  if (!profile) return false;
+  if (profile.onboardingCompletedAt) return true;
+  const required = ['firstName', 'lastName', 'city', 'country'];
+  return required.every((key) => String(profile[key] || '').trim());
+}
+
+function consumerProfileToIdentity(profile, extras = {}) {
+  const first = String(profile?.firstName || '').trim();
+  const last = String(profile?.lastName || '').trim();
+  return {
+    fullName: profile?.fullName || [first, last].filter(Boolean).join(' '),
+    preferredName: profile?.preferredName || first,
+    country: profile?.country || extras.country || '',
+    city: profile?.city || extras.city || '',
+    locationNote: extras.locationNote || '',
+    preferredLanguage: extras.preferredLanguage || '',
+    sarahBehavior: loadPersonalIdentity().sarahBehavior || {},
+  };
+}
+
+async function syncConsumerProfileToPersonalKnowledge(profile, extras = {}) {
+  const identity = consumerProfileToIdentity(profile, extras);
+  savePersonalIdentity({
+    fullName: identity.fullName,
+    preferredName: identity.preferredName,
+    country: identity.country,
+    city: identity.city,
+    locationNote: identity.locationNote,
+    preferredLanguage: identity.preferredLanguage,
+  });
+  await syncPersonalProfileKnowledge(identity);
+}
+
+async function routeAfterConsumerAuth(profile) {
+  const p = profile || window.SarahLive?.getConsumerProfile?.();
+  applyConsumerProfileToUi(p);
+  if (personalSarahLiveActive() && window.SarahLive?.isSignedIn?.()) {
+    await syncPersonalSarahSessionsFromServer({ force: true });
+    if (!consumerRegistrationComplete(p)) {
+      setRoute('register-details');
+      return;
+    }
+    await syncConsumerProfileToPersonalKnowledge(p);
+  }
+  setRoute('home');
+}
+
+function populateRegisterDetailsForm(profile) {
+  const form = document.getElementById('registerDetailsForm');
+  if (!form || !profile) return;
+  const set = (name, value) => {
+    const el = form.elements.namedItem(name);
+    if (el && 'value' in el) el.value = value ?? '';
+  };
+  set('firstName', profile.firstName || profile.preferredName || '');
+  set('lastName', profile.lastName || '');
+  set('email', profile.email || window.SarahLive?.getConsumerProfile?.()?.email || '');
+  set('city', profile.city || '');
+  set('country', profile.country || '');
+  const local = loadPersonalIdentity();
+  set('locationNote', local.locationNote || '');
+  set('preferredLanguage', local.preferredLanguage || '');
+}
+
+function renderRegisterDetails() {
+  if (personalSarahLiveActive() && window.SarahLive?.isSignedIn && !window.SarahLive.isSignedIn()) {
+    setRoute('auth');
+    return;
+  }
+  const profile = window.SarahLive?.getConsumerProfile?.() || {};
+  if (consumerRegistrationComplete(profile)) {
+    setRoute('home');
+    return;
+  }
+  populateRegisterDetailsForm(profile);
+  const statusEl = document.getElementById('registerDetailsStatus');
+  if (statusEl) statusEl.textContent = '';
+}
+
 function applyConsumerProfileToUi(profile) {
   if (!profile) return;
   const name = profile.preferredName || profile.firstName || MOCK_USER.name;
@@ -1989,16 +4013,29 @@ function applyConsumerProfileToUi(profile) {
   document.querySelectorAll('[data-profile-name][data-profile-kind="persona"], [data-profile-name]:not([data-profile-kind])').forEach((el) => {
     el.textContent = name;
   });
+  syncSarahTimeGreetings();
+  syncUserAvatars();
+  applyStoredProfileMedia();
 }
 
-async function syncPersonalSarahSessionsFromServer() {
+async function syncPersonalSarahSessionsFromServer({ force = false, silent = false } = {}) {
   if (!personalSarahLiveActive()) return;
-  personalSarahSessionsLoading = true;
-  renderMsDrawerRecents();
+  const now = Date.now();
+  if (!force && now - personalSarahSessionsLastSyncAt < PERSONAL_SESSIONS_SYNC_MIN_MS) {
+    return;
+  }
+  const gen = ++personalSarahSessionsSyncGen;
+  const hadThreads = listPersonalThreads().length > 0;
+  if (!silent && !hadThreads) {
+    personalSarahSessionsLoading = true;
+    renderMsDrawerRecents();
+  }
   const res = await window.SarahLive.fetchPersonalSessions();
+  if (gen !== personalSarahSessionsSyncGen) return;
   personalSarahSessionsLoading = false;
+  personalSarahSessionsLastSyncAt = Date.now();
   if (res.error) {
-    showProtoToast(res.error);
+    if (!silent) showProtoToast(res.error);
     renderMsDrawerRecents();
     return;
   }
@@ -2009,9 +4046,14 @@ async function syncPersonalSarahSessionsFromServer() {
       {
         id: summary.id,
         title: summary.title,
+        mode: summary.mode,
         lastMessagePreview: summary.lastMessagePreview || '',
         lastMessageAt: summary.lastMessageAt,
         updatedAt: summary.updatedAt,
+        workSubmittedAt: summary.workSubmittedAt,
+        workCompletedAt: summary.workCompletedAt,
+        workCancelledAt: summary.workCancelledAt,
+        workPausedAt: summary.workPausedAt,
         messages: summary.lastMessagePreview
           ? [{ role: 'assistant', content: summary.lastMessagePreview }]
           : [],
@@ -2022,6 +4064,8 @@ async function syncPersonalSarahSessionsFromServer() {
   rt.personalThreadOrder = (res.sessions || []).map((s) => s.id).filter(Boolean);
   renderMsDrawerRecents();
   renderMySarahHistoryFromThreads();
+  const msPanel = document.querySelector('.my-sarah-view')?.dataset.msPanel;
+  if (msPanel === 'tasks') void renderSarahWorkHomeDashboard();
 }
 
 async function loadPersonalThreadFromServer(threadId) {
@@ -2054,11 +4098,16 @@ function pushPersonalUserMessage(threadId, text) {
   return true;
 }
 
-function pushPersonalAssistantReply(threadId, markdown) {
+function pushPersonalAssistantReply(threadId, markdown, creditsMeta) {
   const rt = getSarahRuntime();
   const thread = rt.threads[threadId];
   if (!thread) return;
-  thread.messages.push({ role: 'assistant', markdown: String(markdown || '…') });
+  const msg = { role: 'assistant', markdown: String(markdown || '…') };
+  if (creditsMeta && Number.isFinite(Number(creditsMeta.credits))) {
+    msg.creditsUsed = Number(creditsMeta.credits);
+    msg.creditArchetype = creditsMeta.archetype || null;
+  }
+  thread.messages.push(msg);
 }
 
 function removeThinkingBubble(threadId) {
@@ -2069,9 +4118,191 @@ function removeThinkingBubble(threadId) {
   if (last?.thinking) thread.messages.pop();
 }
 
+function pushThinkingToThread(threadId) {
+  const rt = getSarahRuntime();
+  const thread = rt.threads[threadId];
+  if (!thread?.messages) return;
+  removeThinkingBubble(threadId);
+  thread.messages.push({ thinking: true });
+}
+
+function composePendingBucket(kind) {
+  return kind === 'personal' ? personalComposePending : threadComposePending;
+}
+
+function renderComposePendingStrip(bucket, hostId) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  if (!bucket.items.length) {
+    host.classList.add('hidden');
+    host.innerHTML = '';
+    return;
+  }
+  host.classList.remove('hidden');
+  host.innerHTML = bucket.items
+    .map(
+      (item, index) => `
+    <div class="thread-compose-chip${item.error ? ' is-error' : ''}${item.uploading ? ' is-uploading' : ''}" data-pending-index="${index}">
+      ${
+        item.previewUrl
+          ? `<img src="${escapeHtml(item.previewUrl)}" alt="" class="thread-compose-chip-thumb" />`
+          : `<span class="thread-compose-chip-icon" aria-hidden="true">${item.kind === 'audio' ? '🎙' : '📎'}</span>`
+      }
+      <button type="button" class="thread-compose-chip-remove" data-remove-pending="${index}" aria-label="Remove">×</button>
+    </div>`
+    )
+    .join('');
+  host.querySelectorAll('[data-remove-pending]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const i = Number(btn.getAttribute('data-remove-pending'));
+      const removed = bucket.items.splice(i, 1)[0];
+      if (removed?.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(removed.previewUrl);
+      renderComposePendingStrip(bucket, hostId);
+    });
+  });
+}
+
+async function uploadComposePending(bucket) {
+  if (!window.SarahLive?.uploadChatMedia) return bucket.items.filter((i) => i.attachment).map((i) => i.attachment);
+  const out = [];
+  for (const item of bucket.items) {
+    if (item.attachment) {
+      out.push(item.attachment);
+      continue;
+    }
+    if (!item.file || item.error) continue;
+    item.uploading = true;
+    const res = await window.SarahLive.uploadChatMedia(item.file);
+    item.uploading = false;
+    if (res.error || !res.attachment) {
+      item.error = res.error || 'Upload failed';
+      showProtoToast(item.error);
+      continue;
+    }
+    item.attachment = res.attachment;
+    out.push(res.attachment);
+  }
+  return out;
+}
+
+function addFilesToComposePending(files, bucket, hostId) {
+  const list = Array.from(files || []).slice(0, 4);
+  list.forEach((file) => {
+    const kind = file.type.startsWith('video/')
+      ? 'video'
+      : file.type.startsWith('audio/')
+        ? 'audio'
+        : file.type.startsWith('image/')
+          ? 'image'
+          : 'file';
+    const previewUrl = kind === 'image' ? URL.createObjectURL(file) : '';
+    bucket.items.push({ file, kind, previewUrl, attachment: null, uploading: false, error: '' });
+  });
+  renderComposePendingStrip(bucket, hostId);
+}
+
+function clearComposePending(bucket, hostId) {
+  bucket.items.forEach((item) => {
+    if (item.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(item.previewUrl);
+  });
+  bucket.items = [];
+  renderComposePendingStrip(bucket, hostId);
+}
+
+function bindThreadComposeMedia() {
+  if (window.__threadComposeMediaBound) return;
+  window.__threadComposeMediaBound = true;
+
+  const threadFile = document.getElementById('threadComposeFile');
+  const threadAttach = document.getElementById('threadComposeAttachBtn');
+  const threadVoice = document.getElementById('threadComposeVoiceBtn');
+  threadAttach?.addEventListener('click', () => threadFile?.click());
+  threadFile?.addEventListener('change', (e) => {
+    addFilesToComposePending(e.target.files, threadComposePending, 'threadComposePending');
+    if (threadFile) threadFile.value = '';
+  });
+
+  threadVoice?.addEventListener('click', () => void toggleThreadVoiceRecording('thread'));
+
+  const personalFile = document.getElementById('personalChatFile');
+  const personalAttach = document.getElementById('personalChatAttachBtn');
+  const personalVoice = document.getElementById('personalChatVoiceBtn');
+  personalAttach?.addEventListener('click', () => personalFile?.click());
+  personalFile?.addEventListener('change', (e) => {
+    addFilesToComposePending(e.target.files, personalComposePending, 'personalComposePending');
+    if (personalFile) personalFile.value = '';
+  });
+  personalVoice?.addEventListener('click', () => void toggleThreadVoiceRecording('personal'));
+}
+
+async function toggleThreadVoiceRecording(scope) {
+  const bucket = composePendingBucket(scope);
+  const hostId = scope === 'personal' ? 'personalComposePending' : 'threadComposePending';
+  const btn = scope === 'personal' ? document.getElementById('personalChatVoiceBtn') : document.getElementById('threadComposeVoiceBtn');
+  if (threadVoiceRecorder?.scope === scope && threadVoiceRecorder?.recorder?.state === 'recording') {
+    threadVoiceRecorder.recorder.stop();
+    btn?.classList.remove('is-recording');
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showProtoToast('Microphone not available on this device.');
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const recorder = new MediaRecorder(stream);
+    const chunks = [];
+    recorder.ondataavailable = (ev) => {
+      if (ev.data?.size) chunks.push(ev.data);
+    };
+    recorder.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+      const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type });
+      addFilesToComposePending([file], bucket, hostId);
+      threadVoiceRecorder = null;
+    };
+    threadVoiceRecorder = { recorder, scope };
+    recorder.start();
+    btn?.classList.add('is-recording');
+    showProtoToast('Recording… tap mic again to stop.');
+    setTimeout(() => {
+      if (recorder.state === 'recording') {
+        recorder.stop();
+        btn?.classList.remove('is-recording');
+      }
+    }, 90_000);
+  } catch {
+    showProtoToast('Could not access the microphone.');
+  }
+}
+
+function ensureActiveCompanyThreadRecord(companyId) {
+  const rt = getSarahRuntime();
+  const existing = rt.threads[companyId];
+  if (existing?.kind === 'company' && Array.isArray(existing.messages)) return existing;
+  const ctx = getActiveThreadContext();
+  const record = {
+    kind: 'company',
+    companyId,
+    api: Boolean(ctx.api),
+    name: ctx.name,
+    avatar: ctx.avatar,
+    verified: ctx.verified,
+    messages: Array.isArray(existing?.messages) ? existing.messages : Array.isArray(ctx.messages) ? [...ctx.messages] : [],
+  };
+  rt.threads[companyId] = record;
+  rt.activeThreadId = companyId;
+  return record;
+}
+
 async function deliverPersonalSarahMessage(text, opts) {
   const trimmed = String(text || '').trim();
-  if (!trimmed || personalSarahSending) return null;
+  const pendingBucket = opts?.fromHomeCompose ? personalComposePending : threadComposePending;
+  const pendingHost = opts?.fromHomeCompose ? 'personalComposePending' : 'threadComposePending';
+  const attachments = await uploadComposePending(pendingBucket);
+  if (!trimmed && !attachments.length) return null;
+  if (personalSarahSending) return null;
   const work = Boolean(opts && opts.work);
   const isRetry = Boolean(opts && opts.retry);
   const fromHomeCompose = Boolean(opts && opts.fromHomeCompose);
@@ -2097,15 +4328,24 @@ async function deliverPersonalSarahMessage(text, opts) {
       threadId = created;
     }
     if (!threadId) return null;
-    if (!isRetry) pushPersonalUserMessage(threadId, trimmed);
-    getSarahRuntime().threads[threadId]?.messages.push({ thinking: true });
+    if (!isRetry) {
+      const rt = getSarahRuntime();
+      const thread = rt.threads[threadId];
+      if (thread) {
+        thread.messages.push({ role: 'user', content: trimmed, attachments: [...attachments] });
+      } else {
+        pushPersonalUserMessage(threadId, trimmed);
+      }
+    }
+    pushThinkingToThread(threadId);
+    clearComposePending(pendingBucket, pendingHost);
     if (fromHomeCompose) {
       await openPersonalSarahThread(threadId, { skipServerLoad: true });
     } else {
       renderThread();
     }
     setPersonalSarahComposeBusy(true);
-    const res = await window.SarahLive.sendPersonalMessage(trimmed, { work, sessionId: threadId });
+    const res = await window.SarahLive.sendPersonalMessage(trimmed, { work, sessionId: threadId, attachments });
     setPersonalSarahComposeBusy(false);
     removeThinkingBubble(threadId);
     if (res.error) {
@@ -2123,6 +4363,16 @@ async function deliverPersonalSarahMessage(text, opts) {
           markdown: `**Daily chat limit reached** — ${usage ? `${usage}/` : ''}${limit} Personal Sarah chats today. Try again tomorrow.`,
         });
         showProtoToast('Daily Personal Sarah chat limit reached.');
+      } else if (res.code === 'CREDITS_EXHAUSTED') {
+        thread?.messages.push({
+          role: 'assistant',
+          markdown:
+            '**AI credits used up** for this billing period. Open **Profile → Billing** to buy a top-up, or wait until your plan renews. Sarah Work is paused until you have credits again.',
+        });
+        showProtoToast('AI credits exhausted — top up or wait for renewal.');
+        void refreshSarahPlanUsageUi(['profile', 'account', 'billing']);
+        setRoute('home');
+        setMySarahPanel('billing');
       } else {
         thread?.messages.push({
           role: 'assistant',
@@ -2133,10 +4383,16 @@ async function deliverPersonalSarahMessage(text, opts) {
         showProtoToast(res.error);
       }
     } else {
-      pushPersonalAssistantReply(threadId, res.reply);
+      pushPersonalAssistantReply(threadId, res.reply, res.creditsLast);
       const rt = getSarahRuntime();
       const thread = rt.threads[threadId];
       if (thread) thread.lastMessageAt = Date.now();
+      if (res.workCompleted) {
+        thread && (thread.workCompleted = true);
+        showProtoToast('Sarah Work task completed — see My Notifications.');
+        void refreshLiveNotifications();
+      }
+      void refreshSarahPlanUsageUi();
     }
     renderThread();
     renderMsDrawerRecents();
@@ -2146,8 +4402,26 @@ async function deliverPersonalSarahMessage(text, opts) {
   }
 
   if (threadId) {
-    appendPersonalThreadMessage(threadId, trimmed);
+    pushPersonalUserMessage(threadId, trimmed);
+    pushThinkingToThread(threadId);
     renderThread();
+    setPersonalSarahComposeBusy(true);
+    await new Promise((resolve) => setTimeout(resolve, 560));
+    removeThinkingBubble(threadId);
+    const thread = getSarahRuntime().threads[threadId];
+    thread?.messages.push({
+      role: 'assistant',
+      markdown: assistantReplyForThread(thread?.work, trimmed),
+    });
+    if (thread && (!thread.title || thread.title === 'New chat')) {
+      thread.title = truncatePersonalTitle(trimmed);
+      thread.name = thread.title;
+    }
+    if (thread) thread.timeLabel = 'Just now';
+    getSarahRuntime().personalThreadOrder = [threadId, ...getSarahRuntime().personalThreadOrder.filter((x) => x !== threadId)];
+    setPersonalSarahComposeBusy(false);
+    renderThread();
+    if (thread?.work) schedulePrototypeWorkCompletion(threadId);
     return threadId;
   }
   return createPersonalThread(trimmed, { work });
@@ -2200,6 +4474,7 @@ function appendPersonalThreadMessage(threadId, text) {
   }
   thread.timeLabel = 'Just now';
   rt.personalThreadOrder = [threadId, ...rt.personalThreadOrder.filter((x) => x !== threadId)];
+  if (thread.work) schedulePrototypeWorkCompletion(threadId);
 }
 
 function persistPersonalSarahSessionId(threadId) {
@@ -2233,8 +4508,10 @@ async function openPersonalSarahThread(threadId, { skipServerLoad = false } = {}
 
 async function startNewPersonalChat(options = {}) {
   const work = Boolean(options.work);
-  if (work) goToMySarahWork('');
-  else goToMySarahHome('');
+  if (work) {
+    return startNewWorkThread();
+  }
+  goToMySarahHome('');
 
   if (personalSarahLiveActive() && !work) {
     const res = await window.SarahLive.createPersonalSession({ title: 'New chat' });
@@ -2252,10 +4529,1120 @@ async function startNewPersonalChat(options = {}) {
   return id;
 }
 
-function startNewWorkThread() {
+function utcDayKeyClient() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function readMockWorkUsage() {
+  try {
+    const raw = localStorage.getItem(WORK_USAGE_KEY);
+    if (!raw) return { dayKey: utcDayKeyClient(), used: 0 };
+    const parsed = JSON.parse(raw);
+    if (parsed.dayKey !== utcDayKeyClient()) return { dayKey: utcDayKeyClient(), used: 0 };
+    return { dayKey: parsed.dayKey, used: Number(parsed.used) || 0 };
+  } catch {
+    return { dayKey: utcDayKeyClient(), used: 0 };
+  }
+}
+
+function writeMockWorkUsage(used) {
+  try {
+    localStorage.setItem(WORK_USAGE_KEY, JSON.stringify({ dayKey: utcDayKeyClient(), used }));
+  } catch {
+    /* ignore */
+  }
+}
+
+function currentBillingTier() {
+  return MOCK_SARAH_BILLING_TIERS.find((t) => t.current) || MOCK_SARAH_BILLING_TIERS[0];
+}
+
+function buildClientWorkHomeFromThreads() {
+  const threads = Object.values(getSarahRuntime().threads || {}).filter((t) => t.kind === 'personal' && t.work);
+  const assignments = threads.map((t) => {
+    const ws = getThreadWorkWorkspace(t);
+    const pendingApprovals = (ws.approvals || []).filter((a) => a.status === 'pending').length;
+    let priorityBand = 'planned';
+    let priorityLabel = 'Open';
+    let priorityScore = 30;
+    if (t.workPaused) {
+      priorityBand = 'urgent';
+      priorityLabel = 'Paused';
+      priorityScore = 100;
+    } else if (pendingApprovals) {
+      priorityBand = 'urgent';
+      priorityLabel = 'Needs approval';
+      priorityScore = 90;
+    } else if (t.workSubmitted && !t.workCompleted) {
+      priorityBand = 'active';
+      priorityLabel = 'In progress';
+      priorityScore = 70;
+    } else if (t.workCompleted) {
+      priorityBand = 'done';
+      priorityLabel = 'Complete';
+      priorityScore = 10;
+    } else if (!t.workSubmitted) {
+      priorityBand = 'planned';
+      priorityLabel = 'Draft';
+      priorityScore = 40;
+    }
+    return {
+      id: t.api ? Object.keys(getSarahRuntime().threads).find((k) => getSarahRuntime().threads[k] === t) : null,
+      title: t.title || t.name || 'Work assignment',
+      assignmentStatus: ws.assignmentStatus,
+      progressPercent: ws.progressPercent || 0,
+      phaseLabel: ws.phaseLabel || '',
+      capabilityLabel: ws.capabilityLabel || null,
+      priorityBand,
+      priorityLabel,
+      priorityScore,
+      pendingApprovals,
+      lastMessageAt: t.lastMessageAt,
+    };
+  });
+  assignments.forEach((a, i) => {
+    if (!a.id) {
+      const key = Object.entries(getSarahRuntime().threads).find(([, v]) => v.title === a.title)?.[0];
+      if (key) assignments[i].id = key;
+    }
+  });
+  const byCapability = {};
+  for (const a of assignments) {
+    const cap = inferClientWorkCapability(getSarahRuntime().threads[a.id] || {}) || 'coordination';
+    byCapability[cap] = (byCapability[cap] || 0) + 1;
+  }
+  const stats = {
+    total: assignments.length,
+    inProgress: assignments.filter((a) => a.priorityBand === 'active').length,
+    completed: assignments.filter((a) => a.assignmentStatus === 'completed').length,
+    draft: assignments.filter((a) => a.assignmentStatus === 'draft').length,
+    urgent: assignments.filter((a) => a.priorityBand === 'urgent').length,
+    avgProgress: assignments.length
+      ? Math.round(assignments.reduce((s, a) => s + (a.progressPercent || 0), 0) / assignments.length)
+      : 0,
+    byCapability,
+  };
+  const priority = [...assignments].sort((a, b) => b.priorityScore - a.priorityScore).slice(0, 8);
+  const urgent = priority.filter((a) => a.priorityBand === 'urgent');
+  const summary =
+    urgent.length > 0
+      ? `Today's Work: ${urgent.length} need attention · ${stats.inProgress} in progress.`
+      : stats.inProgress
+        ? `Today's Work: ${stats.inProgress} assignment${stats.inProgress === 1 ? '' : 's'} in progress.`
+        : 'Start a work item — Sarah tracks milestones and deliverables for you.';
+  return { summary, stats, priority, assignments };
+}
+
+const CLIENT_CAPABILITY_LABELS = {
+  research: 'Research',
+  writing: 'Writing & creation',
+  planning: 'Planning',
+  administration: 'Administration',
+  analysis: 'Analysis',
+  monitoring: 'Monitoring',
+  coordination: 'Coordination',
+  personal_assistance: 'Personal assistance',
+};
+
+const WORK_ACTIVITY_KIND_LABELS_CLIENT = {
+  submit: 'Submitted',
+  cancel: 'Cancelled',
+  pause: 'Paused',
+  complete: 'Completed',
+  run_start: 'Execution',
+  milestone_start: 'Milestone',
+  milestone_complete: 'Milestone',
+  milestone_blocked: 'Blocked',
+  approval_requested: 'Approval',
+  approval_approved: 'Approval',
+  approval_rejected: 'Approval',
+  step_meter: 'Credits',
+  message: 'Update',
+};
+
+function inferClientWorkCapability(thread) {
+  const firstUser = (thread?.messages || []).find((m) => m.role === 'user');
+  const text = String(firstUser?.content || thread?.title || '').toLowerCase();
+  if (/\b(research|compare|market|supplier|fact)\b/.test(text)) return 'research';
+  if (/\b(report|proposal|presentation|document|draft|write)\b/.test(text)) return 'writing';
+  if (/\b(plan|schedule|travel|event|project)\b/.test(text)) return 'planning';
+  if (/\b(spreadsheet|financial|analys|analyz|numbers)\b/.test(text)) return 'analysis';
+  if (/\b(track|monitor|deadline|price|reply|follow up|follow-up|watch)\b/.test(text)) return 'monitoring';
+  if (/\b(remind|organis|organiz|admin)\b/.test(text)) return 'administration';
+  return 'coordination';
+}
+
+function buildClientWorkActivity(thread) {
+  const acts = Array.isArray(thread?.workWorkspace?.activity) ? [...thread.workWorkspace.activity] : [];
+  if (thread?.workSubmitted) {
+    acts.push({ kind: 'submit', kindLabel: 'Submitted', label: 'Assignment submitted to Sarah', at: new Date().toISOString() });
+  }
+  if (thread?.workPaused) {
+    acts.push({
+      kind: 'pause',
+      kindLabel: 'Paused',
+      label: thread.workPauseReason || 'Assignment paused',
+      at: new Date().toISOString(),
+    });
+  }
+  if (thread?.workCompleted) {
+    acts.push({ kind: 'complete', kindLabel: 'Completed', label: 'Assignment completed', at: new Date().toISOString() });
+  }
+  if (thread?.workCancelled) {
+    acts.push({ kind: 'cancel', kindLabel: 'Cancelled', label: 'Assignment cancelled', at: new Date().toISOString() });
+  }
+  return acts.slice(-48);
+}
+
+async function renderSarahWorkHomeDashboard() {
+  const dashRoot = document.getElementById('msWorkDashboard');
+  const summaryEl = document.querySelector('#msWorkDaySummary .sw-home-ai-text');
+  const statsEl = document.getElementById('msWorkStats');
+  const chipsEl = document.getElementById('msWorkCapabilityChips');
+  const listEl = document.getElementById('msWorkPriorityList');
+  if (!summaryEl || !statsEl || !listEl) return;
+
+  const clientDash = buildClientWorkHomeFromThreads();
+  let dash = null;
+  if (personalSarahLiveActive() && window.SarahLive?.fetchPersonalWorkHome) {
+    const res = await window.SarahLive.fetchPersonalWorkHome();
+    if (!res.error && res.dashboard) dash = res.dashboard;
+  }
+  if (!dash) dash = clientDash;
+  else if ((dash.stats?.total || 0) < (clientDash.stats?.total || 0)) {
+    dash = {
+      ...dash,
+      stats: { ...dash.stats, ...clientDash.stats, byCapability: dash.stats?.byCapability || clientDash.stats?.byCapability },
+      priority: (dash.priority?.length ? dash.priority : clientDash.priority) || [],
+      assignments: (dash.assignments?.length ? dash.assignments : clientDash.assignments) || [],
+      summary: dash.summary || clientDash.summary,
+    };
+  }
+
+  const st = dash.stats || {};
+  const hasAssignments = (st.total || 0) > 0 || (Array.isArray(dash.priority) && dash.priority.length > 0);
+  if (dashRoot) {
+    dashRoot.classList.toggle('hidden', !hasAssignments);
+    dashRoot.hidden = !hasAssignments;
+  }
+  if (!hasAssignments) {
+    void renderWorkAssignmentsHistory(dash.assignments || []);
+    return;
+  }
+  summaryEl.textContent = dash.summary || 'No assignments yet.';
+  const completedPct = st.total ? Math.round((st.completed / st.total) * 100) : 0;
+  statsEl.innerHTML = `
+    <div class="sw-home-stat" role="listitem">
+      <span class="sw-home-stat-value">${escapeHtml(String(st.inProgress || 0))}</span>
+      <span class="sw-home-stat-label">In progress</span>
+    </div>
+    <div class="sw-home-stat" role="listitem">
+      <span class="sw-home-stat-value">${escapeHtml(String(completedPct))}%</span>
+      <span class="sw-home-stat-label">Completed</span>
+    </div>
+    <div class="sw-home-stat" role="listitem">
+      <span class="sw-home-stat-value">${escapeHtml(String(st.avgProgress || 0))}%</span>
+      <span class="sw-home-stat-label">Avg progress</span>
+    </div>`;
+
+  const capMap = st.byCapability || {};
+  const capCatalog =
+    Array.isArray(dash.capabilities) && dash.capabilities.length
+      ? dash.capabilities
+      : Object.keys(CLIENT_CAPABILITY_LABELS).map((id) => ({ id, label: CLIENT_CAPABILITY_LABELS[id] }));
+  if (chipsEl) {
+    const chips = capCatalog
+      .map((c) => {
+        const count = capMap[c.id] || 0;
+        if (!count && !st.total) return '';
+        return `<span class="sw-home-cap-chip" role="listitem" data-capability="${escapeHtml(c.id)}">${escapeHtml(c.label)} · ${escapeHtml(String(count))}</span>`;
+      })
+      .filter(Boolean);
+    chipsEl.innerHTML =
+      chips.length > 0
+        ? chips.join('')
+        : '<span class="sw-home-cap-chip sw-home-cap-chip--muted">Capability tags appear as you add assignments</span>';
+  }
+
+  const rows = (Array.isArray(dash.priority) ? dash.priority : []).filter((a) => {
+    if (!a?.id) return false;
+    const thread = getSarahRuntime().threads[a.id];
+    if (!thread) return true;
+    const hasUser = (thread.messages || []).some((m) => m.role === 'user' && String(m.content || '').trim());
+    const isBlankDraft =
+      thread.work &&
+      !thread.workSubmitted &&
+      !hasUser &&
+      (!a.title || a.title === 'New work item');
+    return !isBlankDraft;
+  });
+  if (!rows.length) {
+    if (dashRoot) {
+      dashRoot.classList.add('hidden');
+      dashRoot.hidden = true;
+    }
+    void renderWorkAssignmentsHistory(dash.assignments || []);
+    return;
+  }
+  listEl.innerHTML = rows
+    .map((a) => {
+      const id = a.id || '';
+      return `<li class="sw-home-priority-item sw-home-priority--${escapeHtml(a.priorityBand || 'planned')}">
+        <button type="button" class="sw-home-priority-btn" data-open-work-assignment="${escapeHtml(id)}">
+          <span class="sw-home-priority-title">${escapeHtml(a.title || 'Assignment')}</span>
+          <span class="sw-home-priority-meta">
+            ${a.capabilityLabel ? `<span class="sw-home-priority-cap">${escapeHtml(a.capabilityLabel)}</span>` : ''}
+            <span class="sw-home-priority-pill">${escapeHtml(a.priorityLabel || '')}</span>
+            ${a.progressPercent != null ? `<span>${escapeHtml(String(a.progressPercent))}%</span>` : ''}
+            ${a.phaseLabel ? `<span>${escapeHtml(a.phaseLabel)}</span>` : ''}
+          </span>
+        </button>
+      </li>`;
+    })
+    .join('');
+  listEl.querySelectorAll('[data-open-work-assignment]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const sid = btn.getAttribute('data-open-work-assignment');
+      if (sid) void openPersonalSarahThread(sid);
+    });
+  });
+  void renderWorkAssignmentsHistory(dash.assignments || rows);
+}
+
+function renderWorkAssignmentsHistory(assignments) {
+  const historyHost = document.getElementById('msHistoryList');
+  if (!historyHost) return;
+  const rows = Array.isArray(assignments) ? assignments : [];
+  if (!rows.length) {
+    historyHost.innerHTML =
+      '<p class="ms-thread-empty" style="padding:8px 12px">No assignments yet — start with New work item.</p>';
+    return;
+  }
+  historyHost.innerHTML = rows
+    .slice(0, 12)
+    .map(
+      (a) => `<button type="button" class="ms-history-item" data-personal-thread="${escapeHtml(a.id || '')}">
+        <span class="ms-history-body">
+          <span class="ms-history-title">${escapeHtml(a.title || 'Work')}</span>
+          <span class="ms-history-time">${escapeHtml(a.capabilityLabel ? `${a.capabilityLabel} · ` : '')}${escapeHtml(a.priorityLabel || a.phaseLabel || '')} · ${escapeHtml(String(a.progressPercent ?? 0))}%</span>
+        </span>
+      </button>`
+    )
+    .join('');
+  historyHost.querySelectorAll('[data-personal-thread]').forEach((btn) => {
+    btn.addEventListener('click', () => openPersonalSarahThread(btn.getAttribute('data-personal-thread') || ''));
+  });
+}
+
+async function refreshWorkQuotaState() {
+  if (personalSarahLiveActive() && window.SarahLive?.fetchPersonalQuota) {
+    const res = await window.SarahLive.fetchPersonalQuota();
+    if (!res.error && res.quota) {
+      const q = res.quota;
+      workQuotaState.used = Number(q.workTasksUsed) || 0;
+      workQuotaState.limit =
+        Number(q.workTasksRemaining) >= 0 && q.workTasksUsed !== undefined
+          ? Number(q.workTasksUsed) + Number(q.workTasksRemaining)
+          : Number(q.workTasksPerDay ?? q.limit) || 0;
+      workQuotaState.periodScoped = Boolean(q.periodScoped);
+      workQuotaState.dayKey = q.dayKey || utcDayKeyClient();
+      const cs = q.creditsShadow && typeof q.creditsShadow === 'object' ? q.creditsShadow : q;
+      workQuotaState.availableCredits = Number(cs.availableCredits ?? q.availableCredits);
+      workQuotaState.enforcementMode = String(cs.enforcementMode || q.enforcementMode || 'shadow');
+      workQuotaState.loaded = true;
+      return workQuotaState;
+    }
+  }
+  const tier = currentBillingTier();
+  const usage = readMockWorkUsage();
+  workQuotaState.used = usage.used;
+  workQuotaState.limit = Number(tier.workTasksPerDay) || 0;
+  workQuotaState.dayKey = usage.dayKey;
+  workQuotaState.loaded = true;
+  return workQuotaState;
+}
+
+async function reserveWorkTaskSlot() {
+  const q = await refreshWorkQuotaState();
+  if (q.limit <= 0) return { allowed: false, reason: 'plan' };
+  if (q.used >= q.limit) return { allowed: false, reason: 'quota' };
+  if (personalSarahLiveActive()) return { allowed: true, live: true };
+  const next = q.used + 1;
+  writeMockWorkUsage(next);
+  workQuotaState.used = next;
+  return { allowed: true, live: false };
+}
+
+function renderWorkQuotaBanner() {
+  const el = document.getElementById('msWorkQuota');
+  if (!el) return;
+  const q = workQuotaState;
+  if (!q.loaded) {
+    el.textContent = 'Loading Sarah Work allowance…';
+    void refreshWorkQuotaState().then(() => renderWorkQuotaBanner());
+    return;
+  }
+  if (q.limit <= 0) {
+    el.textContent = 'Sarah Work is not included on Sarah Free. Upgrade to delegate tasks to Sarah.';
+    return;
+  }
+  const creditsLine =
+    Number.isFinite(q.availableCredits) && q.availableCredits >= 0
+      ? `${formatSarahCredits(q.availableCredits)} AI credits available.`
+      : '';
+  const submitted = q.used > 0 ? `${q.used} task${q.used === 1 ? '' : 's'} submitted this period.` : '';
+  if (q.enforcementMode === 'enforce') {
+    el.textContent =
+      [creditsLine, 'Sarah Work uses credits automatically (submit + run).', submitted].filter(Boolean).join(' ') ||
+      'Sarah Work is included on your plan.';
+    return;
+  }
+  const remaining = Math.max(0, q.limit - q.used);
+  if (q.periodScoped) {
+    el.textContent = `${creditsLine ? `${creditsLine} ` : ''}Tasks: ${q.used} / ${q.limit} this billing period · ${remaining} remaining.`;
+  } else {
+    el.textContent = `${creditsLine ? `${creditsLine} ` : ''}Tasks: ${q.used} / ${q.limit} today · ${remaining} remaining.`;
+  }
+}
+
+function applyWorkEstimateToBar(plan) {
+  const lead = document.getElementById('threadWorkSubmitLead');
+  const meta = document.getElementById('threadWorkSubmitMeta');
+  if (!lead || !plan) return;
+  const band = plan.bandLabel || plan.band || 'Assignment';
+  const min = plan.estimateRange?.min ?? plan.estimateMin;
+  const max = plan.estimateRange?.max ?? plan.estimateMax;
+  const cap = plan.capCredits;
+  lead.textContent = `${band}: typical ${formatSarahCredits(min)}–${formatSarahCredits(max)} credits. Fair-share cap ${formatSarahCredits(cap)}.`;
+  if (meta) {
+    const rem = plan.remainingCredits;
+    if (rem != null && Number.isFinite(Number(rem))) {
+      meta.textContent = `${formatSarahCredits(rem)} credits on your account. Submit deducts a small starter cost, then Sarah runs within the cap.`;
+      meta.hidden = false;
+    } else {
+      meta.textContent = '';
+      meta.hidden = true;
+    }
+  }
+}
+
+async function loadWorkSubmitEstimate(threadId) {
+  const lead = document.getElementById('threadWorkSubmitLead');
+  if (!lead || !threadId) return;
+  const cached = workEstimateByThread.get(threadId);
+  if (cached && Date.now() - cached.at < WORK_ESTIMATE_TTL_MS) {
+    applyWorkEstimateToBar(cached.plan);
+    return;
+  }
+  lead.textContent = 'Estimating credits for this assignment…';
+  if (personalSarahLiveActive() && window.SarahLive?.fetchPersonalWorkEstimate) {
+    const res = await window.SarahLive.fetchPersonalWorkEstimate(threadId);
+    if (res.error) {
+      lead.textContent = 'Submit when ready — Sarah manages credits from your balance.';
+      return;
+    }
+    workEstimateByThread.set(threadId, { at: Date.now(), plan: res.workBudget });
+    applyWorkEstimateToBar(res.workBudget);
+  } else {
+    lead.textContent = 'Submit your task — credits are managed automatically within your plan.';
+  }
+}
+
+function milestoneStatusLabel(status) {
+  const map = {
+    pending: 'Pending',
+    in_progress: 'In progress',
+    complete: 'Complete',
+    blocked: 'Blocked',
+  };
+  return map[status] || status;
+}
+
+function milestoneStatusClass(status) {
+  return `work-ws-ms--${String(status || 'pending').replace(/_/g, '-')}`;
+}
+
+function buildClientWorkReferenceFiles(thread) {
+  const files = [];
+  (thread?.messages || []).forEach((msg, msgIndex) => {
+    const attachments = Array.isArray(msg.attachments) ? msg.attachments : [];
+    attachments.forEach((att, i) => {
+      files.push({
+        id: `file-${msgIndex}-${i}`,
+        name: att.name || att.filename || 'Attachment',
+        mimeType: att.mimeType || att.type || 'file',
+        url: att.url || null,
+        source: 'chat_attachment',
+        role: msg.role,
+        contextPreview: String(msg.content || '').trim().slice(0, 120) || null,
+      });
+    });
+    if (msg.role === 'user' && msg.content) {
+      const urls = String(msg.content).match(/https?:\/\/[^\s<>"')\]]+/gi) || [];
+      [...new Set(urls)].slice(0, 6).forEach((url, i) => {
+        files.push({
+          id: `link-${msgIndex}-${i}`,
+          name: url.length > 56 ? `${url.slice(0, 53)}…` : url,
+          mimeType: 'link',
+          url,
+          source: 'message_link',
+          role: 'user',
+          contextPreview: String(msg.content).trim().slice(0, 120),
+        });
+      });
+    }
+  });
+  return files;
+}
+
+function buildClientWorkDeliverables(thread) {
+  const st = thread.workCompleted ? 'ready' : thread.workSubmitted ? 'in_progress' : 'pending';
+  const items = [
+    {
+      id: 'del-primary',
+      title: thread.workReport?.taskTitle || thread.title || 'Assignment deliverable',
+      kind: 'document',
+      status: st,
+      summary: thread.workReport?.summary || null,
+      charCount: thread.workReport?.markdown ? thread.workReport.markdown.length : 0,
+    },
+  ];
+  const research = thread.workReport?.execution?.research;
+  if (research) {
+    items.push({
+      id: 'del-research',
+      title: 'Research notes',
+      kind: 'summary',
+      status: 'ready',
+      summary: String(research).slice(0, 200),
+    });
+  }
+  return items;
+}
+
+function deliverableStatusLabel(status) {
+  const map = {
+    pending: 'Pending',
+    in_progress: 'In progress',
+    ready: 'Ready',
+    failed: 'Failed',
+    pending_approval: 'Needs approval',
+  };
+  return map[status] || status;
+}
+
+function approvalStatusLabel(status) {
+  const map = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
+  return map[status] || status;
+}
+
+async function resolveWorkApprovalUi(sessionId, approvalId, decision) {
+  if (!personalSarahLiveActive() || !window.SarahLive?.resolvePersonalWorkApproval) {
+    showProtoToast('Approvals require live Personal Sarah.');
+    return;
+  }
+  const res = await window.SarahLive.resolvePersonalWorkApproval(sessionId, approvalId, { decision });
+  if (res.error) {
+    showProtoToast(res.error);
+    return;
+  }
+  if (res.session) upsertPersonalThreadFromSession(res.session, { partial: false });
+  showProtoToast(
+    decision === 'approved'
+      ? res.resumed
+        ? 'Approved — Sarah resumed the assignment.'
+        : 'Approved.'
+      : 'Request rejected.'
+  );
+  syncWorkWorkspaceUi(getActiveThreadContext());
+  if (res.resumed) void pollWorkSessionUntilSettled(sessionId);
+}
+
+async function downloadWorkDeliverable(sessionId, deliverableId, title) {
+  const safeName = String(title || deliverableId || 'deliverable')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .slice(0, 48);
+  if (personalSarahLiveActive() && window.SarahLive?.fetchPersonalWorkDeliverable) {
+    const res = await window.SarahLive.fetchPersonalWorkDeliverable(sessionId, deliverableId);
+    if (res.error) {
+      if (res.code === 'DELIVERABLE_NOT_READY') showProtoToast('Deliverable not ready yet.');
+      else if (res.code === 'WORK_APPROVAL_REQUIRED') {
+        showProtoToast('Approve the outbound action in Approvals first.');
+        setWorkWorkspaceTab(sessionId, 'approvals');
+        syncWorkWorkspaceUi(getActiveThreadContext());
+      } else showProtoToast(res.error);
+      return;
+    }
+    const md = res.deliverable?.markdown || res.deliverable?.summary || '';
+    if (!md) {
+      showProtoToast('Nothing to download yet.');
+      return;
+    }
+    downloadTextFile(`${safeName || deliverableId}.md`, md, 'text/markdown');
+    return;
+  }
+  const thread = getSarahRuntime().threads[sessionId];
+  if (deliverableId === 'del-primary' && thread?.workReport?.markdown) {
+    downloadTextFile(`${safeName}.md`, thread.workReport.markdown, 'text/markdown');
+  } else showProtoToast('Deliverable not available offline.');
+}
+
+function workActivityKindClass(kind) {
+  const k = String(kind || 'message');
+  if (k === 'step_meter') return 'work-ws-act-kind--meter';
+  if (k.startsWith('approval')) return 'work-ws-act-kind--approval';
+  if (k.startsWith('milestone')) return 'work-ws-act-kind--milestone';
+  if (k === 'pause' || k === 'milestone_blocked') return 'work-ws-act-kind--warn';
+  if (k === 'complete') return 'work-ws-act-kind--done';
+  return 'work-ws-act-kind--neutral';
+}
+
+function buildClientWorkWorkspace(thread) {
+  const status = thread.workCancelled
+    ? 'cancelled'
+    : thread.workPaused
+      ? 'paused'
+      : thread.workCompleted
+        ? 'completed'
+        : thread.workSubmitted
+          ? 'running'
+          : 'draft';
+  const milestones = [
+    { id: 'm1', title: 'Review brief and source material', order: 1, status: 'pending' },
+    { id: 'm2', title: 'Research relevant information', order: 2, status: 'pending' },
+    { id: 'm3', title: 'Prepare assignment draft', order: 3, status: 'pending' },
+    { id: 'm4', title: 'Final quality review', order: 4, status: 'pending' },
+  ];
+  if (status === 'draft') milestones[0].status = 'in_progress';
+  if (status === 'running') {
+    milestones[0].status = 'complete';
+    milestones[1].status = 'complete';
+    milestones[2].status = 'in_progress';
+  }
+  if (status === 'paused') {
+    milestones[0].status = 'complete';
+    milestones[1].status = 'complete';
+    milestones[2].status = 'blocked';
+  }
+  if (status === 'completed') milestones.forEach((m) => (m.status = 'complete'));
+  const weights = { complete: 1, in_progress: 0.5, blocked: 0.25, pending: 0 };
+  const progressPercent = Math.round(
+    (milestones.reduce((s, m) => s + (weights[m.status] ?? 0), 0) / milestones.length) * 100
+  );
+  const firstUser = (thread.messages || []).find((m) => m.role === 'user');
+  const brief = String(firstUser?.content || thread.title || '').trim();
+  const capability =
+    thread?.workWorkspace?.capability || (thread?.work ? inferClientWorkCapability(thread) : 'coordination');
+  return {
+    version: 1,
+    assignmentStatus: status,
+    phaseLabel: status === 'running' ? 'Research and writing' : status === 'draft' ? 'Planning' : status,
+    capability,
+    capabilityLabel: thread?.workWorkspace?.capabilityLabel || CLIENT_CAPABILITY_LABELS[capability] || 'Coordination',
+    objective: brief
+      ? `Complete this assignment: ${brief.length > 280 ? `${brief.slice(0, 277)}…` : brief}`
+      : 'Describe what Sarah should complete for this assignment.',
+    milestones,
+    deliverables: buildClientWorkDeliverables(thread),
+    approvals: [],
+    files: buildClientWorkReferenceFiles(thread),
+    activity: buildClientWorkActivity(thread),
+    settings: thread?.workWorkspace?.settings || {
+      notifyOnStart: true,
+      notifyOnMilestone: true,
+      notifyOnApproval: true,
+      notifyOnComplete: true,
+      notifyOnPause: true,
+      sarahTrustOutbound: 'require_approval',
+      defaultApprovalLevel: 1,
+    },
+    trust: thread?.workWorkspace?.trust || null,
+    progressPercent,
+    budget: thread.workBudgetCapCredits
+      ? {
+          band: thread.workBudgetBand,
+          capCredits: thread.workBudgetCapCredits,
+          estimateMin: thread.workBudgetEstimateMin,
+          estimateMax: thread.workBudgetEstimateMax,
+          usedCredits: thread.workCreditsUsedCredits,
+        }
+      : null,
+  };
+}
+
+function getThreadWorkWorkspace(thread) {
+  const ws = thread?.workWorkspace;
+  if (ws && typeof ws === 'object' && (ws.milestones?.length || ws.objective || ws.capability)) return ws;
+  return buildClientWorkWorkspace(thread || {});
+}
+
+function getWorkWorkspaceTab(threadId) {
+  return workWsTabByThread.get(threadId) || 'conversation';
+}
+
+function setWorkWorkspaceTab(threadId, tab) {
+  if (!threadId) return;
+  workWsTabByThread.set(threadId, tab);
+}
+
+function renderWorkWorkspacePanelMarkup(ws, tab, threadId) {
+  if (tab === 'approvals') {
+    const rows = Array.isArray(ws.approvals) ? ws.approvals : [];
+    if (!rows.length) {
+      return `<p class="work-ws-placeholder">No approvals yet. Sarah requests Level 2 before sending or booking, and Level 3 before payments or signatures.</p>`;
+    }
+    const list = rows
+      .map((a) => {
+        const pending = a.status === 'pending';
+        const detail = a.details?.briefExcerpt
+          ? `<p class="work-ws-apr-detail">${escapeHtml(String(a.details.briefExcerpt).slice(0, 200))}</p>`
+          : '';
+        const actions = pending
+          ? `<span class="work-ws-apr-actions">
+              <button type="button" class="btn btn-primary btn-sm" data-work-apr="${escapeHtml(a.id)}" data-work-apr-decision="approved">Approve</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-work-apr="${escapeHtml(a.id)}" data-work-apr-decision="rejected">Reject</button>
+            </span>`
+          : '';
+        return `<li class="work-ws-apr">
+          <span class="work-ws-apr-level">L${escapeHtml(String(a.level))}</span>
+          <span class="work-ws-apr-summary">${escapeHtml(a.summary || a.actionType || 'Approval')}</span>
+          <span class="work-ws-apr-state">${escapeHtml(approvalStatusLabel(a.status))}</span>
+          ${detail}
+          ${actions}
+        </li>`;
+      })
+      .join('');
+    return `<ul class="work-ws-apr-list">${list}</ul>`;
+  }
+  if (tab === 'files') {
+    const files = ws.files || [];
+    if (!files.length) {
+      return `<p class="work-ws-placeholder">No files or links yet. Attach documents in the assignment conversation or paste reference URLs.</p>`;
+    }
+    const list = files
+      .map((f) => {
+        const src = f.source === 'message_link' ? 'Link' : 'Attachment';
+        const open =
+          f.url && /^https?:\/\//i.test(f.url)
+            ? `<a class="ms-link-btn" href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer">Open</a>`
+            : '';
+        return `<li class="work-ws-file">
+          <span class="work-ws-file-name">${escapeHtml(f.name)}</span>
+          <span class="work-ws-file-meta">${escapeHtml(src)} · ${escapeHtml(f.mimeType || 'file')}</span>
+          ${f.contextPreview ? `<p class="work-ws-file-ctx">${escapeHtml(f.contextPreview)}</p>` : ''}
+          ${open}
+        </li>`;
+      })
+      .join('');
+    return `<ul class="work-ws-file-list">${list}</ul>`;
+  }
+  if (tab === 'overview') {
+    const st = WORK_ASSIGNMENT_STATUS_LABEL[ws.assignmentStatus] || ws.assignmentStatus;
+    const budget = ws.budget
+      ? `<p class="work-ws-meta">Credits · cap ${escapeHtml(formatSarahCredits(ws.budget.capCredits))}${
+          ws.budget.usedCredits != null ? ` · used ${escapeHtml(formatSarahCredits(ws.budget.usedCredits))}` : ''
+        }</p>`
+      : '';
+    return `
+      <article class="work-ws-card">
+        <header class="work-ws-card-head">
+          <span class="work-ws-pill">${escapeHtml(ws.phaseLabel || '')}</span>
+          <span class="work-ws-status">${escapeHtml(st)}</span>
+        </header>
+        <p class="work-ws-cap"><span class="work-ws-cap-badge">${escapeHtml(ws.capabilityLabel || 'Coordination')}</span></p>
+        <h3 class="work-ws-h">Assignment objective</h3>
+        <p class="work-ws-body">${escapeHtml(ws.objective || '')}</p>
+        ${budget}
+        <p class="work-ws-meta">This conversation is scoped to this assignment only — Sarah does not mix other tasks.</p>
+      </article>`;
+  }
+  if (tab === 'milestones') {
+    const list = (ws.milestones || [])
+      .map(
+        (m) => {
+          const when = m.completedAt
+            ? formatSarahUsageWhen(m.completedAt)
+            : m.startedAt && m.status === 'in_progress'
+              ? `Started ${formatSarahUsageWhen(m.startedAt)}`
+              : '';
+          return `<li class="work-ws-ms ${milestoneStatusClass(m.status)}">
+        <span class="work-ws-ms-title">${escapeHtml(m.title)}</span>
+        <span class="work-ws-ms-state">${escapeHtml(milestoneStatusLabel(m.status))}</span>
+        ${when ? `<span class="work-ws-ms-when">${escapeHtml(when)}</span>` : ''}
+      </li>`;
+        }
+      )
+      .join('');
+    return `<ul class="work-ws-ms-list">${list}</ul>`;
+  }
+  if (tab === 'deliverables') {
+    const items = (ws.deliverables || [])
+      .map((d) => {
+        const st = deliverableStatusLabel(d.status);
+        const canOpen = d.status === 'ready' && threadId;
+        const viewReport =
+          canOpen && d.id === 'del-primary'
+            ? `<button type="button" class="ms-link-btn" data-work-open-report="${escapeHtml(threadId)}">View</button>`
+            : '';
+        const download =
+          d.status === 'pending_approval'
+            ? `<span class="work-ws-del-pending">Approve outbound action to download</span>`
+            : canOpen || (d.status === 'ready' && d.id !== 'del-primary')
+              ? `<button type="button" class="ms-link-btn" data-work-download-del="${escapeHtml(d.id)}" data-work-download-title="${escapeHtml(d.title)}">Download</button>`
+              : d.status === 'in_progress'
+                ? `<span class="work-ws-del-pending">Sarah is drafting…</span>`
+                : '';
+        const size =
+          d.charCount > 0 ? `<span class="work-ws-del-size">${escapeHtml(formatSarahCredits(d.charCount))} chars</span>` : '';
+        return `<li class="work-ws-del">
+          <span class="work-ws-del-title">${escapeHtml(d.title)}</span>
+          <span class="work-ws-del-kind">${escapeHtml(d.kind || 'document')}</span>
+          <span class="work-ws-del-state">${escapeHtml(st)}</span>
+          ${size}
+          ${d.summary ? `<p class="work-ws-del-sum">${escapeHtml(d.summary)}</p>` : ''}
+          <span class="work-ws-del-actions">${viewReport} ${download}</span>
+        </li>`;
+      })
+      .join('');
+    return `<ul class="work-ws-del-list">${items || '<li class="work-ws-placeholder">No deliverables yet.</li>'}</ul>`;
+  }
+  if (tab === 'activity') {
+    const sorted = [...(ws.activity || [])].sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')));
+    const items = sorted
+      .map((a) => {
+        const kind = a.kind || 'message';
+        const kindLabel = a.kindLabel || WORK_ACTIVITY_KIND_LABELS_CLIENT[kind] || 'Update';
+        const detail = a.detail ? `<span class="work-ws-act-detail">${escapeHtml(a.detail)}</span>` : '';
+        const credits =
+          a.credits != null && Number(a.credits) > 0
+            ? `<span class="work-ws-act-credits">${escapeHtml(formatSarahCredits(a.credits))} credits</span>`
+            : '';
+        return `<li class="work-ws-act work-ws-act--${escapeHtml(kind.replace(/[^a-z0-9_-]/g, ''))}">
+        <span class="work-ws-act-head">
+          <span class="work-ws-act-kind ${workActivityKindClass(kind)}">${escapeHtml(kindLabel)}</span>
+          <span class="work-ws-act-when">${escapeHtml(formatSarahUsageWhen(a.at))}</span>
+        </span>
+        <span class="work-ws-act-label">${escapeHtml(a.label || '')}</span>
+        ${detail}
+        ${credits}
+      </li>`;
+      })
+      .join('');
+    return `<ul class="work-ws-act-list">${items || '<li class="work-ws-placeholder">Activity will appear after you submit.</li>'}</ul>`;
+  }
+  if (tab === 'settings') {
+    const settings = ws.settings || {};
+    const trust = ws.trust || {};
+    const frozen = ws.assignmentStatus !== 'draft';
+    const outbound = settings.sarahTrustOutbound || 'require_approval';
+    return `<article class="work-ws-card work-ws-settings">
+      <h3 class="work-ws-h">Notifications</h3>
+      <p class="work-ws-meta">Sarah notifies you at meaningful milestones — not every step.</p>
+      <ul class="work-ws-settings-list">
+        ${['notifyOnStart', 'notifyOnMilestone', 'notifyOnApproval', 'notifyOnComplete', 'notifyOnPause']
+          .map((key) => {
+            const labels = {
+              notifyOnStart: 'When Sarah starts',
+              notifyOnMilestone: 'Milestone progress (50%+)',
+              notifyOnApproval: 'Approvals needed',
+              notifyOnComplete: 'When complete',
+              notifyOnPause: 'If paused',
+            };
+            const on = settings[key] !== false;
+            return `<li><label class="work-ws-settings-row"><input type="checkbox" data-work-setting="${escapeHtml(key)}" ${on ? 'checked' : ''} ${frozen ? 'disabled' : ''}/> ${escapeHtml(labels[key] || key)}</label></li>`;
+          })
+          .join('')}
+      </ul>
+      <h3 class="work-ws-h">Sarah Trust (outbound)</h3>
+      <p class="work-ws-meta">Level ${escapeHtml(String(trust.level || settings.defaultApprovalLevel || 1))} · ${trust.actions?.length ? escapeHtml(trust.actions.join(', ')) : 'No outbound actions detected'}</p>
+      <label class="work-ws-settings-row">Outbound policy
+        <select id="workSettingOutbound" data-work-setting-outbound ${frozen ? 'disabled' : ''}>
+          <option value="require_approval" ${outbound === 'require_approval' ? 'selected' : ''}>Require approval</option>
+          <option value="block" ${outbound === 'block' ? 'selected' : ''}>Block outbound actions</option>
+        </select>
+      </label>
+      ${!frozen && threadId ? `<button type="button" class="btn btn-primary btn-sm" data-work-save-settings="${escapeHtml(threadId)}">Save settings</button>` : '<p class="work-ws-meta">Settings lock after submit.</p>'}
+    </article>`;
+  }
+  return '';
+}
+
+function syncWorkWorkspaceUi(ctx) {
+  const shell = document.getElementById('threadWorkWorkspace');
+  const tabsEl = document.getElementById('workWsTabs');
+  const panelEl = document.getElementById('workWsPanel');
+  const log = document.getElementById('threadLog');
+  const compose = document.getElementById('threadComposeForm');
+  const body = document.querySelector('.thread-screen-body');
+  const isWork = ctx.kind === 'personal' && ctx.work;
+  shell?.classList.toggle('hidden', !isWork);
+  body?.classList.toggle('thread-screen-body--work-ws', Boolean(isWork));
+  if (!isWork || !shell || !tabsEl || !panelEl) {
+    log?.classList.remove('hidden');
+    compose?.classList.remove('hidden');
+    panelEl?.classList.add('hidden');
+    return;
+  }
+  const rt = getSarahRuntime();
+  const thread = rt.threads[ctx.id] || ctx;
+  const ws = getThreadWorkWorkspace(thread);
+  thread.workWorkspace = ws;
+  const tab = getWorkWorkspaceTab(ctx.id);
+  const pct = Math.min(100, Math.max(0, Number(ws.progressPercent) || 0));
+  document.getElementById('workWsProgressFill')?.style.setProperty('width', `${pct}%`);
+  const progLabel = document.getElementById('workWsProgressLabel');
+  if (progLabel) progLabel.textContent = `${pct}%`;
+  tabsEl.innerHTML = WORK_WS_TABS.map((t) => {
+    const active = t.id === tab;
+    return `<button type="button" class="work-ws-tab${active ? ' is-active' : ''}" role="tab" aria-selected="${active}" data-work-ws-tab="${t.id}">${escapeHtml(t.label)}</button>`;
+  }).join('');
+  const isConversation = tab === 'conversation';
+  log?.classList.toggle('hidden', !isConversation);
+  compose?.classList.toggle('hidden', !isConversation);
+  panelEl.classList.toggle('hidden', isConversation);
+  if (!isConversation) {
+    panelEl.innerHTML = renderWorkWorkspacePanelMarkup(ws, tab, ctx.id);
+    panelEl.querySelector('[data-work-open-report]')?.addEventListener('click', (e) => {
+      const sid = e.currentTarget.getAttribute('data-work-open-report');
+      if (sid) void openWorkReport(sid);
+    });
+    panelEl.querySelectorAll('[data-work-download-del]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const delId = btn.getAttribute('data-work-download-del');
+        const title = btn.getAttribute('data-work-download-title');
+        if (delId && ctx.id) void downloadWorkDeliverable(ctx.id, delId, title);
+      });
+    });
+    panelEl.querySelector('[data-work-save-settings]')?.addEventListener('click', async (e) => {
+      const sid = e.currentTarget.getAttribute('data-work-save-settings');
+      if (!sid || !window.SarahLive?.patchPersonalWorkSettings) return;
+      const patch = {};
+      panelEl.querySelectorAll('[data-work-setting]').forEach((input) => {
+        patch[input.getAttribute('data-work-setting')] = input.checked;
+      });
+      const outbound = panelEl.querySelector('[data-work-setting-outbound]')?.value;
+      if (outbound) patch.sarahTrustOutbound = outbound;
+      const res = await window.SarahLive.patchPersonalWorkSettings(sid, patch);
+      if (res.error) showProtoToast(res.error);
+      else {
+        if (res.session) upsertPersonalThreadFromSession(res.session, { partial: false });
+        showProtoToast('Assignment settings saved.');
+        syncWorkWorkspaceUi(getActiveThreadContext());
+      }
+    });
+    panelEl.querySelectorAll('[data-work-apr]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const aprId = btn.getAttribute('data-work-apr');
+        const decision = btn.getAttribute('data-work-apr-decision');
+        if (aprId && decision && ctx.id) void resolveWorkApprovalUi(ctx.id, aprId, decision);
+      });
+    });
+  }
+  const submitBar = document.getElementById('threadWorkSubmitBar');
+  const cancelBar = document.getElementById('threadWorkCancelBar');
+  const showBarsOnTab = isConversation || tab === 'overview';
+  if (submitBar && !submitBar.classList.contains('hidden')) {
+    submitBar.style.display = showBarsOnTab ? '' : 'none';
+  }
+  if (cancelBar && !cancelBar.classList.contains('hidden')) {
+    cancelBar.style.display = showBarsOnTab ? '' : 'none';
+  }
+}
+
+if (!window.__workWsTabsBound) {
+  window.__workWsTabsBound = true;
+  document.addEventListener('click', (e) => {
+    const btn = e.target?.closest?.('[data-work-ws-tab]');
+    if (!btn) return;
+    const tab = btn.getAttribute('data-work-ws-tab');
+    const rt = getSarahRuntime();
+    const id = rt.activeThreadId;
+    if (!id || !tab) return;
+    setWorkWorkspaceTab(id, tab);
+    const ctx = getActiveThreadContext();
+    syncWorkWorkspaceUi(ctx);
+    if (tab === 'conversation') renderThread();
+  });
+}
+
+async function pollWorkSessionUntilSettled(threadId, { maxMs = 120_000 } = {}) {
+  if (!personalSarahLiveActive() || !window.SarahLive?.fetchPersonalSession) return;
+  const started = Date.now();
+  const tick = async () => {
+    if (Date.now() - started > maxMs) return;
+    const res = await window.SarahLive.fetchPersonalSession(threadId);
+    if (res.error || !res.session) return;
+    upsertPersonalThreadFromSession(res.session, { partial: false });
+    const s = res.session;
+    if (s.workCompletedAt || s.workPausedAt || s.workCancelledAt) {
+      syncThreadWorkSubmitBar();
+      syncWorkWorkspaceUi(getActiveThreadContext());
+      renderThread();
+      if (s.workCompletedAt) {
+        showProtoToast('Sarah Work task completed — see My Notifications.');
+        void refreshLiveNotifications();
+      } else if (s.workPausedAt) {
+        showProtoToast(s.workPauseReason || 'Sarah Work paused — top up credits or revise and submit again.');
+        void refreshSarahPlanUsageUi(['billing', 'profile']);
+      }
+      return;
+    }
+    setTimeout(() => void tick(), 2800);
+  };
+  setTimeout(() => void tick(), 2500);
+}
+
+async function submitWorkTaskForThread(threadId) {
+  const thread = getSarahRuntime().threads[threadId];
+  if (!thread?.work || thread.workSubmitted) return true;
+  if (personalSarahLiveActive() && thread.api) {
+    const res = await window.SarahLive.submitPersonalWorkSession(threadId);
+    if (res.error) {
+      if (res.code === 'WORK_NOT_INCLUDED' || res.code === 'WORK_QUOTA_EXCEEDED') {
+        showProtoToast(res.error);
+        setMySarahPanel('billing');
+      } else if (res.code === 'CREDITS_EXHAUSTED') {
+        showProtoToast('AI credits exhausted — top up or wait for renewal.');
+        setRoute('home');
+        setMySarahPanel('billing');
+        void refreshSarahPlanUsageUi(['billing', 'profile']);
+      } else showProtoToast(res.error);
+      await refreshWorkQuotaState();
+      renderWorkQuotaBanner();
+      return false;
+    }
+    if (res.session) upsertPersonalThreadFromSession(res.session, { partial: false });
+    thread.workSubmitted = true;
+    thread.workSubmittedAt = res.session?.workSubmittedAt || new Date().toISOString();
+    if (res.workBudget) {
+      thread.workBudgetBand = res.workBudget.band;
+      thread.workBudgetCapCredits = res.workBudget.capCredits;
+      thread.workBudgetEstimateMin = res.workBudget.estimateMin;
+      thread.workBudgetEstimateMax = res.workBudget.estimateMax;
+    }
+    workEstimateByThread.delete(threadId);
+    await refreshWorkQuotaState();
+    renderWorkQuotaBanner();
+    showProtoToast('Task submitted — Sarah is working on it.');
+    void pollWorkSessionUntilSettled(threadId);
+    void refreshSarahPlanUsageUi(['billing', 'profile']);
+    if (document.querySelector('.my-sarah-view')?.dataset.msPanel === 'home') void renderSarahHomeIntelligence();
+    return true;
+  }
+  const slot = await reserveWorkTaskSlot();
+  if (!slot.allowed) {
+    showProtoToast(
+      slot.reason === 'plan'
+        ? 'Sarah Work needs a paid plan. Messages still work on Free.'
+        : 'Your Sarah Work task allowance is used up for today.'
+    );
+    setMySarahPanel('billing');
+    return false;
+  }
+  thread.workSubmitted = true;
+  renderWorkQuotaBanner();
+  showProtoToast('Task submitted (prototype).');
+  return true;
+}
+
+function syncThreadWorkSubmitBar() {
+  const bar = document.getElementById('threadWorkSubmitBar');
+  if (!bar) return;
+  const ctx = getActiveThreadContext();
+  const show =
+    ctx.kind === 'personal' && ctx.work && !ctx.workSubmitted && !ctx.workCancelled && !ctx.workPaused;
+  bar.classList.toggle('hidden', !show);
+  if (show && ctx.id) void loadWorkSubmitEstimate(ctx.id);
+  syncThreadWorkCancelBar();
+}
+
+function syncThreadWorkCancelBar() {
+  const bar = document.getElementById('threadWorkCancelBar');
+  if (!bar) return;
+  const ctx = getActiveThreadContext();
+  const show =
+    ctx.kind === 'personal' && ctx.work && ctx.workSubmitted && !ctx.workCompleted && !ctx.workCancelled;
+  bar.classList.toggle('hidden', !show);
+}
+
+async function cancelWorkTaskForThread(threadId) {
+  const thread = getSarahRuntime().threads[threadId];
+  if (!thread?.work || !thread.workSubmitted || thread.workCompleted || thread.workCancelled) return true;
+  if (personalSarahLiveActive() && thread.api && window.SarahLive?.cancelPersonalWorkSession) {
+    const res = await window.SarahLive.cancelPersonalWorkSession(threadId);
+    if (res.error) {
+      if (res.code === 'WORK_ALREADY_COMPLETED') showProtoToast('This task has already completed.');
+      else showProtoToast(res.error);
+      return false;
+    }
+    thread.workSubmitted = false;
+    thread.workSubmittedAt = null;
+    thread.workCancelled = true;
+    await refreshWorkQuotaState();
+    renderWorkQuotaBanner();
+    showProtoToast(res.alreadyCancelled ? 'Task was already cancelled.' : 'Task cancelled — allowance restored.');
+    return true;
+  }
+  if (thread.workSubmitted && !thread.workCompleted) {
+    const u = readMockWorkUsage();
+    writeMockWorkUsage(Math.max(0, u.used - 1));
+    workQuotaState.used = Math.max(0, workQuotaState.used - 1);
+  }
+  thread.workSubmitted = false;
+  thread.workCancelled = true;
+  renderWorkQuotaBanner();
+  showProtoToast('Task cancelled (prototype).');
+  return true;
+}
+
+async function startNewWorkThread() {
   goToMySarahWork('');
+  if (personalSarahLiveActive()) {
+    const res = await window.SarahLive.createPersonalSession({ title: 'New work item', mode: 'work' });
+    if (res.error) {
+      showProtoToast(res.error);
+      return;
+    }
+    const id = upsertPersonalThreadFromSession(res.session, { partial: false });
+    await openPersonalSarahThread(id);
+    return;
+  }
   const id = createPersonalThread('', { work: true });
   openPersonalSarahThread(id);
+}
+
+function schedulePrototypeWorkCompletion(threadId) {
+  const thread = getSarahRuntime().threads[threadId];
+  if (
+    !thread?.work ||
+    !thread.workSubmitted ||
+    thread.workCompleted ||
+    thread.workCancelled ||
+    (personalSarahLiveActive() && thread?.api)
+  )
+    return;
+  clearTimeout(thread._workCompleteTimer);
+  thread._workCompleteTimer = setTimeout(() => finalizePrototypeWorkTask(threadId), 2800);
+}
+
+function finalizePrototypeWorkTask(threadId) {
+  const thread = getSarahRuntime().threads[threadId];
+  if (!thread || thread.workCompleted) return;
+  thread.workCompleted = true;
+  const taskTitle = getPersonalThreadHeadline(thread);
+  const report = [
+    'Task steps executed (prototype).',
+    'Deliverable saved in this Work thread.',
+    'Open the thread for the completion summary.',
+  ];
+  thread.messages.push({
+    role: 'assistant',
+    markdown: `**Task completed**\n\n**${taskTitle}**\n\n${report.map((l) => `- ${l}`).join('\n')}\n\n_Tap **My Notifications** for the completion record._`,
+  });
+  if (getSarahRuntime().activeThreadId === threadId) renderThread();
+  appendSarahWorkInboxNotification({ threadId, taskTitle, reportLines: report });
 }
 
 const GALLERY_SIZE = 6;
@@ -2286,10 +5673,49 @@ function getCompanyProducts(company) {
   ];
 }
 
+/** Chat media + listing paths proxied on sarah.ziricai.com */
+function resolveApiMediaUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return raw;
+  try {
+    const u = new URL(raw, window.location.origin);
+    if (
+      (u.pathname.includes('/api/chat/media/') || u.pathname.includes('/api/network/v1/listing-media/')) &&
+      u.pathname.endsWith('/content')
+    ) {
+      return `${window.location.origin}${u.pathname}${u.search}`;
+    }
+  } catch {
+    // ignore
+  }
+  if (raw.startsWith('/api/chat/media/') || raw.startsWith('/api/network/v1/listing-media/')) {
+    return `${window.location.origin}${raw}`;
+  }
+  return raw;
+}
+
+/** Portal uploads → same-origin /api/network/v1/listing-media/… (Netlify proxies to API). */
+function resolveListingMediaUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return raw;
+  try {
+    const u = new URL(raw, window.location.origin);
+    if (u.pathname.includes('/api/network/v1/listing-media/') && u.pathname.endsWith('/content')) {
+      return `${window.location.origin}${u.pathname}${u.search}`;
+    }
+  } catch {
+  }
+  if (raw.startsWith('/api/network/v1/listing-media/')) {
+    return `${window.location.origin}${raw}`;
+  }
+  return raw;
+}
+
 function discoverImgAttrs(src, company) {
   const fallback = company.imageFallback || company.image || 'assets/discover/green-haven-fallback.svg';
-  const safeFb = escapeHtml(fallback);
-  const safeSrc = escapeHtml(src);
+  const safeFb = escapeHtml(prototypeAsset(fallback));
+  const resolved = resolveListingMediaUrl(src) || src;
+  const safeSrc = escapeHtml(prototypeAsset(resolved));
   return `src="${safeSrc}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.fb)return;this.dataset.fb=1;this.src='${safeFb}'"`;
 }
 
@@ -2563,42 +5989,55 @@ function bindGalleryLightbox() {
   });
 }
 
-async function renderChatsList() {
-  const host = document.getElementById('chatsList');
-  if (!host) return;
-  const gen = ++chatsListLoadGen;
-  const q = (document.getElementById('chatsTabSearchInput')?.value || '').trim().toLowerCase();
-
-  let chats = getAllChats();
-  if (consumerChatLiveActive()) {
-    const res = await window.SarahLive.fetchChatConversations('all');
-    if (gen !== chatsListLoadGen) return;
-  const payload = res.data || {};
-    const conversations = payload.conversations;
-    if (!res.error && Array.isArray(conversations) && conversations.length) {
-      chats = conversations.map(mapFederatedConversationToChatRow);
-    }
+async function refreshChatsTabOrgSearch(rawQuery) {
+  const q = String(rawQuery || '').trim();
+  if (q.length < 2) {
+    chatsTabOrgSearch.query = '';
+    chatsTabOrgSearch.loading = false;
+    chatsTabOrgSearch.companies = [];
+    return;
   }
+  if (chatsTabOrgSearch.query === q && chatsTabOrgSearch.companies.length && !chatsTabOrgSearch.loading) return;
+  chatsTabOrgSearch.query = q;
+  if (discoverLiveActive() && window.SarahLive?.fetchDiscoverCompanies) {
+    chatsTabOrgSearch.loading = true;
+    const res = await window.SarahLive.fetchDiscoverCompanies({ q, category: 'all' });
+    chatsTabOrgSearch.loading = false;
+    if (chatsTabOrgSearch.query !== q) return;
+    const cards = (res.error ? [] : res.data?.companies || []).map(mapLiveDiscoverCard);
+    chatsTabOrgSearch.companies = cards;
+    cards.forEach((c) => liveDiscover.byId.set(c.id, c));
+    return;
+  }
+  chatsTabOrgSearch.companies = filterDiscoverListings(MOCK_DISCOVER_COMPANIES || [], 'all', q);
+}
 
-  chats = chats.filter((c) => {
-    if (!q) return true;
-    return `${c.name} ${c.preview}`.toLowerCase().includes(q);
-  });
-
-  host.innerHTML = chats
-    .map(
-      (c) => `
+function renderChatRowHtml(c) {
+  return `
     <div class="chat-row" data-open-thread="${escapeHtml(c.id)}" data-company="${c.company ? '1' : '0'}" data-company-id="${escapeHtml(c.company ? c.id : '')}" data-conv-id="${escapeHtml(c.convId || '')}" data-kind="${escapeHtml(c.conversationKind || '')}" role="button" tabindex="0">
       <img class="avatar avatar-sm chat-row-avatar" src="${escapeHtml(prototypeAsset(resolveItemAvatar(c)))}" alt="" width="44" height="44" ${profileImgOnError((c.avatarKey && COMPANY_AVATARS?.[c.avatarKey]) || MOCK_PROFILE.avatarFallback)} />
       <div class="meta">
         <div class="name">${escapeHtml(c.name)}${c.company ? ` ${verifiedBadge}` : ''}</div>
         <div class="preview">${escapeHtml(c.preview)}</div>
       </div>
-      <div class="time">${escapeHtml(c.time)}</div>
-    </div>`
-    )
-    .join('');
+      <div class="time">${escapeHtml(c.time || '')}</div>
+    </div>`;
+}
 
+function renderChatsTabOrgRowHtml(company) {
+  const preview = company.address || company.categoryLabel || 'Sarah Network business';
+  return `
+    <div class="chat-row chat-row--org" data-start-company-chat="${escapeHtml(company.id)}" role="button" tabindex="0">
+      <img class="avatar avatar-sm chat-row-avatar" src="${escapeHtml(prototypeAsset(companyAvatarUrl(company)))}" alt="" width="44" height="44" ${profileImgOnError(company.imageFallback || MOCK_PROFILE.avatarFallback)} />
+      <div class="meta">
+        <div class="name">${escapeHtml(company.name)}${company.verified ? ` ${verifiedBadge}` : ''}</div>
+        <div class="preview">${escapeHtml(preview)}</div>
+      </div>
+      <div class="time chats-org-cta">Message</div>
+    </div>`;
+}
+
+function bindChatsListInteractions(host) {
   host.querySelectorAll('[data-open-thread]').forEach((row) => {
     const open = () => openChatFromList(row.dataset.openThread || 'smilemore-demo', row);
     row.addEventListener('click', open);
@@ -2609,6 +6048,87 @@ async function renderChatsList() {
       }
     });
   });
+  host.querySelectorAll('[data-start-company-chat]').forEach((row) => {
+    const start = () => void openCompanySarahChat(row.dataset.startCompanyChat || '');
+    row.addEventListener('click', start);
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        start();
+      }
+    });
+  });
+}
+
+async function renderChatsList() {
+  const host = document.getElementById('chatsList');
+  if (!host) return;
+  const qRaw = (document.getElementById('chatsTabSearchInput')?.value || '').trim();
+  const q = qRaw.toLowerCase();
+  const now = Date.now();
+  if (
+    !q &&
+    chatsListLastFetchAt &&
+    now - chatsListLastFetchAt < CHATS_LIST_FETCH_MIN_MS &&
+    host.querySelector('.chat-row, .chats-list-empty, .chats-list-hint')
+  ) {
+    return;
+  }
+  const gen = ++chatsListLoadGen;
+
+  let chats = getAllChats();
+  if (consumerChatLiveActive()) {
+    const searchApi = q.length >= 2 && window.SarahLive?.searchChatThreads;
+  const res =
+      searchApi
+        ? await window.SarahLive.searchChatThreads(qRaw)
+        : await window.SarahLive.fetchChatConversations('all');
+    if (gen !== chatsListLoadGen) return;
+    const payload = res.data || {};
+    const conversations = payload.conversations;
+    if (!res.error && Array.isArray(conversations) && (searchApi || conversations.length)) {
+      chats = conversations.map(mapFederatedConversationToChatRow);
+    }
+  }
+
+  if (!consumerChatLiveActive() || !window.SarahLive?.searchChatThreads) {
+    chats = chats.filter((c) => {
+      if (!q) return true;
+      return `${c.name} ${c.preview}`.toLowerCase().includes(q);
+    });
+  }
+
+  let orgSection = '';
+  if (q.length >= 2) {
+    await refreshChatsTabOrgSearch(qRaw);
+    if (gen !== chatsListLoadGen) return;
+    const existingCompanyIds = new Set(
+      chats.filter((c) => c.company).map((c) => String(c.id || c.companyId || '').toLowerCase()).filter(Boolean)
+    );
+    const orgHits = chatsTabOrgSearch.companies.filter((co) => !existingCompanyIds.has(String(co.id || '').toLowerCase()));
+    if (chatsTabOrgSearch.loading && !orgHits.length) {
+      orgSection = '<p class="chats-list-hint">Searching Sarah Network…</p>';
+    } else if (orgHits.length) {
+      orgSection = `<p class="chats-list-section">Businesses on Sarah Network</p>${orgHits.map((co) => renderChatsTabOrgRowHtml(co)).join('')}`;
+    }
+  }
+
+  const chatSection =
+    chats.length || !q
+      ? chats.map((c) => renderChatRowHtml(c)).join('')
+      : '<p class="chats-list-empty">No existing chats match that search.</p>';
+
+  if (!q && !chats.length) {
+    host.innerHTML = '<p class="chats-list-empty">Your conversations will appear here. Search for a business to start chatting with Company Sarah.</p>';
+  } else if (!chats.length && !orgSection && q.length >= 2 && !chatsTabOrgSearch.loading) {
+    host.innerHTML =
+      '<p class="chats-list-empty">No chats or businesses match that search. Try another name or open Discover.</p>';
+  } else {
+    host.innerHTML = `${q && chats.length ? '<p class="chats-list-section">Your chats</p>' : ''}${chatSection}${orgSection}`;
+  }
+  if (!q) chatsListLastFetchAt = Date.now();
+
+  bindChatsListInteractions(host);
 }
 
 function mkClassificationShort(classification) {
@@ -4945,6 +8465,9 @@ function discardValuesPrinciplesEdits() {
 
 function renderMkValuesForm(data) {
   const v = data || {};
+  const identity = loadPersonalIdentity();
+  const behavior = { ...getSarahBehaviorFromIdentity(identity), ...(v.sarahBehavior || {}) };
+  const boundaryBehavior = SARAH_BEHAVIOR_VALUES_KEYS.map((k) => mkBehaviorSelectField(k, behavior)).join('');
   return `
     <form id="mkValuesForm" class="ms-knowledge-form">
       <div class="ms-knowledge-values-callout" role="note">
@@ -4971,25 +8494,15 @@ function renderMkValuesForm(data) {
           <label class="ms-knowledge-label" for="val_causes">Causes &amp; communities you care about</label>
           <textarea class="ms-knowledge-textarea" id="val_causes" name="causesCommunities" rows="2" placeholder="Causes or communities you care about">${escapeHtml(v.causesCommunities || '')}</textarea>
         </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="val_civic">Political or civic stance <span class="ms-knowledge-optional">(high level)</span></label>
-          <textarea class="ms-knowledge-textarea" id="val_civic" name="politicalCivicNote" rows="2" placeholder="How Sarah should respect civic topics — not detailed manifestos unless you want">${escapeHtml(v.politicalCivicNote || '')}</textarea>
-        </div>
       </fieldset>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Boundaries for Sarah</legend>
+        <p class="ms-knowledge-detail-note">Pick how Sarah should handle values and sensitive topics.</p>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="val_rel">Relationship &amp; consent boundaries</label>
-          <textarea class="ms-knowledge-textarea" id="val_rel" name="relationshipConsentBoundaries" rows="2" placeholder="Topics to tread lightly on, confidentiality expectations…">${escapeHtml(v.relationshipConsentBoundaries || '')}</textarea>
+          <textarea class="ms-knowledge-textarea" id="val_rel" name="relationshipConsentBoundaries" rows="2" placeholder="Optional: names or situations Sarah should treat carefully…">${escapeHtml(v.relationshipConsentBoundaries || '')}</textarea>
         </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="val_avoid">Topics to avoid or minimise</label>
-          <textarea class="ms-knowledge-textarea" id="val_avoid" name="topicsToAvoid" rows="2" placeholder="Topics Sarah should not bring up unless you do">${escapeHtml(v.topicsToAvoid || '')}</textarea>
-        </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="val_how">How Sarah should use this when advising</label>
-          <textarea class="ms-knowledge-textarea" id="val_how" name="howSarahShouldWeigh" rows="2" placeholder="e.g. flag conflicts with values; never moralise; ask before quoting this in summaries">${escapeHtml(v.howSarahShouldWeigh || '')}</textarea>
-        </div>
+        ${boundaryBehavior}
       </fieldset>
       <div class="ms-knowledge-form-actions">
         <button type="button" class="btn btn-secondary" id="mkValuesReset">Reset to defaults</button>
@@ -5007,8 +8520,6 @@ function collectValuesPrinciplesFromForm(form) {
     'causesCommunities',
     'politicalCivicNote',
     'relationshipConsentBoundaries',
-    'topicsToAvoid',
-    'howSarahShouldWeigh',
   ];
   const out = {};
   keys.forEach((k) => {
@@ -5024,20 +8535,79 @@ function setMkKnowledgeViewMode(mode) {
   if (detail) detail.classList.toggle('hidden', mode !== 'detail');
 }
 
-const MK_RESPONSE_STYLE_OPTIONS = [
-  { value: 'short', label: 'Short answers' },
-  { value: 'detailed', label: 'Detailed answers' },
-  { value: 'formal', label: 'Formal tone' },
-  { value: 'casual', label: 'Casual tone' },
-  { value: 'step_by_step', label: 'Step-by-step' },
+const SARAH_BEHAVIOR_IDENTITY_KEYS = [
+  'responseStyle',
+  'communicationTone',
+  'answerLength',
+  'proactivity',
+  'whenUnsure',
+  'citeKnowledge',
 ];
+
+const SARAH_BEHAVIOR_VALUES_KEYS = ['howSarahShouldWeigh', 'civicTopics', 'sensitiveTopics', 'topicsToAvoid'];
+
+function getSarahBehaviorFromIdentity(data) {
+  const d = data || {};
+  const b = { ...(d.sarahBehavior || {}) };
+  if (d.responseStyle && !b.responseStyle) b.responseStyle = d.responseStyle;
+  return b;
+}
+
+function mkBehaviorSelectField(fieldKey, behavior) {
+  const field = window.SARAH_BEHAVIOR_FIELDS?.[fieldKey];
+  if (!field) return '';
+  const sel = behavior?.[fieldKey] || field.default;
+  const opts = field.options
+    .map((o) => `<option value="${escapeHtml(o.value)}"${sel === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`)
+    .join('');
+  return `
+    <div class="ms-knowledge-field-row">
+      <label class="ms-knowledge-label" for="sb_${escapeHtml(fieldKey)}">${escapeHtml(field.label)}</label>
+      <select class="ms-knowledge-input" id="sb_${escapeHtml(fieldKey)}" name="sarahBehavior_${escapeHtml(fieldKey)}">${opts}</select>
+    </div>`;
+}
+
+function collectSarahBehaviorFromForm(form, keys) {
+  const behavior = {};
+  for (const key of keys) {
+    const el = form.elements.namedItem(`sarahBehavior_${key}`);
+    if (el && 'value' in el) behavior[key] = String(el.value || '');
+  }
+  return behavior;
+}
+
+async function syncPersonalProfileKnowledge(identity) {
+  if (!personalSarahLiveActive() || !window.SarahLive?.upsertPersonalKnowledgeSection) return;
+  const payload = {
+    version: 1,
+    fullName: identity.fullName || '',
+    preferredName: identity.preferredName || '',
+    dateOfBirth: identity.dateOfBirth || '',
+    preferredLanguage: identity.preferredLanguage || '',
+    country: identity.country || '',
+    city: identity.city || '',
+    locationNote: identity.locationNote || '',
+    nationalityBackground: identity.nationalityBackground || '',
+    educationQualifications: identity.educationQualifications || '',
+    personalBiography: identity.personalBiography || '',
+    importantLifeExperiences: identity.importantLifeExperiences || '',
+    skillsExpertise: identity.skillsExpertise || '',
+    interestsHobbies: identity.interestsHobbies || '',
+    enjoysDislikes: identity.enjoysDislikes || '',
+    personalValues: identity.personalValues || '',
+    strengthsImprove: identity.strengthsImprove || '',
+    sarahBehavior: identity.sarahBehavior || {},
+  };
+  await window.SarahLive.upsertPersonalKnowledgeSection('personal_profile', {
+    content: JSON.stringify(payload),
+    sarahMayUse: true,
+  });
+}
 
 function renderMkPersonalIdentityForm(data) {
   const d = data || {};
-  const opts = MK_RESPONSE_STYLE_OPTIONS.map((o) => {
-    const sel = (d.responseStyle || 'detailed') === o.value ? ' selected' : '';
-    return `<option value="${escapeHtml(o.value)}"${sel}>${escapeHtml(o.label)}</option>`;
-  }).join('');
+  const behavior = getSarahBehaviorFromIdentity(d);
+  const behaviorFields = SARAH_BEHAVIOR_IDENTITY_KEYS.map((k) => mkBehaviorSelectField(k, behavior)).join('');
   return `
     <form id="mkIdentityForm" class="ms-knowledge-form" autocomplete="on">
       <p class="ms-knowledge-detail-note">Edits save in this browser for the prototype. Sync to your account arrives with the My Knowledge API.</p>
@@ -5112,14 +8682,8 @@ function renderMkPersonalIdentityForm(data) {
 
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">How Sarah should respond</legend>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="mk_communicationPreferences">Communication preferences</label>
-          <textarea class="ms-knowledge-textarea" id="mk_communicationPreferences" name="communicationPreferences" rows="3" placeholder="Tone, length, when to be direct">${escapeHtml(d.communicationPreferences || '')}</textarea>
-        </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="mk_responseStyle">Preferred response style</label>
-          <select class="ms-knowledge-input" id="mk_responseStyle" name="responseStyle">${opts}</select>
-        </div>
+        <p class="ms-knowledge-detail-note">Choose how Sarah talks and acts — no need to write instructions in your own words.</p>
+        ${behaviorFields}
       </fieldset>
 
       <fieldset class="ms-knowledge-fieldset">
@@ -5661,10 +9225,16 @@ function bindMkCategoryDetailOnce() {
       const fd = new FormData(form);
       const partial = {};
       fd.forEach((val, key) => {
+        if (String(key).startsWith('sarahBehavior_')) return;
         partial[key] = typeof val === 'string' ? val : String(val || '');
       });
-      savePersonalIdentity(partial);
-      showProtoToast('Personal identity saved (this device)');
+      const behavior = collectSarahBehaviorFromForm(form, SARAH_BEHAVIOR_IDENTITY_KEYS);
+      const prev = loadPersonalIdentity();
+      partial.sarahBehavior = { ...(prev.sarahBehavior || {}), ...behavior };
+      partial.responseStyle = partial.sarahBehavior.responseStyle || partial.responseStyle;
+      const saved = savePersonalIdentity(partial);
+      void syncPersonalProfileKnowledge(saved);
+      showProtoToast('Personal identity and Sarah preferences saved');
       return;
     }
     if (form.id === 'mkFamilyForm') {
@@ -5738,8 +9308,17 @@ function bindMkCategoryDetailOnce() {
       return;
     }
     if (form.id === 'mkValuesForm') {
-      saveValuesPrinciples(collectValuesPrinciplesFromForm(form));
-      showProtoToast('Values & principles saved (this device)');
+      const values = collectValuesPrinciplesFromForm(form);
+      saveValuesPrinciples(values);
+      const behaviorPart = collectSarahBehaviorFromForm(form, SARAH_BEHAVIOR_VALUES_KEYS);
+      const identity = loadPersonalIdentity();
+      const merged = {
+        ...identity,
+        sarahBehavior: { ...(identity.sarahBehavior || {}), ...behaviorPart },
+      };
+      savePersonalIdentity(merged);
+      void syncPersonalProfileKnowledge(merged);
+      showProtoToast('Values and Sarah boundaries saved');
     }
   });
 }
@@ -6514,6 +10093,13 @@ function bindMySarahInteractions() {
   document.querySelectorAll('.ms-segment-btn[data-ms-mode]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const mode = btn.dataset.msMode || 'chat';
+      const panel = document.querySelector('.my-sarah-view')?.dataset.msPanel || 'home';
+      if (panel === 'home') {
+        setMsHomeCardMode(mode);
+        syncMsSegment('home');
+        void renderSarahHomeIntelligence();
+        return;
+      }
       setMySarahPanel(mode === 'work' ? 'tasks' : 'home');
     });
   });
@@ -6537,6 +10123,8 @@ function bindMySarahInteractions() {
 function renderMySarahHistoryFromThreads() {
   const historyHost = document.getElementById('msHistoryList');
   if (!historyHost || personalSarahUsesMockThreads()) return;
+  const msPanel = document.querySelector('.my-sarah-view')?.dataset.msPanel;
+  if (msPanel === 'tasks') return;
   const threads = listPersonalThreads().slice(0, 8);
   if (!threads.length) {
     historyHost.innerHTML = '<p class="ms-thread-empty" style="padding:8px 12px">No chats yet — start a conversation below.</p>';
@@ -7024,28 +10612,788 @@ function renderSarahPayPanel() {
   });
 }
 
-function renderMySarahBilling() {
+const SARAH_TIER_SKU = {
+  free: 'rs02.sarah.free.zar.monthly',
+  plus: 'rs02.sarah.plus.zar.monthly',
+  premium: 'rs02.sarah.premium.zar.monthly',
+  ultimate: 'rs02.sarah.ultimate.zar.monthly',
+};
+
+const SARAH_DEFAULT_TOPUP_SKU = 'rs06.credits.consumer.500.zar';
+
+async function maybeCompleteCheckoutReturn() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkoutCancelled') === '1') {
+      params.delete('checkoutCancelled');
+      const qs0 = params.toString();
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${qs0 ? `?${qs0}` : ''}${window.location.hash || ''}`
+      );
+      showProtoToast('Checkout cancelled.');
+      return;
+    }
+    const ref = params.get('checkoutRef') || params.get('reference');
+    if (!ref || !window.SarahLive?.verifyConsumerCheckout) return;
+    if (!personalSarahLiveActive()) return;
+    const res = await window.SarahLive.verifyConsumerCheckout(ref);
+    params.delete('checkoutRef');
+    params.delete('reference');
+    const qs = params.toString();
+    const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash || ''}`;
+    window.history.replaceState({}, '', next);
+    if (res.error) {
+      showProtoToast(res.error);
+      return;
+    }
+    const creditTopUp = res.checkoutKind === 'rs06_credit_pack';
+    if (creditTopUp) {
+      const bal = res.topUpBalanceCredits != null ? formatSarahCredits(res.topUpBalanceCredits) : '';
+      showProtoToast(
+        res.duplicate
+          ? 'Top-up already applied.'
+          : `Payment confirmed. +${res.creditsAdded || 500} credits${bal ? ` · balance ${bal}` : ''}.`
+      );
+      void refreshSarahPlanUsageUi(['billing', 'profile', 'account']);
+    } else {
+      showProtoToast(res.duplicate ? 'Plan already active.' : 'Payment confirmed. Plan updated.');
+    }
+    await refreshWorkQuotaState();
+    renderWorkQuotaBanner();
+    setMySarahPanel('billing');
+  } catch {
+    /* non-fatal */
+  }
+}
+
+const HOME_CARD_GRID_SIZE = 4;
+
+function homeCardLaunchMessage(card) {
+  const prompt = String(card?.prompt || '').trim();
+  if (prompt) return prompt;
+  const title = String(card?.title || 'this').trim();
+  const lines = Array.isArray(card?.lines)
+    ? card.lines.join(' ')
+    : Array.isArray(card?.statements)
+      ? card.statements.join(' ')
+      : '';
+  return `I'd like help with "${title}".${lines ? ` ${lines}` : ''} Please guide me step by step.`;
+}
+
+function parseHomeCardPayload(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(decodeURIComponent(raw));
+  } catch {
+    return null;
+  }
+}
+
+function selectHomeCardsForGrid(primary, extra, prefs, mode) {
+  const dismissed = new Set((prefs?.dismissed || []).map(String));
+  const pool = [...(primary || []), ...(extra || []), ...MOCK_MY_SARAH_QUICK, ...MOCK_MY_SARAH_QUICK_EXTRA];
+  const seen = new Set();
+  const out = [];
+  for (const c of pool) {
+    if (!c?.id || dismissed.has(c.id) || seen.has(c.id)) continue;
+    seen.add(c.id);
+    out.push(c);
+    if (out.length >= HOME_CARD_GRID_SIZE) break;
+  }
+  if (!out.length && mode === 'work') {
+    return pool.slice(0, HOME_CARD_GRID_SIZE);
+  }
+  return out;
+}
+
+async function activateSarahHomeCard(card) {
+  const action = card?.action;
+  const work = msHomeCardMode() === 'work';
+  const message = homeCardLaunchMessage(card);
+
+  if (action?.type === 'mode' && action.mode === 'work') {
+    setMsHomeCardMode('work');
+    syncMsSegment('home');
+    void renderSarahHomeIntelligence();
+  }
+
+  if (action?.type === 'thread' && action.sessionId) {
+    const sid = action.sessionId;
+    await openPersonalSarahThread(sid);
+    if (message) {
+      await deliverPersonalSarahMessage(message, { threadId: sid, work });
+    }
+    return;
+  }
+
+  const input = document.getElementById('personalChatInput');
+  if (input) input.value = '';
+  await deliverPersonalSarahMessage(message, { fromHomeCompose: true, work });
+}
+
+function bindSarahHomeCardAction(card) {
+  const action = card?.action;
+  if (!action) return false;
+  if (action.type === 'panel' && action.panel) {
+    setMySarahPanel(action.panel);
+    return true;
+  }
+  if (action.type === 'route' && action.route === 'discover') {
+    setRoute('discover');
+    return true;
+  }
+  if (action.type === 'route' && action.route === 'profile') {
+    setRoute('profile');
+    return true;
+  }
+  if (action.type === 'thread' && action.sessionId) {
+    openPersonalSarahThread(action.sessionId);
+    return true;
+  }
+  if (action.type === 'mode' && action.mode === 'work') {
+    setMsHomeCardMode('work');
+    syncMsSegment('home');
+    void renderSarahHomeIntelligence();
+    return true;
+  }
+  if (action.type === 'entity' && action.snId) {
+    location.hash = `discover-company/${encodeURIComponent(action.snId)}`;
+    return true;
+  }
+  return false;
+}
+
+function readLocalSarahHomePrefs() {
+  if (window.SarahLive?.readSarahHomePrefs) return window.SarahLive.readSarahHomePrefs();
+  try {
+    return JSON.parse(sessionStorage.getItem('sarah.home.prefs') || '{}');
+  } catch {
+    return { dismissed: [], pinned: [], staticHome: false };
+  }
+}
+
+function writeLocalSarahHomePrefs(prefs) {
+  if (window.SarahLive?.saveSarahHomePrefsLocal) window.SarahLive.saveSarahHomePrefsLocal(prefs);
+  else sessionStorage.setItem('sarah.home.prefs', JSON.stringify(prefs));
+}
+
+function dismissSarahHomeCard(cardId) {
+  if (!cardId) return;
+  const prefs = readLocalSarahHomePrefs();
+  const dismissed = new Set([...(prefs.dismissed || []), cardId]);
+  writeLocalSarahHomePrefs({ ...prefs, dismissed: [...dismissed] });
+  void renderSarahHomeIntelligence();
+}
+
+function renderHomeCardMarkup(q, { showDismiss = false } = {}) {
+  const statements = Array.isArray(q.lines)
+    ? q.lines
+    : Array.isArray(q.statements)
+      ? q.statements
+      : q.subtitle
+        ? [q.subtitle]
+        : [];
+  const statementLines = statements.map((line) => `<li class="ms-quick-sub">${escapeHtml(line)}</li>`).join('');
+  const reason = q.reason ? `<p class="ms-quick-reason">${escapeHtml(q.reason)}</p>` : '';
+  const prompt = q.prompt || '';
+  const dismiss =
+    showDismiss && q.id
+      ? `<button type="button" class="ms-quick-dismiss" data-dismiss-card="${escapeHtml(q.id)}" aria-label="Dismiss suggestion">×</button>`
+      : '';
+  return `
+    <div class="ms-quick-card-wrap">
+      ${dismiss}
+      <button type="button" class="ms-quick-card" data-card-id="${escapeHtml(q.id || '')}" data-quick-prompt="${escapeHtml(prompt)}" data-card-action="${encodeURIComponent(JSON.stringify(q.action || null))}" data-card-payload="${encodeURIComponent(JSON.stringify({ id: q.id, title: q.title, prompt: q.prompt, lines: q.lines || q.statements, action: q.action || null }))}">
+        <span class="ms-quick-icon">${MS_QUICK_ICONS[q.icon] || MS_QUICK_ICONS.insight}</span>
+        <span class="ms-quick-title">${escapeHtml(q.title)}</span>
+        ${reason}
+        <ul class="ms-quick-statements">${statementLines}</ul>
+      </button>
+    </div>`;
+}
+
+function bindHomeCardClicks(host) {
+  if (!host) return;
+  host.querySelectorAll('.ms-quick-dismiss').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissSarahHomeCard(btn.getAttribute('data-dismiss-card'));
+    });
+  });
+  host.querySelectorAll('.ms-quick-card').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const card = parseHomeCardPayload(btn.getAttribute('data-card-payload'));
+      if (card) void activateSarahHomeCard(card);
+    });
+  });
+}
+
+async function renderSarahHomeIntelligence() {
+  const quickHost = document.getElementById('msQuickGrid');
+  const moreHost = document.getElementById('msHomeMore');
+  const prefsHost = document.getElementById('msHomePrefs');
+  const staticBox = document.getElementById('msHomeStaticPref');
+  const greetingEl = document.querySelector('.ms-greeting-bubble');
+  if (!quickHost) return;
+
+  let cards = MOCK_MY_SARAH_QUICK;
+  let moreCards = [];
+  let greeting = null;
+  const mode = msHomeCardMode();
+  const live = personalSarahLiveActive() && window.SarahLive?.fetchSarahHomeCards;
+
+  if (prefsHost) prefsHost.classList.toggle('hidden', !live);
+  const prefs = readLocalSarahHomePrefs();
+  if (staticBox) staticBox.checked = Boolean(prefs.staticHome);
+
+  if (live) {
+    const res = await window.SarahLive.fetchSarahHomeCards(mode);
+    if (!res.error) {
+      moreCards = res.moreCards || [];
+      greeting = res.greeting;
+      cards = selectHomeCardsForGrid(res.cards || [], moreCards, prefs, mode);
+    }
+  } else {
+    cards = selectHomeCardsForGrid(MOCK_MY_SARAH_QUICK, MOCK_MY_SARAH_QUICK_EXTRA, prefs, mode);
+  }
+
+  const liveProfile = window.SarahLive?.getConsumerProfile?.();
+  const greetName = consumerDisplayFirstName(liveProfile) || MOCK_USER.name;
+
+  if (greetingEl) greetingEl.textContent = sarahHomeGreetingText(greetName);
+
+  quickHost.innerHTML = cards
+    .slice(0, HOME_CARD_GRID_SIZE)
+    .map((q) => renderHomeCardMarkup(q, { showDismiss: true }))
+    .join('');
+  bindHomeCardClicks(quickHost);
+
+  if (moreHost) {
+    moreHost.classList.add('hidden');
+    moreHost.innerHTML = '';
+  }
+}
+
+if (!window.__sarahHomeStaticBound) {
+  window.__sarahHomeStaticBound = true;
+  document.addEventListener(
+    'change',
+    (e) => {
+      if (e.target?.id !== 'msHomeStaticPref') return;
+      const prefs = readLocalSarahHomePrefs();
+      writeLocalSarahHomePrefs({ ...prefs, staticHome: Boolean(e.target.checked) });
+      void renderSarahHomeIntelligence();
+    },
+    true
+  );
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    syncSarahTimeGreetings();
+    const panel = document.querySelector('.my-sarah-view')?.dataset.msPanel;
+    if (panel === 'home') void renderSarahHomeIntelligence();
+  });
+}
+
+const SARAH_MONTHLY_CREDITS_BY_TIER_ID = {
+  free: 250,
+  plus: 2800,
+  premium: 5500,
+  ultimate: 11000,
+};
+
+function tierIdFromSkuId(skuId) {
+  const id = String(skuId || '');
+  if (id.includes('.ultimate.')) return 'ultimate';
+  if (id.includes('.premium.')) return 'premium';
+  if (id.includes('.plus.')) return 'plus';
+  return 'free';
+}
+
+function formatSarahCredits(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return n >= 1000 ? n.toLocaleString('en-ZA') : String(Math.round(n * 10) / 10);
+}
+
+const SARAH_USAGE_ARCHETYPE_LABELS = {
+  'CHAT-TURN': 'Chat',
+  'CHAT-TOOL': 'Chat (tools)',
+  'WORK-STEP': 'Sarah Work',
+  'WORK-SUBMIT': 'Work submission',
+  'DOC-SMALL': 'Document',
+  DEMO: 'Preview',
+};
+
+function labelSarahUsageEvent(ev = {}) {
+  const archetype = String(ev.archetype || '').trim().toUpperCase();
+  if (archetype && SARAH_USAGE_ARCHETYPE_LABELS[archetype]) return SARAH_USAGE_ARCHETYPE_LABELS[archetype];
+  const surface = String(ev.surface || '').toLowerCase();
+  if (surface.includes('work')) return 'Sarah Work';
+  if (surface.includes('personal') || surface.includes('chat')) return 'Chat';
+  return archetype || 'AI activity';
+}
+
+function sarahUsageEventSurfaceKind(ev = {}) {
+  const archetype = String(ev.archetype || '').trim().toUpperCase();
+  if (archetype.startsWith('WORK')) return 'work';
+  const surface = String(ev.surface || '').toLowerCase();
+  if (surface.includes('work')) return 'work';
+  return 'chat';
+}
+
+function filterSarahUsageEvents(rows, filter = 'all') {
+  const list = Array.isArray(rows) ? rows : [];
+  if (filter === 'work') return list.filter((ev) => sarahUsageEventSurfaceKind(ev) === 'work');
+  if (filter === 'chat') return list.filter((ev) => sarahUsageEventSurfaceKind(ev) === 'chat');
+  return list;
+}
+
+function formatSarahUsageWhen(iso) {
+  if (!iso) return 'Just now';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'Recently';
+  const now = Date.now();
+  const diffMs = now - d.getTime();
+  if (diffMs < 60_000) return 'Just now';
+  if (diffMs < 86_400_000) {
+    return d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+  }
+  return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function buildSarahPlanUsageHistoryMarkup(snap, { limit = 10, compact = false, surfaceFilter = 'all' } = {}) {
+  const filtered = filterSarahUsageEvents(snap.recentUsage, surfaceFilter);
+  const rows = filtered.slice(0, limit);
+  if (!snap.live) {
+    return compact
+      ? ''
+      : `<section class="sarah-plan-usage-history" aria-labelledby="sarahUsageHistoryTitle">
+          <h3 class="sarah-plan-usage-history-title" id="sarahUsageHistoryTitle">Recent activity</h3>
+          <p class="sarah-plan-usage-meta">Sign in to see credit usage for this billing period.</p>
+        </section>`;
+  }
+  const filterBar = compact
+    ? ''
+    : `<div class="sarah-usage-surface-filter" role="tablist" aria-label="Filter activity">
+        <button type="button" class="ms-link-btn sarah-usage-filter-btn${surfaceFilter === 'all' ? ' is-active' : ''}" data-sarah-usage-filter="all">All</button>
+        <button type="button" class="ms-link-btn sarah-usage-filter-btn${surfaceFilter === 'chat' ? ' is-active' : ''}" data-sarah-usage-filter="chat">Chat</button>
+        <button type="button" class="ms-link-btn sarah-usage-filter-btn${surfaceFilter === 'work' ? ' is-active' : ''}" data-sarah-usage-filter="work">Sarah Work</button>
+      </div>`;
+  if (!rows.length) {
+    return `<section class="sarah-plan-usage-history" aria-labelledby="sarahUsageHistoryTitle">
+      <h3 class="sarah-plan-usage-history-title" id="sarahUsageHistoryTitle">Recent activity</h3>
+      ${filterBar}
+      <p class="sarah-plan-usage-meta">${
+        surfaceFilter === 'work'
+          ? 'No Sarah Work credit usage this period yet.'
+          : surfaceFilter === 'chat'
+            ? 'No chat credit usage this period yet.'
+            : 'No credit usage recorded this period yet. Chat with Sarah to see activity here.'
+      }</p>
+    </section>`;
+  }
+  const list = rows
+    .map((ev) => {
+      const label = labelSarahUsageEvent(ev);
+      const credits = formatSarahCredits(ev.credits);
+      const when = formatSarahUsageWhen(ev.at);
+      const preview = ev.messagePreview ? String(ev.messagePreview).trim() : '';
+      const openLabel = sarahUsageEventSurfaceKind(ev) === 'work' ? 'Open task' : 'Open chat';
+      const sessionBtn =
+        ev.sessionId && !compact
+          ? `<button type="button" class="ms-link-btn sarah-usage-open-thread" data-session-id="${escapeHtml(String(ev.sessionId))}">${escapeHtml(openLabel)}</button>`
+          : '';
+      return `<li class="sarah-plan-usage-history-item">
+        <span class="sarah-plan-usage-history-main">
+          <span class="sarah-plan-usage-history-label">${escapeHtml(label)}</span>
+          ${preview ? `<span class="sarah-plan-usage-history-preview">${escapeHtml(preview)}</span>` : ''}
+          <span class="sarah-plan-usage-history-when">${escapeHtml(when)}</span>
+        </span>
+        <span class="sarah-plan-usage-history-credits">−${escapeHtml(credits)}</span>
+        ${sessionBtn}
+      </li>`;
+    })
+    .join('');
+  const more =
+    compact && Array.isArray(snap.recentUsage) && snap.recentUsage.length > limit
+      ? `<button type="button" class="ms-link-btn" data-sarah-usage-open-billing>View all in Billing</button>`
+      : '';
+  return `<section class="sarah-plan-usage-history" aria-labelledby="sarahUsageHistoryTitle">
+    <h3 class="sarah-plan-usage-history-title" id="sarahUsageHistoryTitle">Recent activity</h3>
+    ${filterBar}
+    <ul class="sarah-plan-usage-history-list">${list}</ul>
+    ${more}
+  </section>`;
+}
+
+async function fetchSarahPlanUsageSnapshot() {
+  let tierName = currentBillingTier().name;
+  let tierId = currentBillingTier().id;
+  let skuId = SARAH_TIER_SKU[tierId] || SARAH_TIER_SKU.free;
+
+  if (personalSarahLiveActive() && window.SarahLive?.fetchPersonalQuota) {
+    const res = await window.SarahLive.fetchPersonalQuota();
+    if (!res.error && res.quota) {
+      const q = res.quota;
+      const cs = q.creditsShadow && typeof q.creditsShadow === 'object' ? q.creditsShadow : q;
+      if (cs.tierSkuId) {
+        skuId = cs.tierSkuId;
+        tierId = tierIdFromSkuId(skuId);
+        const tier = MOCK_SARAH_BILLING_TIERS.find((t) => t.id === tierId);
+        if (tier?.name) tierName = tier.name;
+      }
+      return {
+        live: true,
+        tierName,
+        tierId,
+        meteringMode: cs.meteringMode || q.meteringMode || cs.enforcementMode || 'shadow',
+        enforcementMode: cs.enforcementMode || q.enforcementMode || 'shadow',
+        monthlyAllowance: Number(cs.monthlyAllowanceCredits ?? q.monthlyAllowanceCredits),
+        monthlyUsed: Number(cs.monthlyUsedCredits ?? q.monthlyUsedCredits),
+        monthlyRemaining: Number(cs.monthlyRemainingCredits ?? q.monthlyRemainingCredits),
+        topUp: Number(cs.topUpBalanceCredits ?? q.topUpBalanceCredits ?? 0),
+        usagePercent: Number(cs.usagePercent ?? q.usagePercent ?? 0),
+        periodKey: String(cs.periodKey || q.periodKey || ''),
+        wouldBlock: Boolean(cs.wouldBlockAtEnforce),
+        renewalDate: cs.renewalDate || cs.periodEnd || q.periodEnd || null,
+        recentUsage: Array.isArray(cs.recentUsage) ? cs.recentUsage : [],
+        usageAlert: cs.usageAlert || q.usageAlert || null,
+        creditsBlocked: Boolean(cs.creditsBlocked ?? q.creditsBlocked),
+        availableCredits: Number(cs.availableCredits ?? q.availableCredits),
+      };
+    }
+  }
+
+  const allowance = SARAH_MONTHLY_CREDITS_BY_TIER_ID[tierId] ?? 250;
+  return {
+    live: false,
+    tierName,
+    tierId,
+    meteringMode: 'prototype',
+    enforcementMode: 'shadow',
+    monthlyAllowance: allowance,
+    monthlyUsed: 0,
+    monthlyRemaining: allowance,
+    topUp: 0,
+    usagePercent: 0,
+    periodKey: `month_${new Date().toISOString().slice(0, 7)}`,
+    wouldBlock: false,
+    recentUsage: [],
+  };
+}
+
+function buildSarahPlanUsageMarkup(snap, { variant = 'full' } = {}) {
+  const compact = variant === 'compact';
+  const pct = Math.min(100, Math.max(0, Number(snap.usagePercent) || 0));
+  const fillClass = pct >= 90 ? 'is-critical' : pct >= 75 ? 'is-warning' : '';
+  const renewalBit =
+    snap.renewalDate && snap.live
+      ? ` Renews ${new Date(snap.renewalDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}.`
+      : '';
+  const periodLabel = snap.periodKey ? snap.periodKey.replace(/^(month_|period_)/, '').replace('_', ' → ') : 'This period';
+  const modeHint =
+    snap.enforcementMode === 'enforce' || snap.meteringMode === 'enforce'
+      ? 'Live enforcement — Sarah pauses when monthly allowance and top-ups are used up.'
+      : snap.meteringMode === 'shadow'
+        ? 'Preview metering — limits are recorded but not enforced. Unused monthly credits expire each billing period.'
+        : snap.live
+          ? 'Live usage for this billing period.'
+          : 'Sign in for live usage from your account.';
+  const shadowNote = snap.wouldBlock
+    ? ' At full enforcement, new AI requests would pause until you top up or renew.'
+    : '';
+  const alertCopy =
+    snap.usageAlert === 'exhausted' || snap.creditsBlocked
+      ? 'Credits exhausted — buy a top-up or wait for renewal.'
+      : snap.usageAlert === 'exhausted_preview'
+        ? 'Monthly allowance fully used — top up before enforce goes live.'
+        : snap.usageAlert === 'approaching_95'
+          ? 'You have used 95%+ of your monthly allowance.'
+          : snap.usageAlert === 'approaching_80'
+            ? 'You have used 80%+ of your monthly allowance.'
+            : '';
+
+  const rows = `
+    <div class="sarah-plan-usage-rows">
+      <div class="sarah-plan-usage-row">
+        <span class="sarah-plan-usage-label">Monthly allowance</span>
+        <span class="sarah-plan-usage-value">${escapeHtml(formatSarahCredits(snap.monthlyAllowance))}</span>
+      </div>
+      <div class="sarah-plan-usage-row">
+        <span class="sarah-plan-usage-label">Used this period</span>
+        <span class="sarah-plan-usage-value">${escapeHtml(formatSarahCredits(snap.monthlyUsed))}</span>
+      </div>
+      <div class="sarah-plan-usage-row">
+        <span class="sarah-plan-usage-label">Remaining</span>
+        <span class="sarah-plan-usage-value">${escapeHtml(formatSarahCredits(snap.monthlyRemaining))}</span>
+      </div>
+      <div class="sarah-plan-usage-row">
+        <span class="sarah-plan-usage-label">Top-up balance</span>
+        <span class="sarah-plan-usage-value">${escapeHtml(formatSarahCredits(snap.topUp))}</span>
+      </div>
+    </div>`;
+
+  const meter = `
+    <div class="sarah-plan-usage-meter" role="presentation">
+      <div class="sarah-plan-usage-meter-track">
+        <div class="sarah-plan-usage-meter-fill ${fillClass}" style="width:${pct}%"></div>
+      </div>
+    </div>
+    <p class="sarah-plan-usage-meta">${escapeHtml(String(pct))}% of monthly allowance · ${escapeHtml(periodLabel)}${escapeHtml(renewalBit)}${shadowNote ? ` — ${escapeHtml(shadowNote.trim())}` : ''}</p>
+    ${alertCopy ? `<p class="sarah-plan-usage-alert${snap.usageAlert === 'exhausted' || snap.creditsBlocked ? ' is-critical' : ''}">${escapeHtml(alertCopy)}</p>` : ''}`;
+
+  const history = buildSarahPlanUsageHistoryMarkup(snap, {
+    limit: compact ? 5 : 30,
+    compact,
+    surfaceFilter: compact ? 'all' : sarahUsageSurfaceFilter,
+  });
+  const actions = compact
+    ? ''
+    : `<div class="sarah-plan-usage-actions">
+        <button type="button" class="ms-link-btn" data-sarah-usage-topup>Buy 500 top-up credits</button>
+        <button type="button" class="ms-link-btn" data-sarah-usage-export>Export my usage (CSV + JSON)</button>
+      </div>
+      <p class="sarah-plan-usage-meta sarah-plan-usage-topup-note">Top-up credits stay on your account separately from your monthly plan allowance. Non-refundable once used (preview terms).</p>`;
+
+  return `
+    <article class="sarah-plan-usage-card${compact ? ' sarah-plan-usage-card--compact' : ''}">
+      ${compact ? '' : `<span class="sarah-plan-usage-badge">${snap.enforcementMode === 'enforce' ? 'Live enforcement' : 'Metered usage'}</span>`}
+      <p class="sarah-plan-usage-tier"><strong>${escapeHtml(snap.tierName || 'Sarah Free')}</strong></p>
+      ${meter}
+      ${rows}
+      ${history}
+      <p class="sarah-plan-usage-meta">${escapeHtml(modeHint)}</p>
+      ${actions}
+    </article>`;
+}
+
+function downloadTextFile(filename, text, mime = 'text/plain') {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function usageEventsToClientCsv(events = []) {
+  const header = ['at', 'credits', 'archetype', 'surface', 'interaction', 'sessionId', 'messagePreview'];
+  const esc = (v) => {
+    const s = String(v ?? '');
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return `${[header.join(','), ...events.map((ev) => header.map((k) => esc(ev[k])).join(','))].join('\n')}\n`;
+}
+
+async function exportMySarahUsageFiles() {
+  if (!personalSarahLiveActive() || !window.SarahLive?.fetchPersonalUsageExport) {
+    showProtoToast('Sign in to export usage.');
+    return;
+  }
+  showProtoToast('Preparing your usage export…');
+  const res = await window.SarahLive.fetchPersonalUsageExport();
+  if (res.error) {
+    showProtoToast(res.error);
+    return;
+  }
+  const payload = res.export || {};
+  const stamp = String(payload.periodKey || 'period').replace(/[^\w-]/g, '_');
+  downloadTextFile(`sarah-usage-${stamp}.json`, JSON.stringify(payload, null, 2), 'application/json');
+  downloadTextFile(`sarah-usage-${stamp}.csv`, usageEventsToClientCsv(payload.events), 'text/csv');
+  showProtoToast('Downloaded JSON and CSV for this billing period.');
+}
+
+async function startSarahCreditTopUpCheckout() {
+  if (!personalSarahLiveActive()) {
+    showProtoToast('Sign in to buy top-up credits.');
+    return;
+  }
+  if (!window.SarahLive?.checkoutConsumerPlan) {
+    showProtoToast('Checkout is unavailable in this build.');
+    return;
+  }
+  const cfgRes = await window.SarahLive.fetchRevenuePublicConfig?.();
+  const cfg = cfgRes?.config || {};
+  const sku = String(cfg.defaultCreditTopUpSkuId || SARAH_DEFAULT_TOPUP_SKU);
+  if (!cfg.creditsTopUpEnabled) {
+    showProtoToast('Top-up checkout is not enabled yet.');
+    return;
+  }
+  if (!cfg.paidCheckoutAvailable) {
+    showProtoToast('Payment provider is not configured for top-ups yet.');
+    return;
+  }
+  showProtoToast('Opening secure checkout…');
+  const res = await window.SarahLive.checkoutConsumerPlan(sku, {
+    returnUrl: `${window.location.origin}${window.location.pathname}`,
+  });
+  if (res.error) {
+    showProtoToast(res.error);
+    return;
+  }
+  if (res.completed) {
+    showProtoToast(`+${res.creditsAdded || 500} credits added to your balance.`);
+    void refreshSarahPlanUsageUi(['billing', 'profile', 'account']);
+    return;
+  }
+  if (res.authorizationUrl) {
+    window.location.href = res.authorizationUrl;
+    return;
+  }
+  showProtoToast('Could not start checkout.');
+}
+
+function bindSarahPlanUsageActions(host) {
+  host?.querySelector('[data-sarah-usage-topup]')?.addEventListener('click', () => {
+    void startSarahCreditTopUpCheckout();
+  });
+  host?.querySelector('[data-sarah-usage-export]')?.addEventListener('click', () => {
+    void exportMySarahUsageFiles();
+  });
+  host?.querySelector('[data-sarah-usage-open-billing]')?.addEventListener('click', () => {
+    setRoute('home');
+    setMySarahPanel('billing');
+    closeMsDrawer();
+  });
+  host?.querySelectorAll('.sarah-usage-open-thread').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const sid = btn.getAttribute('data-session-id');
+      if (sid) void openPersonalSarahThread(sid);
+    });
+  });
+  host?.querySelectorAll('[data-sarah-usage-filter]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = btn.getAttribute('data-sarah-usage-filter') || 'all';
+      if (!['all', 'chat', 'work'].includes(next)) return;
+      sarahUsageSurfaceFilter = next;
+      void refreshSarahPlanUsageUi(['billing']);
+    });
+  });
+}
+
+/**
+ * @param {Array<'billing'|'profile'|'account'>} [surfaces]
+ */
+async function refreshSarahPlanUsageUi(surfaces) {
+  const want =
+    surfaces && surfaces.length
+      ? new Set(surfaces)
+      : new Set(['billing', 'profile', 'account'].filter((s) => {
+          if (s === 'billing') return document.getElementById('msBillingUsage');
+          if (s === 'profile') return document.getElementById('profileUsageSummary');
+          if (s === 'account') return document.getElementById('profileAccountUsage');
+          return false;
+        }));
+
+  if (!want.size) return;
+  const snap = await fetchSarahPlanUsageSnapshot();
+
+  if (want.has('billing')) {
+    const el = document.getElementById('msBillingUsage');
+    if (el) {
+      el.innerHTML = buildSarahPlanUsageMarkup(snap, { variant: 'full' });
+      bindSarahPlanUsageActions(el);
+    }
+  }
+  if (want.has('profile')) {
+    const el = document.getElementById('profileUsageSummary');
+    if (el) {
+      el.innerHTML = buildSarahPlanUsageMarkup(snap, { variant: 'compact' });
+      bindSarahPlanUsageActions(el);
+    }
+  }
+  if (want.has('account')) {
+    const el = document.getElementById('profileAccountUsage');
+    if (el) {
+      el.innerHTML = buildSarahPlanUsageMarkup(snap, { variant: 'compact' });
+      bindSarahPlanUsageActions(el);
+    }
+  }
+}
+
+async function renderMySarahBilling() {
+  await refreshSarahPlanUsageUi(['billing']);
   const host = document.getElementById('msBillingTiers');
   if (!host) return;
-  host.innerHTML = MOCK_SARAH_BILLING_TIERS.map(
-    (tier) => `
-    <article class="ms-tier-card ${tier.current ? 'is-current' : ''}">
+  let checkoutEnabled = false;
+  let paidCheckoutAvailable = false;
+  let currentSku = SARAH_TIER_SKU.free;
+  if (personalSarahLiveActive() && window.SarahLive) {
+    const cfg = await window.SarahLive.fetchRevenuePublicConfig?.();
+    checkoutEnabled = Boolean(cfg?.config?.checkoutEnabled);
+    paidCheckoutAvailable = Boolean(cfg?.config?.paidCheckoutAvailable);
+    const sub = await window.SarahLive.fetchMySubscription?.();
+    if (sub?.subscription?.skuId) currentSku = sub.subscription.skuId;
+  }
+  host.innerHTML = MOCK_SARAH_BILLING_TIERS.map((tier) => {
+    const sku = SARAH_TIER_SKU[tier.id] || SARAH_TIER_SKU.free;
+    const isCurrent = currentSku === sku || (!personalSarahLiveActive() && tier.current);
+    const cta =
+      isCurrent
+        ? 'Active'
+        : checkoutEnabled && (tier.price === 0 || paidCheckoutAvailable)
+          ? tier.price === 0
+            ? 'Switch to Free'
+            : 'Upgrade'
+          : tier.price === 0
+            ? 'Downgrade (mock)'
+            : 'Upgrade (unavailable)';
+    return `
+    <article class="ms-tier-card ${isCurrent ? 'is-current' : ''}" data-tier-id="${escapeHtml(tier.id)}">
       <header class="ms-tier-head">
         <h3>${escapeHtml(tier.name)}</h3>
-        ${tier.current ? '<span class="ms-tier-badge">Current plan</span>' : ''}
+        ${isCurrent ? '<span class="ms-tier-badge">Current plan</span>' : ''}
       </header>
       <p class="ms-tier-price">${tier.price === 0 ? 'Free' : `R ${tier.price}<span>/mo</span>`}</p>
       <ul class="ms-tier-features">
-        <li>${escapeHtml(String(tier.dailyChats))} Personal Sarah chats / day</li>
+        <li>${escapeHtml(String(SARAH_MONTHLY_CREDITS_BY_TIER_ID[tier.id] || 250))} AI credits / month (draft allowance)</li>
+        <li>${escapeHtml(String(tier.dailyChats))} Personal Sarah chats / day (legacy cap)</li>
+        <li>${Number(tier.workTasksPerDay) > 0 ? `${escapeHtml(String(tier.workTasksPerDay))} Sarah Work tasks / day` : 'No Sarah Work tasks (chat only)'}</li>
         <li>${escapeHtml(tier.knowledgeLabel)}</li>
         <li>${tier.premiumModels ? 'Premium models' : 'Standard models'}</li>
         <li>Discover &amp; Status access</li>
       </ul>
-      <button type="button" class="ms-tier-cta" ${tier.current ? 'disabled' : ''}>
-        ${tier.current ? 'Active' : tier.price === 0 ? 'Downgrade (mock)' : 'Upgrade (mock)'}
+      <button type="button" class="ms-tier-cta" data-tier-sku="${escapeHtml(sku)}" ${isCurrent ? 'disabled' : ''}>
+        ${escapeHtml(cta)}
       </button>
-    </article>`
-  ).join('');
+    </article>`;
+  }).join('');
+  host.querySelectorAll('.ms-tier-cta:not([disabled])').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const sku = btn.getAttribute('data-tier-sku');
+      if (!sku || !personalSarahLiveActive() || !window.SarahLive?.checkoutConsumerPlan) {
+        showProtoToast('Billing change (prototype).');
+        return;
+      }
+      if (!checkoutEnabled) {
+        showProtoToast('Live checkout is not enabled on this environment yet.');
+        return;
+      }
+      const tierPrice = MOCK_SARAH_BILLING_TIERS.find((t) => SARAH_TIER_SKU[t.id] === sku)?.price ?? 0;
+      if (tierPrice > 0 && !paidCheckoutAvailable) {
+        showProtoToast('Paid checkout is not configured on this server yet.');
+        return;
+      }
+      const res = await window.SarahLive.checkoutConsumerPlan(sku);
+      if (res.error) {
+        showProtoToast(res.error);
+        return;
+      }
+      if (res.authorizationUrl && !res.completed) {
+        window.location.href = res.authorizationUrl;
+        return;
+      }
+      showProtoToast('Plan updated.');
+      await refreshWorkQuotaState();
+      renderWorkQuotaBanner();
+      void renderMySarahBilling();
+    });
+  });
 }
 
 function renderMySarahPage() {
@@ -7085,33 +11433,7 @@ function renderMySarahPage() {
     renderMySarahHistoryFromThreads();
   }
 
-  const quickHost = document.getElementById('msQuickGrid');
-  if (quickHost) {
-    quickHost.innerHTML = MOCK_MY_SARAH_QUICK.map((q) => {
-      const statements = Array.isArray(q.statements)
-        ? q.statements
-        : q.subtitle
-          ? [q.subtitle]
-          : [];
-      const statementLines = statements
-        .map((line) => `<li class="ms-quick-sub">${escapeHtml(line)}</li>`)
-        .join('');
-      return `
-      <button type="button" class="ms-quick-card" data-quick-prompt="${escapeHtml(q.prompt)}">
-        <span class="ms-quick-icon">${MS_QUICK_ICONS[q.icon] || MS_QUICK_ICONS.insight}</span>
-        <span class="ms-quick-title">${escapeHtml(q.title)}</span>
-        <ul class="ms-quick-statements">${statementLines}</ul>
-      </button>`;
-    }).join('');
-
-    quickHost.querySelectorAll('[data-quick-prompt]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const input = document.getElementById('personalChatInput');
-        if (input) input.value = btn.getAttribute('data-quick-prompt') || '';
-        input?.focus({ preventScroll: true });
-      });
-    });
-  }
+  void renderSarahHomeIntelligence();
 
   renderMySarahBilling();
   renderMsDrawerRecents();
@@ -7122,12 +11444,22 @@ function renderThread() {
   const ctx = getActiveThreadContext();
   const isPersonal = ctx.kind === 'personal';
   const titleEl = document.getElementById('threadTitle');
+  const rt = getSarahRuntime();
+  const thread = rt.activeThreadId ? rt.threads[rt.activeThreadId] : null;
+  const heading = isPersonal ? getPersonalThreadHeadline(thread) || 'Personal Sarah' : ctx.name;
   if (titleEl) {
-    titleEl.innerHTML = `${escapeHtml(ctx.name)}${ctx.verified ? ` ${verifiedBadge}` : ''}`;
+    titleEl.innerHTML = `${escapeHtml(heading)}${!isPersonal && ctx.verified ? ` ${verifiedBadge}` : ''}`;
   }
+  document.getElementById('btnThreadBack')?.setAttribute('aria-label', `Back from ${heading}`);
   const subtitleEl = document.getElementById('threadSubtitle');
   if (subtitleEl) {
-    if (isPersonal && personalSarahLiveActive()) {
+    if (isPersonal && ctx.work && thread) {
+      const ws = getThreadWorkWorkspace(thread);
+      const st = WORK_ASSIGNMENT_STATUS_LABEL[ws.assignmentStatus] || 'Assignment';
+      const conn =
+        personalSarahLiveActive() && window.SarahLive?.getConnectionState?.() === 'connected' ? ' · Connected' : '';
+      subtitleEl.textContent = `${ws.capabilityLabel || 'Sarah Work'} · ${st} · ${ws.progressPercent ?? 0}%${conn}`;
+    } else if (isPersonal && personalSarahLiveActive()) {
       const st = window.SarahLive?.getConnectionState?.() || 'connecting';
       const labels = {
         connected: 'Personal Sarah · Connected',
@@ -7163,7 +11495,7 @@ function renderThread() {
 
   const log = document.getElementById('threadLog');
   if (!log) return;
-  log.innerHTML = ctx.messages.map((m) => renderThreadMessageMarkup(m, isPersonal)).join('');
+  log.innerHTML = ctx.messages.map((m) => renderThreadMessageMarkup(m, isPersonal, ctx)).join('');
   log.querySelectorAll('[data-retry-send]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const retryText = btn.getAttribute('data-retry-send') || '';
@@ -7179,6 +11511,8 @@ function renderThread() {
   requestAnimationFrame(() => {
     log.scrollTop = log.scrollHeight;
   });
+  syncThreadWorkSubmitBar();
+  syncWorkWorkspaceUi(ctx);
 }
 
 function activateView() {
@@ -7195,8 +11529,10 @@ function activateView() {
     btn.classList.toggle('is-active', navActive);
   });
 
-  const preAuth = route === 'welcome' || route === 'auth';
-  showNav(!preAuth);
+  const preAuth = route === 'welcome' || route === 'auth' || route === 'register-details';
+  showNav(!preAuth && route !== 'chat-thread');
+
+  if (route === 'register-details') renderRegisterDetails();
 
   if (route === 'chats') renderChatsList();
   if (route === 'home') {
@@ -7204,7 +11540,7 @@ function activateView() {
     renderMySarahPage();
     applyMySarahPanel(msPanel);
     updatePersonalSarahLiveUi();
-    if (personalSarahLiveActive()) syncPersonalSarahSessionsFromServer();
+    if (personalSarahLiveActive()) syncPersonalSarahSessionsFromServer({ silent: true });
   }
   if (route === 'chat-thread') {
     const { personalThreadId } = parseLocationHash();
@@ -7239,7 +11575,6 @@ function activateView() {
     }
   }
 
-  if (route === 'status') renderHome();
   if (route === 'discover') renderDiscover();
   if (route === 'discover-company') {
     const { companyId } = parseLocationHash();
@@ -7341,29 +11676,9 @@ function renderProfileSocialTab() {
   const host = document.getElementById('profileSocialBody');
   if (!host) return;
   const tab = activeProfileSocialTab;
-
   if (tab === 'posts') {
-    host.className = 'profile-social-body profile-social-body--feed feed-list profile-feed-list';
-    const profilePosts = [...getUserCreatedPosts(), ...MOCK_PROFILE_POSTS];
-    host.innerHTML = profilePosts
-      .map((post) =>
-        renderFeedCard({
-          id: post.id,
-          author: MOCK_USER.name,
-          avatar: getEffectiveUserAvatar(),
-          verified: MOCK_PROFILE.verified,
-          time: post.time,
-          authorType: post.authorType || 'creator',
-          body: post.body,
-          image: post.image,
-          video: post.video,
-          imageFallback: MOCK_PROFILE.coverFallback,
-          likes: post.likes,
-          comments: post.comments,
-          sponsored: false,
-        })
-      )
-      .join('');
+    activeProfileSocialTab = 'photos';
+    renderProfileSocialTab();
     return;
   }
   host.className = 'profile-social-body';
@@ -7454,6 +11769,7 @@ function renderProfileBusinessSocialTab() {
         })
       )
       .join('');
+    wireFeedEngageButtons(host);
     return;
   }
 
@@ -7541,6 +11857,12 @@ async function handleProfileAccountAction(action) {
     case 'billing':
       setMySarahPanel('billing');
       break;
+    case 'notif-prefs':
+      openSnaPrefsSheet();
+      break;
+    case 'notifications':
+      openMyNotifications();
+      break;
     case 'chats':
       setRoute('chats');
       break;
@@ -7597,56 +11919,178 @@ function renderProfileAccountSections() {
   });
 }
 
+function parsePersonalProfilePayloadClient(content) {
+  const raw = String(content || '').trim();
+  if (!raw) return { fields: {}, sarahBehavior: {} };
+  try {
+    const j = JSON.parse(raw);
+    if (j && typeof j === 'object' && !Array.isArray(j)) {
+      const { sarahBehavior, ...fields } = j;
+      return { fields, sarahBehavior: sarahBehavior && typeof sarahBehavior === 'object' ? sarahBehavior : {} };
+    }
+  } catch {
+    /* plain text legacy */
+  }
+  return { fields: { narrative: raw }, sarahBehavior: {} };
+}
+
+function labelForSarahBehaviorValue(fieldKey, value) {
+  const def = window.SARAH_BEHAVIOR_FIELDS?.[fieldKey];
+  if (!def) return String(value || '').trim() || '—';
+  const v = String(value || '').trim() || def.default || '';
+  const opt = (def.options || []).find((o) => o.value === v);
+  return opt?.label || v || '—';
+}
+
+function renderProfileSarahBehaviorList(behavior = {}) {
+  const host = document.getElementById('profileSarahBehaviorList');
+  if (!host) return;
+  const fields = window.SARAH_BEHAVIOR_FIELDS || {};
+  const keys = Object.keys(fields);
+  if (!keys.length) {
+    host.innerHTML = '<li><span>Preferences will appear when you set them in My Knowledge.</span></li>';
+    return;
+  }
+  host.innerHTML = keys
+    .map((key) => {
+      const meta = fields[key];
+      const label = labelForSarahBehaviorValue(key, behavior[key] ?? meta.default);
+      return `<li class="profile-pref-pill">
+        <span class="profile-pref-pill-label">${escapeHtml(meta.label || key)}</span>
+        <span class="profile-pref-pill-value">${escapeHtml(label)}</span>
+      </li>`;
+    })
+    .join('');
+}
+
+function excerptKnowledgeSection(section) {
+  const key = section?.sectionKey || '';
+  let body = String(section?.content || '').trim();
+  if (!body) return '';
+  if (key === 'personal_profile' || key === 'identity') {
+    const { fields } = parsePersonalProfilePayloadClient(body);
+    const lines = Object.entries(fields)
+      .filter(([, v]) => v != null && String(v).trim())
+      .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${String(v).slice(0, 120)}`);
+    return lines.slice(0, 3).join(' · ') || String(fields.narrative || '').slice(0, 180);
+  }
+  if (body.startsWith('{')) {
+    try {
+      const j = JSON.parse(body);
+      const flat = Object.entries(j)
+        .filter(([, v]) => v != null && String(v).trim())
+        .slice(0, 4)
+        .map(([k, v]) => `${k}: ${String(v).slice(0, 80)}`);
+      return flat.join(' · ');
+    } catch {
+      /* fall through */
+    }
+  }
+  return body.replace(/\s+/g, ' ').slice(0, 200);
+}
+
+function mockProfileKnowledgeSections() {
+  const mk = window.SARAH_PROTOTYPE?.MOCK_MY_KNOWLEDGE;
+  const cats = mk?.categories || [];
+  const identity = loadPersonalIdentity();
+  const narrative = [identity.preferredName, identity.city, identity.narrative].filter(Boolean).join(' · ');
+  return cats.map((cat) => {
+    let content = '';
+    if (cat.key === 'identity' && narrative) content = narrative;
+    return {
+      sectionKey: cat.key,
+      label: cat.label,
+      sarahMayUse: cat.sarahMayUse !== false,
+      content: content || (cat.blurb || '').slice(0, 120),
+      isPlaceholder: !content && Boolean(cat.blurb),
+    };
+  });
+}
+
+function renderProfileKnowledgeCards(sections) {
+  const host = document.getElementById('profileKnowledgeSections');
+  if (!host) return;
+  const rows = (sections || []).sort((a, b) => String(a.label).localeCompare(String(b.label)));
+  if (!rows.length) {
+    host.innerHTML =
+      '<p class="profile-knowledge-excerpt profile-knowledge-excerpt--empty">Open My Knowledge to tell Sarah about yourself.</p>';
+    return;
+  }
+  host.innerHTML = rows
+    .map((sec) => {
+      const excerpt = excerptKnowledgeSection(sec);
+      const empty = !excerpt || sec.isPlaceholder;
+      const badge = sec.sarahMayUse
+        ? '<span class="profile-knowledge-badge profile-knowledge-badge--on">Sarah may use</span>'
+        : '<span class="profile-knowledge-badge profile-knowledge-badge--off">Private</span>';
+      return `<article class="profile-knowledge-card">
+        <header class="profile-knowledge-card-head">
+          <strong>${escapeHtml(sec.label || sec.sectionKey)}</strong>
+          ${badge}
+        </header>
+        <p class="profile-knowledge-excerpt${empty ? ' profile-knowledge-excerpt--empty' : ''}">${
+          empty ? 'Not filled in yet — tap Edit to add details.' : escapeHtml(excerpt)
+        }</p>
+      </article>`;
+    })
+    .join('');
+}
+
+async function refreshProfileSarahKnowledgeUi() {
+  let behavior = {};
+  let sections = mockProfileKnowledgeSections();
+
+  if (window.SarahLive?.isSignedIn?.() && window.SarahLive?.fetchPersonalKnowledgeSections) {
+    const res = await window.SarahLive.fetchPersonalKnowledgeSections();
+    if (!res.error && Array.isArray(res.sections)) {
+      sections = res.sections.map((s) => ({
+        sectionKey: s.sectionKey,
+        label: s.label || s.sectionKey,
+        sarahMayUse: Boolean(s.sarahMayUse),
+        content: s.content || '',
+      }));
+      const profile = res.sections.find((s) => s.sectionKey === 'personal_profile');
+      if (profile?.content) {
+        behavior = parsePersonalProfilePayloadClient(profile.content).sarahBehavior;
+      }
+    }
+  } else {
+    const id = loadPersonalIdentity();
+    if (id.sarahBehavior && typeof id.sarahBehavior === 'object') behavior = id.sarahBehavior;
+  }
+
+  renderProfileSarahBehaviorList(behavior);
+  renderProfileKnowledgeCards(sections);
+}
+
 function renderProfilePersona(profilePanel) {
   activeProfilePanel = profilePanel === 'account' ? 'account' : 'public';
   applyProfileKindAndPanels();
 
   const p = MOCK_PROFILE || {};
   syncUserAvatars();
-  const cover = document.getElementById('profileCover');
-  const coverSrc = getEffectiveProfileCover();
-  if (cover) {
-    cover.removeAttribute('data-fb');
-    cover.src = prototypeAsset(coverSrc);
-    if (!/^data:/i.test(coverSrc)) {
-      cover.onerror = function onCoverErr() {
-        if (this.dataset.fb) return;
-        this.dataset.fb = '1';
-        this.src = prototypeAsset(p.coverFallback || 'assets/discover/green-haven-hero.jpg');
-      };
-    }
-  }
   applyStoredProfileMedia();
+  const profile = window.SarahLive?.getConsumerProfile?.() || null;
   document.querySelectorAll('[data-profile-name][data-profile-kind="persona"]').forEach((el) => {
-    el.textContent = MOCK_USER.name;
+    el.textContent = profile?.displayName || profile?.firstName || MOCK_USER.name;
   });
-  const handle = document.getElementById('profileHandle');
-  if (handle) handle.textContent = `@${p.username || 'user'} · Joined ${p.joined || ''}`;
-  const verifiedHost = document.getElementById('profileVerifiedBadge');
-  if (verifiedHost) {
-    verifiedHost.innerHTML = p.verified ? `${verifiedBadge} Verified` : '';
-    verifiedHost.hidden = !p.verified;
+  const contact = document.getElementById('profileContactLine');
+  if (contact) {
+    const bits = [
+      profile?.email || MOCK_USER.email,
+      [profile?.city, profile?.country].filter(Boolean).join(', ') || p.location,
+    ].filter(Boolean);
+    contact.textContent = bits.join(' · ');
   }
   const bio = document.getElementById('profileBio');
-  if (bio) bio.textContent = p.bio || '';
-  const meta = document.getElementById('profileMeta');
-  if (meta) {
-    const interests = (p.interests || []).join(' · ');
-    meta.textContent = [p.occupation, p.location, interests].filter(Boolean).join(' · ');
-  }
-  const stats = document.getElementById('profileStats');
-  if (stats) {
-    stats.innerHTML = `
-      <span><strong>${formatProfileCount(p.following || 0)}</strong> Following</span>
-      <span><strong>${formatProfileCount(p.followers || 0)}</strong> Followers</span>
-      <span><strong>${(p.posts || 0) + getUserCreatedPosts().length}</strong> Posts</span>`;
+  if (bio) {
+    const text = p.bio || profile?.locationNote || '';
+    bio.textContent = text;
+    bio.hidden = !text;
   }
 
-  document.querySelectorAll('#profileSocialTabs .profile-social-tab[data-profile-tab]').forEach((btn) => {
-    btn.classList.toggle('is-active', btn.dataset.profileTab === activeProfileSocialTab);
-  });
-  renderProfileSocialTab();
-  renderProfileActivity();
+  void refreshProfileSarahKnowledgeUi();
+  void refreshSarahPlanUsageUi(['profile', 'account']);
   renderProfileAccountSections();
 }
 
@@ -7741,6 +12185,12 @@ function bindProfileInteractions() {
   };
   document.getElementById('profileOpenAccount')?.addEventListener('click', openPersonaAccount);
   document.getElementById('profileOpenAccountBottom')?.addEventListener('click', openPersonaAccount);
+  document.getElementById('profileOpenKnowledge')?.addEventListener('click', () => setMySarahPanel('knowledge'));
+  document.getElementById('profileOpenBilling')?.addEventListener('click', () => {
+    setRoute('home');
+    setMySarahPanel('billing');
+    closeMsDrawer();
+  });
   document.getElementById('profileBackPublic')?.addEventListener('click', () => {
     setProfileKind('persona', { preservePanel: true });
     setProfilePanel('public');
@@ -8092,6 +12542,7 @@ async function handleLiveSubscribe(companyId) {
     return false;
   }
   applyLiveConnection(res.connection);
+  window.SarahLive?.recordDiscoverLead?.(company.snId)?.catch?.(() => {});
   showProtoToast(`Subscribed to ${company.name}`);
   sub01RefreshSurfaces();
   return true;
@@ -8115,6 +12566,8 @@ async function handleLiveUnsubscribe(companyId) {
 /** Map a /api/discover/companies card into the shape the Discover/detail renderers expect. */
 function mapLiveDiscoverCard(card) {
   const fallbackImg = SARAH_AVATAR_SRC || 'assets/sarah-avatar.svg';
+  const cover = resolveListingMediaUrl(card.coverUrl || card.logoUrl) || fallbackImg;
+  const logo = resolveListingMediaUrl(card.logoUrl) || fallbackImg;
   return {
     id: card.companyId,
     companyId: card.companyId,
@@ -8125,14 +12578,31 @@ function mapLiveDiscoverCard(card) {
     categories: card.categories || [],
     tags: card.tags || [],
     description: card.shortDescription || '',
-    address: card.location || '',
+    address: card.address || card.location || '',
+    locationLabel: card.location || '',
     verified: Boolean(card.verified),
-    image: card.coverUrl || card.logoUrl || fallbackImg,
+    image: cover,
     imageFallback: fallbackImg,
-    avatar: card.logoUrl || fallbackImg,
-    gallery: [],
-    products: [],
-    hours: [],
+    avatar: logo,
+    gallery: (card.gallery || [])
+      .map((g) => resolveListingMediaUrl(typeof g === 'string' ? g : g.imageUrl))
+      .filter(Boolean),
+    products: (card.products || []).map((p) => ({
+      id: p.id || p.name,
+      name: p.name,
+      price: p.price || '',
+      image: resolveListingMediaUrl(p.imageUrl || card.coverUrl || card.logoUrl),
+      description: p.description || '',
+    })),
+    hours: Array.isArray(card.hours) ? card.hours.filter((h) => h && h.day && h.time) : [],
+    contact:
+      card.contact && typeof card.contact === 'object'
+        ? {
+            phone: card.contact.phone || '',
+            email: card.contact.email || '',
+            website: card.contact.website || '',
+          }
+        : null,
     rating: null,
     reviewCount: null,
     distanceKm: null,
@@ -8158,9 +12628,22 @@ function discoverCategoriesSource() {
   return [{ id: 'all', label: 'All' }, ...liveDiscover.facets.map((f) => ({ id: f.id, label: f.label }))];
 }
 
+function liveDiscoverFetchStale() {
+  return (
+    liveDiscover.query !== discoverSearchQuery ||
+    liveDiscover.category !== activeDiscoverCategory ||
+    (liveDiscover.place || '') !== discoverPlaceQuery
+  );
+}
+
 async function refreshLiveDiscover() {
-  if (!discoverLiveActive() || liveDiscover.loading) return;
+  if (!discoverLiveActive()) return;
+  if (liveDiscover.loading) {
+    liveDiscover.pendingRefetch = true;
+    return;
+  }
   liveDiscover.loading = true;
+  liveDiscover.pendingRefetch = false;
   liveDiscover.error = '';
   liveDiscover.query = discoverSearchQuery;
   liveDiscover.category = activeDiscoverCategory;
@@ -8187,19 +12670,77 @@ async function refreshLiveDiscover() {
   const route = parseLocationHash().route;
   if (route === 'discover') renderDiscover();
   else if (route === 'discover-company') renderCompanyDetail(parseLocationHash().companyId);
+  if (liveDiscover.pendingRefetch || liveDiscoverFetchStale()) {
+    liveDiscover.pendingRefetch = false;
+    void refreshLiveDiscover();
+  }
 }
 
 /** Kick a live fetch when the directory has not been loaded or the query/category changed. */
 function ensureLiveDiscoverFresh() {
-  if (!discoverLiveActive() || liveDiscover.loading) return;
-  if (
-    !liveDiscover.loaded ||
-    liveDiscover.query !== discoverSearchQuery ||
-    liveDiscover.category !== activeDiscoverCategory ||
-    (liveDiscover.place || '') !== discoverPlaceQuery
-  ) {
+  if (!discoverLiveActive()) return;
+  if (liveDiscover.loading) {
+    if (liveDiscoverFetchStale()) liveDiscover.pendingRefetch = true;
+    return;
+  }
+  if (!liveDiscover.loaded || liveDiscoverFetchStale()) {
     void refreshLiveDiscover();
   }
+}
+
+/** One search box: optional "… in Gauteng" or a province name sets city/region for live Discover. */
+function splitDiscoverSearchInput(raw) {
+  const q = String(raw || '').trim();
+  if (!q) return { q: '', place: '' };
+  const lower = q.toLowerCase();
+  if (DISCOVER_PROVINCES.includes(lower)) return { q: '', place: q };
+  const inMatch = q.match(/^(.+?)\s+in\s+(.+)$/i);
+  if (inMatch) {
+    const term = inMatch[1].trim();
+    const place = inMatch[2].trim();
+    if (place.length >= 2) return { q: term, place };
+  }
+  return { q, place: '' };
+}
+
+function bindDiscoverCatsOnce() {
+  const host = document.getElementById('discoverCats');
+  if (!host || host.dataset.bound === '1') return;
+  host.dataset.bound = '1';
+  host.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-discover-cat]');
+    if (!btn) return;
+    activeDiscoverCategory = btn.dataset.discoverCat || 'all';
+    renderDiscover();
+  });
+}
+
+function bindFeedTabsOnce() {
+  const host = document.getElementById('feedTabs');
+  if (!host || host.dataset.bound === '1') return;
+  host.dataset.bound = '1';
+  host.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-feed-tab]');
+    if (!btn) return;
+    activeFeedTab = btn.dataset.feedTab || 'for-you';
+    renderHome();
+  });
+}
+
+function bindStatusFeedActionsOnce() {
+  const host = document.getElementById('feedList');
+  if (!host || host.dataset.statusActionsBound === '1') return;
+  host.dataset.statusActionsBound = '1';
+  host.addEventListener('click', (e) => {
+    if (e.target.closest('[data-status-feed-retry]')) {
+      resetLiveStatusFeedCache();
+      ensureLiveStatusFeed();
+      renderHome();
+      return;
+    }
+    const jump = e.target.closest('[data-route-jump]');
+    if (jump?.dataset?.routeJump) setRoute(jump.dataset.routeJump);
+  });
 }
 
 const DISCOVER_NL_KEYWORDS = {
@@ -8271,22 +12812,18 @@ function renderDiscover() {
   const searchInput = document.getElementById('discoverSearchInput');
   if (searchInput) {
     if (pendingDiscoverSearchFromOrg) {
-      searchInput.value = pendingDiscoverSearchFromOrg;
-      discoverSearchQuery = pendingDiscoverSearchFromOrg;
+      discoverSearchRaw = pendingDiscoverSearchFromOrg;
+      searchInput.value = discoverSearchRaw;
+      const split = splitDiscoverSearchInput(discoverSearchRaw);
+      discoverSearchQuery = split.q;
+      discoverPlaceQuery = split.place;
       pendingDiscoverSearchFromOrg = '';
-    } else if (searchInput.value !== discoverSearchQuery) {
-      searchInput.value = discoverSearchQuery;
+    } else if (document.activeElement !== searchInput && searchInput.value !== discoverSearchRaw) {
+      searchInput.value = discoverSearchRaw;
     }
   }
 
   const live = discoverLiveActive();
-  // Phase 2.0: the place filter is a server-side search, so it only exists in live mode.
-  const placeWrap = document.getElementById('discoverPlaceWrap');
-  if (placeWrap) placeWrap.hidden = !live;
-  const placeInput = document.getElementById('discoverPlaceInput');
-  if (placeInput && placeInput.value !== discoverPlaceQuery && document.activeElement !== placeInput) {
-    placeInput.value = discoverPlaceQuery;
-  }
   ensureLiveDiscoverFresh();
   ensureLiveConnectionsFresh();
 
@@ -8296,13 +12833,6 @@ function renderDiscover() {
       ${escapeHtml(cat.label)}
     </button>`
   ).join('');
-
-  catsHost.querySelectorAll('[data-discover-cat]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      activeDiscoverCategory = btn.dataset.discoverCat || 'all';
-      renderDiscover();
-    });
-  });
 
   // Live: server already searched/filtered. Fixtures: client-side filter.
   const list = live
@@ -8431,12 +12961,33 @@ function renderCompanyDetail(companyId) {
     return;
   }
 
+  const snId = company.snId || liveDiscover.byId.get(String(companyId))?.snId;
+  if (discoverLiveActive() && snId && window.SarahLive?.recordDiscoverProfileView) {
+    window.SarahLive.recordDiscoverProfileView(snId).catch(() => {});
+  }
+
   const hoursHtml = (company.hours || [])
     .map(
       (h, i) => `
     <div class="company-hours-row ${i === 0 ? 'is-today' : ''}">
       <span>${escapeHtml(h.day)}</span>
       <span>${escapeHtml(h.time)}</span>
+    </div>`
+    )
+    .join('');
+
+  const contact = company.contact || {};
+  const contactRows = [
+    contact.phone ? { label: 'Phone', value: contact.phone, href: `tel:${String(contact.phone).replace(/[^\d+]/g, '')}` } : null,
+    contact.email ? { label: 'Email', value: contact.email, href: `mailto:${contact.email}` } : null,
+    contact.website ? { label: 'Website', value: contact.website, href: contact.website } : null,
+  ].filter(Boolean);
+  const contactHtml = contactRows
+    .map(
+      (row) => `
+    <div class="company-contact-row">
+      <span class="company-contact-label">${escapeHtml(row.label)}</span>
+      <a class="company-contact-value" href="${escapeHtml(row.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(row.value)}</a>
     </div>`
     )
     .join('');
@@ -8494,7 +13045,7 @@ function renderCompanyDetail(companyId) {
             ${DISCOVER_SVG.pin}
             <span>${escapeHtml(String(company.distanceKm))} km</span>
           </p>`}
-          <p class="company-address">${escapeHtml(company.address)}</p>
+          ${company.address ? `<p class="company-address">${escapeHtml(company.address)}</p>` : company.locationLabel ? `<p class="company-address">${escapeHtml(company.locationLabel)}</p>` : ''}
         </div>
         <button type="button" class="company-fav-lg" data-fav-toggle aria-label="Favorite">${DISCOVER_SVG.heart}</button>
       </header>
@@ -8509,11 +13060,6 @@ function renderCompanyDetail(companyId) {
       </div>
 
       <button type="button" class="company-chat-sarah" data-chat-company="${escapeHtml(company.id)}">Chat With Sarah</button>
-
-      <div class="company-actions company-actions--secondary">
-        <button type="button" class="company-action"><svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>Direction</button>
-        <button type="button" class="company-action"><svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7"/><path d="M12 16V4"/><path d="M8 8l4-4 4 4"/></svg>Share</button>
-      </div>
 
       <section class="company-block company-section company-block--description">
         <h2>Description</h2>
@@ -8537,6 +13083,15 @@ function renderCompanyDetail(companyId) {
         <h2>Products</h2>
         <p class="company-section-lead">Available to order — like items or buy through Sarah (mock checkout).</p>
         <div class="product-grid">${productsHtml}</div>
+      </section>`
+          : ''
+      }
+
+      ${
+        contactRows.length
+          ? `<section class="company-block company-section company-contact">
+        <h2>Contact</h2>
+        <div class="company-contact-list">${contactHtml}</div>
       </section>`
           : ''
       }
@@ -8626,9 +13181,10 @@ function renderCompanyDetail(companyId) {
 
 function syncUserAvatars() {
   const av = getEffectiveUserAvatar();
-  document.querySelectorAll('[data-user-avatar]').forEach((img) => {
+  const avSrc = prototypeAsset(av);
+  document.querySelectorAll('[data-user-avatar], .feed-comment-compose-avatar').forEach((img) => {
     img.removeAttribute('data-fb');
-    img.src = prototypeAsset(av);
+    img.src = avSrc;
     img.alt = MOCK_USER.name;
     if (!/^data:/i.test(av)) {
       img.onerror = function onUserAvatarErr() {
@@ -8641,12 +13197,8 @@ function syncUserAvatars() {
 }
 
 function renderHome() {
-  const greet = document.getElementById('homeGreeting');
-  if (greet) {
-    const hour = new Date().getHours();
-    const part = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-    greet.textContent = `${part}, ${MOCK_USER.name}`;
-  }
+  return;
+  syncSarahTimeGreetings();
 
   syncUserAvatars();
 
@@ -8660,35 +13212,54 @@ function renderHome() {
       (t) =>
         `<button type="button" class="feed-tab ${t.id === activeFeedTab ? 'is-active' : ''}" data-feed-tab="${t.id}">${escapeHtml(t.label)}</button>`
     ).join('');
-    tabsHost.querySelectorAll('[data-feed-tab]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        activeFeedTab = btn.dataset.feedTab || 'for-you';
-        renderHome();
-      });
-    });
   }
 
   const feedHost = document.getElementById('feedList');
   if (!feedHost) return;
 
-  const items = MOCK_FEED.filter((p) => {
-    if (activeFeedTab === 'for-you') return p.tab === 'for-you';
-    if (activeFeedTab === 'following') return p.tab === 'following';
+  ensureLiveStatusFeed();
+
+  const liveMode = statusFeedLiveMode();
+  const display = liveMode ? [] : statusFeedMockForTab(activeFeedTab);
+  const userOnTab = liveMode
+    ? []
+    : getUserCreatedPosts().filter((p) => userPostVisibleOnFeedTab(p, activeFeedTab));
+  const liveItems = (liveStatusPosts || []).filter((p) => {
     if (activeFeedTab === 'companies') return p.authorType === 'company';
-    if (activeFeedTab === 'creators') return p.authorType === 'creator';
+    if (activeFeedTab === 'creators') return p.authorType === 'creator' || p.authorType === 'user';
     if (activeFeedTab === 'videos') return Boolean(p.image || p.video);
+    if (activeFeedTab === 'following') return p.tab === 'following';
     return true;
   });
-  const display = items.length ? items : MOCK_FEED.filter((p) => p.tab === 'for-you');
-  const userOnTab = getUserCreatedPosts().filter((p) => userPostVisibleOnFeedTab(p, activeFeedTab));
   const q = statusFeedQuery.trim().toLowerCase();
-  const merged = [...userOnTab, ...display].filter((p) => feedMatchesQuery(p, q));
+  const merged = [...userOnTab, ...liveItems, ...display].filter((p) => feedMatchesQuery(p, q));
 
   if (!merged.length && q) {
     feedHost.innerHTML =
       '<p class="feed-empty-search">No posts match your search. Open search and clear the field to see everything again.</p>';
+  } else if (!merged.length) {
+    const session = statusFeedHasSession();
+    const authBoot = window.SarahLive?.isAuthReady?.() === false;
+    if (liveMode && !session) {
+      feedHost.innerHTML = statusFeedEmptyMarkup(authBoot ? { loading: true } : { signedOut: true });
+    } else if (liveMode && (statusFeedLive.loading || authBoot) && liveStatusPosts === null) {
+      feedHost.innerHTML = statusFeedEmptyMarkup({ loading: true });
+    } else if (liveMode && statusFeedLive.error) {
+      feedHost.innerHTML = statusFeedEmptyMarkup({ error: statusFeedLive.error });
+    } else if (liveMode) {
+      feedHost.innerHTML = statusFeedEmptyMarkup();
+    } else {
+      feedHost.innerHTML =
+        '<p class="feed-empty-search">No posts on this tab yet.</p>';
+    }
   } else {
-    feedHost.innerHTML = merged.map((p) => renderFeedCard(p)).join('');
+    try {
+      feedHost.innerHTML = merged.map((p) => renderFeedCard(p)).join('');
+      wireFeedEngageButtons(feedHost);
+    } catch (err) {
+      console.warn('[Status] feed render failed', err);
+      feedHost.innerHTML = statusFeedEmptyMarkup({ error: 'Could not display posts. Refresh and try again.' });
+    }
   }
 
   syncNotificationBadge();
@@ -8722,9 +13293,9 @@ function bindSarahLiveAuth() {
     hint.textContent = 'Live Personal Sarah — sign in with your Sarah account to sync conversations.';
   }
 
-  window.SarahLive.onConnectionChange?.(() => {
+  window.SarahLive.onConnectionChange?.((state) => {
     updatePersonalSarahLiveUi();
-    renderThread();
+    if (parseLocationHash().route === 'chat-thread') renderThread();
   });
 
   document.getElementById('signInPanel')?.addEventListener('submit', async (e) => {
@@ -8736,10 +13307,8 @@ function bindSarahLiveAuth() {
       setAuthStatus(res.error);
       return;
     }
-    applyConsumerProfileToUi(res.profile);
-    await syncPersonalSarahSessionsFromServer();
     setAuthStatus('');
-    setRoute('home');
+    await routeAfterConsumerAuth(res.profile);
   });
 
   document.getElementById('signUpPanel')?.addEventListener('submit', async (e) => {
@@ -8754,27 +13323,84 @@ function bindSarahLiveAuth() {
       email: fd.get('email'),
       password: fd.get('password'),
       firstName: fd.get('firstName'),
+      lastName: fd.get('lastName'),
+      city: fd.get('city'),
+      country: fd.get('country'),
     });
     if (res.error) {
       setAuthStatus(res.error);
       return;
     }
-    applyConsumerProfileToUi(res.profile);
     setAuthStatus('');
+    await routeAfterConsumerAuth(res.profile);
+  });
+
+  document.getElementById('registerDetailsForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!window.SarahLive?.patchConsumerProfile) {
+      showProtoToast('Sign in with live mode to save your details.');
+      return;
+    }
+    const status = document.getElementById('registerDetailsStatus');
+    const fd = new FormData(e.target);
+    const firstName = String(fd.get('firstName') || '').trim();
+    const lastName = String(fd.get('lastName') || '').trim();
+    const city = String(fd.get('city') || '').trim();
+    const country = String(fd.get('country') || '').trim();
+    const locationNote = String(fd.get('locationNote') || '').trim();
+    const preferredLanguage = String(fd.get('preferredLanguage') || '').trim();
+    if (!firstName || !lastName || !city || !country) {
+      if (status) status.textContent = 'Please complete all required fields.';
+      return;
+    }
+    if (status) status.textContent = 'Saving…';
+    const patch = {
+      firstName,
+      lastName,
+      preferredName: firstName,
+      fullName: [firstName, lastName].join(' '),
+      city,
+      country,
+      onboardingCompletedAt: new Date().toISOString(),
+    };
+    const res = await window.SarahLive.patchConsumerProfile(patch);
+    if (res.error) {
+      if (status) status.textContent = res.error;
+      return;
+    }
+    const profile = res.data?.profile || window.SarahLive.getConsumerProfile();
+    applyConsumerProfileToUi(profile);
+    await syncConsumerProfileToPersonalKnowledge(profile, { locationNote, preferredLanguage });
+    if (status) status.textContent = '';
+    showProtoToast('Your details are saved.');
     setRoute('home');
+    void renderSarahHomeIntelligence();
   });
 
   window.SarahLive.onAuthChange(async (user, profile) => {
     if (user && profile) applyConsumerProfileToUi(profile);
-    if (!user) clearLivePersonalSarahState();
+    if (!user) {
+      clearLivePersonalSarahState();
+    }
     resetLiveConnections();
     if (user) ensureLiveConnectionsFresh();
     else sub01RefreshSurfaces();
     updatePersonalSarahLiveUi();
     if (user) {
-      await syncPersonalSarahSessionsFromServer();
+      await window.SarahLive.refreshConsumerProfile?.();
+      const remotePhoto = String(window.SarahLive.getConsumerProfile?.()?.photoURL || '').trim();
+      if (remotePhoto) {
+        saveCachedProfilePhotoUrl(remotePhoto);
+        saveStoredProfileDataUrl(PROFILE_AVATAR_STORAGE_KEY, '');
+      }
+      applyStoredProfileMedia();
+      await pullSnaPrefsFromServer();
+      await syncPersonalSarahSessionsFromServer({ force: true });
       const route = parseLocationHash().route;
-      if (route === 'auth' || route === 'welcome') setRoute('home');
+      if (route === 'auth' || route === 'welcome') {
+        if (!consumerRegistrationComplete(profile)) setRoute('register-details');
+        else setRoute('home');
+      }
       if (route === 'chats') renderChatsList();
     }
   });
@@ -8787,19 +13413,41 @@ function init() {
   document.getElementById('authMockContinue')?.addEventListener('click', () => setRoute('home'));
   document.getElementById('btnThreadBack')?.addEventListener('click', () => {
     const ctx = getActiveThreadContext();
-    if (ctx.kind === 'personal') setMySarahPanel('home');
-    else setRoute('chats');
+    const rt = getSarahRuntime();
+    if (ctx.kind === 'personal' && ctx.work) {
+      showWorkTasksHub('');
+      return;
+    }
+    const fallback = ctx.kind === 'personal' ? 'home' : 'chats';
+    const dest = rt.threadReturnRoute || fallback;
+    if (dest === 'home') setRoute('home');
+    else setRoute(dest);
   });
 
   document.querySelectorAll('.bottom-nav [data-route]').forEach((btn) => {
-    btn.addEventListener('click', () => setRoute(btn.dataset.route));
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.route || 'welcome';
+      if (target === 'home') {
+        let panel = 'home';
+        try {
+          panel = sessionStorage.getItem(MS_LAST_PANEL_KEY) || 'home';
+        } catch {
+          /* ignore */
+        }
+        if (panel === 'tasks') {
+          showWorkTasksHub('');
+          return;
+        }
+      }
+      setRoute(target);
+    });
   });
 
   document.getElementById('personalChatForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = document.getElementById('personalChatInput');
     const text = input?.value.trim();
-    if (!text) return;
+    if (!text && !personalComposePending.items.length) return;
     const panel = document.querySelector('.my-sarah-view')?.dataset.msPanel || 'home';
     const threadId = await deliverPersonalSarahMessage(text, {
       work: panel === 'tasks',
@@ -8821,13 +13469,27 @@ function init() {
       return;
     }
     if (ctx.kind === 'company' && ctx.api && consumerChatLiveActive()) {
-      const companyId = ctx.companyId || ctx.id;
+      const companyId = resolveLiveCompanySarahId(ctx.companyId || ctx.id);
       if (!companyId) return;
+      const attachments = await uploadComposePending(threadComposePending);
+      if (!text && !attachments.length) return;
+      const thread = ensureActiveCompanyThreadRecord(companyId);
+      thread.messages.push({ role: 'user', content: text, attachments: [...attachments] });
+      pushThinkingToThread(companyId);
+      if (input) input.value = '';
+      clearComposePending(threadComposePending, 'threadComposePending');
+      renderThread();
       setPersonalSarahComposeBusy(true);
       try {
-        const res = await window.SarahLive.sendCompanyMessage(companyId, text);
+        const res = await window.SarahLive.sendCompanyMessage(companyId, { message: text, attachments });
+        removeThinkingBubble(companyId);
         if (res.error) {
           showProtoToast(res.error);
+          thread.messages.push({
+            role: 'assistant',
+            markdown: `**Could not reach Sarah** — ${res.error}`,
+          });
+          renderThread();
           return;
         }
         const payload = res.data || {};
@@ -8837,7 +13499,6 @@ function init() {
         } else {
           await loadCompanyThreadFromApiIfNeeded();
         }
-        if (input) input.value = '';
         renderThread();
       } finally {
         setPersonalSarahComposeBusy(false);
@@ -8872,9 +13533,110 @@ function init() {
 
   initAuthTabs();
   bindGalleryLightbox();
-  bindCreatePostUi();
   bindProfileMediaUiOnce();
+  bindMsComposeViewportPin();
   bindProtoSearchAndNotif();
+  bindMyNotificationsUi();
+  bindSnaPrefsUi();
+  bindPushDeliveryChannels();
+  import('./sna-reminders.mjs')
+    .then((m) => m.initSarahReminders())
+    .catch((err) => console.warn('[Sarah] reminders module', err));
+
+  document.getElementById('msTryReminderDemo')?.addEventListener('click', async () => {
+    const dueAt = new Date(Date.now() + 60_000).toISOString();
+    if (personalSarahLiveActive() && window.SarahLive?.createPersonalReminder) {
+      const res = await window.SarahLive.createPersonalReminder({
+        title: 'Time to leave for work',
+        dueAt,
+        notes: 'Server reminder — check My Notifications when due.',
+      });
+      if (res.error) {
+        showProtoToast(res.error);
+        return;
+      }
+      const rem = res.reminder;
+      if (rem?.dueAt) {
+        import('./sna-reminders.mjs')
+          .then((m) => {
+            m.scheduleReminder({
+              id: rem.id || `srv-${Date.now()}`,
+              title: rem.title || 'Reminder',
+              body: rem.notes || 'Server reminder',
+              fireAt: Date.parse(rem.dueAt) || Date.now() + 60_000,
+            });
+          })
+          .catch(() => {});
+      }
+      showProtoToast('Reminder scheduled — alarm in about 1 minute.');
+      return;
+    }
+    import('./sna-reminders.mjs')
+      .then((m) => {
+        m.scheduleDemoReminder(1);
+        showProtoToast('Reminder set locally for 1 minute.');
+      })
+      .catch(() => showProtoToast('Reminders are unavailable in this browser.'));
+  });
+
+  document.getElementById('threadWorkSubmitBtn')?.addEventListener('click', async () => {
+    const ctx = getActiveThreadContext();
+    if (ctx.kind !== 'personal' || !ctx.work) return;
+    const ok = await submitWorkTaskForThread(ctx.id);
+    if (ok) {
+      syncThreadWorkSubmitBar();
+      renderThread();
+    }
+  });
+
+  document.getElementById('threadWorkCancelBtn')?.addEventListener('click', async () => {
+    const ctx = getActiveThreadContext();
+    if (ctx.kind !== 'personal' || !ctx.work) return;
+    const ok = await cancelWorkTaskForThread(ctx.id);
+    if (ok) {
+      syncThreadWorkSubmitBar();
+      renderThread();
+    }
+  });
+
+  if (personalSarahLiveActive() && window.SarahLive?.pollDuePersonalReminders) {
+    const pollServerReminders = async () => {
+      if (!window.SarahLive?.isSignedIn?.()) return;
+      const res = await window.SarahLive.pollDuePersonalReminders();
+      if (res.error || !(res.delivered > 0)) return;
+      void refreshLiveNotifications();
+      const prefs = { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
+      try {
+        const alarm = await import('./sna-reminders.mjs');
+        for (const item of res.items || []) {
+          markPushStarred(item.id);
+          const title = item.title || 'Reminder';
+          const body = item.notes || item.body || title;
+          if (prefs.reminders !== false) tryOsPushAlert(title, body);
+          if (!document.hidden) {
+            alarm.triggerServerReminderAlarm({ id: item.id, title, body });
+          }
+        }
+      } catch {
+        showProtoToast(`${res.delivered} reminder(s) due — check My Notifications.`);
+      }
+      syncNotificationBadge();
+      if (isMyNotificationsOpen()) renderMyNotificationsPanel();
+    };
+    void pollServerReminders();
+    setInterval(pollServerReminders, 15000);
+    import('./personal-geofence.mjs').then((geo) => {
+      geo.startPersonalGeofenceWatch(async (coords) => {
+        const res = await window.SarahLive.checkPersonalReminderGeofence(coords);
+        if (res.error || !res.delivered) return;
+        void refreshLiveNotifications();
+        const alarm = await import('./sna-reminders.mjs');
+        for (const item of res.items || []) {
+          alarm.triggerServerReminderAlarm({ id: item.id, title: item.title, body: item.title });
+        }
+      });
+    });
+  }
 
   window.addEventListener('hashchange', () => activateView());
 
@@ -8888,8 +13650,17 @@ function init() {
       closeProtoNotifSheet();
       return;
     }
+    if (!document.getElementById('snaPrefsSheet')?.classList.contains('hidden')) {
+      saveSnaGlobalPrefs(readSnaPrefsForm());
+      closeSnaPrefsSheet();
+      return;
+    }
     if (!document.getElementById('createPostSheet')?.classList.contains('hidden')) {
       closeCreatePostSheet();
+      return;
+    }
+    if (!document.getElementById('feedCommentSheet')?.classList.contains('hidden')) {
+      closeFeedCommentSheet();
       return;
     }
     if (document.querySelector('.my-sarah-view.is-drawer-open')) closeMsDrawer();
@@ -8898,6 +13669,10 @@ function init() {
 
   syncUserAvatars();
   syncNotificationBadge();
+  syncSarahTimeGreetings();
+  if (!window.__sarahGreetingClock) {
+    window.__sarahGreetingClock = window.setInterval(syncSarahTimeGreetings, 60_000);
+  }
 
   if (!location.hash) location.hash = 'welcome';
   activateView();
@@ -8905,11 +13680,13 @@ function init() {
 
 function bootSarahApp() {
   try {
+    bindStatusInteractionDelegates();
     if (!window.__sarahAppBooted) {
       window.__sarahAppBooted = true;
       init();
     }
     bindSarahLiveAuth();
+    void maybeCompleteCheckoutReturn();
     if (window.SarahLive?.isLiveEnabled?.()) {
       document.getElementById('authMockContinue')?.classList.add('hidden');
     } else {
@@ -8927,4 +13704,4 @@ if (window.__sarahLiveBootSignaled && !window.__sarahAppBooted) bootSarahApp();
 setTimeout(() => {
   if (!window.__sarahAppBooted) bootSarahApp();
   else bindSarahLiveAuth();
-}, 1200);
+}, 500);
