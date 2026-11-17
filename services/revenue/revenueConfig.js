@@ -77,6 +77,23 @@ export async function isCommercialActive(key) {
 }
 
 /**
+ * When `RS02_CHECKOUT_ALLOW_UIDS` is set, RS02 plan checkout is limited to those uids (comma/semicolon/space separated).
+ * Empty/unset env preserves prior behaviour (any consumer when RS02 checkout is enabled).
+ * @param {string} uid
+ */
+export function isRs02CheckoutUidAllowed(uid) {
+    const raw = String(process.env.RS02_CHECKOUT_ALLOW_UIDS || "").trim();
+    if (!raw) return true;
+    const allowed = raw
+        .split(/[,;\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    if (allowed.length === 0) return true;
+    const id = String(uid || "").trim();
+    return id.length > 0 && allowed.includes(id);
+}
+
+/**
  * @param {'rs01Limits'|'rs02Limits'|'rs06Credits'} key
  */
 export async function getEnforcementMode(key) {
