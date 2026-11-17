@@ -30,6 +30,7 @@ import { resetRevenueConfigCacheForTests } from "../services/revenue/revenueConf
 
 const sessionCol = createNetworkCollection(NETWORK_COLLECTIONS.CONSUMER_CHECKOUT_SESSIONS);
 const webhookCol = createNetworkCollection(NETWORK_COLLECTIONS.CONSUMER_CHECKOUT_WEBHOOK_EVENTS);
+const ledgerCol = createNetworkCollection(NETWORK_COLLECTIONS.CONSUMER_PAYMENT_LEDGER);
 const RS02_SKU = "rs02.sarah.plus.zar.monthly";
 const RS06_SKU = "rs06.credits.consumer.500.zar";
 const rs02Sku = getCatalogueSku(RS02_SKU);
@@ -95,6 +96,11 @@ async function seedCapturedLedger(reference, session, provider = "paystack") {
         status: "captured",
         completedAt: new Date().toISOString(),
     });
+}
+
+async function patchLedger(reference, patch) {
+    const row = await getConsumerPaymentByReference(reference);
+    await ledgerCol.put(reference, { ...row, ...patch }, { merge: false });
 }
 
 function resetAll() {
@@ -272,6 +278,68 @@ assert.equal(await getConsumerPaymentByReference(dupNoLedger.reference), null);
 const subAfterDup = await getConsumerSubscription(uidRs02);
 assert.notEqual(subAfterDup?.skuId, RS02_SKU);
 assert.equal((await getConsumerSarahCreditShadowSummary(uidRs06)).topUpBalanceCredits, 0);
+
+// --- assertLedgerMatchesSession hardening (malformed ledger cannot repair) ---
+resetAll();
+metaByRef.clear();
+paystackMock(metaByRef);
+
+const vBase = await initConsumerCheckout(uidRs02, RS02_SKU, { email, provider: "paystack" });
+const vRow = await sessionCol.get(vBase.reference);
+await seedCapturedLedger(vBase.reference, vRow);
+const mkReject = (code) => (e) => e.code === code;
+
+await patchLedger(vBase.reference, { paymentReference: "" });
+await assert.rejects(() => verifyConsumerCheckout(vBase.reference, uidRs02), mkReject("CHECKOUT_REFERENCE_MISMATCH"));
+await patchLedger(vBase.reference, { paymentReference: vBase.reference });
+
+await patchLedger(vBase.reference, { uid: "" });
+await assert.rejects(() => verifyConsumerCheckout(vBase.reference, uidRs02), mkReject("PAYMENT_UID_MISMATCH"));
+await patchLedger(vBase.reference, { uid: vRow.uid });
+
+await patchLedger(vBase.reference, { skuId: "" });
+await assert.rejects(() => verifyConsumerCheckout(vBase.reference, uidRs02), mkReject("PAYMENT_SKU_MISMATCH"));
+await patchLedger(vBase.reference, { skuId: vRow.skuId });
+
+await patchLedger(vBase.reference, { amountCents: null });
+await assert.rejects(() => verifyConsumerCheckout(vBase.reference, uidRs02), mkReject("PAYMENT_AMOUNT_MISMATCH"));
+await patchLedger(vBase.reference, { amountCents: vRow.amountCents });
+assert.equal(vRow.amountCents, rs02Sku.amountCents);
+assert.equal(vRow.amountCents, 9900);
+
+await patchLedger(vBase.reference, { currency: "" });
+await assert.rejects(() => verifyConsumerCheckout(vBase.reference, uidRs02), mkReject("PAYMENT_CURRENCY_MISMATCH"));
+await patchLedger(vBase.reference, { currency: vRow.currency });
+
+// --- Completed session metadata preserved on repair / concurrent duplicate verify ---
+resetAll();
+metaByRef.clear();
+paystackMock(metaByRef);
+const preserve = await initConsumerCheckout(uidRs02, RS02_SKU, { email, provider: "paystack" });
+const preserveRow = await sessionCol.get(preserve.reference);
+await seedCapturedLedger(preserve.reference, preserveRow);
+const frozenAt = "2026-06-01T12:00:00.000Z";
+await sessionCol.put(
+    preserve.reference,
+    {
+        ...preserveRow,
+        status: "completed",
+        completedAt: frozenAt,
+        paymentReference: preserve.reference,
+        paymentProvider: "paystack",
+    },
+    { merge: false }
+);
+await verifyConsumerCheckout(preserve.reference, uidRs02);
+let preserved = await sessionCol.get(preserve.reference);
+assert.equal(preserved.status, "completed");
+assert.equal(preserved.completedAt, frozenAt);
+await Promise.all([
+    verifyConsumerCheckout(preserve.reference, uidRs02),
+    verifyConsumerCheckout(preserve.reference, uidRs02),
+]);
+preserved = await sessionCol.get(preserve.reference);
+assert.equal(preserved.completedAt, frozenAt);
 
 globalThis.fetch = originalFetch;
 console.log("pay-02e-checkout-session-consistency.test.mjs: ok");

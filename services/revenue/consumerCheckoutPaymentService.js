@@ -275,23 +275,66 @@ export async function initConsumerCheckout(uid, skuId, opts = {}) {
     return initPaystackCheckout(uid, sku, email, returnUrl);
 }
 
-function assertLedgerMatchesSession(ledger, session, reference) {
-    const ref = String(reference || "").trim();
-    if (String(ledger.paymentReference || ref) !== ref) {
-        throw err(403, "CHECKOUT_REFERENCE_MISMATCH", "Payment reference mismatch.");
+function requireLedgerMatchString(value, code, message) {
+    if (value == null || value === "") {
+        throw err(402, code, message);
     }
-    if (String(ledger.uid) !== String(session.uid)) {
-        throw err(403, "PAYMENT_UID_MISMATCH", "Payment consumer does not match checkout session.");
-    }
-    if (String(ledger.skuId) !== String(session.skuId)) {
-        throw err(403, "PAYMENT_SKU_MISMATCH", "Payment plan does not match checkout session.");
-    }
-    const sessionAmount = Number(session.amountCents);
-    const ledgerAmount = Number(ledger.amountCents);
-    if (!Number.isFinite(sessionAmount) || sessionAmount !== ledgerAmount) {
+    const s = String(value).trim();
+    if (!s) throw err(402, code, message);
+    return s;
+}
+
+function requireAmountCents(value) {
+    if (value == null || value === "") {
         throw err(402, "PAYMENT_AMOUNT_MISMATCH", "Paid amount does not match the plan.");
     }
-    if (normCurrency(ledger.currency) !== normCurrency(session.currency)) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+        throw err(402, "PAYMENT_AMOUNT_MISMATCH", "Paid amount does not match the plan.");
+    }
+    return n;
+}
+
+function requireMatchCurrency(value) {
+    if (value == null || value === "") {
+        throw err(402, "PAYMENT_CURRENCY_MISMATCH", "Paid currency does not match the plan.");
+    }
+    const raw = String(value).trim();
+    if (raw.length < 3) {
+        throw err(402, "PAYMENT_CURRENCY_MISMATCH", "Paid currency does not match the plan.");
+    }
+    return normCurrency(raw);
+}
+
+function assertLedgerMatchesSession(ledger, session, reference) {
+    const ref = String(reference || "").trim();
+    if (!ref) throw err(400, "REFERENCE_REQUIRED", "Payment reference required.");
+    const ledgerRef = requireLedgerMatchString(
+        ledger.paymentReference,
+        "CHECKOUT_REFERENCE_MISMATCH",
+        "Payment reference mismatch."
+    );
+    if (ledgerRef !== ref) {
+        throw err(403, "CHECKOUT_REFERENCE_MISMATCH", "Payment reference mismatch.");
+    }
+    const ledgerUid = requireLedgerMatchString(ledger.uid, "PAYMENT_UID_MISMATCH", "Payment consumer does not match checkout session.");
+    const sessionUid = requireLedgerMatchString(session.uid, "PAYMENT_UID_MISMATCH", "Payment consumer does not match checkout session.");
+    if (ledgerUid !== sessionUid) {
+        throw err(403, "PAYMENT_UID_MISMATCH", "Payment consumer does not match checkout session.");
+    }
+    const ledgerSku = requireLedgerMatchString(ledger.skuId, "PAYMENT_SKU_MISMATCH", "Payment plan does not match checkout session.");
+    const sessionSku = requireLedgerMatchString(session.skuId, "PAYMENT_SKU_MISMATCH", "Payment plan does not match checkout session.");
+    if (ledgerSku !== sessionSku) {
+        throw err(403, "PAYMENT_SKU_MISMATCH", "Payment plan does not match checkout session.");
+    }
+    const sessionAmount = requireAmountCents(session.amountCents);
+    const ledgerAmount = requireAmountCents(ledger.amountCents);
+    if (sessionAmount !== ledgerAmount) {
+        throw err(402, "PAYMENT_AMOUNT_MISMATCH", "Paid amount does not match the plan.");
+    }
+    const sessionCur = requireMatchCurrency(session.currency);
+    const ledgerCur = requireMatchCurrency(ledger.currency);
+    if (sessionCur !== ledgerCur) {
         throw err(402, "PAYMENT_CURRENCY_MISMATCH", "Paid currency does not match the plan.");
     }
 }

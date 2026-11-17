@@ -57,7 +57,7 @@ On **duplicate / idempotent** paths (`existingPay?.status === "captured"` or `ro
 
 `services/revenue/consumerCheckoutPaymentService.js`:
 
-1. `ensureSessionCompleted(reference, paymentProvider)` — session-only repair; validates ledger `captured` against session uid/sku/amount/currency; uses `markSessionCompletedFirestore` or memory `sessions.put`; no subscription/ledger writes.
+1. `ensureSessionCompleted(reference, paymentProvider)` — session-only repair; validates ledger `captured` against session via `assertLedgerMatchesSession` (stored `paymentReference`, uid, sku, integer `amountCents`, currency required on both sides; no coercion of missing fields); uses `markSessionCompletedFirestore` or memory `sessions.put`; no subscription/ledger writes.
 2. Invoked from `completeSession` when ledger captured and session not completed (duplicate paths and ledger-create race).
 3. Paystack/Stripe duplicate webhook deliveries call `ensureSessionCompleted` without re-running provider verify.
 
