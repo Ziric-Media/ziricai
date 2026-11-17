@@ -77,6 +77,16 @@ export const TENANT_COLLECTIONS = {
     SUPPORT_REMEDIATION_AUDITS: "supportRemediationAudits",
     /** Portal Sarah conversation sessions (tenant + user scoped). */
     SARAH_SESSIONS: "sarahSessions",
+    /** EDU — minimised learner rows (school tenant). */
+    SCHOOL_LEARNERS: "schoolLearners",
+    /** EDU — parent/guardian ↔ learner links with verification status. */
+    GUARDIAN_LINKS: "guardianLinks",
+    /** EDU — staff decisions on guardian applications (audit). */
+    GUARDIAN_AUDIT: "guardianAudit",
+    /** EDU — learner admission applications (Stage 3). */
+    ADMISSION_APPLICATIONS: "admissionApplications",
+    /** EDU — audit trail for admission application changes. */
+    ADMISSION_AUDIT: "admissionAudit",
     /** Sarah BOS — commercial cycle (quote → verified pay → mobilise) per tenant. */
     BOS_COMMERCIAL_CYCLES: "bosCommercialCycles",
     /** Sarah BOS — Admin/human → module Sarah workforce instructions. */
@@ -216,6 +226,22 @@ export const NETWORK_COLLECTIONS = {
     /** Phase 2.0 — verification evidence file bytes: metadata doc per upload + base64 chunks (Firestore 1 MiB doc cap). */
     EVIDENCE_BLOBS: "networkEvidenceBlobs",
     EVIDENCE_BLOB_CHUNKS: "networkEvidenceBlobChunks",
+    /** CHAT-01 — consumer chat attachment bytes (metadata + chunks); token-gated download. */
+    CHAT_MEDIA_BLOBS: "networkChatMediaBlobs",
+    CHAT_MEDIA_BLOB_CHUNKS: "networkChatMediaBlobChunks",
+    /** CHAT-01 — upload tokens + attachment metadata (pending through ready). */
+    CHAT_MEDIA_UPLOADS: "networkChatMediaUploads",
+    /** Company Portal → Sarah Status posts (listed tenants). */
+    STATUS_POSTS: "networkStatusPosts",
+    /** Sarah App consumers — public Status timeline posts (image/video + reactions). */
+    CONSUMER_STATUS_POSTS: "networkConsumerStatusPosts",
+    CONSUMER_STATUS_POST_REACTIONS: "networkConsumerStatusPostReactions",
+    CONSUMER_STATUS_COMMENTS: "networkConsumerStatusComments",
+    STATUS_POST_REACTIONS: "networkStatusPostReactions",
+    /** Aggregated presence metrics per companyId (views, reactions, leads). */
+    PRESENCE_METRICS: "networkPresenceMetrics",
+    /** Public Discover listing images (logo/cover); token-gated GET. */
+    LISTING_MEDIA_UPLOADS: "networkListingMediaUploads",
     /** Phase 2.0 — per-recipient in-app notifications for subscriber events (consumer polls; marks read). */
     NOTIFICATIONS: "networkNotifications",
     /** Phase 2.0 — Mission Control search administration (category / synonym overrides; single doc `config`). */
@@ -224,6 +250,8 @@ export const NETWORK_COLLECTIONS = {
     PLATFORM_ROLES: "networkPlatformRoles",
     /** Phase 2.1 — consumer FCM/web push tokens (`consent` required for delivery). */
     PUSH_DEVICES: "networkPushDevices",
+    /** SNA-01E — per-consumer global notification prefs (push + quiet hours). */
+    CONSUMER_NOTIFICATION_PREFS: "networkConsumerNotificationPrefs",
     /** RS02 — consumer Sarah subscription (sku + billing period). */
     CONSUMER_SUBSCRIPTIONS: "networkConsumerSubscriptions",
     CONSUMER_CHECKOUT_SESSIONS: "networkConsumerCheckoutSessions",
@@ -231,6 +259,21 @@ export const NETWORK_COLLECTIONS = {
     CONSUMER_CHECKOUT_WEBHOOK_EVENTS: "networkConsumerCheckoutWebhookEvents",
     /** RS02 — immutable consumer payment records. */
     CONSUMER_PAYMENT_LEDGER: "networkConsumerPaymentLedger",
+};
+
+/** MC-PO — platform governance collections (server-only; Mission Control APIs). */
+export const PLATFORM_GOVERNANCE = {
+    /** Immutable-style event log (PII-minimized payloads). */
+    EVENTS: "platformEvents",
+    /** Daily aggregated counters keyed by UTC day + metric. */
+    EVENT_DAILY: "platformEventDaily",
+    CONSUMER_SAFETY_CASES: "platformConsumerSafetyCases",
+    /** ZiricAI-authored announcements (not org subscriber events). */
+    ANNOUNCEMENTS: "platformAnnouncements",
+    /** Daily Sarah App telemetry rollups. */
+    APP_TELEMETRY_DAILY: "platformSarahAppTelemetryDaily",
+    /** Durable Mission Control admin actions. */
+    ADMIN_AUDIT: "platformAdminAudit",
 };
 
 /** Optional future platform person link index. */

@@ -167,6 +167,14 @@ export const MODULE_PERMISSIONS = {
    */
   network: 'canManageNetwork',
 
+  statusPosts: 'canManageNetwork',
+
+  discoverProfile: 'canManageNetwork',
+
+  schoolGuardians: 'canManageNetwork',
+
+  schoolAdmissions: 'canManageNetwork',
+
 };
 
 

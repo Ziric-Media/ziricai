@@ -6,6 +6,12 @@ import { canAccessModule } from '../permissions.js';
 import { sarahNavIconMarkup } from '../../shared/sarahAvatar.js';
 import { isAutomotivePresetActive } from '../automotive/automotivePreset.js';
 
+export function isEducationSchoolActive(company) {
+  if (!company) return false;
+  if (company.settings?.education?.requireVerifiedGuardians === true) return true;
+  return String(company.industry || '').toLowerCase().includes('education');
+}
+
 export const NAV_SECTIONS = [
   {
     id: 'sarah-workforce',
@@ -41,6 +47,8 @@ export const NAV_SECTIONS = [
     label: 'Grow',
     items: [
       { id: 'analytics', label: 'Analytics', icon: 'fa-chart-line' },
+      { id: 'statusPosts', label: 'Sarah Status', icon: 'fa-bullhorn' },
+      { id: 'discoverProfile', label: 'Discover profile', icon: 'fa-compass' },
       { id: 'marketplace', label: 'Marketplace', icon: 'fa-store' },
     ],
   },
@@ -52,6 +60,18 @@ export const NAV_SECTIONS = [
       { id: 'integrations', label: 'Integrations', icon: 'fa-plug' },
       { id: 'team', label: 'Team', icon: 'fa-user-group' },
       { id: 'network', label: 'Sarah Network', icon: 'fa-globe' },
+      {
+        id: 'schoolGuardians',
+        label: 'Parents & guardians',
+        icon: 'fa-people-roof',
+        requiresEducationSchool: true,
+      },
+      {
+        id: 'schoolAdmissions',
+        label: 'Admissions',
+        icon: 'fa-graduation-cap',
+        requiresEducationSchool: true,
+      },
       { id: 'notifications', label: 'Notifications', icon: 'fa-bell', badgeKey: 'notifications' },
       { id: 'activity', label: 'Activity Log', icon: 'fa-clock-rotate-left' },
       { id: 'settings', label: 'Settings', icon: 'fa-gear' },
@@ -88,6 +108,7 @@ export function renderSidebarNav() {
   nav.innerHTML = NAV_SECTIONS.map((section) => {
     const items = section.items.filter((item) => {
       if (item.requiresAutomotivePreset && !isAutomotivePresetActive(state.company)) return false;
+      if (item.requiresEducationSchool && !isEducationSchoolActive(state.company)) return false;
       return canAccessModule(role, item.id);
     });
     if (!items.length) return '';
