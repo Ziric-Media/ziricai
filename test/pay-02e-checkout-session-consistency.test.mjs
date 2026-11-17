@@ -311,6 +311,14 @@ await patchLedger(vBase.reference, { currency: "" });
 await assert.rejects(() => verifyConsumerCheckout(vBase.reference, uidRs02), mkReject("PAYMENT_CURRENCY_MISMATCH"));
 await patchLedger(vBase.reference, { currency: vRow.currency });
 
+await patchLedger(vBase.reference, { currency: "XXX" });
+await assert.rejects(
+    () => verifyConsumerCheckout(vBase.reference, uidRs02),
+    mkReject("PAYMENT_CURRENCY_MISMATCH"),
+    "unsupported catalogue currency must block repair"
+);
+await patchLedger(vBase.reference, { currency: vRow.currency });
+
 // --- Completed session metadata preserved on repair / concurrent duplicate verify ---
 resetAll();
 metaByRef.clear();
