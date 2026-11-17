@@ -275,7 +275,66 @@ export async function initConsumerCheckout(uid, skuId, opts = {}) {
     return initPaystackCheckout(uid, sku, email, returnUrl);
 }
 
-async function markSessionCompletedFirestore(reference, row, provider) {
+function assertLedgerMatchesSession(ledger, session, reference) {
+    const ref = String(reference || "").trim();
+    if (String(ledger.paymentReference || ref) !== ref) {
+        throw err(403, "CHECKOUT_REFERENCE_MISMATCH", "Payment reference mismatch.");
+    }
+    if (String(ledger.uid) !== String(session.uid)) {
+        throw err(403, "PAYMENT_UID_MISMATCH", "Payment consumer does not match checkout session.");
+    }
+    if (String(ledger.skuId) !== String(session.skuId)) {
+        throw err(403, "PAYMENT_SKU_MISMATCH", "Payment plan does not match checkout session.");
+    }
+    const sessionAmount = Number(session.amountCents);
+    const ledgerAmount = Number(ledger.amountCents);
+    if (!Number.isFinite(sessionAmount) || sessionAmount !== ledgerAmount) {
+        throw err(402, "PAYMENT_AMOUNT_MISMATCH", "Paid amount does not match the plan.");
+    }
+    if (normCurrency(ledger.currency) !== normCurrency(session.currency)) {
+        throw err(402, "PAYMENT_CURRENCY_MISMATCH", "Paid currency does not match the plan.");
+    }
+}
+
+/**
+ * Session-only repair when payment ledger is already captured (no entitlement or ledger writes).
+ * @param {string} reference
+ * @param {string} [paymentProvider]
+ */
+async function ensureSessionCompleted(reference, paymentProvider) {
+    const ref = String(reference || "").trim();
+    const ledger = await getConsumerPaymentByReference(ref);
+    if (!ledger || ledger.status !== "captured") {
+        return { repaired: false, reason: "LEDGER_NOT_CAPTURED" };
+    }
+    const row = await sessions.get(ref);
+    if (!row) throw err(404, "CHECKOUT_NOT_FOUND", "Checkout session not found.");
+    if (row.status === "completed") {
+        return { repaired: false, reason: "SESSION_ALREADY_COMPLETED", row };
+    }
+    assertLedgerMatchesSession(ledger, row, ref);
+    const provider = paymentProvider || ledger.provider || row.provider || "paystack";
+    const completedAt = ledger.completedAt || new Date().toISOString();
+    if (useAdminBackend()) {
+        const tx = await markSessionCompletedFirestore(ref, row, provider, completedAt);
+        return {
+            repaired: !tx.duplicate,
+            row: tx.row,
+            reason: tx.duplicate ? "SESSION_ALREADY_COMPLETED" : "SESSION_REPAIRED",
+        };
+    }
+    const next = {
+        ...row,
+        status: "completed",
+        completedAt,
+        paymentReference: ref,
+        paymentProvider: provider,
+    };
+    await sessions.put(ref, next, { merge: false });
+    return { repaired: true, row: next, reason: "SESSION_REPAIRED" };
+}
+
+async function markSessionCompletedFirestore(reference, row, provider, completedAt) {
     const col = NETWORK_COLLECTIONS.CONSUMER_CHECKOUT_SESSIONS;
     return runAdminFirestoreTransaction(async (tx) => {
         const ref = networkDocRef(col, reference);
@@ -283,11 +342,11 @@ async function markSessionCompletedFirestore(reference, row, provider) {
         if (!snap.exists()) throw err(404, "CHECKOUT_NOT_FOUND", "Checkout session not found.");
         const current = snap.data();
         if (current.status === "completed") return { duplicate: true, row: current };
-        const completedAt = new Date().toISOString();
+        const completedAtTs = completedAt || new Date().toISOString();
         const next = {
             ...current,
             status: "completed",
-            completedAt,
+            completedAt: completedAtTs,
             paymentReference: reference,
             paymentProvider: provider,
         };
@@ -306,6 +365,10 @@ async function completeSession(reference, uidFromSession, paymentProvider) {
         const existingPay = await getConsumerPaymentByReference(reference);
         const sessionSku = getCatalogueSku(row.skuId);
         const creditPack = isConsumerCreditPackSku(sessionSku);
+        if (existingPay?.status === "captured" && row.status !== "completed") {
+            const repairProvider = existingPay.provider || row.provider || paymentProvider || "paystack";
+            await ensureSessionCompleted(reference, repairProvider);
+        }
         if (existingPay?.status === "captured" || row.status === "completed") {
             if (creditPack) {
                 const usage = await getConsumerSarahCreditShadowSummary(row.uid);
@@ -340,6 +403,16 @@ async function completeSession(reference, uidFromSession, paymentProvider) {
             completedAt,
         });
         if (!ledger.created && ledger.duplicate) {
+            await ensureSessionCompleted(reference, provider);
+            if (creditPack) {
+                const usage = await getConsumerSarahCreditShadowSummary(row.uid);
+                return {
+                    checkoutKind: "rs06_credit_pack",
+                    topUpBalanceCredits: usage.topUpBalanceCredits,
+                    subscription: await getConsumerSubscription(row.uid),
+                    duplicate: true,
+                };
+            }
             const subscription = await getConsumerSubscription(row.uid);
             return { subscription, duplicate: true };
         }
@@ -496,8 +569,11 @@ export async function handlePaystackCheckoutWebhook(rawBody, signature) {
     if (event.event !== "charge.success") return { handled: false };
     const reference = event.data?.reference;
     if (!reference) return { handled: false };
-    const { claim, duplicate } = await claimWebhookEvent("paystack", eventId);
-    if (!claim) return { handled: true, duplicate: true, reference };
+    const { claim } = await claimWebhookEvent("paystack", eventId);
+    if (!claim) {
+        await ensureSessionCompleted(reference);
+        return { handled: true, duplicate: true, reference };
+    }
     const row = await sessions.get(reference);
     await verifyPaystackReference(reference, null, row);
     return { handled: true, reference };
@@ -524,8 +600,11 @@ export async function handleStripeCheckoutWebhook(rawBody, signature) {
     if (event.type !== "checkout.session.completed") return { handled: false };
     const reference = event.data?.object?.client_reference_id;
     if (!reference) return { handled: false };
-    const { claim, duplicate } = await claimWebhookEvent("stripe", event.id);
-    if (!claim) return { handled: true, duplicate: true, reference };
+    const { claim } = await claimWebhookEvent("stripe", event.id);
+    if (!claim) {
+        await ensureSessionCompleted(reference);
+        return { handled: true, duplicate: true, reference };
+    }
     const row = await sessions.get(reference);
     await verifyStripeReference(reference, null, row);
     return { handled: true, reference };
