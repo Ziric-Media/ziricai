@@ -338,7 +338,10 @@ function assertLedgerMatchesSession(ledger, session, reference) {
         throw err(402, "PAYMENT_CURRENCY_MISMATCH", "Paid currency does not match the plan.");
     }
     const catalogueSku = getCatalogueSku(sessionSku);
-    const expectedCur = requireMatchCurrency(catalogueSku?.currency || session.currency);
+    if (!catalogueSku) {
+        throw err(403, "PAYMENT_SKU_MISMATCH", "Payment plan does not match checkout session.");
+    }
+    const expectedCur = requireMatchCurrency(catalogueSku.currency);
     if (sessionCur !== expectedCur || ledgerCur !== expectedCur) {
         throw err(402, "PAYMENT_CURRENCY_MISMATCH", "Paid currency does not match the plan.");
     }

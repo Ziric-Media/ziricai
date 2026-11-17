@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { NETWORK_COLLECTIONS } from "../services/database/schema.js";
 import { createNetworkCollection } from "../services/network/networkCollectionStore.js";
-import { getCatalogueSku } from "../services/revenue/catalogueService.js";
+import { getCatalogueSku, registerCatalogueSkuForTests } from "../services/revenue/catalogueService.js";
 import {
     initConsumerCheckout,
     verifyConsumerCheckout,
@@ -60,6 +60,9 @@ function paystackMock(metaByRef) {
             const meta = metaByRef.get(ref) || {};
             const skuId = meta.skuId || RS02_SKU;
             const sku = getCatalogueSku(skuId);
+            const fallback = getCatalogueSku(RS02_SKU);
+            const amount = sku?.amountCents ?? meta.amountCents ?? fallback.amountCents;
+            const currency = sku?.currency || meta.currency || fallback.currency || "ZAR";
             return {
                 ok: true,
                 json: async () => ({
@@ -67,8 +70,8 @@ function paystackMock(metaByRef) {
                     data: {
                         status: "success",
                         reference: ref,
-                        amount: sku.amountCents,
-                        currency: sku.currency || "ZAR",
+                        amount,
+                        currency,
                         metadata: meta,
                     },
                 }),
@@ -318,6 +321,96 @@ await assert.rejects(
     "unsupported catalogue currency must block repair"
 );
 await patchLedger(vBase.reference, { currency: vRow.currency });
+
+// --- Catalogue SKU must exist (no session.currency fallback) ---
+resetAll();
+metaByRef.clear();
+paystackMock(metaByRef);
+const absentCat = await initConsumerCheckout(uidRs02, RS02_SKU, { email, provider: "paystack" });
+const absentRow = await sessionCol.get(absentCat.reference);
+const absentSku = "pay02e.catalogue.absent.sku";
+await sessionCol.put(absentCat.reference, { ...absentRow, skuId: absentSku }, { merge: false });
+metaByRef.set(absentCat.reference, {
+    uid: absentRow.uid,
+    skuId: absentSku,
+    amountCents: absentRow.amountCents,
+    currency: absentRow.currency,
+});
+await recordConsumerPayment({
+    paymentReference: absentCat.reference,
+    uid: absentRow.uid,
+    skuId: absentSku,
+    amountCents: absentRow.amountCents,
+    currency: absentRow.currency,
+    provider: "paystack",
+    status: "captured",
+});
+await assert.rejects(
+    () => verifyConsumerCheckout(absentCat.reference, uidRs02),
+    mkReject("PAYMENT_SKU_MISMATCH"),
+    "unknown catalogue SKU must block repair"
+);
+assert.equal((await sessionCol.get(absentCat.reference)).status, "pending");
+
+// --- Catalogue entry without currency must block repair ---
+resetAll();
+metaByRef.clear();
+paystackMock(metaByRef);
+const noCurSku = "pay02e.catalogue.no.currency.sku";
+const noCurInit = await initConsumerCheckout(uidRs02, RS02_SKU, { email, provider: "paystack" });
+const noCurRow = await sessionCol.get(noCurInit.reference);
+registerCatalogueSkuForTests({
+    skuId: noCurSku,
+    amountCents: 9900,
+    currency: "ZAR",
+    revenueStreamId: "RS02",
+    public: false,
+});
+await sessionCol.put(noCurInit.reference, { ...noCurRow, skuId: noCurSku, amountCents: 9900 }, { merge: false });
+metaByRef.set(noCurInit.reference, {
+    uid: noCurRow.uid,
+    skuId: noCurSku,
+    amountCents: 9900,
+    currency: "ZAR",
+});
+await recordConsumerPayment({
+    paymentReference: noCurInit.reference,
+    uid: noCurRow.uid,
+    skuId: noCurSku,
+    amountCents: 9900,
+    currency: "ZAR",
+    provider: "paystack",
+    status: "captured",
+});
+registerCatalogueSkuForTests({ skuId: noCurSku, amountCents: 9900, revenueStreamId: "RS02", public: false });
+await assert.rejects(
+    () => verifyConsumerCheckout(noCurInit.reference, uidRs02),
+    mkReject("PAYMENT_CURRENCY_MISMATCH"),
+    "catalogue SKU without currency must block repair"
+);
+assert.equal((await sessionCol.get(noCurInit.reference)).status, "pending");
+
+// --- Ledger completedAt copied to session on pending → completed repair ---
+resetAll();
+metaByRef.clear();
+paystackMock(metaByRef);
+const ledgerTs = "2026-07-15T08:30:00.000Z";
+const tsRepair = await initConsumerCheckout(uidRs02, RS02_SKU, { email, provider: "paystack" });
+const tsRow = await sessionCol.get(tsRepair.reference);
+await recordConsumerPayment({
+    paymentReference: tsRepair.reference,
+    uid: tsRow.uid,
+    skuId: tsRow.skuId,
+    amountCents: tsRow.amountCents,
+    currency: tsRow.currency,
+    provider: "paystack",
+    status: "captured",
+    completedAt: ledgerTs,
+});
+await verifyConsumerCheckout(tsRepair.reference, uidRs02);
+const tsSession = await sessionCol.get(tsRepair.reference);
+assert.equal(tsSession.status, "completed");
+assert.equal(tsSession.completedAt, ledgerTs);
 
 // --- Completed session metadata preserved on repair / concurrent duplicate verify ---
 resetAll();

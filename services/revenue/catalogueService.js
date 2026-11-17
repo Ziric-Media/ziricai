@@ -206,6 +206,14 @@ export function getCatalogueSku(skuId) {
     return skuById.get(skuId) || null;
 }
 
+/** @param {object} sku */
+export function registerCatalogueSkuForTests(sku) {
+    ensureCatalogue();
+    const id = String(sku?.skuId || "").trim();
+    if (!id) throw new Error("registerCatalogueSkuForTests: skuId required");
+    skuById.set(id, { ...sku, skuId: id });
+}
+
 /**
  * @param {string} templateId
  */
