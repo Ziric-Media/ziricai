@@ -5,6 +5,8 @@
     },
     "scripts": {
         "prepare:sites": "node scripts/prepare-sites.js",
+        "prepare:users": "node scripts/prepare-sites.js users",
+        "deploy:sarah": "npm run prepare:users && cd users && netlify deploy --prod --dir . --no-build",
         "predev": "node scripts/prepare-sites.js",
         "dev": "node api/server.js",
         "dev:api": "node api/server.js",
@@ -24,6 +26,7 @@
         "verify:sales-funnel-turn": "node scripts/verify-sales-funnel-turn.js",
         "verify:appointment-schedule-authority": "node scripts/verify-appointment-schedule-authority.js",
         "verify:webhook": "node scripts/verify-webhook.js",
+        "verify:pay-02-checkout": "node scripts/pay-02-checkout-verify.mjs",
         "verify:whatsapp-integration": "node scripts/verify-whatsapp-integration.js",
         "verify:tenant-isolation": "node scripts/verify-tenant-isolation.js",
         "verify:book-test-drive": "node scripts/verify-book-test-drive.js",

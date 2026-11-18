@@ -26,8 +26,10 @@ Use **Paystack test keys** (or Stripe test mode) on a non-production Railway ser
 ## Automated gate (local / CI)
 
 ```bash
-node scripts/rs02-checkout-verify.mjs
+node scripts/pay-02-checkout-verify.mjs
 ```
+
+(`node scripts/rs02-checkout-verify.mjs` delegates to the same suite.)
 
 ## Manual matrix (staging)
 
