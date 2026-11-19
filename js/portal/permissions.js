@@ -171,6 +171,8 @@ export const MODULE_PERMISSIONS = {
 
   discoverProfile: 'canManageNetwork',
 
+  recommendations: 'canManageNetwork',
+
   schoolGuardians: 'canManageNetwork',
 
   schoolAdmissions: 'canManageNetwork',

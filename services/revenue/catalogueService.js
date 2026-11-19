@@ -2,6 +2,7 @@
  * Unified product & pricing catalogue (R0) — in-memory seed from billingPlans + RS02–RS08 placeholders.
  */
 import { BILLING_PLANS, getPlan } from "../platform/billingPlans.js";
+import { REC_CAMPAIGN_PACKAGES } from "../recommendations/campaignConstants.js";
 
 const CATALOGUE_VERSION_ID = "seed-r0-v1";
 
@@ -127,6 +128,26 @@ function registerSarahPlans() {
     }
 }
 
+function registerRecCampaignSkus() {
+    for (const [skuId, pkg] of Object.entries(REC_CAMPAIGN_PACKAGES)) {
+        skuById.set(skuId, {
+            skuId,
+            productId: "rs09.rec",
+            revenueStreamId: "RS09",
+            name: `Sarah Recommendations — ${pkg.name}`,
+            description: `${pkg.monthlyAllowance} sponsored presentations per month · up to ${pkg.maxOfferings} offering(s)`,
+            accountTypes: ["company"],
+            currency: "ZAR",
+            amountCents: pkg.amountCents,
+            billingPeriod: "monthly",
+            entitlementTemplateId: null,
+            public: true,
+            monthlyAllowance: pkg.monthlyAllowance,
+            maxOfferings: pkg.maxOfferings,
+        });
+    }
+}
+
 function registerPlaceholderSkus() {
     const placeholders = [
         { skuId: "rs03.status.boost.starter.zar", revenueStreamId: "RS03", name: "Starter Boost", amountCents: 5000 },
@@ -182,6 +203,7 @@ function ensureCatalogue() {
     registerCompanyPlans();
     registerSarahPlans();
     registerPlaceholderSkus();
+    registerRecCampaignSkus();
     initialized = true;
 }
 

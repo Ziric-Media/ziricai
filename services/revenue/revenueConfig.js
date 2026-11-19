@@ -13,6 +13,7 @@ const DEFAULT_CONFIG = {
         rs06Credits: false,
         rs07Addons: false,
         rs08EnterpriseBilling: false,
+        rs09RecCampaignCheckout: false,
     },
     enforcement: {
         rs01Limits: "shadow",
@@ -72,8 +73,31 @@ export async function isCommercialActive(key) {
     if (key === "rs06Credits" && ["1", "true", "yes"].includes(String(process.env.RS06_CREDITS_CHECKOUT || "").toLowerCase())) {
         return true;
     }
+    if (key === "rs09RecCampaignCheckout" && ["1", "true", "yes"].includes(String(process.env.RECOMMENDATIONS_CHECKOUT_ENABLED || "").toLowerCase())) {
+        return true;
+    }
+    if (key === "rs09RecCampaignCheckout" && String(process.env.RS09_REC_CHECKOUT || "").toLowerCase() === "pilot") {
+        return true;
+    }
     const cfg = await getRevenueConfig();
     return Boolean(cfg.commercialActivation[key]);
+}
+
+/**
+ * When `RS02_CHECKOUT_ALLOW_UIDS` is set, RS02 plan checkout is limited to those uids (comma/semicolon/space separated).
+ * Empty/unset env preserves prior behaviour (any consumer when RS02 checkout is enabled).
+ * @param {string} uid
+ */
+export function isRs02CheckoutUidAllowed(uid) {
+    const raw = String(process.env.RS02_CHECKOUT_ALLOW_UIDS || "").trim();
+    if (!raw) return true;
+    const allowed = raw
+        .split(/[,;\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    if (allowed.length === 0) return true;
+    const id = String(uid || "").trim();
+    return id.length > 0 && allowed.includes(id);
 }
 
 /**

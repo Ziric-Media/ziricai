@@ -7667,3 +7667,59 @@
     color: var(--text-muted, #64748b);
     margin-top: 2px;
 }
+
+/* REC — Sarah Recommendations portal module (rec-*) */
+.portal-body .rec-page { display: flex; flex-direction: column; gap: 16px; }
+.rec-hero {
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border, #e2e8f0);
+    background: rgba(162, 28, 175, 0.06);
+    font-size: 13px;
+}
+.rec-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.rec-tab {
+    border: 1px solid var(--border, #e2e8f0);
+    background: var(--bg-card, #fff);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.rec-tab.is-active { background: #a21caf; color: #fff; border-color: #a21caf; }
+.rec-card {
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    padding: 16px;
+    background: var(--bg-card, #fff);
+}
+.rec-card h3 { margin: 0 0 12px; font-size: 15px; }
+.rec-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.rec-span-2 { grid-column: span 2; }
+.rec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rec-table th, .rec-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-subtle, #e2e8f0); text-align: left; vertical-align: middle; }
+.rec-empty { text-align: center; color: var(--text-muted, #64748b); padding: 16px; }
+.rec-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.rec-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: capitalize;
+    background: #e2e8f0;
+}
+.rec-pill--success { background: #d1fae5; color: #047857; }
+.rec-pill--danger { background: #fee2e2; color: #b91c1c; }
+.rec-pill--info { background: #dbeafe; color: #1d4ed8; }
+.rec-pill--neutral { background: #f1f5f9; color: #475569; }
+.rec-ro { font-size: 13px; color: var(--text-muted, #64748b); }
+@media (max-width: 720px) {
+    .rec-form-grid { grid-template-columns: 1fr; }
+    .rec-span-2 { grid-column: span 1; }
+}

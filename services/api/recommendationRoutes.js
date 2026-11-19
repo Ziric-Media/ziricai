@@ -35,6 +35,11 @@ import {
     listRecCampaignPackages,
     clientCampaign,
 } from "../recommendations/campaignService.js";
+import {
+    startRecCampaignCheckout,
+    confirmRecCampaignCheckout,
+    getRecCampaignCheckoutStatus,
+} from "../recommendations/billingService.js";
 
 function fail(res, err, fallbackCode) {
     res.status(err.status || 500).json({
@@ -262,6 +267,48 @@ export function mountRecommendationRoutes(app, deps = {}) {
             res.json({ ok: true, data: { campaign } });
         } catch (err) {
             fail(res, err, "CAMPAIGN_SUBMIT_FAILED");
+        }
+    });
+
+    app.get("/api/companies/:companyId/recommendations/campaigns/:campaignId/checkout", async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const companyId = String(req.params.companyId || "");
+            const campaignId = String(req.params.campaignId || "");
+            await authorize(req, companyId, { write: false });
+            const data = await getRecCampaignCheckoutStatus(companyId, campaignId);
+            res.json({ ok: true, data });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_CHECKOUT_STATUS_FAILED");
+        }
+    });
+
+    app.post("/api/companies/:companyId/recommendations/campaigns/:campaignId/checkout", async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const companyId = String(req.params.companyId || "");
+            const campaignId = String(req.params.campaignId || "");
+            const tenant = await authorize(req, companyId, { write: true });
+            const data = await startRecCampaignCheckout(companyId, campaignId);
+            res.status(201).json({ ok: true, data: { checkout: data, actorUid: tenant.uid } });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_CHECKOUT_START_FAILED");
+        }
+    });
+
+    app.post("/api/companies/:companyId/recommendations/campaigns/:campaignId/checkout/confirm", async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const companyId = String(req.params.companyId || "");
+            const campaignId = String(req.params.campaignId || "");
+            const tenant = await authorize(req, companyId, { write: true });
+            const result = await confirmRecCampaignCheckout(companyId, campaignId, {
+                ...(req.body || {}),
+                actorUid: tenant.uid,
+            });
+            res.json({ ok: true, data: result });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_CHECKOUT_CONFIRM_FAILED");
         }
     });
 

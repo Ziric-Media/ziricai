@@ -50,6 +50,7 @@ export const NAV_SECTIONS = [
       { id: 'statusPosts', label: 'Sarah Status', icon: 'fa-bullhorn' },
       { id: 'discoverProfile', label: 'Discover profile', icon: 'fa-compass' },
       { id: 'marketplace', label: 'Marketplace', icon: 'fa-store' },
+      { id: 'recommendations', label: 'Sarah Recommendations', icon: 'fa-bullseye' },
     ],
   },
   {

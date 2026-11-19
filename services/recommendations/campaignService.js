@@ -46,6 +46,8 @@ export function clientCampaign(row) {
         status: c.status,
         approvalStatus: c.approvalStatus,
         paymentStatus: c.paymentStatus,
+        paymentReference: c.paymentReference || null,
+        paidAt: c.paidAt || null,
         monthlyAllowance: c.monthlyAllowance,
         periodStart: c.periodStart || null,
         periodEnd: c.periodEnd || null,

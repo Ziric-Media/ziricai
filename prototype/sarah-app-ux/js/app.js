@@ -2395,9 +2395,11 @@ function renderThreadMessageMarkup(message, isPersonal, ctx = null) {
     isPersonal && Number.isFinite(Number(message.creditsUsed))
       ? `<p class="thread-credit-footnote" title="Credits metered for this Sarah reply">−${escapeHtml(formatSarahCredits(message.creditsUsed))} credits</p>`
       : '';
+  const recPanel = isPersonal && message.recommendationsUi ? renderRecommendationsUiMarkup(message.recommendationsUi) : '';
   return `<article class="thread-turn thread-turn--assistant">
     <div class="thread-msg thread-msg--assistant">
       <div class="thread-prose thread-prose--rich ${proseKind}">${body}</div>
+      ${recPanel}
       ${creditNote}
       ${retry}
     </div>
@@ -3683,6 +3685,8 @@ function mapFederatedConversationToChatRow(c) {
   const companyId = c.companyId || '';
   const convId = c.id || '';
   const id = isBusiness ? companyId || convId : convId || companyId;
+  const rawLogo = c.logoUrl || c.avatarUrl || null;
+  const avatar = rawLogo ? resolveListingMediaUrl(rawLogo) : null;
   return {
     id,
     convId,
@@ -3691,7 +3695,8 @@ function mapFederatedConversationToChatRow(c) {
     preview: c.preview || c.lastMessagePreview || 'Tap to open',
     time: formatPersonalThreadTime(c.lastMessageAt) || '',
     online: false,
-    avatarKey: isBusiness ? guessCompanyAvatarKey(companyId, c.displayLabel) : null,
+    avatarKey: avatar ? null : isBusiness ? guessCompanyAvatarKey(companyId, c.displayLabel) : null,
+    avatar,
     company: isBusiness,
     snId: c.snId || null,
     api: true,
@@ -3761,8 +3766,33 @@ async function loadCompanyThreadFromApiIfNeeded() {
 
 let chatsListLoadGen = 0;
 let chatsListLastFetchAt = 0;
-const CHATS_LIST_FETCH_MIN_MS = 30_000;
+const CHATS_LIST_FETCH_MIN_MS = 45_000;
+const CHATS_LIST_SESSION_KEY = 'sarah.chats.list.cache.v1';
+/** @type {object[]|null} */
+let chatsListMemoryCache = null;
 let chatsTabSearchDebounceTimer = null;
+
+function loadChatsListSessionCache() {
+  if (chatsListMemoryCache?.length) return chatsListMemoryCache;
+  try {
+    const raw = sessionStorage.getItem(CHATS_LIST_SESSION_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveChatsListSessionCache(chats) {
+  if (!Array.isArray(chats)) return;
+  chatsListMemoryCache = chats;
+  try {
+    sessionStorage.setItem(CHATS_LIST_SESSION_KEY, JSON.stringify(chats.slice(0, 80)));
+  } catch {
+    /* ignore */
+  }
+}
 /** Discover businesses matching the Chats tab query (for starting new Company Sarah threads). */
 const chatsTabOrgSearch = { query: '', loading: false, companies: [] };
 
@@ -4098,7 +4128,7 @@ function pushPersonalUserMessage(threadId, text) {
   return true;
 }
 
-function pushPersonalAssistantReply(threadId, markdown, creditsMeta) {
+function pushPersonalAssistantReply(threadId, markdown, creditsMeta, recommendationsUi) {
   const rt = getSarahRuntime();
   const thread = rt.threads[threadId];
   if (!thread) return;
@@ -4107,7 +4137,60 @@ function pushPersonalAssistantReply(threadId, markdown, creditsMeta) {
     msg.creditsUsed = Number(creditsMeta.credits);
     msg.creditArchetype = creditsMeta.archetype || null;
   }
+  if (recommendationsUi && typeof recommendationsUi === 'object') {
+    msg.recommendationsUi = recommendationsUi;
+  }
   thread.messages.push(msg);
+}
+
+function discoverHashFromProfileUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return null;
+  const m = raw.match(/\/discover\/([^/?#]+)/i) || raw.match(/^discover\/([^/?#]+)/i);
+  return m ? m[1] : null;
+}
+
+function renderRecommendationsUiMarkup(ui) {
+  if (!ui || typeof ui !== 'object') return '';
+  const organic = Array.isArray(ui.organic) ? ui.organic : [];
+  const sponsored = Array.isArray(ui.sponsored) ? ui.sponsored : [];
+  if (!organic.length && !sponsored.length) return '';
+  const disc = ui.disclosure || {};
+  const head = disc.headline ? `<p class="rec-disclosure-head"><strong>${escapeHtml(disc.headline)}</strong></p>` : '';
+  const body = disc.body ? `<p class="rec-disclosure-body">${escapeHtml(disc.body)}</p>` : '';
+
+  const card = (item, sponsoredRow) => {
+    const sn = discoverHashFromProfileUrl(item.discoverProfileUrl);
+    const link = sn
+      ? `<button type="button" class="rec-card-link" data-rec-discover="${escapeHtml(sn)}">View on Discover</button>`
+      : '';
+    const badge = sponsoredRow
+      ? `<span class="rec-badge rec-badge--sponsored" title="Paid visibility — not an endorsement">${escapeHtml(item.disclosureLabel || 'Sponsored')}</span>`
+      : `<span class="rec-badge rec-badge--organic">Match</span>`;
+  const reason = item.reason ? `<p class="rec-card-reason">${escapeHtml(item.reason)}</p>` : '';
+    return `<li class="rec-card${sponsoredRow ? ' rec-card--sponsored' : ''}">
+      <div class="rec-card-top">
+        <span class="rec-card-name">${escapeHtml(item.displayName || 'Offering')}</span>
+        ${badge}
+      </div>
+      ${reason}
+      ${link}
+    </li>`;
+  };
+
+  const organicList = organic.length
+    ? `<section class="rec-section" aria-label="Organic recommendations"><h4 class="rec-section-title">Relevant options</h4><ul class="rec-card-list">${organic.map((o) => card(o, false)).join('')}</ul></section>`
+    : '';
+  const sponsoredList = sponsored.length
+    ? `<section class="rec-section" aria-label="Sponsored recommendations"><h4 class="rec-section-title">Sponsored</h4><ul class="rec-card-list">${sponsored.map((o) => card(o, true)).join('')}</ul></section>`
+    : '';
+
+  return `<aside class="rec-disclosure-panel" role="complementary" data-request-id="${escapeHtml(ui.requestId || '')}">
+    ${head}
+    ${body}
+    ${organicList}
+    ${sponsoredList}
+  </aside>`;
 }
 
 function removeThinkingBubble(threadId) {
@@ -4383,7 +4466,7 @@ async function deliverPersonalSarahMessage(text, opts) {
         showProtoToast(res.error);
       }
     } else {
-      pushPersonalAssistantReply(threadId, res.reply, res.creditsLast);
+      pushPersonalAssistantReply(threadId, res.reply, res.creditsLast, res.recommendationsUi);
       const rt = getSarahRuntime();
       const thread = rt.threads[threadId];
       if (thread) thread.lastMessageAt = Date.now();
@@ -6077,6 +6160,15 @@ async function renderChatsList() {
   const gen = ++chatsListLoadGen;
 
   let chats = getAllChats();
+  if (!q && consumerChatLiveActive()) {
+    const cached = loadChatsListSessionCache();
+    if (cached.length && !host.querySelector('.chat-row')) {
+      host.innerHTML = cached.map((c) => renderChatRowHtml(c)).join('');
+      bindChatsListInteractions(host);
+    } else if (!host.querySelector('.chat-row')) {
+      host.innerHTML = '<p class="chats-list-hint">Loading your conversations…</p>';
+    }
+  }
   if (consumerChatLiveActive()) {
     const searchApi = q.length >= 2 && window.SarahLive?.searchChatThreads;
   const res =
@@ -6088,6 +6180,7 @@ async function renderChatsList() {
     const conversations = payload.conversations;
     if (!res.error && Array.isArray(conversations) && (searchApi || conversations.length)) {
       chats = conversations.map(mapFederatedConversationToChatRow);
+      if (!q) saveChatsListSessionCache(chats);
     }
   }
 
@@ -10094,13 +10187,19 @@ function bindMySarahInteractions() {
     btn.addEventListener('click', () => {
       const mode = btn.dataset.msMode || 'chat';
       const panel = document.querySelector('.my-sarah-view')?.dataset.msPanel || 'home';
-      if (panel === 'home') {
-        setMsHomeCardMode(mode);
-        syncMsSegment('home');
-        void renderSarahHomeIntelligence();
+      if (mode === 'work') {
+        setMsHomeCardMode('work');
+        if (panel !== 'tasks') showWorkTasksHub('');
+        else syncMsSegment('tasks');
         return;
       }
-      setMySarahPanel(mode === 'work' ? 'tasks' : 'home');
+      setMsHomeCardMode('chat');
+      if (panel === 'tasks' || panel === 'home') {
+        setMySarahPanel('home');
+        void renderSarahHomeIntelligence();
+      } else {
+        syncMsSegment(panel);
+      }
     });
   });
 
@@ -11506,6 +11605,13 @@ function renderThread() {
         if (last?.retryable) thread.messages.pop();
       }
       await deliverPersonalSarahMessage(retryText, { threadId: rt.activeThreadId, work: ctx.work, retry: true });
+    });
+  });
+  log.querySelectorAll('[data-rec-discover]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const sn = btn.getAttribute('data-rec-discover') || '';
+      if (!sn) return;
+      location.hash = `discover-company/${encodeURIComponent(sn)}`;
     });
   });
   requestAnimationFrame(() => {

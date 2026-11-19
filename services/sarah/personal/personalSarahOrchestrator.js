@@ -17,6 +17,7 @@ import {
 } from "./personalSarahSessionStore.js";
 import { PERSONAL_SARAH_TOOL_DEFINITIONS, executePersonalSarahTool, resolveReminderDueAt } from "./personalSarahTools.js";
 import { maybeCompleteSarahWorkTask } from "./personalSarahWorkCompletion.js";
+import { buildRecommendationsUiFromActions } from "./personalSarahRecommendationsUi.js";
 
 bootstrapEnv();
 
@@ -207,6 +208,7 @@ export async function handlePersonalSarahChat(auth, input) {
         reply,
         sessionId: session.id,
         actions,
+        recommendationsUi: buildRecommendationsUiFromActions(actions),
         mode: "openai",
         workCompleted,
         sessionSurface: session.mode === "work" ? "work" : "chat",

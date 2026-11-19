@@ -3,18 +3,40 @@
  */
 import { state, subscribe } from './dataStore.js';
 import { canAccessModule } from '../permissions.js';
+import { sarahNavIconMarkup } from '../../shared/sarahAvatar.js';
+import { isAutomotivePresetActive } from '../automotive/automotivePreset.js';
+
+export function isEducationSchoolActive(company) {
+  if (!company) return false;
+  if (company.settings?.education?.requireVerifiedGuardians === true) return true;
+  return String(company.industry || '').toLowerCase().includes('education');
+}
 
 export const NAV_SECTIONS = [
+  {
+    id: 'sarah-workforce',
+    label: 'Sarah workforce',
+    items: [
+      { id: 'sarah', label: 'Sarah Admin', icon: 'fa-wand-magic-sparkles', navIcon: 'sarah' },
+      { id: 'conversations', label: 'Sarah Sales', icon: 'fa-inbox', live: true },
+      { id: 'finance', label: 'Sarah Finance', icon: 'fa-coins' },
+      { id: 'operations', label: 'Sarah Operations', icon: 'fa-list-check' },
+      { id: 'hr', label: 'Sarah HR', icon: 'fa-user-tie', navTag: 'preview' },
+    ],
+  },
   {
     id: 'operate',
     label: 'Operate',
     items: [
       { id: 'dashboard', label: 'Overview', icon: 'fa-gauge-high' },
-      { id: 'sarah', label: 'Sarah', icon: 'fa-sparkles' },
-      { id: 'conversations', label: 'Inbox', icon: 'fa-inbox', live: true },
+      {
+        id: 'automotiveCommandCentre',
+        label: 'Command Centre',
+        icon: 'fa-car',
+        requiresAutomotivePreset: true,
+      },
       { id: 'customers', label: 'CRM', icon: 'fa-users' },
       { id: 'appointments', label: 'Appointments', icon: 'fa-calendar-check' },
-      { id: 'operations', label: 'Operations', icon: 'fa-list-check' },
       { id: 'agents', label: 'AI Employees', icon: 'fa-robot' },
       { id: 'knowledge', label: 'Knowledge Base', icon: 'fa-book' },
       { id: 'automation', label: 'Automation', icon: 'fa-diagram-project' },
@@ -25,7 +47,10 @@ export const NAV_SECTIONS = [
     label: 'Grow',
     items: [
       { id: 'analytics', label: 'Analytics', icon: 'fa-chart-line' },
+      { id: 'statusPosts', label: 'Sarah Status', icon: 'fa-bullhorn' },
+      { id: 'discoverProfile', label: 'Discover profile', icon: 'fa-compass' },
       { id: 'marketplace', label: 'Marketplace', icon: 'fa-store' },
+      { id: 'recommendations', label: 'Sarah Recommendations', icon: 'fa-bullseye' },
     ],
   },
   {
@@ -35,6 +60,19 @@ export const NAV_SECTIONS = [
       { id: 'billing', label: 'Billing', icon: 'fa-credit-card' },
       { id: 'integrations', label: 'Integrations', icon: 'fa-plug' },
       { id: 'team', label: 'Team', icon: 'fa-user-group' },
+      { id: 'network', label: 'Sarah Network', icon: 'fa-globe' },
+      {
+        id: 'schoolGuardians',
+        label: 'Parents & guardians',
+        icon: 'fa-people-roof',
+        requiresEducationSchool: true,
+      },
+      {
+        id: 'schoolAdmissions',
+        label: 'Admissions',
+        icon: 'fa-graduation-cap',
+        requiresEducationSchool: true,
+      },
       { id: 'notifications', label: 'Notifications', icon: 'fa-bell', badgeKey: 'notifications' },
       { id: 'activity', label: 'Activity Log', icon: 'fa-clock-rotate-left' },
       { id: 'settings', label: 'Settings', icon: 'fa-gear' },
@@ -69,7 +107,11 @@ export function renderSidebarNav() {
 
   const role = state.profile?.role;
   nav.innerHTML = NAV_SECTIONS.map((section) => {
-    const items = section.items.filter((item) => canAccessModule(role, item.id));
+    const items = section.items.filter((item) => {
+      if (item.requiresAutomotivePreset && !isAutomotivePresetActive(state.company)) return false;
+      if (item.requiresEducationSchool && !isEducationSchoolActive(state.company)) return false;
+      return canAccessModule(role, item.id);
+    });
     if (!items.length) return '';
 
     return `
@@ -103,10 +145,23 @@ function navLink(item) {
         ? '<span class="indicator online"></span>'
         : '';
 
+  const navTag =
+    item.navTag === 'preview'
+      ? '<span class="bos-nav-tag bos-nav-tag-preview">Preview</span>'
+      : item.navTag === 'integration'
+        ? '<span class="bos-nav-tag bos-nav-tag-integration">Awaiting integration</span>'
+        : '';
+
+  const iconInner =
+    item.navIcon === 'sarah'
+      ? sarahNavIconMarkup()
+      : `<i class="fa-solid ${item.icon}" aria-hidden="true"></i>`;
+
   return `
     <a href="#" data-page="${item.id}" ${state.currentPage === item.id ? 'class="active"' : ''}>
-      <span class="icon"><i class="fa-solid ${item.icon}"></i></span>
-      <span>${item.label}</span>
+      <span class="icon bos-nav-icon">${iconInner}</span>
+      <span class="bos-nav-label">${item.label}</span>
+      ${navTag}
       ${badge}
     </a>`;
 }

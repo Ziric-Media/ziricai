@@ -178,6 +178,82 @@ export async function markConversationRead(companyId, conversationId) {
   });
 }
 
+export async function assignConversation(companyId, conversationId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/assign`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function acceptConversation(companyId, conversationId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/accept`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function transferConversation(companyId, conversationId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/transfer`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function escalateConversation(companyId, conversationId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/escalate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function returnConversationToSarah(companyId, conversationId, payload = {}) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/return-to-sarah`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function fetchHandoverSummary(companyId, conversationId) {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/handover-summary`
+  );
+}
+
+export async function fetchAcceptQueue(companyId) {
+  return request(`/api/companies/${encodeURIComponent(companyId)}/conversations/accept-queue`);
+}
+
+export async function saveInternalNote(companyId, conversationId, text, channel = 'sarah_app') {
+  return request(
+    `/api/companies/${encodeURIComponent(companyId)}/conversations/${encodeURIComponent(conversationId)}/internal-note`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, channel }),
+    }
+  );
+}
+
 export async function fetchAppointments(companyId, { upcoming = true } = {}) {
   const qs = upcoming ? '?upcoming=true' : '';
   return request(`/api/companies/${encodeURIComponent(companyId)}/appointments${qs}`);
@@ -244,10 +320,20 @@ export async function inviteTeamMember(companyId, { email, role, departmentId } 
   });
 }
 
+/** Automotive Command Centre — Phase 1 read-only dashboard metrics. */
+export async function fetchAutomotiveDashboard(companyId, { from, to, periodDays } = {}) {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (periodDays != null) params.set('periodDays', String(periodDays));
+  const qs = params.toString() ? `?${params}` : '';
+  return request(`/api/companies/${encodeURIComponent(companyId)}/automotive/dashboard${qs}`);
+}
+
 /* ── Sarah BOS commercial cycle (Central Motors pilot) ── */
 
 export async function fetchBosCommercialCycles(companyId) {
-  return request(`/api/portal/bos/cycles/${encodeURIComponent(companyId)}`);
+  return request(`/api/portal/bos/cycles/${encodeURIComponent(companyId)}`, { silent: true });
 }
 
 export async function postBosCommercialCycleAction(companyId, cycleId, action, body = {}) {
@@ -600,4 +686,205 @@ export async function patchSupportCase(companyId, caseId, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+/* ---------- SNET-03 / SNET-04 — Sarah Network listing + verification (tenant) ---------- */
+
+/** v1 envelope errors are `{ code, message, fields? }` — flatten to `{ error: string, code, fields }` for the portal. */
+async function networkRequest(path, options = {}) {
+  const res = await request(path, { silent: true, ...options });
+  if (!res.error) return { data: res.data?.data ?? res.data };
+  const e = res.error;
+  const isObj = typeof e === 'object' && e !== null;
+  return {
+    error: isObj ? e.message || e.code || 'Request failed' : e,
+    code: (isObj && e.code) || res.code,
+    fields: isObj ? e.fields : undefined,
+    missing: isObj ? e.missing : undefined,
+    status: res.status,
+  };
+}
+
+const jsonBody = (method, body) => ({
+  method,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body || {}),
+});
+
+const networkOrg = (companyId) => `/api/network/v1/orgs/${encodeURIComponent(companyId)}`;
+
+export async function fetchNetworkListing(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/listing`);
+}
+
+export async function saveNetworkListingDraft(companyId, patch) {
+  return networkRequest(`${networkOrg(companyId)}/listing`, jsonBody('PUT', patch));
+}
+
+export async function publishNetworkListing(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/listing/publish`, jsonBody('POST'));
+}
+
+export async function unpublishNetworkListing(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/listing/unpublish`, jsonBody('POST'));
+}
+
+export async function fetchNetworkVerification(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/verification`);
+}
+
+/** body: { evidence?: [{ kind, label, url?|ref? }] } */
+export async function submitNetworkVerification(companyId, body = {}) {
+  return networkRequest(`${networkOrg(companyId)}/verification`, jsonBody('POST', body));
+}
+
+/** body: { items: [{ kind, label, url?|ref?|uploadId? }] } */
+export async function addNetworkVerificationEvidence(companyId, items) {
+  return networkRequest(`${networkOrg(companyId)}/verification/evidence`, jsonBody('POST', { items }));
+}
+
+/**
+ * Upload an evidence file (Gate 6): request a tenant-scoped token, then PUT the bytes.
+ * Resolves `{ data: { uploadId, file } }`; attach it with `{ kind, label, uploadId }` in the evidence call.
+ * The server records size + sha256 only (the file bytes are not stored yet).
+ */
+export async function fetchPresenceMetrics(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/presence/metrics`);
+}
+
+export async function boostDiscoverProfile(companyId, body = {}) {
+  return networkRequest(`${networkOrg(companyId)}/presence/boost`, jsonBody('POST', body));
+}
+
+export async function fetchStatusPosts(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/status-posts`);
+}
+
+export async function createStatusPost(companyId, body) {
+  return networkRequest(`${networkOrg(companyId)}/status-posts`, jsonBody('POST', body));
+}
+
+/** SNA-01D — subscriber inbox + optional push fan-out */
+export async function listSubscriberEvents(companyId, limit = 30) {
+  const q = new URLSearchParams({ limit: String(limit) });
+  return networkRequest(`${networkOrg(companyId)}/subscriber-events?${q}`);
+}
+
+/** @param {{ type: 'announcement'|'notification'|'reminder', title: string, body?: string }} body */
+export async function postSubscriberEvent(companyId, body) {
+  return networkRequest(`${networkOrg(companyId)}/subscriber-events`, jsonBody('POST', body));
+}
+
+export async function fetchSubscriberDeliverySummary(companyId) {
+  return networkRequest(`${networkOrg(companyId)}/subscriber-events/delivery-summary`);
+}
+
+export async function scheduleStatusPosts(companyId, slots) {
+  return networkRequest(`${networkOrg(companyId)}/status-posts/schedule`, jsonBody('POST', { slots }));
+}
+
+export async function updateStatusPost(companyId, postId, body) {
+  return networkRequest(`${networkOrg(companyId)}/status-posts/${encodeURIComponent(postId)}`, jsonBody('PATCH', body));
+}
+
+export async function removeStatusPost(companyId, postId) {
+  return networkRequest(`${networkOrg(companyId)}/status-posts/${encodeURIComponent(postId)}`, { method: 'DELETE' });
+}
+
+export async function boostStatusPost(companyId, postId, body = {}) {
+  return networkRequest(
+    `${networkOrg(companyId)}/status-posts/${encodeURIComponent(postId)}/boost`,
+    jsonBody('POST', body)
+  );
+}
+
+/** Upload logo/cover for Discover listing — returns `{ data: { publicUrl } }`. */
+export async function uploadNetworkListingMediaFile(companyId, file) {
+  const mimeType = file?.type || '';
+  const issued = await networkRequest(
+    `${networkOrg(companyId)}/listing/media-uploads`,
+    jsonBody('POST', { mimeType, fileName: file?.name || null, byteLength: file?.size || 0 })
+  );
+  if (issued.error) return issued;
+  const { uploadId, token } = issued.data;
+  const done = await networkRequest(
+    `${networkOrg(companyId)}/listing/media-uploads/${encodeURIComponent(uploadId)}?token=${encodeURIComponent(token)}`,
+    { method: 'PUT', headers: { 'Content-Type': mimeType || 'application/octet-stream' }, body: await file.arrayBuffer() }
+  );
+  if (done.error) return done;
+  return { data: { publicUrl: done.data.publicUrl, uploadId } };
+}
+
+const recBase = (companyId) => `/api/companies/${encodeURIComponent(companyId)}/recommendations`;
+
+async function recRequest(path, options = {}) {
+  const res = await request(path, { silent: true, ...options });
+  if (!res.error) return { data: res.data?.data ?? res.data };
+  const e = res.error;
+  const isObj = typeof e === 'object' && e !== null;
+  return {
+    error: isObj ? e.message || e.code || 'Request failed' : e,
+    code: (isObj && e.code) || res.code,
+    status: res.status,
+  };
+}
+
+export async function fetchRecOfferings(companyId) {
+  return recRequest(`${recBase(companyId)}/offerings`);
+}
+
+export async function createRecOffering(companyId, body) {
+  return recRequest(`${recBase(companyId)}/offerings`, jsonBody('POST', body));
+}
+
+export async function submitRecOfferingVerification(companyId, offeringId) {
+  return recRequest(`${recBase(companyId)}/offerings/${encodeURIComponent(offeringId)}/submit-verification`, jsonBody('POST', {}));
+}
+
+export async function fetchRecPackages(companyId) {
+  return recRequest(`${recBase(companyId)}/packages`);
+}
+
+export async function fetchRecCampaigns(companyId) {
+  return recRequest(`${recBase(companyId)}/campaigns`);
+}
+
+export async function createRecCampaign(companyId, body) {
+  return recRequest(`${recBase(companyId)}/campaigns`, jsonBody('POST', body));
+}
+
+export async function submitRecCampaign(companyId, campaignId) {
+  return recRequest(`${recBase(companyId)}/campaigns/${encodeURIComponent(campaignId)}/submit`, jsonBody('POST', {}));
+}
+
+export async function activateRecCampaign(companyId, campaignId) {
+  return recRequest(`${recBase(companyId)}/campaigns/${encodeURIComponent(campaignId)}/activate`, jsonBody('POST', {}));
+}
+
+export async function fetchRecCampaignUsage(companyId, campaignId) {
+  return recRequest(`${recBase(companyId)}/campaigns/${encodeURIComponent(campaignId)}/usage`);
+}
+
+export async function startRecCampaignCheckout(companyId, campaignId) {
+  return recRequest(`${recBase(companyId)}/campaigns/${encodeURIComponent(campaignId)}/checkout`, jsonBody('POST', {}));
+}
+
+export async function confirmRecCampaignCheckout(companyId, campaignId, body) {
+  return recRequest(`${recBase(companyId)}/campaigns/${encodeURIComponent(campaignId)}/checkout/confirm`, jsonBody('POST', body));
+}
+
+export async function uploadNetworkEvidenceFile(companyId, file) {
+  const mimeType = file?.type || '';
+  const issued = await networkRequest(
+    `${networkOrg(companyId)}/verification/evidence-uploads`,
+    jsonBody('POST', { mimeType, fileName: file?.name || null, byteLength: file?.size || 0 })
+  );
+  if (issued.error) return issued;
+  const { uploadId, token } = issued.data;
+  const done = await networkRequest(
+    `${networkOrg(companyId)}/verification/evidence-uploads/${encodeURIComponent(uploadId)}?token=${encodeURIComponent(token)}`,
+    { method: 'PUT', headers: { 'Content-Type': mimeType || 'application/octet-stream' }, body: await file.arrayBuffer() }
+  );
+  if (done.error) return done;
+  return { data: { uploadId, file: done.data.file } };
 }
