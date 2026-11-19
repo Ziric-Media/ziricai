@@ -270,3 +270,9 @@ export async function getCampaignWithUsage(companyId, campaignId) {
 export function listRecCampaignPackages() {
     return Object.entries(REC_CAMPAIGN_PACKAGES).map(([skuId, p]) => ({ skuId, ...p }));
 }
+
+/** Active campaigns for the recommendation engine (REC-05). */
+export async function listActiveCampaigns({ limit = 200 } = {}) {
+    const rows = (await campaignsCol.list({ where: [["status", "==", CAMPAIGN_STATUS.ACTIVE]], limit: 300 })).map(strip);
+    return rows.slice(0, limit);
+}

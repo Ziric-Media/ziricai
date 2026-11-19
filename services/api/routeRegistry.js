@@ -222,6 +222,9 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/platform/network/v1/verification/:caseId/evidence/:evidenceId/download", domain: "platform", tenantScoped: false, description: "Download a stored verification evidence file (verification_officer / super admin; audited; attachment, nosniff)" },
     { method: "POST", path: "/api/platform/network/v1/verification/:caseId/decision", domain: "platform", tenantScoped: false, description: "Decide verification case: start_review, request_info, verify/approve, reject, restrict (audited)" },
 
+    // REC-05 — Sarah Recommendations query (consumer)
+    { method: "POST", path: "/api/recommendations/v1/query", domain: "consumer", tenantScoped: false, description: "REC query engine — organic + sponsored shortlist" },
+
     // REC-02 — Sarah Recommendations offerings + verification
     { method: "GET", path: "/api/companies/:companyId/recommendations/offerings", domain: "tenant", tenantScoped: true, description: "List recommendation offerings (RS09 catalogue)" },
     { method: "POST", path: "/api/companies/:companyId/recommendations/offerings", domain: "tenant", tenantScoped: true, description: "Create recommendation offering draft" },

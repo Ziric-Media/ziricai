@@ -271,6 +271,7 @@ export const RECOMMENDATION_COLLECTIONS = {
     CAMPAIGN_USAGE_PERIODS: "recCampaignUsagePeriods",
     PRESENTATION_EVENTS: "recPresentationEvents",
     ATTRIBUTION_EVENTS: "recAttributionEvents",
+    RECOMMENDATION_REQUESTS: "recRecommendationRequests",
 };
 
 /** MC-PO — platform governance collections (server-only; Mission Control APIs). */

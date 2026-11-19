@@ -2,7 +2,9 @@
  * REC-02 — Recommendations offering catalogue + verification API.
  */
 import express from "express";
+import { requireConsumerScope } from "../auth/consumerAuth.js";
 import { PLATFORM_PERMISSIONS as P, requirePlatformPermission } from "../auth/platformRbac.js";
+import { queryRecommendations } from "../recommendations/queryService.js";
 import { defaultAuthorize } from "./networkListingRoutes.js";
 import { isRecOfferingsApiEnabled } from "../recommendations/recommendationConfig.js";
 import {
@@ -66,6 +68,20 @@ export function mountRecommendationRoutes(app, deps = {}) {
     const authorize = deps.authorize || defaultAuthorize;
     const guardRead = deps.platformGuard || requirePlatformPermission(P.VERIFICATION_READ);
     const guardDecide = deps.platformGuard || requirePlatformPermission(P.VERIFICATION_DECIDE);
+    const consumerGuard = deps.consumerGuard || requireConsumerScope();
+
+    app.post("/api/recommendations/v1/query", consumerGuard, async (req, res) => {
+        try {
+            const uid = req.consumer?.uid || req.auth?.uid || null;
+            const result = await queryRecommendations(req.body || {}, {
+                consumerUid: uid,
+                surface: req.body?.surface || "sarah_app",
+            });
+            res.json({ ok: true, data: result });
+        } catch (err) {
+            fail(res, err, "RECOMMENDATIONS_QUERY_FAILED");
+        }
+    });
 
     app.get("/api/companies/:companyId/recommendations/offerings", async (req, res) => {
         if (!ensureRecApiEnabled(res)) return;
