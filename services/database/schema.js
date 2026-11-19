@@ -261,6 +261,18 @@ export const NETWORK_COLLECTIONS = {
     CONSUMER_PAYMENT_LEDGER: "networkConsumerPaymentLedger",
 };
 
+/**
+ * REC-02+ — Sarah Recommendations (RS09). Server-write only; tenant-scoped by companyId on documents.
+ */
+export const RECOMMENDATION_COLLECTIONS = {
+    OFFERINGS: "recOfferings",
+    OFFERING_VERIFICATION_CASES: "recOfferingVerificationCases",
+    CAMPAIGNS: "recCampaigns",
+    CAMPAIGN_USAGE_PERIODS: "recCampaignUsagePeriods",
+    PRESENTATION_EVENTS: "recPresentationEvents",
+    ATTRIBUTION_EVENTS: "recAttributionEvents",
+};
+
 /** MC-PO — platform governance collections (server-only; Mission Control APIs). */
 export const PLATFORM_GOVERNANCE = {
     /** Immutable-style event log (PII-minimized payloads). */
