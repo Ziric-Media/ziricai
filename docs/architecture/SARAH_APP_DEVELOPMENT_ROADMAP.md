@@ -33,8 +33,40 @@
 - [SARAH_NETWORK_PROTOCOL.md](./SARAH_NETWORK_PROTOCOL.md)
 - [SARAH_APP_DATA_ARCHITECTURE.md](./SARAH_APP_DATA_ARCHITECTURE.md)
 - [SARAH_APP_STATUS_DISCOVER_ARCHITECTURE.md](./SARAH_APP_STATUS_DISCOVER_ARCHITECTURE.md)
+- [SARAH_APP_SUBSCRIPTION_AND_USAGE_SPEC.md](./SARAH_APP_SUBSCRIPTION_AND_USAGE_SPEC.md) (**US-01–US-05**)
+- [SARAH_WORK_SPECIFICATION.md](./SARAH_WORK_SPECIFICATION.md) (**SW-01–SW-04**)
 
 **Exit:** Stakeholder sign-off, domain/trademark check, POPIA checklist assigned.
+
+---
+
+## Programme specs — Usage & Sarah Work (parallel track)
+
+Implements stakeholder decisions (2026-11-15): monthly tokens **expire**; **top-ups** when exhausted; Sarah Work **automatic** budgeting.
+
+| ID | Spec | Implementation gate |
+|----|------|----------------------|
+| **SA-01** | AI-first nav; Status tab removed from consumer shell | **In progress** (PWA) — see master architecture |
+| **SW-01–04** | [Sarah Work spec](./SARAH_WORK_SPECIFICATION.md) | After US-02 metering baseline |
+| **US-01–05** | [Subscription & Usage spec](./SARAH_APP_SUBSCRIPTION_AND_USAGE_SPEC.md) | Behaviour **locked**; tier credits **draft** in [COGS worksheet](./SARAH_APP_US01_COGS_AND_TIER_ALLOWANCES.md) pending sign-off |
+
+**Recommended order:** **sign-off COGS doc** → implement **US-02** → **US-04** / **SW-02** → **US-05** → **US-03** Profile dashboard → P1 shadow metering.
+
+---
+
+## Programme — Sarah Recommendations (REC)
+
+**Revenue stream:** RS09 (B2B campaigns; B2C conversational delivery). **Not** a substitute for RS03 Status Boost or RS04 Discover sponsored placement.
+
+| Phase | Deliverable | Status |
+|-------|-------------|--------|
+| **REC-01** | [Master spec](./REC-01_SARAH_RECOMMENDATIONS_MASTER_SPEC.md) + [repo audit](./REC-01_REPOSITORY_READINESS_AUDIT.md) | **Gate 1 approved** ([record](./REC-01_GATE_01_APPROVAL.md)) |
+| **REC-01b** | [Technical architecture](./REC-01B_TECHNICAL_ARCHITECTURE.md) | **Drafted** — Gate 2 sign-off pending |
+| REC-02 … REC-11 | Verification → pilot → commercial launch | Not authorised |
+
+**Pilot:** 60–90 days; verified orgs only; Central Motors / Educare per readiness gates in REC-01 §18. **No implementation** until Gate 2 architecture approval.
+
+**Sarah Work next (post v1 deploy):** [Work 1.0 assignment workspace](./SARAH_WORK_SPECIFICATION.md#work-10--assignment-workspace-product-direction) — **SW-05** workspace shell → **SW-06** milestones/runner → **SW-07** deliverables → **SW-03b** approvals → **SW-08** Work home dashboard.
 
 ---
 

@@ -22,7 +22,7 @@ ZiricAI operates a **multi-revenue-stream** model:
 |----------|--------|
 | Consumer subscription tiers | **Four:** Free, Plus, Premium, Ultimate |
 | Company advertising | **Both:** Status Boost **and** Discover sponsored placement |
-| Revenue architecture scope | **All eight streams** in master architecture; **phased activation** |
+| Revenue architecture scope | **Nine streams** (incl. RS09 REC-01); **phased activation** |
 
 **Principles:**
 
@@ -46,6 +46,9 @@ Technical translation: [ZIRICAI_REVENUE_SYSTEM_ARCHITECTURE.md](./ZIRICAI_REVENU
 | **RS06** | AI credits & additional usage | B2B/B2C | Consumption |
 | **RS07** | Premium integrations & add-ons | B2B | Recurring / usage |
 | **RS08** | Enterprise implementation & services | B2B | Once-off / contract |
+| **RS09** | Sarah Recommendations (sponsored conversational discovery) | B2B buy / B2C delivery | Monthly campaign + presentation allowance |
+
+**RS09 normative spec:** [REC-01_SARAH_RECOMMENDATIONS_MASTER_SPEC.md](./REC-01_SARAH_RECOMMENDATIONS_MASTER_SPEC.md) — independent of RS03/RS04; implementation via REC-02–REC-11.
 
 ---
 
@@ -88,6 +91,18 @@ Technical translation: [ZIRICAI_REVENUE_SYSTEM_ARCHITECTURE.md](./ZIRICAI_REVENU
 **Trust:** Subscription does **not** grant access to company private data or other users’ My Knowledge.
 
 **Cost control:** Free tier must be useful but **metered** (model tier + daily caps) to protect gross margin.
+
+**Usage model (confirmed — Sarah App, 2026-11-15):** Full normative behaviour in [SARAH_APP_SUBSCRIPTION_AND_USAGE_SPEC.md](./SARAH_APP_SUBSCRIPTION_AND_USAGE_SPEC.md).
+
+| Rule | Detail |
+|------|--------|
+| Monthly allowance | Credited at billing period start; **unused expires** at period end (no rollover). |
+| Exhaustion | New AI restricted at 100%; optional **top-up** purchase; **no** automatic payment without user action. |
+| Top-up ledger | Separate from monthly allowance; top-ups should **not** expire with the subscription period (validity/refunds disclosed at purchase). |
+| Sarah Work | Automatic internal budgeting within allowance — [SARAH_WORK_SPECIFICATION.md](./SARAH_WORK_SPECIFICATION.md). |
+| Tier token counts | **Draft** in [SARAH_APP_US01_COGS_AND_TIER_ALLOWANCES.md](./SARAH_APP_US01_COGS_AND_TIER_ALLOWANCES.md) — sign-off before catalogue lock |
+
+**Profile (US-03):** **My Plan & Usage** shows monthly allowance, used, top-up balance, tier, renewal date, history, and purchase entry.
 
 ---
 
@@ -132,9 +147,30 @@ Companies publish Status from Company Portal; **Boost** pays for extended distri
 
 **Organic protection:** Every **verified** business gets a fair organic listing. Sponsored ≠ verified. Sponsored results **labelled**. Personal Sarah must not rank sponsors only by bid (relevance + user trust rules).
 
+**REC-01 alignment (planning tariffs):** Discover Boost R199 / 7d, Featured R499 / 30d, Premium R999 / 30d, Enterprise from R2,499 / 30d — reconcile SKU ids in catalogue before REC-04 activation. See REC-01 §7.
+
 ---
 
-## 7. RS05 — Transaction commissions
+## 7. RS09 — Sarah Recommendations (sponsored conversational discovery)
+
+**Conversational discovery and sponsored referral** when users ask Sarah for products, services, or businesses (not directory slots).
+
+| Package (proposed) | Price/mo | Presentation allowance |
+|--------------------|----------|------------------------|
+| Starter | R750 | 30 |
+| Growth | R1,500 | 75 |
+| Professional | R3,000 | 180 |
+| Enterprise | From R5,000 | Custom |
+
+Full rules: qualified presentation definition, exhaustion, no rollover default, relevance-first ranking, disclosure — [REC-01](./REC-01_SARAH_RECOMMENDATIONS_MASTER_SPEC.md).
+
+**Separation:** RS09 billing and entitlements are **not** consumer Sarah subscriptions (RS02) or company portal plans (RS01). Paying for recommendations does **not** grant verification.
+
+**Activation:** REC-10 pilot after Gates 1–5; no production payment until PAY-02 + REC-09 acceptance.
+
+---
+
+## 8. RS05 — Transaction commissions
 
 Earn when ZiricAI **facilitates** an agreed commercial action (booking, purchase, referral) via Sarah Network with **user approval**.
 
@@ -153,7 +189,7 @@ Use payment partners (Stripe, Paystack, etc.); ZiricAI is not required to become
 
 ---
 
-## 8. RS06 — AI credits & additional usage
+## 9. RS06 — AI credits & additional usage
 
 Subscriptions include allowances; **credit packs** cover heavy operations (large docs, advanced reasoning, agent runs).
 
@@ -170,7 +206,7 @@ Subscriptions include allowances; **credit packs** cover heavy operations (large
 
 ---
 
-## 9. RS07 — Premium integrations & add-ons
+## 10. RS07 — Premium integrations & add-ons
 
 Monetise beyond base tier: WhatsApp add-on, advanced CRM/analytics, accounting connectors, extra AI employees, storage, API usage, automation packs.
 
@@ -178,7 +214,7 @@ Monetise beyond base tier: WhatsApp add-on, advanced CRM/analytics, accounting c
 
 ---
 
-## 10. RS08 — Enterprise services
+## 11. RS08 — Enterprise services
 
 Implementation, migration, custom workflows, training, dedicated support, custom integrations.
 
@@ -192,7 +228,7 @@ Implementation, migration, custom workflows, training, dedicated support, custom
 
 ---
 
-## 11. Central revenue management (conceptual)
+## 12. Central revenue management (conceptual)
 
 Shared platform service (not duplicated in Sarah App vs Company Portal):
 
@@ -217,30 +253,31 @@ Shared platform service (not duplicated in Sarah App vs Company Portal):
 
 ---
 
-## 12. Product ownership map
+## 13. Product ownership map
 
 | Surface | Revenue streams |
 |---------|-----------------|
-| **Company Portal** | RS01, RS03, RS04, RS07, RS08 |
-| **Sarah App** | RS02, RS05 (consumer side), RS06 |
+| **Company Portal** | RS01, RS03, RS04, RS09, RS07, RS08 |
+| **Sarah App** | RS02, RS05 (consumer side), RS06, RS09 (delivery) |
 | **Status & Discover (Sarah App UX, company publish in portal)** | RS03, RS04 delivery |
+| **Sarah Chats (Personal / Company Sarah)** | RS09 delivery (organic + disclosed sponsored) |
 | **Mission Control** | Pricing admin, revenue KPIs, moderation, fraud |
 
 ---
 
-## 13. Trust & compliance (monetisation)
+## 14. Trust & compliance (monetisation)
 
 - Sponsored content labelled; ad preferences for consumers.
 - No selling personal data; My Knowledge disclosure remains user-controlled ([SARAH_APP_TRUST_AND_CONSENT.md](./SARAH_APP_TRUST_AND_CONSENT.md)).
 - POPIA-aware targeting and consent records for ads.
 - Paying advertisers do not receive “verified” badge automatically.
-- Personal Sarah recommendations are not **pay-to-win**; sponsored Discover is explicit slots only.
+- Personal Sarah recommendations are not **pay-to-win**; sponsored Discover is explicit slots only; **RS09** uses server-side eligibility and relevance-first ranking ([REC-01](./REC-01_SARAH_RECOMMENDATIONS_MASTER_SPEC.md)).
 
 ---
 
-## 14. Implementation phases
+## 15. Implementation phases
 
-Two timelines apply: **architecture readiness** (design all eight streams into RMS) vs **commercial activation** (when we actually charge).
+Two timelines apply: **architecture readiness** (design all nine streams into RMS) vs **commercial activation** (when we actually charge).
 
 | Stream | Architecture | Commercial activation |
 |--------|--------------|------------------------|
@@ -252,8 +289,9 @@ Two timelines apply: **architecture readiness** (design all eight streams into R
 | RS06 AI credits | Phase 1 design | Phase 2 |
 | RS07 Add-ons | Phase 1 design | Phase 2 |
 | RS08 Enterprise services | Phase 1 design | Phase 3 |
+| RS09 Sarah Recommendations | REC-01 spec (Gate 1) | REC-10 pilot (after Gates 1–5) |
 
-**Phase 1 (architecture):** Central catalogue, ledger, entitlements, flags, payment adapter stubs — RS01–RS04 schema and hooks; RS05–RS08 types in catalogue/ledger only.
+**Phase 1 (architecture):** Central catalogue, ledger, entitlements, flags, payment adapter stubs — RS01–RS04 schema and hooks; RS05–RS08 types in catalogue/ledger only; **RS09** schema deferred to REC-02–REC-09.
 
 **Phase 2 (ecosystem activation):** RS05, RS06, RS07 when Sarah Network, metering, and add-on products are mature.
 
@@ -263,7 +301,7 @@ Two timelines apply: **architecture readiness** (design all eight streams into R
 
 ---
 
-## 15. Illustrative scenarios (not forecasts)
+## 16. Illustrative scenarios (not forecasts)
 
 Combined monthly illustration (~R100M) shows **consumer subscriptions** can exceed **company subscriptions** at scale — diversification is the strategic goal.
 
@@ -271,9 +309,9 @@ All public pricing requires: payment fees, VAT, refunds, AI COGS, and pilot conv
 
 ---
 
-## 16. Acceptance criteria (architecture ready for build planning)
+## 17. Acceptance criteria (architecture ready for build planning)
 
-- Eight streams registered with product IDs and billing rules.
+- Nine streams registered with product IDs and billing rules (RS09 per REC-01).
 - B2B vs B2C subscriptions separated.
 - Entitlement engine covers company + consumer accounts.
 - Metering supports credits and plan limits.
@@ -284,9 +322,12 @@ All public pricing requires: payment fees, VAT, refunds, AI COGS, and pilot conv
 
 ---
 
-## 17. Related documents
+## 18. Related documents
 
 - [ZIRICAI_REVENUE_MANAGEMENT_IMPLEMENTATION_SPEC.md](./ZIRICAI_REVENUE_MANAGEMENT_IMPLEMENTATION_SPEC.md) — **RMS build specification (R0 gate)**  
 - [ZIRICAI_REVENUE_SYSTEM_ARCHITECTURE.md](./ZIRICAI_REVENUE_SYSTEM_ARCHITECTURE.md) — technical mapping & codebase audit  
 - [SARAH_APP_MASTER_ARCHITECTURE.md](./SARAH_APP_MASTER_ARCHITECTURE.md) — consumer product boundaries  
 - [MARKETPLACE.md](./MARKETPLACE.md) — packs (future RS extension)
+- [REC-01_SARAH_RECOMMENDATIONS_MASTER_SPEC.md](./REC-01_SARAH_RECOMMENDATIONS_MASTER_SPEC.md) — RS09 product & commercial model
+- [REC-01_REPOSITORY_READINESS_AUDIT.md](./REC-01_REPOSITORY_READINESS_AUDIT.md) — codebase gap analysis (Gate 2)
+- [REC-01B_TECHNICAL_ARCHITECTURE.md](./REC-01B_TECHNICAL_ARCHITECTURE.md) — entities, APIs, Sarah integration (Gate 2)

@@ -104,7 +104,7 @@ Verification audit in Mission Control (future module); no tenant can set own `ve
 | Rule | Enforcement |
 |------|-------------|
 | Sponsored posts and Discover cards are **labelled** | UI + API `sponsored: true`, `campaignId` |
-| Organic Discover and For You ranking remain | Sponsored slots capped; no pay-to-win Personal Sarah recommendations |
+| Organic Discover and For You ranking remain | Sponsored slots capped; no pay-to-win Personal Sarah recommendations ([REC-01](./REC-01_SARAH_RECOMMENDATIONS_MASTER_SPEC.md) RS09: relevance-first engine, disclosed sponsored presentations only) |
 | User ad preferences | Profile settings (future): reduce sponsored frequency |
 | Content reporting | Report post/profile → moderation queue (MC) |
 | Impersonation | Verified badge policy; takedown for fake businesses/creators |
