@@ -3661,74 +3661,273 @@ body.is-feed-comment-open {
 
 .ms-knowledge-section-modal-panel {
   width: min(680px, 100%);
-  max-height: min(90vh, 920px);
+  max-height: min(92vh, 900px);
+  overflow: hidden;
+  padding: 0;
   display: flex;
   flex-direction: column;
+}
+
+.ms-knowledge-section-modal-panel > .ms-knowledge-upload-modal-head {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 20px 20px 14px;
+  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(180deg, #fafbfe 0%, var(--color-surface) 100%);
+}
+
+.ms-knowledge-section-modal-panel .ms-knowledge-detail-eyebrow {
+  color: var(--color-primary);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.ms-knowledge-section-modal-panel .ms-knowledge-upload-modal-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
 .ms-knowledge-section-modal-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  gap: 8px;
   align-items: center;
-  padding: 0 4px 10px;
-  font-size: 12px;
-  color: var(--color-text-secondary, #64748b);
-  border-bottom: 1px solid var(--color-border, #e2e8f0);
-  margin-bottom: 8px;
+  padding: 10px 20px 12px;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .ms-knowledge-section-modal-meta[hidden] {
   display: none !important;
 }
 
+.ms-knowledge-section-modal-meta .ms-knowledge-meta-line {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: 5px 11px;
+  border-radius: var(--radius-full);
+  background: #f1f5f9;
+}
+
 .ms-knowledge-section-modal-foot {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  padding-top: 12px;
-  margin-top: 4px;
-  border-top: 1px solid var(--color-border, #e2e8f0);
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px 18px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
+  background: linear-gradient(0deg, #f8fafc 0%, var(--color-surface) 55%);
 }
 
 .ms-knowledge-section-modal-foot[hidden] {
   display: none !important;
 }
 
+.ms-knowledge-section-modal-foot .ms-knowledge-chip-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  border-radius: var(--radius-md);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+.ms-knowledge-section-modal-foot [data-mk-section-next] {
+  margin-left: auto;
+  background: var(--color-primary);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(91, 33, 182, 0.28);
+}
+
+.ms-knowledge-section-modal-foot [data-mk-section-next]:hover {
+  background: var(--color-primary-hover);
+  color: #fff;
+}
+
 .ms-knowledge-section-modal-body {
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   flex: 1;
   min-height: 0;
-  padding-right: 4px;
+  padding: 16px 20px 8px;
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 72px;
+}
+
+.ms-knowledge-section-modal-panel > .ms-knowledge-upload-modal-lead {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 6px 20px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.ms-knowledge-section-modal-panel > .ms-knowledge-area-picker {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 16px 20px;
+  gap: 10px;
+}
+
+.ms-knowledge-section-modal-body .ms-knowledge-detail-note {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: #4c1d95;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid #ddd6fe;
+}
+
+.ms-knowledge-section-modal-body .ms-knowledge-fieldset {
+  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.ms-knowledge-section-modal-body .ms-knowledge-legend {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.ms-knowledge-section-modal-body .ms-knowledge-input,
+.ms-knowledge-section-modal-body .ms-knowledge-textarea,
+.ms-knowledge-section-modal-body select.ms-knowledge-input {
+  background: #fff;
+  border-color: #e2e8f0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ms-knowledge-section-modal-body .ms-knowledge-input:focus,
+.ms-knowledge-section-modal-body .ms-knowledge-textarea:focus,
+.ms-knowledge-section-modal-body select.ms-knowledge-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(91, 33, 182, 0.14);
+}
+
+.ms-knowledge-section-modal-body .ms-knowledge-form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 12px -20px 0;
+  padding: 14px 20px 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--color-surface) 28%);
+  border-top: 1px solid var(--color-border);
+}
+
+.ms-knowledge-section-modal-body .ms-knowledge-family-card,
+.ms-knowledge-section-modal-body .ms-knowledge-goal-card,
+.ms-knowledge-section-modal-body .ms-knowledge-work-card,
+.ms-knowledge-section-modal-body .ms-knowledge-biz-card,
+.ms-knowledge-section-modal-body .ms-knowledge-edu-card,
+.ms-knowledge-section-modal-body .ms-knowledge-date-card,
+.ms-knowledge-section-modal-body .ms-knowledge-doc-card,
+.ms-knowledge-section-modal-body .ms-knowledge-prop-card,
+.ms-knowledge-section-modal-body .ms-knowledge-travel-card {
+  background: #fff;
+  border-color: #e2e8f0;
+  box-shadow: var(--shadow-sm);
 }
 
 .ms-knowledge-area-picker {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .ms-knowledge-area-picker-btn {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 5px;
   text-align: left;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--color-border, #e2e8f0);
-  background: #fff;
+  padding: 14px 44px 14px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   cursor: pointer;
   font: inherit;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease, background 0.15s ease;
+}
+
+.ms-knowledge-area-picker-btn::after {
+  content: "›";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.ms-knowledge-area-picker-btn:hover {
+  border-color: #c4b5fd;
+  background: #faf5ff;
+  box-shadow: var(--shadow-md);
+}
+
+.ms-knowledge-area-picker-btn:active {
+  transform: scale(0.99);
 }
 
 .ms-knowledge-area-picker-btn strong {
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 .ms-knowledge-area-picker-btn span {
-  font-size: 12px;
-  color: var(--color-text-secondary, #64748b);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 640px) {
+  .ms-knowledge-upload-modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .ms-knowledge-upload-modal:not(.hidden) .ms-knowledge-upload-modal-panel.ms-knowledge-section-modal-panel {
+    animation: mkModalSheetUp 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .ms-knowledge-upload-modal-panel.ms-knowledge-section-modal-panel {
+    width: 100%;
+    max-height: 94vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.12);
+  }
+
+  .ms-knowledge-section-modal-body .ms-knowledge-field-row--half {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes mkModalSheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 /* My Knowledge — MK-01 home (prototype) */
@@ -4093,17 +4292,47 @@ body.is-feed-comment-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 20px;
 }
 
 .ms-knowledge-upload-modal.hidden {
   display: none;
 }
 
+.ms-knowledge-upload-modal:not(.hidden) .ms-knowledge-upload-modal-backdrop {
+  animation: mkModalBackdropIn 0.22s ease-out;
+}
+
+.ms-knowledge-upload-modal:not(.hidden) .ms-knowledge-upload-modal-panel {
+  animation: mkModalPanelIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes mkModalBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mkModalPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .ms-knowledge-upload-modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .ms-knowledge-upload-modal-panel {
@@ -4112,35 +4341,56 @@ body.is-feed-comment-open {
   width: min(420px, 100%);
   max-height: min(90vh, 560px);
   overflow-y: auto;
-  padding: 18px;
+  padding: 20px;
   border-radius: var(--radius-xl);
   background: var(--color-surface);
-  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 24px 48px rgba(15, 23, 42, 0.16),
+    0 0 0 1px rgba(15, 23, 42, 0.05);
 }
 
 .ms-knowledge-upload-modal-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 8px;
 }
 
 .ms-knowledge-upload-modal-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--color-text);
+  letter-spacing: -0.02em;
 }
 
 .ms-knowledge-upload-modal-close {
+  flex-shrink: 0;
   border: none;
-  background: transparent;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
-  color: var(--color-text-secondary);
-  padding: 4px 8px;
+  color: var(--color-text-muted);
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+.ms-knowledge-upload-modal-close:hover {
+  background: #e2e8f0;
+  color: var(--color-text);
+}
+
+.ms-knowledge-upload-modal-close:active {
+  transform: scale(0.94);
 }
 
 .ms-knowledge-upload-modal-lead {
