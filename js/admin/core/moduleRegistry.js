@@ -3,6 +3,13 @@
  */
 export const MODULES = [
   'dashboard',
+  'mcPlatformUsers',
+  'mcPlatformActivity',
+  'mcPlatformSafety',
+  'mcPlatformMonitor',
+  'mcPlatformComms',
+  'mcOrgOversight',
+  'mcPlatformAudit',
   'companies',
   'government',
   'publicService',
@@ -18,12 +25,20 @@ export const MODULES = [
   'agents',
   'marketplace',
   'sarahNetwork',
+  'mcRecommendations',
   'knowledge',
   'settings',
 ];
 
 export const MODULE_LABELS = {
   dashboard: 'Dashboard',
+  mcPlatformUsers: 'Sarah Users',
+  mcPlatformActivity: 'Platform Activity',
+  mcPlatformSafety: 'User Safety',
+  mcPlatformMonitor: 'Sarah App Monitor',
+  mcPlatformComms: 'Platform Comms',
+  mcOrgOversight: 'Organisations',
+  mcPlatformAudit: 'Platform Audit',
   companies: 'Companies',
   government: 'Government',
   publicService: 'Public Service',
@@ -39,6 +54,7 @@ export const MODULE_LABELS = {
   agents: 'AI Employees',
   marketplace: 'AI Marketplace',
   sarahNetwork: 'Sarah Network',
+  mcRecommendations: 'Sarah Recommendations',
   knowledge: 'Knowledge Base',
   settings: 'Settings',
 };

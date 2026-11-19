@@ -40,9 +40,13 @@ Deploy static portal: sync `app/js/portal` → `js/portal` before `prepare-sites
 - `test/rec-07-disclosure-ui.test.mjs`
 - `test/rec-09-billing.test.mjs`
 
+## Mission Control (REC pilot ops)
+
+- Module: **Sarah Recommendations** in Mission Control (`mcRecommendations`) — offering verification + campaign approval queues.
+- Source: `js/admin/modules/mc-recommendations.js` (deploy via `prepare-sites admin`).
+
 ## Still open
 
 - REC-08 attribution analytics UI
-- REC-10 pilot acceptance checklist
-- MC campaign queue UI (APIs exist)
+- REC-10 pilot acceptance checklist (sign-off doc)
 - Paystack tenant checkout (production payments)

@@ -499,3 +499,46 @@ export async function setNetworkRoles(uid, body) {
     silent: true,
   });
 }
+
+/* ---------- REC — Sarah Recommendations (MC queues) ---------- */
+
+export async function fetchRecOfferingVerificationQueue(status = '') {
+  const qs = new URLSearchParams();
+  if (status) qs.set('status', status);
+  const q = qs.toString();
+  return request(`/api/operations/recommendations/verification-queue${q ? `?${q}` : ''}`, { silent: true });
+}
+
+export async function fetchRecOfferingVerificationCase(caseId) {
+  return request(`/api/operations/recommendations/verification-queue/${encodeURIComponent(caseId)}`, { silent: true });
+}
+
+/** body: { action, note?, checks? } */
+export async function decideRecOfferingVerification(caseId, body) {
+  return request(`/api/operations/recommendations/verification-queue/${encodeURIComponent(caseId)}/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    silent: true,
+  });
+}
+
+export async function fetchRecCampaignApprovalQueue(status = 'pending_approval') {
+  const qs = new URLSearchParams();
+  if (status) qs.set('status', status);
+  return request(`/api/operations/recommendations/campaign-approval-queue?${qs}`, { silent: true });
+}
+
+export async function fetchRecCampaign(campaignId) {
+  return request(`/api/operations/recommendations/campaigns/${encodeURIComponent(campaignId)}`, { silent: true });
+}
+
+/** body: { action: 'approve' | 'reject', note } */
+export async function decideRecCampaign(campaignId, body) {
+  return request(`/api/operations/recommendations/campaigns/${encodeURIComponent(campaignId)}/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    silent: true,
+  });
+}
