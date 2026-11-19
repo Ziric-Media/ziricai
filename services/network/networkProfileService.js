@@ -50,6 +50,10 @@ export const PUBLIC_PROFILE_FIELDS = Object.freeze([
     "contact",
     /** Phase 2.0: optional `{ lat, lng }` for Discover `near=` search (shown at ~1 km precision). */
     "geo",
+    /** Discover detail: image gallery `[{ id?, imageUrl, caption? }]`. */
+    "gallery",
+    /** Discover detail: products / services `[{ id?, name, description?, price?, imageUrl? }]`. */
+    "products",
 ]);
 export const RESTRICTED_PROFILE_FIELDS = Object.freeze(["legalName", "registrationNumber"]);
 export const REQUIRED_TO_PUBLISH = Object.freeze(["displayName", "industry", "shortDescription", "location"]);
@@ -78,6 +82,52 @@ function list(value, max, itemMax, field) {
     if (!Array.isArray(value)) throw bad(`${field} must be a list.`, "PROFILE_INVALID", { field });
     if (value.length > max) throw bad(`${field} has too many entries (max ${max}).`, "PROFILE_INVALID", { field });
     return value.map((v) => str(String(v), itemMax, field)).filter(Boolean);
+}
+
+function slugId(prefix) {
+    return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function galleryList(value) {
+    if (value === null || value === undefined) return undefined;
+    if (!Array.isArray(value)) throw bad("gallery must be a list.", "PROFILE_INVALID", { field: "gallery" });
+    if (value.length > 24) throw bad("gallery has too many images (max 24).", "PROFILE_INVALID", { field: "gallery" });
+    return value
+        .map((row) => {
+            if (!row || typeof row !== "object") return null;
+            const imageUrl = url(row.imageUrl, "gallery.imageUrl");
+            if (!imageUrl) return null;
+            const caption = row.caption ? str(row.caption, 160, "gallery.caption") : null;
+            const id = str(String(row.id || slugId("gal")), 40, "gallery.id") || slugId("gal");
+            return { id, imageUrl, ...(caption ? { caption } : {}) };
+        })
+        .filter(Boolean);
+}
+
+function productsList(value) {
+    if (value === null || value === undefined) return undefined;
+    if (!Array.isArray(value)) throw bad("products must be a list.", "PROFILE_INVALID", { field: "products" });
+    if (value.length > 48) throw bad("products has too many entries (max 48).", "PROFILE_INVALID", { field: "products" });
+    return value
+        .map((row) => {
+            if (!row || typeof row !== "object") return null;
+            const name = str(row.name, 120, "products.name");
+            if (!name) return null;
+            const id = str(String(row.id || slugId("prd")), 40, "products.id") || slugId("prd");
+            const description = row.description ? str(row.description, 400, "products.description") : null;
+            const price = row.price ? str(row.price, 40, "products.price") : null;
+            const imageUrl = row.imageUrl ? url(row.imageUrl, "products.imageUrl") : null;
+            const promotion = row.promotion ? str(row.promotion, 80, "products.promotion") : null;
+            return {
+                id,
+                name,
+                ...(description ? { description } : {}),
+                ...(price ? { price } : {}),
+                ...(imageUrl ? { imageUrl } : {}),
+                ...(promotion ? { promotion } : {}),
+            };
+        })
+        .filter(Boolean);
 }
 
 /**
@@ -133,6 +183,8 @@ export function validateProfilePatch(input = {}) {
     }
     if (has("legalName")) restricted.legalName = str(input.legalName, 200, "legalName");
     if (has("registrationNumber")) restricted.registrationNumber = str(input.registrationNumber, 60, "registrationNumber");
+    if (has("gallery")) profile.gallery = galleryList(input.gallery);
+    if (has("products")) profile.products = productsList(input.products);
     return { profile, restricted };
 }
 

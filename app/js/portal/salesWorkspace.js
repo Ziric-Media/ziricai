@@ -193,14 +193,7 @@ export function renderSalesShell({ section, bodyHtml, unreadCount = 0 }) {
       )}
       ${nav}
       <div class="sw-module-body sales-module-body" data-sales-body>
-        ${
-          section === 'overview' || section === 'sarah'
-            ? bodyHtml
-            : `<div class="sales-channel-head">
-            <h2 class="sales-channel-title">${escapeHtml(meta.title)}</h2>
-            <p class="sales-channel-subtitle">${escapeHtml(meta.subtitle)}</p>
-          </div>${bodyHtml}`
-        }
+        ${bodyHtml}
       </div>
     </div>`;
 }

@@ -29,7 +29,10 @@ import {
 } from "../conversation/tenantConversationRef.js";
 import { mirrorSarahAppHumanReplyToConsumer } from "../users/sarahAppConsumerMirrorService.js";
 import { openUserConversation, getUserConversationByCompany } from "../users/userConversationService.js";
+import { toIsoTimestamp } from "../core/timestampUtils.js";
 import { ownershipStateFromTakeover } from "../users/handoverStateService.js";
+import { getConsumerProfile } from "../users/consumerProfileService.js";
+import { getUserProfile } from "../auth/authService.js";
 
 const CHANNEL_LABELS = {
     whatsapp: "WhatsApp",
@@ -68,13 +71,19 @@ export {
 
 function formatRelativeTime(iso) {
     if (!iso) return "—";
-    const diff = Date.now() - new Date(iso).getTime();
+    const normalized = toIsoTimestamp(iso) || iso;
+    const ms = new Date(normalized).getTime();
+    if (!Number.isFinite(ms)) return "Recently";
+    const diff = Date.now() - ms;
+    if (diff < 0) return "Just now";
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return "Just now";
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
+    const days = Math.floor(hrs / 24);
+    if (!Number.isFinite(days)) return "Recently";
+    return `${days}d ago`;
 }
 
 function resolvePhoneFromConversationRef(conversationId) {
@@ -92,6 +101,34 @@ function findListedConversation(convList, conversationId, phone) {
         );
 }
 
+async function resolveConsumerPhotoUrl(conv) {
+    const channel = conv.channel || "whatsapp";
+    if (channel !== "sarah_app") {
+        return conv.customerPhotoUrl || conv.avatarUrl || conv.photoURL || null;
+    }
+    if (conv.customerPhotoUrl || conv.avatarUrl || conv.photoURL) {
+        return conv.customerPhotoUrl || conv.avatarUrl || conv.photoURL;
+    }
+    const uid = resolveSarahAppUidFromRef(conv.customerId || conv.phone || conv.id);
+    if (!uid) return null;
+    try {
+        const [consumer, global] = await Promise.all([getConsumerProfile(uid), getUserProfile(uid)]);
+        return consumer?.photoURL || consumer?.photoUrl || global?.photoURL || null;
+    } catch {
+        return null;
+    }
+}
+
+async function attachConsumerPhotos(rows) {
+    await Promise.all(
+        rows.map(async (row) => {
+            const url = await resolveConsumerPhotoUrl(row);
+            if (url) row.customerPhotoUrl = url;
+        })
+    );
+    return rows;
+}
+
 function mapConversationRow(conv, companyId) {
     const channel = conv.channel || "whatsapp";
     const phone = conv.customerId || conv.phone || resolvePhoneFromConversationRef(conv.id);
@@ -101,6 +138,7 @@ function mapConversationRow(conv, companyId) {
         phone,
         customerName: conv.customerName || conv.name || phone || "Unknown",
         name: conv.name || conv.customerName,
+        customerPhotoUrl: conv.customerPhotoUrl || conv.avatarUrl || conv.photoURL || null,
         lastMessage: conv.lastMessage || conv.preview || "",
         preview: conv.preview || conv.lastMessage || "",
         status: conv.status || "in_progress",
@@ -109,8 +147,8 @@ function mapConversationRow(conv, companyId) {
         channel,
         channelLabel: CHANNEL_LABELS[channel] || channel,
         channelColor: CHANNEL_COLORS[channel] || "grey",
-        time: conv.time ? formatRelativeTime(conv.time) : formatRelativeTime(conv.lastSeen || conv.updatedAt),
-        lastMessageAt: conv.time || conv.lastSeen || conv.updatedAt,
+        time: formatRelativeTime(conv.lastSeen || conv.updatedAt || conv.time),
+        lastMessageAt: toIsoTimestamp(conv.lastSeen || conv.updatedAt || conv.time) || null,
         unread: Boolean(conv.unread ?? conv.online),
         readAt: conv.readAt || null,
         leadScore: conv.leadScore ?? null,
@@ -137,34 +175,79 @@ export async function listTenantConversations(companyId, options = {}) {
     const limit = options.limit || 50;
     const legacy = await legacyListConversations({ companyId, limit });
     if (legacy.length) {
-        return legacy.map((c) => mapConversationRow(c, companyId));
+        const rows = legacy.map((c) => mapConversationRow(c, companyId));
+        return attachConsumerPhotos(rows);
     }
     const tenant = await conversationRepo.list(companyId, { max: limit });
     if (tenant.length) {
-        return tenant.map((c) => mapConversationRow(c, companyId));
+        const rows = tenant.map((c) => mapConversationRow(c, companyId));
+        return attachConsumerPhotos(rows);
     }
-    return legacy.map((c) => mapConversationRow(c, companyId));
+    const rows = legacy.map((c) => mapConversationRow(c, companyId));
+    return attachConsumerPhotos(rows);
 }
 
 export async function getTenantConversation(companyId, conversationId) {
-    const phone = resolvePhoneFromConversationRef(conversationId);
     const convList = await legacyListConversations({ companyId, limit: 100 });
-    const conv = findListedConversation(convList, conversationId, phone);
-    const channel = conv?.channel || "whatsapp";
-    const canonicalId = resolveCanonicalConversationId(phone, channel);
+    const listedChannel = resolveListedChannel(convList, conversationId);
+    const ref = resolveTenantConversationRef(conversationId, { listedChannel });
+    const { phone, channel, canonicalId, customerId } = ref;
 
-    const meta = (await getCanonicalConversationMeta(companyId, phone, channel)) || {};
-    const history = await legacyGetConversation(phone, 50, { companyId, channel });
+    const conv =
+        findConversationInList(convList, conversationId) ||
+        findListedConversation(convList, conversationId, phone);
+
+    let meta = (await conversationRepo.get(companyId, canonicalId)) || {};
+    if (!Object.keys(meta).length) {
+        meta = (await getCanonicalConversationMeta(companyId, phone, channel)) || {};
+    }
+
+    const history = await legacyGetConversation(phone, 100, {
+        companyId,
+        channel,
+        externalUserId: channel === "sarah_app" ? phone : undefined,
+    });
     const takeoverState = await getConversationTakeoverState(companyId, phone, channel);
 
     const messages = history.map((m) => mapMessageForInboxApi(m));
 
-    const mergedMeta = takeoverState.meta || meta;
+    const mergedMeta = { ...meta, ...(takeoverState.meta || {}) };
+    let customerName =
+        conv?.customerName || conv?.name || mergedMeta.customerName || mergedMeta.name || null;
+
+    if (channel === "sarah_app") {
+        const userConv = getUserConversationByCompany(phone, companyId);
+        const fromConsumer = userConv?.consumerDisplayName;
+        if (fromConsumer && fromConsumer !== "Sarah App user") {
+            customerName = fromConsumer;
+        } else if (mergedMeta.customerName && mergedMeta.customerName !== "Sarah App user") {
+            customerName = mergedMeta.customerName;
+        }
+    }
+
     const context = await buildSlimInboxContext(companyId, phone);
+
+    const photoUrl = await resolveConsumerPhotoUrl({
+        channel,
+        customerId,
+        phone,
+        id: canonicalId,
+    });
 
     return {
         conversation: mapConversationRow(
-            { ...conv, ...mergedMeta, id: canonicalId, phone, conversationId: canonicalId },
+            {
+                ...conv,
+                ...mergedMeta,
+                id: canonicalId,
+                phone,
+                customerId,
+                conversationId: canonicalId,
+                channel,
+                customerName: customerName || conv?.customerName,
+                name: customerName || conv?.name,
+                ...(photoUrl ? { customerPhotoUrl: photoUrl } : {}),
+            },
             companyId
         ),
         messages,

@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../admin/ui.js';
+import { renderInboxMessageBody } from '../shared/markdownMessage.js';
 
 const CHANNEL_LABELS = {
   whatsapp: 'WhatsApp',
@@ -90,6 +91,24 @@ function listSubtitle(conversation) {
   return conversation.preview || conversation.lastMessage || '';
 }
 
+function conversationPhotoUrl(conversation) {
+  if (!conversation) return '';
+  return String(
+    conversation.customerPhotoUrl || conversation.avatarUrl || conversation.photoURL || ''
+  ).trim();
+}
+
+export function renderConversationAvatar(conversation, { className = 'inbox-item-avatar', size = 'md' } = {}) {
+  const name = conversation?.customerName || conversation?.name || 'Visitor';
+  const photo = conversationPhotoUrl(conversation);
+  const initial = escapeHtml(name.charAt(0).toUpperCase());
+  const label = escapeHtml(name);
+  if (photo) {
+    return `<div class="${escapeHtml(className)} has-photo is-${size}" aria-hidden="true"><img src="${escapeHtml(photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" /></div>`;
+  }
+  return `<div class="${escapeHtml(className)} is-${size}" aria-hidden="true" title="${label}">${initial}</div>`;
+}
+
 function resolveBubbleRole(message) {
   if (message.role === 'customer' || message.role === 'user') return 'customer';
   if (message.role === 'human' || message.source === 'human') return 'human';
@@ -131,7 +150,7 @@ export function renderInboxListItem(conversation, active) {
 
   return `
     <button class="inbox-item ${active ? 'active' : ''} ${conversation.unread ? 'unread' : ''}" type="button" data-id="${escapeHtml(conversation.id || conversation.phone)}">
-      <div class="inbox-item-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</div>
+      ${renderConversationAvatar(conversation)}
       <div class="inbox-item-body">
         <div class="inbox-item-top">
           <span class="name">${escapeHtml(name)}${unreadDot}</span>
@@ -153,13 +172,13 @@ export function renderMessageBubble(message, aiEmployeeName) {
   if (role === 'ai') label = aiEmployeeName || 'AI Assistant';
   else if (role === 'human') label = message.senderName || 'Staff';
 
-  const text = message.content || message.message || '';
+  const bodyHtml = renderInboxMessageBody(message);
   const timeLabel = formatMessageTime(message.createdAt);
 
   return `
     <div class="thread-bubble ${cls}" data-role="${escapeHtml(role)}" data-source="${escapeHtml(message.source || role)}">
       <div class="bubble-label">${escapeHtml(label)}</div>
-      <div class="bubble-text">${escapeHtml(text)}</div>
+      <div class="bubble-text bubble-text--rich">${bodyHtml}</div>
       ${timeLabel ? `<div class="bubble-time">${escapeHtml(timeLabel)}</div>` : ''}
     </div>
   `;
@@ -204,7 +223,7 @@ export function renderInboxThread(conversation, messages, { canReply, aiEmployee
     <div class="inbox-thread" id="inboxThread">
       <div class="inbox-col-header">Conversation</div>
       <div class="thread-header">
-        <div class="thread-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</div>
+        ${renderConversationAvatar(conversation, { className: 'thread-avatar', size: 'lg' })}
         <div class="thread-header-info">
           <div class="thread-name">${escapeHtml(name)}</div>
           <div class="thread-sub">${channelIcon} ${escapeHtml(channel)} · ${escapeHtml(modeLabel)}</div>
@@ -216,15 +235,27 @@ export function renderInboxThread(conversation, messages, { canReply, aiEmployee
         </div>
       </div>
       <div class="thread-messages" id="threadMessages">${msgHtml}</div>
+      ${
+        conversation.channel === 'sarah_app'
+          ? `<div class="thread-handover-ops" id="handoverOpsBar">
+        <button class="btn btn-secondary btn-sm" type="button" id="assignBtn" title="Assign employee">Assign</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="acceptBtn" title="Accept into queue">Accept</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="transferBtn" title="Transfer">Transfer</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="escalateBtn" title="Escalate">Escalate</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="handoverSummaryBtn" title="Sarah handover summary">Summary</button>
+      </div>`
+          : ''
+      }
       ${canReply ? `
         <div class="thread-compose portal-inbox-compose">
           <input type="text" id="replyInput" placeholder="Type a message..." autocomplete="off" />
-          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">${human ? 'Release to AI' : 'Take over'}</button>
+          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">${human ? 'Return to Sarah' : 'Take over'}</button>
           <button class="btn btn-primary btn-sm" type="button" id="sendReplyBtn">
             <i class="fa-solid fa-paper-plane"></i> Send
           </button>
         </div>
       ` : ''}
+      <div class="inbox-handover-summary hidden" id="handoverSummaryPanel"></div>
     </div>
   `;
 }

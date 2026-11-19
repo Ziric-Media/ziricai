@@ -1550,6 +1550,22 @@ body.is-feed-comment-open {
   border-radius: 10px;
   overflow: hidden;
   background: #f1f5f9;
+  position: relative;
+}
+
+.product-card-promo {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  background: #f59e0b;
+  color: #111827;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  border-radius: 5px;
 }
 
 .product-card-media img {

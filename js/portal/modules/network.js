@@ -4,7 +4,7 @@
  * references. Talks to /api/network/v1/orgs/:companyId/{listing,verification}; owners and managers write
  * (server enforces `canManageNetwork`), other members see it read-only.
  *
- * Layout: status hero → public profile (grid) → private registration → action bar → verification timeline.
+ * Layout: status hero → public profile (grid) → action bar → verification (registration + evidence).
  * Styles live in css/company-portal.css under "Sarah Network module (snet-*)".
  */
 import { state } from '../core/dataStore.js';
@@ -19,7 +19,13 @@ import {
   submitNetworkVerification,
   addNetworkVerificationEvidence,
   uploadNetworkEvidenceFile,
+  fetchPresenceMetrics,
+  boostDiscoverProfile,
+  listSubscriberEvents,
+  postSubscriberEvent,
+  fetchSubscriberDeliverySummary,
 } from '../api.js';
+import { imageUploadControlHtml, bindImageUploads, readImageUploadUrl } from './portalImageUpload.js';
 
 const FALLBACK_KINDS = ['registration_certificate', 'proof_of_address', 'ownership_proof', 'website', 'other'];
 
@@ -81,6 +87,33 @@ function field(id, text, value, { type = 'text', hint = '', disabled = false, pl
   </div>`;
 }
 
+function brandingMediaField(id, label, urlValue, { disabled = false, hint = '', wide = false, variant = 'logo' } = {}) {
+  return `<div class="form-group snet-field snet-branding-field${wide ? ' snet-field--wide' : ''}">
+    <label for="${id}">${escapeHtml(label)}</label>
+    ${imageUploadControlHtml(urlValue, { disabled, id, variant })}
+    ${hint ? `<div class="form-hint">${escapeHtml(hint)}</div>` : `<div class="form-hint">JPEG, PNG, or WebP up to 5 MB. Paste a link or upload — you'll see a preview here.</div>`}
+  </div>`;
+}
+
+function galleryRowHtml(g, ro) {
+  return `<div class="snet-repeat-row snet-repeat-row--gallery" data-gal-row>
+    <div class="snet-repeat-img">${imageUploadControlHtml(g.imageUrl || '', { disabled: ro, variant: 'tile' })}</div>
+    <input type="text" data-gal-caption value="${escapeHtml(g.caption || '')}" placeholder="Caption (optional)" ${ro ? 'disabled' : ''} />
+    ${ro ? '' : `<button type="button" class="btn btn-secondary btn-sm" data-gal-remove>Remove</button>`}
+  </div>`;
+}
+
+function productRowHtml(pr, ro) {
+  return `<div class="snet-repeat-row snet-repeat-row--product" data-prd-row>
+    <input type="text" data-prd-name value="${escapeHtml(pr.name || '')}" placeholder="Name" ${ro ? 'disabled' : ''} />
+    <input type="text" data-prd-price value="${escapeHtml(pr.price || '')}" placeholder="Price" ${ro ? 'disabled' : ''} />
+    <input type="text" data-prd-promo value="${escapeHtml(pr.promotion || '')}" placeholder="Promotion (optional)" ${ro ? 'disabled' : ''} />
+    <div class="snet-repeat-img">${imageUploadControlHtml(pr.imageUrl || '', { disabled: ro, variant: 'compact' })}</div>
+    <textarea data-prd-desc rows="2" placeholder="Description" ${ro ? 'disabled' : ''}>${escapeHtml(pr.description || '')}</textarea>
+    ${ro ? '' : `<button type="button" class="btn btn-secondary btn-sm" data-prd-remove>Remove</button>`}
+  </div>`;
+}
+
 function sectionCard({ icon, title, hint = '', body, tone = '' }) {
   return `
     <section class="snet-card">
@@ -125,6 +158,152 @@ function evidenceListHtml(evidence) {
       </li>`;
     })
     .join('')}</ul>`;
+}
+
+function presenceMetricsHtml(metrics, canEdit = false) {
+  if (!metrics) return '';
+  return `
+    <section class="snet-card" aria-label="Presence metrics">
+      <header class="snet-card-head">
+        <span class="snet-card-icon" aria-hidden="true"><i class="fa-solid fa-chart-simple"></i></span>
+        <div>
+          <h3>Discover metrics</h3>
+          <p>Profile visits, Status reactions, and leads from customers who showed interest.</p>
+        </div>
+      </header>
+      <div class="snet-card-body">
+        <div class="snet-stats snet-stats--presence">
+          <div class="snet-stat"><div class="snet-stat-label">Profile visits</div><div class="snet-stat-value snet-stat-value--num">${Number(metrics.profileViews) || 0}</div></div>
+          <div class="snet-stat"><div class="snet-stat-label">Post reactions</div><div class="snet-stat-value snet-stat-value--num">${Number(metrics.postReactions) || 0}</div></div>
+          <div class="snet-stat"><div class="snet-stat-label">Interested leads</div><div class="snet-stat-value snet-stat-value--num">${Number(metrics.leadsInterested) || 0}</div></div>
+        </div>
+        ${
+          metrics.profileBoostUntil && new Date(metrics.profileBoostUntil).getTime() > Date.now()
+            ? `<p class="form-hint"><i class="fa-solid fa-rocket"></i> Discover profile boosted until ${escapeHtml(String(metrics.profileBoostUntil).slice(0, 10))}.</p>`
+            : ''
+        }
+        ${
+          canEdit
+            ? `<div style="margin-top:12px;"><button type="button" class="btn btn-secondary btn-sm" id="nlBoostProfile">Boost Discover profile</button></div>`
+            : ''
+        }
+      </div>
+    </section>`;
+}
+
+function galleryProductsHtml(p, ro) {
+  const gallery = lines(p.gallery);
+  const products = lines(p.products);
+  const galRows = gallery.map((g) => galleryRowHtml(g, ro)).join('');
+  const prodRows = products.map((pr) => productRowHtml(pr, ro)).join('');
+  return `
+    ${sectionCard({
+      icon: 'fa-images',
+      title: 'Gallery',
+      hint: 'Extra photos customers see on your Discover profile.',
+      body: `<div id="nlGalleryList" class="snet-repeat-list">${galRows || '<div class="snet-empty snet-empty--inline">No gallery images yet.</div>'}</div>
+        ${ro ? '' : '<button type="button" class="btn btn-secondary btn-sm" id="nlGalleryAdd">Add image</button>'}`,
+    })}
+    ${sectionCard({
+      icon: 'fa-box',
+      title: 'Products & services',
+      hint: 'Highlight what you sell — name, optional price, image, and short description.',
+      body: `<div id="nlProductList" class="snet-repeat-list">${prodRows || '<div class="snet-empty snet-empty--inline">No products yet.</div>'}</div>
+        ${ro ? '' : '<button type="button" class="btn btn-secondary btn-sm" id="nlProductAdd">Add product</button>'}`,
+    })}`;
+}
+
+function subscriberDeliveryStrip(summary) {
+  if (!summary?.totals) return '';
+  const t = summary.totals;
+  return `<p class="form-hint snet-delivery-strip">Delivery monitor (last 100): ${t.delivered} sent · ${t.scheduled} scheduled · inbox ${t.inboxDelivered} · read ${t.read} · push ${t.pushed}${t.fanOutErrors ? ` · ${t.fanOutErrors} errors` : ''}</p>`;
+}
+
+function subscriberCommunicationsHtml(events, canEdit, deliverySummary = null, company = null) {
+  const school =
+    company &&
+    (company.settings?.education?.requireVerifiedGuardians === true ||
+      String(company.industry || '').toLowerCase().includes('education'));
+  const campuses = company?.campuses || company?.settings?.campusesPublic || [];
+  if (!canEdit) return '';
+  const rows =
+    events.length === 0
+      ? '<p class="form-hint">No subscriber messages sent yet.</p>'
+      : `<ul class="snet-event-log">${events
+          .slice(0, 15)
+          .map((e) => {
+            const eng = e.engagement || {};
+            const status =
+              e.status === 'scheduled'
+                ? `scheduled ${escapeHtml(String(e.scheduledAt || '').slice(0, 16).replace('T', ' '))}`
+                : `inbox ${escapeHtml(String(eng.inboxDelivered ?? e.delivered ?? 0))} · read ${escapeHtml(String(eng.read ?? 0))} · push ${escapeHtml(String(eng.pushed ?? 0))}`;
+            const pri = e.priority && e.priority !== 'normal' ? ` · ${escapeHtml(e.priority)}` : '';
+            return `<li>
+          <strong>${escapeHtml(e.type || '')}</strong>${pri} · ${escapeHtml(e.title || '')}
+          <span class="snet-event-log-meta">${escapeHtml(String(e.publishedAt || e.createdAt || '').slice(0, 16).replace('T', ' '))}
+          · ${status}</span>
+        </li>`;
+          })
+          .join('')}</ul>`;
+  return sectionCard({
+    icon: 'fa-bullhorn',
+    title: 'Subscriber communications',
+    hint: 'Send notifications and announcements to customers subscribed on Sarah App (My Notifications + push when enabled).',
+    body: `
+      ${subscriberDeliveryStrip(deliverySummary)}
+      <div class="snet-grid">
+        <div class="form-group snet-field">
+          <label for="subCommsType">Message type</label>
+          <select id="subCommsType">
+            <option value="notification">Notification (inbox)</option>
+            <option value="announcement">Announcement (inbox + push attempt)</option>
+            <option value="reminder">Reminder</option>
+          </select>
+        </div>
+        <div class="form-group snet-field">
+          <label for="subCommsPriority">Priority</label>
+          <select id="subCommsPriority">
+            <option value="normal">Normal</option>
+            <option value="important">Important</option>
+            <option value="urgent">Urgent (announcements only)</option>
+          </select>
+        </div>
+        <div class="form-group snet-field snet-field--wide">
+          <label for="subCommsTitle">Title</label>
+          <input id="subCommsTitle" type="text" maxlength="120" placeholder="e.g. School closed tomorrow" />
+        </div>
+        <div class="form-group snet-field snet-field--wide">
+          <label for="subCommsBody">Message</label>
+          <textarea id="subCommsBody" rows="3" maxlength="1000" placeholder="Short summary subscribers see in My Notifications."></textarea>
+        </div>
+        ${
+          school && campuses.length
+            ? `<div class="form-group snet-field">
+          <label for="subCommsCampus">Campus audience (optional)</label>
+          <select id="subCommsCampus">
+            <option value="">All approved guardians</option>
+            ${campuses.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name || c.id)}</option>`).join('')}
+          </select>
+        </div>`
+            : ''
+        }
+        <div class="form-group snet-field snet-field--wide">
+          <label class="snet-checkbox-row">
+            <input type="checkbox" id="subCommsSchedule" />
+            Schedule send (up to 90 days ahead)
+          </label>
+        </div>
+        <div class="form-group snet-field hidden" id="subCommsScheduleWrap">
+          <label for="subCommsScheduledAt">Send at</label>
+          <input id="subCommsScheduledAt" type="datetime-local" />
+        </div>
+      </div>
+      <div class="snet-actionbar-buttons" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary" id="subCommsSend">Send to subscribers</button>
+      </div>
+      <h4 class="snet-subhead" style="margin:20px 0 8px;font-size:13px;font-weight:600;">Recent sends</h4>
+      ${rows}`,
+  });
 }
 
 function statusCardHtml(listing, verification, companyName) {
@@ -173,9 +352,8 @@ function statusCardHtml(listing, verification, companyName) {
     </section>`;
 }
 
-function formHtml(listing) {
+function formHtml(listing, { showPresenceExtras = false } = {}) {
   const p = listing.profile || {};
-  const r = listing.restricted || {};
   const c = p.contact || {};
   const ro = !listing.canEdit;
   const selected = new Set(lines(p.categories));
@@ -210,8 +388,8 @@ function formHtml(listing) {
       ${field('nlLat', 'Map latitude (optional)', String(p.geo?.lat ?? ''), { disabled: ro })}
       ${field('nlLng', 'Map longitude (optional)', String(p.geo?.lng ?? ''), { disabled: ro })}
       <div class="form-hint snet-field--wide">Lets “near me” searches find you precisely (e.g. -25.8713, 29.2332). Shown to the public at about 1&nbsp;km precision. Leave empty to be placed from your location text.</div>
-      ${field('nlLogo', 'Logo URL (https)', p.logoUrl, { disabled: ro, type: 'url' })}
-      ${field('nlCover', 'Cover image URL (https)', p.coverUrl, { disabled: ro, type: 'url' })}
+      ${brandingMediaField('nlLogo', 'Logo', p.logoUrl, { disabled: ro, variant: 'logo' })}
+      ${brandingMediaField('nlCover', 'Cover image', p.coverUrl, { disabled: ro, variant: 'cover' })}
       <div class="form-group snet-field snet-field--wide">
         <label for="nlHours">Opening hours</label>
         <textarea id="nlHours" rows="4" ${ro ? 'disabled' : ''} placeholder="Mon-Fri: 08:00-17:00">${escapeHtml(hoursText(p.hours))}</textarea>
@@ -226,12 +404,6 @@ function formHtml(listing) {
       ${field('nlWebsite', 'Website (https)', c.website, { disabled: ro, type: 'url' })}
     </div>`;
 
-  const privateBody = `
-    <div class="snet-grid">
-      ${field('nlLegalName', 'Registered legal name', r.legalName, { disabled: ro })}
-      ${field('nlRegNo', 'Registration number', r.registrationNumber, { disabled: ro })}
-    </div>`;
-
   return `
     ${sectionCard({
       icon: 'fa-store',
@@ -240,13 +412,7 @@ function formHtml(listing) {
       body: profileBody,
     })}
     ${sectionCard({ icon: 'fa-address-book', title: 'Contact', hint: 'How customers can reach you outside of Sarah.', body: contactBody })}
-    ${sectionCard({
-      icon: 'fa-lock',
-      title: 'Registration details',
-      hint: 'Private — used only for verification and never shown to customers.',
-      body: privateBody,
-      tone: 'private',
-    })}
+    ${showPresenceExtras ? galleryProductsHtml(p, ro) : ''}
 
     <div class="snet-actionbar">
       ${
@@ -294,6 +460,20 @@ function timelineHtml(vState) {
     .join('')}</ol>`;
 }
 
+function registrationDetailsHtml(listing) {
+  const r = listing.restricted || {};
+  const ro = !listing.canEdit;
+  return `
+    <div class="snet-subcard snet-subcard--private" id="nlRegistrationBlock">
+      <h4 class="snet-subtitle"><i class="fa-solid fa-lock" aria-hidden="true"></i> Registration details</h4>
+      <p class="form-hint">Private — used only for verification and never shown on Sarah Discover. Include your registered legal name and company registration number before requesting verification.</p>
+      <div class="snet-grid">
+        ${field('nlLegalName', 'Registered legal name', r.legalName, { disabled: ro })}
+        ${field('nlRegNo', 'Registration number', r.registrationNumber, { disabled: ro })}
+      </div>
+    </div>`;
+}
+
 function verificationHtml(listing, verification) {
   const vState = verification?.state || 'unverified';
   const latest = verification?.latestCase || null;
@@ -325,6 +505,7 @@ function verificationHtml(listing, verification) {
     : '';
 
   const body = `
+    ${registrationDetailsHtml(listing)}
     <div class="snet-verify-head">${pill(verificationTone(vState), titleCase(vState))}<p>${escapeHtml(VERIFICATION_COPY[vState] || '')}</p></div>
     ${timelineHtml(vState)}
     ${noteRow}
@@ -340,7 +521,7 @@ function verificationHtml(listing, verification) {
     ${
       canRequest
         ? `<div class="snet-subcard"><h4 class="snet-subtitle">Request verification</h4>
-             <p class="form-hint">Requires your registered legal name and registration number above (save them first). You can attach one evidence item now and add more later.</p>
+             <p class="form-hint">Requires legal name and registration number in Registration details (save your draft first). You can attach one evidence item now and add more later.</p>
              ${evidenceForm('nvNew')}
              <button class="btn btn-primary btn-sm" type="button" id="nvSubmit">Request verification</button></div>`
         : ''
@@ -370,6 +551,27 @@ async function evidenceToItem(companyId, ev) {
   return { item: { ...item, uploadId: up.data.uploadId } };
 }
 
+function readGallery(container) {
+  return [...container.querySelectorAll('#nlGalleryList .snet-repeat-row--gallery')]
+    .map((row) => ({
+      imageUrl: readImageUploadUrl(row.querySelector('[data-img-upload]')),
+      caption: row.querySelector('[data-gal-caption]')?.value?.trim() || '',
+    }))
+    .filter((g) => g.imageUrl);
+}
+
+function readProducts(container) {
+  return [...container.querySelectorAll('#nlProductList .snet-repeat-row--product')]
+    .map((row) => ({
+      name: row.querySelector('[data-prd-name]')?.value?.trim() || '',
+      price: row.querySelector('[data-prd-price]')?.value?.trim() || '',
+      promotion: row.querySelector('[data-prd-promo]')?.value?.trim() || '',
+      imageUrl: readImageUploadUrl(row.querySelector('[data-img-upload]')),
+      description: row.querySelector('[data-prd-desc]')?.value?.trim() || '',
+    }))
+    .filter((p) => p.name);
+}
+
 function readProfile(container) {
   const v = (id) => container.querySelector(`#${id}`)?.value?.trim() || '';
   const picked = [...container.querySelectorAll('input[name="nlCategory"]:checked')].map((i) => i.value);
@@ -390,28 +592,38 @@ function readProfile(container) {
     contact: { phone: v('nlPhone'), email: v('nlEmail'), website: v('nlWebsite') },
     legalName: v('nlLegalName'),
     registrationNumber: v('nlRegNo'),
+    gallery: readGallery(container),
+    products: readProducts(container),
   };
 }
 
-export async function renderNetwork(container) {
+export async function renderDiscoverProfile(container) {
+  return renderNetwork(container, { variant: 'discover' });
+}
+
+export async function renderNetwork(container, opts = {}) {
+  const discover = opts.variant === 'discover';
   const companyId = state.companyId;
-  container.innerHTML = loadingState('Loading Sarah Network listing…');
+  container.innerHTML = loadingState(discover ? 'Loading Discover profile…' : 'Loading Sarah Network listing…');
   if (!companyId) {
     container.innerHTML = errorState('No company selected.');
     return;
   }
 
-  const [listingRes, verificationRes] = await Promise.all([
+  const [listingRes, verificationRes, metricsRes, eventsRes, deliveryRes] = await Promise.all([
     fetchNetworkListing(companyId),
     fetchNetworkVerification(companyId),
+    discover ? fetchPresenceMetrics(companyId) : Promise.resolve({ data: null }),
+    listSubscriberEvents(companyId, 20),
+    fetchSubscriberDeliverySummary(companyId),
   ]);
 
   if (listingRes.error) {
     container.innerHTML = `
-      ${pageHeader('Sarah Network', 'Manage how your business appears on Sarah Discover.')}
+      ${pageHeader(discover ? 'Discover profile' : 'Sarah Network', discover ? 'Manage how your business appears on Sarah Discover.' : 'Manage how your business appears on Sarah Discover.')}
       ${errorState(listingRes.error)}
       <div style="text-align:center;margin-top:12px;"><button class="btn btn-secondary btn-sm" type="button" id="nlRetry">Retry</button></div>`;
-    container.querySelector('#nlRetry')?.addEventListener('click', () => renderNetwork(container));
+    container.querySelector('#nlRetry')?.addEventListener('click', () => renderNetwork(container, opts));
     return;
   }
 
@@ -420,11 +632,22 @@ export async function renderNetwork(container) {
   const verification = verificationRes.error ? null : verificationRes.data;
   const companyName = state.company?.name || 'your business';
 
+  const metrics = metricsRes?.error ? null : metricsRes?.data;
+  const subscriberEvents = eventsRes?.data?.events || [];
+  const deliverySummary = deliveryRes?.error ? null : deliveryRes?.data;
+
   container.innerHTML = `
     <div class="snet-page">
-      ${pageHeader('Sarah Network', `How ${escapeHtml(companyName)} appears on Sarah Discover and who has verified it.`)}
+      ${pageHeader(
+        discover ? 'Discover profile' : 'Sarah Network',
+        discover
+          ? `Create and update ${escapeHtml(companyName)} on Sarah Discover — info, images, and products.`
+          : `How ${escapeHtml(companyName)} appears on Sarah Discover and who has verified it.`
+      )}
       ${statusCardHtml(listing, verification, companyName)}
-      ${formHtml(listing)}
+      ${subscriberCommunicationsHtml(subscriberEvents, listing.canEdit, deliverySummary, state.company)}
+      ${discover && metrics ? presenceMetricsHtml(metrics, listing.canEdit) : ''}
+      ${formHtml(listing, { showPresenceExtras: discover })}
       ${
         verificationRes.error
           ? `<div class="snet-alert snet-alert--warn"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div>Verification status unavailable: ${escapeHtml(verificationRes.error)}</div></div>`
@@ -432,11 +655,11 @@ export async function renderNetwork(container) {
       }
     </div>
   `;
-  bind(container, companyId, listing);
+  bind(container, companyId, listing, opts);
 }
 
-function bind(container, companyId, listing) {
-  const rerender = () => renderNetwork(container);
+function bind(container, companyId, listing, opts = {}) {
+  const rerender = () => renderNetwork(container, opts);
   const guard = (btn, fn) => async () => {
     if (btn.disabled) return;
     btn.disabled = true;
@@ -484,6 +707,50 @@ function bind(container, companyId, listing) {
     });
   }
 
+  const subSchedule = container.querySelector('#subCommsSchedule');
+  const subScheduleWrap = container.querySelector('#subCommsScheduleWrap');
+  subSchedule?.addEventListener('change', () => {
+    subScheduleWrap?.classList.toggle('hidden', !subSchedule.checked);
+  });
+
+  const subSend = container.querySelector('#subCommsSend');
+  if (subSend) {
+    subSend.onclick = guard(subSend, async () => {
+      const type = container.querySelector('#subCommsType')?.value || 'notification';
+      const title = container.querySelector('#subCommsTitle')?.value?.trim() || '';
+      const body = container.querySelector('#subCommsBody')?.value?.trim() || '';
+      if (!title) return showToast('Title is required.', 'error');
+      const priority = container.querySelector('#subCommsPriority')?.value || 'normal';
+      let scheduledAt;
+      if (subSchedule?.checked) {
+        const raw = container.querySelector('#subCommsScheduledAt')?.value;
+        if (!raw) return showToast('Pick a date and time to schedule.', 'error');
+        scheduledAt = new Date(raw).toISOString();
+      }
+      const payload = { type, title, body, priority };
+      const campusId = container.querySelector('#subCommsCampus')?.value?.trim();
+      if (campusId) payload.campusId = campusId;
+      if (scheduledAt) payload.scheduledAt = scheduledAt;
+      const res = await postSubscriberEvent(companyId, payload);
+      if (res.error) return showToast(fieldError(res), 'error');
+      const evt = res.data?.event;
+      if (evt?.status === 'scheduled') {
+        showToast('Scheduled — will deliver to subscriber inboxes at the chosen time.', 'success');
+      } else {
+        const delivered = evt?.delivered;
+        showToast(
+          typeof delivered === 'number' ? `Sent — ${delivered} subscriber inbox updates` : 'Subscriber message recorded',
+          'success'
+        );
+      }
+      container.querySelector('#subCommsTitle').value = '';
+      container.querySelector('#subCommsBody').value = '';
+      if (subSchedule) subSchedule.checked = false;
+      subScheduleWrap?.classList.add('hidden');
+      rerender();
+    });
+  }
+
   const submit = container.querySelector('#nvSubmit');
   if (submit) {
     submit.onclick = guard(submit, async () => {
@@ -518,4 +785,48 @@ function bind(container, companyId, listing) {
       rerender();
     });
   }
+
+  container.querySelector('#nlBoostProfile')?.addEventListener('click', guard(container.querySelector('#nlBoostProfile'), async () => {
+    const days = Number(window.prompt('Boost Discover profile for how many days? (1–30)', '7')) || 0;
+    if (days < 1 || days > 30) return showToast('Enter 1–30 days', 'error');
+    const res = await boostDiscoverProfile(companyId, { tier: 'standard', days, target: 'profile' });
+    if (res.error) return showToast(res.error, 'error');
+    showToast('Discover profile boosted', 'success');
+    rerender();
+  }));
+
+  const wireUploads = () => bindImageUploads(container, companyId);
+
+  container.querySelector('#nlGalleryAdd')?.addEventListener('click', () => {
+    const host = container.querySelector('#nlGalleryList');
+    if (!host) return;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = galleryRowHtml({ imageUrl: '', caption: '' }, false);
+    const row = wrap.firstElementChild;
+    host.querySelector('.snet-empty')?.remove();
+    host.appendChild(row);
+    row.querySelector('[data-gal-remove]')?.addEventListener('click', () => row.remove());
+    wireUploads();
+  });
+
+  container.querySelector('#nlProductAdd')?.addEventListener('click', () => {
+    const host = container.querySelector('#nlProductList');
+    if (!host) return;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = productRowHtml({ name: '', price: '', imageUrl: '', description: '' }, false);
+    const row = wrap.firstElementChild;
+    host.querySelector('.snet-empty')?.remove();
+    host.appendChild(row);
+    row.querySelector('[data-prd-remove]')?.addEventListener('click', () => row.remove());
+    wireUploads();
+  });
+
+  container.querySelectorAll('[data-gal-remove]').forEach((btn) => {
+    btn.addEventListener('click', () => btn.closest('.snet-repeat-row')?.remove());
+  });
+  container.querySelectorAll('[data-prd-remove]').forEach((btn) => {
+    btn.addEventListener('click', () => btn.closest('.snet-repeat-row--product')?.remove());
+  });
+
+  wireUploads();
 }

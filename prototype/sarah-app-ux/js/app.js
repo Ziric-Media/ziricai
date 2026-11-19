@@ -13112,10 +13112,14 @@ function renderCompanyDetail(companyId) {
   const productsHtml = products
     .map((p) => {
       const liked = isProductLiked(company.id, p.id);
+      const promoBadge = p.promotion
+        ? `<span class="product-card-promo">${escapeHtml(p.promotion)}</span>`
+        : '';
       return `
       <article class="product-card">
         <div class="product-card-media">
-          <img ${discoverImgAttrs(p.image || company.image, company)} />
+          ${promoBadge}
+          <img ${discoverImgAttrs(p.image || p.imageUrl || company.image, company)} />
         </div>
         <h3 class="product-card-title">${escapeHtml(p.name)}</h3>
         ${p.description ? `<p class="product-card-desc">${escapeHtml(p.description)}</p>` : ''}

@@ -874,7 +874,17 @@ function renderProtoSearchResults(query) {
  * Phase 2.0: in live mode the bell shows the server inbox (GET /api/network/v1/my-notifications — subscriber
  * announcements / reminders from organisations the user subscribed to). Fixtures only render when live mode is off.
  */
-const liveNotifs = { items: [], unread: 0, loaded: false, loading: false, error: '', timer: null };
+const liveNotifs = {
+  items: [],
+  unread: 0,
+  loaded: false,
+  loading: false,
+  error: '',
+  timer: null,
+  /** @type {Set<string>} */
+  knownIds: new Set(),
+  sawInitialInbox: false,
+};
 
 function notifLiveActive() {
   return Boolean(window.SarahLive?.isLiveEnabled?.() && window.SarahLive?.fetchMyNotifications);
@@ -891,6 +901,50 @@ function formatNotifTime(iso) {
   return new Date(t).toLocaleDateString();
 }
 
+async function attentionForSubscriberNotif(kind, { id, title, body, org }) {
+  const prefs = { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
+  const mod = await import('./sna-reminders.mjs').catch(() => null);
+  if (kind === 'reminder' && prefs.reminders !== false) {
+    tryOsPushAlert(title, body);
+    mod?.triggerServerReminderAlarm?.({ id, title, body });
+    return;
+  }
+  if (kind === 'announcement' && prefs.announcements !== false) {
+    tryOsPushAlert(title, body);
+    mod?.triggerSchoolAttentionAlert?.({
+      id,
+      title,
+      body,
+      label: org ? `${org} — announcement` : 'School announcement',
+    });
+    return;
+  }
+  if (kind === 'notification' && prefs.orgNotifications !== false) {
+    tryOsPushAlert(title, body);
+  }
+}
+
+function scanNewLiveNotifications(items) {
+  if (!Array.isArray(items) || !items.length) return;
+  const known = liveNotifs.knownIds || new Set();
+  const announce = liveNotifs.sawInitialInbox;
+  for (const n of items) {
+    const id = String(n.notificationId || '');
+    if (!id || known.has(id)) continue;
+    known.add(id);
+    if (!announce || n.read) continue;
+    const row = mapLiveNotifToRow(n);
+    void attentionForSubscriberNotif(row.kind, {
+      id: row.id,
+      title: row.title,
+      body: row.body,
+      org: row.org,
+    });
+  }
+  liveNotifs.knownIds = known;
+  liveNotifs.sawInitialInbox = true;
+}
+
 async function refreshLiveNotifications() {
   if (!notifLiveActive() || liveNotifs.loading) return;
   liveNotifs.loading = true;
@@ -905,6 +959,7 @@ async function refreshLiveNotifications() {
     liveNotifs.error = '';
     liveNotifs.items = res.notifications || [];
     liveNotifs.unread = Number(res.unread) || 0;
+    scanNewLiveNotifications(liveNotifs.items);
   }
   syncNotificationBadge();
   if (!document.getElementById('protoNotifSheet')?.classList.contains('hidden')) renderProtoNotifications();
@@ -916,7 +971,7 @@ function startLiveNotificationPolling() {
   void refreshLiveNotifications();
   liveNotifs.timer = setInterval(() => {
     if (!document.hidden) void refreshLiveNotifications();
-  }, 60000);
+  }, 30000);
 }
 
 /** Phase 2.1/2.2 — FCM token when available; else stable web_* token for server fan-out. */
@@ -954,6 +1009,17 @@ function syncNotificationBadge() {
     drawerBadge.textContent = count > 99 ? '99+' : String(count);
     drawerBadge.classList.toggle('hidden', count <= 0);
     document.querySelector('.ms-drawer-link--notif')?.classList.toggle('has-unread', count > 0);
+  }
+  const homeBadge = document.getElementById('homeNotifBadge');
+  const homeBtn = document.getElementById('homeNotifBtn');
+  if (homeBadge) {
+    homeBadge.textContent = count > 99 ? '99+' : String(count);
+    homeBadge.classList.toggle('hidden', count <= 0);
+    homeBadge.setAttribute('aria-hidden', count <= 0 ? 'true' : 'false');
+  }
+  if (homeBtn) {
+    homeBtn.classList.toggle('has-unread', count > 0);
+    homeBtn.setAttribute('aria-label', count > 0 ? `Notifications, ${count} unread` : 'Notifications');
   }
   const legacyBadge = document.getElementById('statusNotifBadge');
   if (legacyBadge) {
@@ -1086,22 +1152,25 @@ function handlePushPayload(payload = {}) {
   const body = payload.notification?.body || data.body || '';
   const id = data.notificationId || data.reminderId || data.id || `push-${Date.now()}`;
   markPushStarred(id);
-  const rawType = String(data.type || '').toLowerCase();
+  const rawType = String(data.type || data.pushType || '').toLowerCase();
+  const channel = String(data.channel || '').toLowerCase();
   const kind =
-    rawType === 'sarah_reminder' || rawType === 'reminders' || rawType.includes('reminder')
+    rawType === 'sarah_reminder' || rawType === 'reminders' || rawType.includes('reminder') || channel === 'reminders'
       ? 'reminder'
-      : rawType === 'sarah_usage' || rawType.includes('usage')
-        ? 'usage'
-        : 'notification';
+      : rawType.includes('announcement') || channel === 'announcements'
+        ? 'announcement'
+        : rawType === 'sarah_usage' || rawType.includes('usage')
+          ? 'usage'
+          : 'notification';
   const prefs = { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
+  const org = data.orgName || data.organisationName || '';
   if (kind === 'reminder' && prefs.reminders !== false) {
-    tryOsPushAlert(title, body);
-    void import('./sna-reminders.mjs').then((m) =>
-      m.triggerServerReminderAlarm({ id, title, body: body || title })
-    );
+    void attentionForSubscriberNotif('reminder', { id, title, body: body || title, org });
+  } else if (kind === 'announcement' && prefs.announcements !== false) {
+    void attentionForSubscriberNotif('announcement', { id, title, body: body || title, org });
   } else if (kind === 'usage' && prefs.usageAlerts !== false) {
     tryOsPushAlert(title, body);
-  } else if (kind !== 'reminder' && kind !== 'usage' && prefs.orgNotifications !== false) {
+  } else if (kind === 'notification' && prefs.orgNotifications !== false) {
     tryOsPushAlert(title, body);
   }
   const extras = loadSnaInboxExtras();
@@ -1177,7 +1246,8 @@ function snaGroupLabel(ts) {
 
 function filterInboxRows(rows, tab) {
   if (tab === 'unread') return rows.filter((r) => r.unread);
-  if (tab === 'notifications') return rows.filter((r) => r.kind === 'notification' || r.kind === 'usage');
+  if (tab === 'notifications')
+    return rows.filter((r) => r.kind === 'notification' || r.kind === 'usage' || r.kind === 'announcement');
   if (tab === 'reminders') return rows.filter((r) => r.kind === 'reminder');
   if (tab === 'organisations') return rows.filter((r) => r.kind === 'notification' || r.kind === 'announcement');
   if (tab === 'work') return rows.filter((r) => r.kind === 'work');
@@ -1651,7 +1721,10 @@ function bindProtoSearchAndNotif() {
   window.__protoSearchNotifBound = true;
   bindThreadComposeMedia();
 
-  document.getElementById('homeChatSearchBtn')?.addEventListener('click', () => openProtoSearchSheet('chats'));
+  document.getElementById('homeNotifBtn')?.addEventListener('click', () => {
+    void refreshLiveNotifications();
+    openMyNotifications();
+  });
   document.getElementById('protoSearchInput')?.addEventListener('input', (e) => {
     renderProtoSearchResults(e.target.value.trim().toLowerCase());
   });
@@ -2210,13 +2283,8 @@ function parseHomeSubRoute(raw) {
   if (legacy === 'knowledge' || legacy === 'home/knowledge') {
     return { route: 'home', msPanel: 'knowledge', knowledgeCategory: null };
   }
-  if (
-    legacy === 'home/tasks' ||
-    legacy === 'home/work' ||
-    legacy === 'my-sarah/tasks' ||
-    legacy === 'my-sarah/work'
-  ) {
-    return { route: 'home', msPanel: 'home', workHome: true };
+  if (legacy === 'home/tasks' || legacy === 'home/work' || legacy === 'my-sarah/tasks' || legacy === 'my-sarah/work') {
+    return { route: 'home', msPanel: 'tasks' };
   }
   if (legacy === 'home' || legacy.startsWith('home/') || legacy === 'my-sarah' || legacy.startsWith('my-sarah/')) {
     const parts = legacy.split('/').filter(Boolean);
@@ -2327,9 +2395,11 @@ function renderThreadMessageMarkup(message, isPersonal, ctx = null) {
     isPersonal && Number.isFinite(Number(message.creditsUsed))
       ? `<p class="thread-credit-footnote" title="Credits metered for this Sarah reply">−${escapeHtml(formatSarahCredits(message.creditsUsed))} credits</p>`
       : '';
+  const recPanel = isPersonal && message.recommendationsUi ? renderRecommendationsUiMarkup(message.recommendationsUi) : '';
   return `<article class="thread-turn thread-turn--assistant">
     <div class="thread-msg thread-msg--assistant">
       <div class="thread-prose thread-prose--rich ${proseKind}">${body}</div>
+      ${recPanel}
       ${creditNote}
       ${retry}
     </div>
@@ -2386,10 +2456,7 @@ function clearLivePersonalSarahState() {
 }
 
 function mySarahHashForPanel(panel, opts = {}) {
-  if (panel === 'home') {
-    if (opts.workHome || msHomeCardMode() === 'work') return 'home/work';
-    return 'home';
-  }
+  if (panel === 'home') return 'home';
   if (panel === 'tasks') return 'home/work';
   if (panel === 'knowledge') {
     const cat = String(opts.knowledgeCategory || '').trim();
@@ -2409,40 +2476,7 @@ function msHomeCardMode() {
 }
 
 function setMsHomeCardMode(mode) {
-  const next = mode === 'work' ? 'work' : 'chat';
-  sessionStorage.setItem(MS_HOME_CARD_MODE_KEY, next);
-  const root = document.querySelector('.my-sarah-view');
-  if (root && (root.dataset.msPanel || 'home') === 'home') {
-    root.setAttribute('data-ms-mode', next);
-    syncMsSegment('home');
-  }
-  syncMySarahHomeWorkSurface();
-  if (next === 'chat') void renderSarahHomeIntelligence();
-}
-
-function syncMySarahHomeWorkSurface() {
-  const root = document.querySelector('.my-sarah-view');
-  const panel = root?.dataset.msPanel || 'home';
-  const work = msHomeCardMode() === 'work' && panel === 'home';
-  const chatZone = document.getElementById('msChatZone');
-  const workZone = document.getElementById('msWorkHomeZone');
-  const quickHost = document.getElementById('msQuickGrid');
-  if (root && panel === 'home') root.setAttribute('data-ms-mode', work ? 'work' : 'chat');
-  chatZone?.classList.toggle('hidden', work);
-  if (chatZone) chatZone.hidden = work;
-  workZone?.classList.toggle('hidden', !work);
-  if (workZone) workZone.hidden = !work;
-  if (work && quickHost) quickHost.innerHTML = '';
-  if (work) {
-    const compose = document.getElementById('personalChatForm');
-    const composeInput = document.getElementById('personalChatInput');
-    compose?.classList.remove('hidden');
-    if (composeInput) composeInput.placeholder = 'Tell Sarah what to do…';
-    void refreshWorkQuotaState().then(() => {
-      renderWorkQuotaBanner();
-      void renderSarahWorkHomeDashboard();
-    });
-  }
+  sessionStorage.setItem(MS_HOME_CARD_MODE_KEY, mode === 'work' ? 'work' : 'chat');
 }
 
 function msModeForPanel(panel) {
@@ -2484,7 +2518,7 @@ function syncMsSegment(panel) {
 function setMySarahPanel(panel, prompt) {
   const p = MY_SARAH_PANELS.includes(panel) ? panel : 'home';
   if (p === 'tasks') {
-    goToMySarahWorkHome(prompt || '');
+    showWorkTasksHub(prompt || '');
     return;
   }
   try {
@@ -2577,8 +2611,13 @@ function applyMySarahPanel(panel, prompt) {
   } else {
     hideNotificationDetail();
   }
-  if (panel === 'home') syncMySarahHomeWorkSurface();
-  if (panel === 'home') renderMsDrawerRecents();
+  if (panel === 'tasks') {
+    void refreshWorkQuotaState().then(() => {
+      renderWorkQuotaBanner();
+      void renderSarahWorkHomeDashboard();
+    });
+  }
+  if (panel === 'home' || panel === 'tasks') renderMsDrawerRecents();
 
   if (prompt && composeInput) {
     composeInput.value = prompt;
@@ -2598,38 +2637,26 @@ function getRoute() {
 
 function goToMySarahHome(prompt) {
   snaActiveTab = 'all';
-  setMsHomeCardMode('chat');
   setMySarahPanel('home', prompt || '');
-}
-
-function goToMySarahWorkHome(prompt = '') {
-  snaActiveTab = 'all';
-  try {
-    sessionStorage.setItem(MS_LAST_PANEL_KEY, 'home');
-  } catch {
-    /* ignore */
-  }
-  setMsHomeCardMode('work');
-  const hash = mySarahHashForPanel('home', { workHome: true });
-  if (location.hash.replace(/^#/, '') !== hash) {
-    location.hash = hash;
-  }
-  applyMySarahPanel('home', prompt || '');
 }
 
 const MS_LAST_PANEL_KEY = 'sarah.home.lastMsPanel';
 
 function showWorkTasksHub(prompt = '') {
-  goToMySarahWorkHome(prompt || '');
+  try {
+    sessionStorage.setItem(MS_LAST_PANEL_KEY, 'tasks');
+  } catch {
+    /* ignore */
+  }
+  const hash = mySarahHashForPanel('tasks');
+  if (location.hash.replace(/^#/, '') !== hash) {
+    location.hash = hash;
+  }
+  applyMySarahPanel('tasks', prompt || '');
 }
 
 function goToMySarahWork(prompt) {
-  goToMySarahWorkHome(prompt || '');
-  const composeInput = document.getElementById('personalChatInput');
-  if (composeInput && prompt) {
-    composeInput.value = prompt;
-    requestAnimationFrame(() => composeInput.focus({ preventScroll: true }));
-  }
+  showWorkTasksHub(prompt || '');
 }
 
 function showNav(show) {
@@ -3658,6 +3685,8 @@ function mapFederatedConversationToChatRow(c) {
   const companyId = c.companyId || '';
   const convId = c.id || '';
   const id = isBusiness ? companyId || convId : convId || companyId;
+  const rawLogo = c.logoUrl || c.avatarUrl || null;
+  const avatar = rawLogo ? resolveListingMediaUrl(rawLogo) : null;
   return {
     id,
     convId,
@@ -3666,7 +3695,8 @@ function mapFederatedConversationToChatRow(c) {
     preview: c.preview || c.lastMessagePreview || 'Tap to open',
     time: formatPersonalThreadTime(c.lastMessageAt) || '',
     online: false,
-    avatarKey: isBusiness ? guessCompanyAvatarKey(companyId, c.displayLabel) : null,
+    avatarKey: avatar ? null : isBusiness ? guessCompanyAvatarKey(companyId, c.displayLabel) : null,
+    avatar,
     company: isBusiness,
     snId: c.snId || null,
     api: true,
@@ -3736,8 +3766,33 @@ async function loadCompanyThreadFromApiIfNeeded() {
 
 let chatsListLoadGen = 0;
 let chatsListLastFetchAt = 0;
-const CHATS_LIST_FETCH_MIN_MS = 30_000;
+const CHATS_LIST_FETCH_MIN_MS = 45_000;
+const CHATS_LIST_SESSION_KEY = 'sarah.chats.list.cache.v1';
+/** @type {object[]|null} */
+let chatsListMemoryCache = null;
 let chatsTabSearchDebounceTimer = null;
+
+function loadChatsListSessionCache() {
+  if (chatsListMemoryCache?.length) return chatsListMemoryCache;
+  try {
+    const raw = sessionStorage.getItem(CHATS_LIST_SESSION_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveChatsListSessionCache(chats) {
+  if (!Array.isArray(chats)) return;
+  chatsListMemoryCache = chats;
+  try {
+    sessionStorage.setItem(CHATS_LIST_SESSION_KEY, JSON.stringify(chats.slice(0, 80)));
+  } catch {
+    /* ignore */
+  }
+}
 /** Discover businesses matching the Chats tab query (for starting new Company Sarah threads). */
 const chatsTabOrgSearch = { query: '', loading: false, companies: [] };
 
@@ -4040,7 +4095,7 @@ async function syncPersonalSarahSessionsFromServer({ force = false, silent = fal
   renderMsDrawerRecents();
   renderMySarahHistoryFromThreads();
   const msPanel = document.querySelector('.my-sarah-view')?.dataset.msPanel;
-  if (msPanel === 'home' && msHomeCardMode() === 'work') void renderSarahWorkHomeDashboard();
+  if (msPanel === 'tasks') void renderSarahWorkHomeDashboard();
 }
 
 async function loadPersonalThreadFromServer(threadId) {
@@ -4073,7 +4128,7 @@ function pushPersonalUserMessage(threadId, text) {
   return true;
 }
 
-function pushPersonalAssistantReply(threadId, markdown, creditsMeta) {
+function pushPersonalAssistantReply(threadId, markdown, creditsMeta, recommendationsUi) {
   const rt = getSarahRuntime();
   const thread = rt.threads[threadId];
   if (!thread) return;
@@ -4082,7 +4137,60 @@ function pushPersonalAssistantReply(threadId, markdown, creditsMeta) {
     msg.creditsUsed = Number(creditsMeta.credits);
     msg.creditArchetype = creditsMeta.archetype || null;
   }
+  if (recommendationsUi && typeof recommendationsUi === 'object') {
+    msg.recommendationsUi = recommendationsUi;
+  }
   thread.messages.push(msg);
+}
+
+function discoverHashFromProfileUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return null;
+  const m = raw.match(/\/discover\/([^/?#]+)/i) || raw.match(/^discover\/([^/?#]+)/i);
+  return m ? m[1] : null;
+}
+
+function renderRecommendationsUiMarkup(ui) {
+  if (!ui || typeof ui !== 'object') return '';
+  const organic = Array.isArray(ui.organic) ? ui.organic : [];
+  const sponsored = Array.isArray(ui.sponsored) ? ui.sponsored : [];
+  if (!organic.length && !sponsored.length) return '';
+  const disc = ui.disclosure || {};
+  const head = disc.headline ? `<p class="rec-disclosure-head"><strong>${escapeHtml(disc.headline)}</strong></p>` : '';
+  const body = disc.body ? `<p class="rec-disclosure-body">${escapeHtml(disc.body)}</p>` : '';
+
+  const card = (item, sponsoredRow) => {
+    const sn = discoverHashFromProfileUrl(item.discoverProfileUrl);
+    const link = sn
+      ? `<button type="button" class="rec-card-link" data-rec-discover="${escapeHtml(sn)}">View on Discover</button>`
+      : '';
+    const badge = sponsoredRow
+      ? `<span class="rec-badge rec-badge--sponsored" title="Paid visibility — not an endorsement">${escapeHtml(item.disclosureLabel || 'Sponsored')}</span>`
+      : `<span class="rec-badge rec-badge--organic">Match</span>`;
+  const reason = item.reason ? `<p class="rec-card-reason">${escapeHtml(item.reason)}</p>` : '';
+    return `<li class="rec-card${sponsoredRow ? ' rec-card--sponsored' : ''}">
+      <div class="rec-card-top">
+        <span class="rec-card-name">${escapeHtml(item.displayName || 'Offering')}</span>
+        ${badge}
+      </div>
+      ${reason}
+      ${link}
+    </li>`;
+  };
+
+  const organicList = organic.length
+    ? `<section class="rec-section" aria-label="Organic recommendations"><h4 class="rec-section-title">Relevant options</h4><ul class="rec-card-list">${organic.map((o) => card(o, false)).join('')}</ul></section>`
+    : '';
+  const sponsoredList = sponsored.length
+    ? `<section class="rec-section" aria-label="Sponsored recommendations"><h4 class="rec-section-title">Sponsored</h4><ul class="rec-card-list">${sponsored.map((o) => card(o, true)).join('')}</ul></section>`
+    : '';
+
+  return `<aside class="rec-disclosure-panel" role="complementary" data-request-id="${escapeHtml(ui.requestId || '')}">
+    ${head}
+    ${body}
+    ${organicList}
+    ${sponsoredList}
+  </aside>`;
 }
 
 function removeThinkingBubble(threadId) {
@@ -4358,7 +4466,7 @@ async function deliverPersonalSarahMessage(text, opts) {
         showProtoToast(res.error);
       }
     } else {
-      pushPersonalAssistantReply(threadId, res.reply, res.creditsLast);
+      pushPersonalAssistantReply(threadId, res.reply, res.creditsLast, res.recommendationsUi);
       const rt = getSarahRuntime();
       const thread = rt.threads[threadId];
       if (thread) thread.lastMessageAt = Date.now();
@@ -6052,6 +6160,15 @@ async function renderChatsList() {
   const gen = ++chatsListLoadGen;
 
   let chats = getAllChats();
+  if (!q && consumerChatLiveActive()) {
+    const cached = loadChatsListSessionCache();
+    if (cached.length && !host.querySelector('.chat-row')) {
+      host.innerHTML = cached.map((c) => renderChatRowHtml(c)).join('');
+      bindChatsListInteractions(host);
+    } else if (!host.querySelector('.chat-row')) {
+      host.innerHTML = '<p class="chats-list-hint">Loading your conversations…</p>';
+    }
+  }
   if (consumerChatLiveActive()) {
     const searchApi = q.length >= 2 && window.SarahLive?.searchChatThreads;
   const res =
@@ -6063,6 +6180,7 @@ async function renderChatsList() {
     const conversations = payload.conversations;
     if (!res.error && Array.isArray(conversations) && (searchApi || conversations.length)) {
       chats = conversations.map(mapFederatedConversationToChatRow);
+      if (!q) saveChatsListSessionCache(chats);
     }
   }
 
@@ -10068,13 +10186,20 @@ function bindMySarahInteractions() {
   document.querySelectorAll('.ms-segment-btn[data-ms-mode]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const mode = btn.dataset.msMode || 'chat';
+      const panel = document.querySelector('.my-sarah-view')?.dataset.msPanel || 'home';
       if (mode === 'work') {
-        goToMySarahWorkHome();
+        setMsHomeCardMode('work');
+        if (panel !== 'tasks') showWorkTasksHub('');
+        else syncMsSegment('tasks');
         return;
       }
-      goToMySarahHome();
-      syncMsSegment('home');
-      void renderSarahHomeIntelligence();
+      setMsHomeCardMode('chat');
+      if (panel === 'tasks' || panel === 'home') {
+        setMySarahPanel('home');
+        void renderSarahHomeIntelligence();
+      } else {
+        syncMsSegment(panel);
+      }
     });
   });
 
@@ -10087,11 +10212,6 @@ function bindMySarahInteractions() {
     if (goChat && goChat.classList.contains('ms-link-btn')) {
       setMySarahPanel('home');
     }
-    const goChatHome = e.target.closest('[data-ms-go-chat-home]');
-    if (goChatHome) {
-      goToMySarahHome();
-      return;
-    }
     const workPrompt = e.target.closest('[data-ms-work-prompt]');
     if (workPrompt) {
       goToMySarahWork(workPrompt.getAttribute('data-ms-work-prompt') || '');
@@ -10103,7 +10223,7 @@ function renderMySarahHistoryFromThreads() {
   const historyHost = document.getElementById('msHistoryList');
   if (!historyHost || personalSarahUsesMockThreads()) return;
   const msPanel = document.querySelector('.my-sarah-view')?.dataset.msPanel;
-  if (msPanel === 'tasks' || (msPanel === 'home' && msHomeCardMode() === 'work')) return;
+  if (msPanel === 'tasks') return;
   const threads = listPersonalThreads().slice(0, 8);
   if (!threads.length) {
     historyHost.innerHTML = '<p class="ms-thread-empty" style="padding:8px 12px">No chats yet — start a conversation below.</p>';
@@ -10693,8 +10813,9 @@ async function activateSarahHomeCard(card) {
   const message = homeCardLaunchMessage(card);
 
   if (action?.type === 'mode' && action.mode === 'work') {
-    goToMySarahWorkHome();
-    return;
+    setMsHomeCardMode('work');
+    syncMsSegment('home');
+    void renderSarahHomeIntelligence();
   }
 
   if (action?.type === 'thread' && action.sessionId) {
@@ -10808,9 +10929,6 @@ function bindHomeCardClicks(host) {
   });
 }
 
-let sarahHomeCardsCache = null;
-let sarahHomeCardsCacheKey = '';
-
 async function renderSarahHomeIntelligence() {
   const quickHost = document.getElementById('msQuickGrid');
   const moreHost = document.getElementById('msHomeMore');
@@ -10818,7 +10936,6 @@ async function renderSarahHomeIntelligence() {
   const staticBox = document.getElementById('msHomeStaticPref');
   const greetingEl = document.querySelector('.ms-greeting-bubble');
   if (!quickHost) return;
-  if (msHomeCardMode() === 'work') return;
 
   let cards = MOCK_MY_SARAH_QUICK;
   let moreCards = [];
@@ -10830,24 +10947,15 @@ async function renderSarahHomeIntelligence() {
   const prefs = readLocalSarahHomePrefs();
   if (staticBox) staticBox.checked = Boolean(prefs.staticHome);
 
-  const cacheKey = `${mode}:${Boolean(prefs.staticHome)}:${(prefs.dismissed || []).join(',')}:${live ? 'live' : 'mock'}`;
-  if (sarahHomeCardsCache && sarahHomeCardsCacheKey === cacheKey) {
-    cards = sarahHomeCardsCache.cards;
-    moreCards = sarahHomeCardsCache.moreCards;
-    greeting = sarahHomeCardsCache.greeting;
-  } else if (live) {
+  if (live) {
     const res = await window.SarahLive.fetchSarahHomeCards(mode);
     if (!res.error) {
       moreCards = res.moreCards || [];
       greeting = res.greeting;
       cards = selectHomeCardsForGrid(res.cards || [], moreCards, prefs, mode);
-      sarahHomeCardsCache = { cards, moreCards, greeting };
-      sarahHomeCardsCacheKey = cacheKey;
     }
   } else {
     cards = selectHomeCardsForGrid(MOCK_MY_SARAH_QUICK, MOCK_MY_SARAH_QUICK_EXTRA, prefs, mode);
-    sarahHomeCardsCache = { cards, moreCards, greeting };
-    sarahHomeCardsCacheKey = cacheKey;
   }
 
   const liveProfile = window.SarahLive?.getConsumerProfile?.();
@@ -11424,11 +11532,7 @@ function renderMySarahPage() {
     renderMySarahHistoryFromThreads();
   }
 
-  if (msHomeCardMode() === 'work' && (document.querySelector('.my-sarah-view')?.dataset.msPanel || 'home') === 'home') {
-    syncMySarahHomeWorkSurface();
-  } else {
-    void renderSarahHomeIntelligence();
-  }
+  void renderSarahHomeIntelligence();
 
   renderMySarahBilling();
   renderMsDrawerRecents();
@@ -11503,6 +11607,13 @@ function renderThread() {
       await deliverPersonalSarahMessage(retryText, { threadId: rt.activeThreadId, work: ctx.work, retry: true });
     });
   });
+  log.querySelectorAll('[data-rec-discover]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const sn = btn.getAttribute('data-rec-discover') || '';
+      if (!sn) return;
+      location.hash = `discover-company/${encodeURIComponent(sn)}`;
+    });
+  });
   requestAnimationFrame(() => {
     log.scrollTop = log.scrollHeight;
   });
@@ -11511,8 +11622,7 @@ function renderThread() {
 }
 
 function activateView() {
-  const parsed = parseLocationHash();
-  const { route, msPanel } = parsed;
+  const { route, msPanel } = parseLocationHash();
 
   document.querySelectorAll('.view').forEach((v) => {
     v.classList.toggle('is-active', v.dataset.view === route);
@@ -11532,14 +11642,9 @@ function activateView() {
 
   if (route === 'chats') renderChatsList();
   if (route === 'home') {
-    if (parsed.workHome) setMsHomeCardMode('work');
-    else if (parsed.msPanel === 'home') {
-      const raw = (location.hash || '#').replace(/^#/, '');
-      if (raw === 'home' || raw === 'my-sarah') setMsHomeCardMode('chat');
-    }
     syncUserAvatars();
-    applyMySarahPanel(parsed.workHome ? 'home' : msPanel);
     renderMySarahPage();
+    applyMySarahPanel(msPanel);
     updatePersonalSarahLiveUi();
     if (personalSarahLiveActive()) syncPersonalSarahSessionsFromServer({ silent: true });
   }
@@ -13007,10 +13112,14 @@ function renderCompanyDetail(companyId) {
   const productsHtml = products
     .map((p) => {
       const liked = isProductLiked(company.id, p.id);
+      const promoBadge = p.promotion
+        ? `<span class="product-card-promo">${escapeHtml(p.promotion)}</span>`
+        : '';
       return `
       <article class="product-card">
         <div class="product-card-media">
-          <img ${discoverImgAttrs(p.image || company.image, company)} />
+          ${promoBadge}
+          <img ${discoverImgAttrs(p.image || p.imageUrl || company.image, company)} />
         </div>
         <h3 class="product-card-title">${escapeHtml(p.name)}</h3>
         ${p.description ? `<p class="product-card-desc">${escapeHtml(p.description)}</p>` : ''}
@@ -13436,7 +13545,7 @@ function init() {
           /* ignore */
         }
         if (panel === 'tasks') {
-          goToMySarahWorkHome();
+          showWorkTasksHub('');
           return;
         }
       }
@@ -13450,9 +13559,8 @@ function init() {
     const text = input?.value.trim();
     if (!text && !personalComposePending.items.length) return;
     const panel = document.querySelector('.my-sarah-view')?.dataset.msPanel || 'home';
-    const workCompose = panel === 'tasks' || (panel === 'home' && msHomeCardMode() === 'work');
     const threadId = await deliverPersonalSarahMessage(text, {
-      work: workCompose,
+      work: panel === 'tasks',
       fromHomeCompose: panel === 'home',
     });
     if (input) input.value = '';

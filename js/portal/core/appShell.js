@@ -49,7 +49,7 @@ export const NAV_SECTIONS = [
       { id: 'analytics', label: 'Analytics', icon: 'fa-chart-line' },
       { id: 'statusPosts', label: 'Sarah Status', icon: 'fa-bullhorn' },
       { id: 'discoverProfile', label: 'Discover profile', icon: 'fa-compass' },
-      { id: 'marketplace', label: 'Marketplace', icon: 'fa-store' },
+      { id: 'marketplace', label: 'Discover products', icon: 'fa-store' },
       { id: 'recommendations', label: 'Sarah Recommendations', icon: 'fa-bullseye' },
     ],
   },
