@@ -10,6 +10,7 @@ export const campaignsCol = createNetworkCollection(RECOMMENDATION_COLLECTIONS.C
 export const campaignUsageCol = createNetworkCollection(RECOMMENDATION_COLLECTIONS.CAMPAIGN_USAGE_PERIODS);
 export const attributionCol = createNetworkCollection(RECOMMENDATION_COLLECTIONS.ATTRIBUTION_EVENTS);
 export const recommendationRequestsCol = createNetworkCollection(RECOMMENDATION_COLLECTIONS.RECOMMENDATION_REQUESTS);
+export const presentationsCol = createNetworkCollection(RECOMMENDATION_COLLECTIONS.PRESENTATION_EVENTS);
 
 export function clearRecommendationStoreForTests() {
     offeringsCol.clearMemory();
@@ -18,4 +19,5 @@ export function clearRecommendationStoreForTests() {
     campaignUsageCol.clearMemory();
     attributionCol.clearMemory();
     recommendationRequestsCol.clearMemory();
+    presentationsCol.clearMemory();
 }

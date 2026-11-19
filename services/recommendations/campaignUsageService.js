@@ -42,3 +42,35 @@ export async function getCampaignUsage(campaignId) {
     const raw = await campaignUsageCol.get(periodId);
     return raw ? strip(raw) : null;
 }
+
+/**
+ * Idempotent debit — returns { debited: false } when already consumed for this event key.
+ * @param {string} campaignId
+ * @param {string} idempotencyKey
+ */
+export async function consumePresentationAllowance(campaignId, idempotencyKey) {
+    const periodId = usagePeriodId(campaignId);
+    const raw = await campaignUsageCol.get(periodId);
+    if (!raw) {
+        return { debited: false, reason: "no_usage_period" };
+    }
+    const cur = strip(raw);
+    const keys = new Set(cur.idempotencyKeys || []);
+    if (keys.has(idempotencyKey)) {
+        return { debited: false, duplicate: true, remainingPresentations: cur.remainingPresentations };
+    }
+    if (cur.remainingPresentations <= 0) {
+        return { debited: false, reason: "exhausted", remainingPresentations: 0 };
+    }
+    const now = new Date().toISOString();
+    const next = {
+        ...cur,
+        usedPresentations: cur.usedPresentations + 1,
+        remainingPresentations: cur.remainingPresentations - 1,
+        lastEventAt: now,
+        idempotencyKeys: [...keys, idempotencyKey],
+        exhaustedAt: cur.remainingPresentations - 1 <= 0 ? now : cur.exhaustedAt,
+    };
+    await campaignUsageCol.put(periodId, next, { merge: false });
+    return { debited: true, remainingPresentations: next.remainingPresentations, exhausted: next.remainingPresentations <= 0 };
+}

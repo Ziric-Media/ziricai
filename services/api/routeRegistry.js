@@ -224,6 +224,7 @@ export const ROUTE_CATALOG = [
 
     // REC-05 — Sarah Recommendations query (consumer)
     { method: "POST", path: "/api/recommendations/v1/query", domain: "consumer", tenantScoped: false, description: "REC query engine — organic + sponsored shortlist" },
+    { method: "POST", path: "/api/recommendations/v1/presentations", domain: "consumer", tenantScoped: false, description: "Record qualified sponsored presentation (idempotent)" },
 
     // REC-02 — Sarah Recommendations offerings + verification
     { method: "GET", path: "/api/companies/:companyId/recommendations/offerings", domain: "tenant", tenantScoped: true, description: "List recommendation offerings (RS09 catalogue)" },

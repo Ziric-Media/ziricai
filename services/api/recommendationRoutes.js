@@ -5,6 +5,7 @@ import express from "express";
 import { requireConsumerScope } from "../auth/consumerAuth.js";
 import { PLATFORM_PERMISSIONS as P, requirePlatformPermission } from "../auth/platformRbac.js";
 import { queryRecommendations } from "../recommendations/queryService.js";
+import { recordSponsoredPresentation } from "../recommendations/presentationService.js";
 import { defaultAuthorize } from "./networkListingRoutes.js";
 import { isRecOfferingsApiEnabled } from "../recommendations/recommendationConfig.js";
 import {
@@ -69,6 +70,27 @@ export function mountRecommendationRoutes(app, deps = {}) {
     const guardRead = deps.platformGuard || requirePlatformPermission(P.VERIFICATION_READ);
     const guardDecide = deps.platformGuard || requirePlatformPermission(P.VERIFICATION_DECIDE);
     const consumerGuard = deps.consumerGuard || requireConsumerScope();
+
+    app.post("/api/recommendations/v1/presentations", consumerGuard, async (req, res) => {
+        try {
+            const uid = req.consumer?.uid || req.auth?.uid || null;
+            const body = req.body || {};
+            if (!body.disclosureShown) {
+                return res.status(422).json({
+                    ok: false,
+                    error: { code: "DISCLOSURE_REQUIRED", message: "disclosureShown must be true" },
+                });
+            }
+            const record = await recordSponsoredPresentation({
+                ...body,
+                consumerUid: uid,
+                surface: body.surface || "personal_sarah",
+            });
+            res.status(record.duplicate ? 200 : 201).json({ ok: true, data: record });
+        } catch (err) {
+            fail(res, err, "PRESENTATION_RECORD_FAILED");
+        }
+    });
 
     app.post("/api/recommendations/v1/query", consumerGuard, async (req, res) => {
         try {
