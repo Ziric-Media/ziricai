@@ -93,7 +93,7 @@ export async function handlePersonalSarahChat(auth, input) {
     let round = 0;
     let currentMessages = [...messages];
 
-    while (round < 3) {
+    while (round < 5) {
         const response = await openai.chat.completions.create({
             model: process.env.OPENAI_MODEL || "gpt-4o-mini",
             messages: currentMessages,

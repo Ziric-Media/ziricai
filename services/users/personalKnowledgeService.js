@@ -2,6 +2,7 @@
  * U3 — My Knowledge sections (personalKnowledge/{uid}/sections/{sectionKey}).
  */
 import { getConfiguredStorageBackend } from "../storage/storageAdapter.js";
+import { buildSarahBehaviorPromptBlock, normalizeSarahBehavior } from "../sarah/personal/sarahBehaviorOptions.js";
 import {
     getDoc,
     setDoc,
@@ -136,14 +137,53 @@ export async function upsertKnowledgeSection(uid, sectionKey, patch = {}) {
 /**
  * Text for Personal Sarah system prompt (authorized sections only).
  */
+export function parsePersonalProfilePayload(content) {
+    const raw = String(content || "").trim();
+    if (!raw) return { fields: {}, sarahBehavior: {} };
+    try {
+        const j = JSON.parse(raw);
+        if (j && typeof j === "object" && !Array.isArray(j)) {
+            const { sarahBehavior, ...fields } = j;
+            return {
+                fields,
+                sarahBehavior: normalizeSarahBehavior(sarahBehavior || {}),
+            };
+        }
+    } catch {
+        /* plain text legacy */
+    }
+    return { fields: { narrative: raw }, sarahBehavior: {} };
+}
+
+export async function getSarahBehaviorForUser(uid) {
+    const sec = await getKnowledgeSection(uid, "personal_profile").catch(() => null);
+    if (!sec?.sarahMayUse) return null;
+    const { sarahBehavior } = parsePersonalProfilePayload(sec.content);
+    const block = buildSarahBehaviorPromptBlock(sarahBehavior);
+    return block || null;
+}
+
 export async function buildPersonalKnowledgeDigest(uid, maxChars = 4000) {
     const sections = await listKnowledgeSections(uid);
     const parts = [];
     let used = 0;
+    const behavior = await getSarahBehaviorForUser(uid);
+    if (behavior) {
+        parts.push(behavior);
+        used += behavior.length + 2;
+    }
     for (const sec of sections) {
         if (!sec.sarahMayUse) continue;
-        const body = String(sec.content || "").trim();
+        let body = String(sec.content || "").trim();
         if (!body) continue;
+        if (sec.sectionKey === "personal_profile") {
+            const { fields } = parsePersonalProfilePayload(body);
+            body = Object.entries(fields)
+                .filter(([, v]) => v != null && String(v).trim())
+                .map(([k, v]) => `${k}: ${String(v).slice(0, 400)}`)
+                .join("\n");
+            if (!body) continue;
+        }
         const block = `[${sec.label}]\n${body.slice(0, 800)}`;
         if (used + block.length > maxChars) break;
         parts.push(block);
