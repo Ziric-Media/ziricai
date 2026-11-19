@@ -104,7 +104,7 @@ export function renderConversationAvatar(conversation, { className = 'inbox-item
   const initial = escapeHtml(name.charAt(0).toUpperCase());
   const label = escapeHtml(name);
   if (photo) {
-    return `<div class="${escapeHtml(className)} has-photo is-${size}" aria-hidden="true"><img src="${escapeHtml(photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" /></div>`;
+    return `<div class="${escapeHtml(className)} has-photo is-${size}" data-fallback-initial="${initial}" aria-hidden="true"><img src="${escapeHtml(photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-consumer-avatar-img /></div>`;
   }
   return `<div class="${escapeHtml(className)} is-${size}" aria-hidden="true" title="${label}">${initial}</div>`;
 }
@@ -426,6 +426,20 @@ export function renderInboxPage({ metrics, layoutHtml, unreadCount }) {
       ${layoutHtml}
     </div>
   `;
+}
+
+export function bindConsumerAvatarFallbacks(container) {
+  container.querySelectorAll('[data-consumer-avatar-img]').forEach((img) => {
+    if (img.dataset.bound === '1') return;
+    img.dataset.bound = '1';
+    img.addEventListener('error', () => {
+      const wrap = img.closest('[data-fallback-initial]');
+      if (!wrap) return;
+      wrap.classList.remove('has-photo');
+      img.remove();
+      wrap.textContent = wrap.getAttribute('data-fallback-initial') || '?';
+    });
+  });
 }
 
 export function scrollThreadToBottom(container) {

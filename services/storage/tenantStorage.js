@@ -8,6 +8,7 @@ import { TENANT_COLLECTIONS } from "../database/schema.js";
 import { normalizePhone } from "../customerService.js";
 import { isLikelyCompanyName } from "../customerIdentity.js";
 import { getDurableCustomer, upsertDurableCustomer } from "../database/customerRepository.js";
+import { resolveConsumerPhotoUrl } from "../users/consumerAvatarService.js";
 
 const customersRepo = new TenantRepository(TENANT_COLLECTIONS.CUSTOMERS);
 const conversationsRepo = new TenantRepository(TENANT_COLLECTIONS.CONVERSATIONS);
@@ -41,7 +42,7 @@ export function resolveSarahAppCustomerId(uid) {
     return `sarah_app::${safe || "anonymous"}`;
 }
 
-function resolveCustomerIdForChannel(phone, channel, options = {}) {
+export function resolveCustomerIdForChannel(phone, channel, options = {}) {
     if (channel === "sarah_app") {
         return resolveSarahAppCustomerId(options.externalUserId || phone);
     }
@@ -50,6 +51,11 @@ function resolveCustomerIdForChannel(phone, channel, options = {}) {
 
 /** Single canonical tenant conversation document id (e.g. whatsapp::27849000523). */
 export function resolveCanonicalConversationId(conversationIdOrPhone, channel = "whatsapp") {
+    if (channel === "sarah_app") {
+        const uid = String(conversationIdOrPhone || "").trim();
+        if (!uid) return conversationIdOrPhone;
+        return conversationDocId(resolveSarahAppCustomerId(uid), channel);
+    }
     const phone = normalizePhone(conversationIdOrPhone);
     if (!phone) return conversationIdOrPhone;
     return conversationDocId(phone, channel);
@@ -160,9 +166,13 @@ export async function getOrCreateConversation(companyId, phone, channel = "whats
     );
 }
 
-export async function getTenantConversation(companyId, phone, channel = "whatsapp") {
+export async function getTenantConversation(companyId, phone, channel = "whatsapp", options = {}) {
     assertCompanyId(companyId);
-    const conversationId = conversationDocId(customerDocId(phone), channel);
+    const customerId = resolveCustomerIdForChannel(phone, channel, {
+        externalUserId: options.externalUserId || phone,
+        ...options,
+    });
+    const conversationId = conversationDocId(customerId, channel);
     return conversationsRepo.get(companyId, conversationId);
 }
 
@@ -245,6 +255,21 @@ export async function saveTenantMessage(companyId, phone, role, content, options
     }
 
     if (channel === "sarah_app") {
+        const photoUrl =
+            existingCustomer.consumerPhotoUrl ||
+            existingCustomer.avatarUrl ||
+            (await resolveConsumerPhotoUrl({
+                channel,
+                customerId,
+                phone,
+                id: conversationId,
+                companyId,
+                externalUserId: options.externalUserId || phone,
+            }));
+        if (photoUrl) {
+            customerPatch.consumerPhotoUrl = photoUrl;
+            customerPatch.avatarUrl = photoUrl;
+        }
         await customersRepo.set(companyId, customerId, {
             ...existingCustomer,
             ...customerPatch,
@@ -255,6 +280,12 @@ export async function saveTenantMessage(companyId, phone, role, content, options
             updatedAt: now(),
             createdAt: existingCustomer.createdAt || now(),
         });
+        if (photoUrl) {
+            await conversationsRepo.update(companyId, conversationId, {
+                customerPhotoUrl: photoUrl,
+                channel: "sarah_app",
+            });
+        }
     } else {
         await upsertTenantCustomer(companyId, phone, customerPatch);
     }

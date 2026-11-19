@@ -23,16 +23,15 @@ import { mapMessageForInboxApi } from "../conversation/inboxMessageContract.js";
 import { buildSlimInboxContext } from "../conversation/inboxContext.js";
 import {
     findConversationInList,
+    inferChannelFromConversationId,
     resolveListedChannel,
     resolveTenantConversationRef,
-    resolveSarahAppUidFromRef,
 } from "../conversation/tenantConversationRef.js";
 import { mirrorSarahAppHumanReplyToConsumer } from "../users/sarahAppConsumerMirrorService.js";
 import { openUserConversation, getUserConversationByCompany } from "../users/userConversationService.js";
 import { toIsoTimestamp } from "../core/timestampUtils.js";
 import { ownershipStateFromTakeover } from "../users/handoverStateService.js";
-import { getConsumerProfile } from "../users/consumerProfileService.js";
-import { getUserProfile } from "../auth/authService.js";
+import { resolveConsumerPhotoUrl } from "../users/consumerAvatarService.js";
 
 const CHANNEL_LABELS = {
     whatsapp: "WhatsApp",
@@ -101,24 +100,6 @@ function findListedConversation(convList, conversationId, phone) {
         );
 }
 
-async function resolveConsumerPhotoUrl(conv) {
-    const channel = conv.channel || "whatsapp";
-    if (channel !== "sarah_app") {
-        return conv.customerPhotoUrl || conv.avatarUrl || conv.photoURL || null;
-    }
-    if (conv.customerPhotoUrl || conv.avatarUrl || conv.photoURL) {
-        return conv.customerPhotoUrl || conv.avatarUrl || conv.photoURL;
-    }
-    const uid = resolveSarahAppUidFromRef(conv.customerId || conv.phone || conv.id);
-    if (!uid) return null;
-    try {
-        const [consumer, global] = await Promise.all([getConsumerProfile(uid), getUserProfile(uid)]);
-        return consumer?.photoURL || consumer?.photoUrl || global?.photoURL || null;
-    } catch {
-        return null;
-    }
-}
-
 async function attachConsumerPhotos(rows) {
     await Promise.all(
         rows.map(async (row) => {
@@ -130,7 +111,8 @@ async function attachConsumerPhotos(rows) {
 }
 
 function mapConversationRow(conv, companyId) {
-    const channel = conv.channel || "whatsapp";
+    const inferredChannel = inferChannelFromConversationId(conv.conversationId || conv.id);
+    const channel = conv.channel || inferredChannel || "whatsapp";
     const phone = conv.customerId || conv.phone || resolvePhoneFromConversationRef(conv.id);
     const id = conv.conversationId || conv.id || resolveCanonicalConversationId(phone, channel);
     return {
@@ -139,6 +121,7 @@ function mapConversationRow(conv, companyId) {
         customerName: conv.customerName || conv.name || phone || "Unknown",
         name: conv.name || conv.customerName,
         customerPhotoUrl: conv.customerPhotoUrl || conv.avatarUrl || conv.photoURL || null,
+        externalUserId: conv.externalUserId || null,
         lastMessage: conv.lastMessage || conv.preview || "",
         preview: conv.preview || conv.lastMessage || "",
         status: conv.status || "in_progress",

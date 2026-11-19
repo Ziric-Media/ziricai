@@ -24,6 +24,7 @@ import {
   scrollThreadToBottom,
   setActiveFilterButton,
   conversationPhone,
+  bindConsumerAvatarFallbacks,
 } from './inbox-ui.js';
 import {
   renderSalesShell,
@@ -178,6 +179,7 @@ export async function renderConversations(container) {
     });
     bindSalesNav(container, onSection);
     bindEvents(filtered);
+    bindConsumerAvatarFallbacks(container);
     if (!threadLoading && selected && !threadError) {
       scrollThreadToBottom(container);
     }
