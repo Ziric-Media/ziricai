@@ -22,9 +22,24 @@ export const KNOWLEDGE_SECTION_KEYS = [
     "lifestyle",
     "important_dates",
     "goals",
+    /* Sarah App My Knowledge categories (MK-02) */
+    "business",
+    "routines",
+    "property",
+    "travel",
+    "values",
 ];
 
+const EXTRA_SECTION_META = {
+    business: { label: "Business & entrepreneurship", classification: "medium", defaultSarahMayUse: true },
+    routines: { label: "Routines & daily life", classification: "medium", defaultSarahMayUse: true },
+    property: { label: "Property & assets", classification: "medium", defaultSarahMayUse: true },
+    travel: { label: "Travel & places", classification: "low", defaultSarahMayUse: true },
+    values: { label: "Values & principles", classification: "high", defaultSarahMayUse: false },
+};
+
 export const KNOWLEDGE_SECTION_META = {
+    ...EXTRA_SECTION_META,
     personal_profile: { label: "Personal profile", classification: "medium", defaultSarahMayUse: true },
     family: { label: "Family", classification: "high", defaultSarahMayUse: false },
     education: { label: "Education", classification: "medium", defaultSarahMayUse: true },
@@ -163,6 +178,93 @@ export async function getSarahBehaviorForUser(uid) {
     return block || null;
 }
 
+const FIELD_LABEL_OVERRIDES = {
+    preferredName: "Preferred name",
+    fullName: "Full name",
+    maritalStatus: "Marital status",
+    hasChildren: "Has children",
+    childrenCount: "Number of children",
+    musicTastes: "Music tastes",
+    sportsTeams: "Sports teams supported",
+    socialStyle: "Social style",
+    closeFriends: "Close friends",
+    usualHangouts: "Usual hangouts",
+    homeRegion: "Home region",
+    employmentStatus: "Employment status",
+    primaryCurrency: "Primary currency",
+    contactFrequency: "Contact frequency",
+    livesWith: "Where they live",
+};
+
+function humanizeFieldKey(key) {
+    if (FIELD_LABEL_OVERRIDES[key]) return FIELD_LABEL_OVERRIDES[key];
+    return String(key || "")
+        .replace(/([A-Z])/g, " $1")
+        .replace(/_/g, " ")
+        .trim()
+        .replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function flattenKnowledgeData(value, prefix = "") {
+    const lines = [];
+    if (value == null) return lines;
+    if (Array.isArray(value)) {
+        if (!value.length) return lines;
+        lines.push(`${prefix || "items"}: ${value.length} entries`);
+        value.slice(0, 8).forEach((row, i) => {
+            if (row && typeof row === "object") {
+                const summary = Object.entries(row)
+                    .filter(([, v]) => v != null && String(v).trim())
+                    .slice(0, 6)
+                    .map(([k, v]) => `${humanizeFieldKey(k)}: ${String(v).slice(0, 120)}`)
+                    .join("; ");
+                if (summary) lines.push(`- ${prefix ? `${prefix} ` : ""}#${i + 1}: ${summary}`);
+            } else if (row != null && String(row).trim()) {
+                lines.push(`- ${String(row).slice(0, 200)}`);
+            }
+        });
+        return lines;
+    }
+    if (typeof value === "object") {
+        for (const [k, v] of Object.entries(value)) {
+            if (v == null || (typeof v === "string" && !v.trim())) continue;
+            if (typeof v === "object") {
+                lines.push(...flattenKnowledgeData(v, humanizeFieldKey(k)));
+            } else {
+                lines.push(`${humanizeFieldKey(k)}: ${String(v).slice(0, 400)}`);
+            }
+        }
+        return lines;
+    }
+    lines.push(`${prefix ? `${prefix}: ` : ""}${String(value).slice(0, 400)}`);
+    return lines;
+}
+
+export function formatKnowledgeSectionForPrompt(sec) {
+    let body = String(sec?.content || "").trim();
+    if (!body) return "";
+    if (sec.sectionKey === "personal_profile") {
+        const { fields } = parsePersonalProfilePayload(body);
+        const lines = flattenKnowledgeData(fields);
+        return lines.length ? lines.join("\n") : "";
+    }
+    try {
+        const parsed = JSON.parse(body);
+        if (parsed && typeof parsed === "object") {
+            const payload = parsed.data != null ? parsed.data : parsed;
+            if (parsed.category && typeof payload === "object") {
+                const lines = flattenKnowledgeData(payload);
+                return lines.length ? lines.join("\n") : "";
+            }
+            const lines = flattenKnowledgeData(payload);
+            return lines.length ? lines.join("\n") : "";
+        }
+    } catch {
+        /* plain text */
+    }
+    return body.slice(0, 1200);
+}
+
 export async function buildPersonalKnowledgeDigest(uid, maxChars = 4000) {
     const sections = await listKnowledgeSections(uid);
     const parts = [];
@@ -174,17 +276,9 @@ export async function buildPersonalKnowledgeDigest(uid, maxChars = 4000) {
     }
     for (const sec of sections) {
         if (!sec.sarahMayUse) continue;
-        let body = String(sec.content || "").trim();
+        const body = formatKnowledgeSectionForPrompt(sec);
         if (!body) continue;
-        if (sec.sectionKey === "personal_profile") {
-            const { fields } = parsePersonalProfilePayload(body);
-            body = Object.entries(fields)
-                .filter(([, v]) => v != null && String(v).trim())
-                .map(([k, v]) => `${k}: ${String(v).slice(0, 400)}`)
-                .join("\n");
-            if (!body) continue;
-        }
-        const block = `[${sec.label}]\n${body.slice(0, 800)}`;
+        const block = `[${sec.label || sec.sectionKey}]\n${body.slice(0, 1200)}`;
         if (used + block.length > maxChars) break;
         parts.push(block);
         used += block.length + 2;

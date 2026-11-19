@@ -503,6 +503,37 @@
               </div>
             </div>
           </div>
+
+          <div id="mkAreaPickerModal" class="ms-knowledge-upload-modal hidden" role="dialog" aria-modal="true" aria-labelledby="mkAreaPickerTitle" aria-hidden="true">
+            <div class="ms-knowledge-upload-modal-backdrop" data-mk-area-close tabindex="-1"></div>
+            <div class="ms-knowledge-upload-modal-panel ms-knowledge-section-modal-panel">
+              <header class="ms-knowledge-upload-modal-head">
+                <h4 class="ms-knowledge-upload-modal-title" id="mkAreaPickerTitle">My Knowledge</h4>
+                <button type="button" class="ms-knowledge-upload-modal-close" data-mk-area-close aria-label="Close">&times;</button>
+              </header>
+              <p class="ms-knowledge-upload-modal-lead" id="mkAreaPickerLead">Choose a section to view or edit.</p>
+              <div class="ms-knowledge-area-picker" id="mkAreaPickerList"></div>
+            </div>
+          </div>
+
+          <div id="mkSectionModal" class="ms-knowledge-upload-modal hidden" role="dialog" aria-modal="true" aria-labelledby="mkSectionModalTitle" aria-hidden="true">
+            <div class="ms-knowledge-upload-modal-backdrop" data-mk-section-close tabindex="-1"></div>
+            <div class="ms-knowledge-upload-modal-panel ms-knowledge-section-modal-panel">
+              <header class="ms-knowledge-upload-modal-head">
+                <div>
+                  <p class="ms-knowledge-detail-eyebrow" id="mkSectionModalEyebrow"></p>
+                  <h4 class="ms-knowledge-upload-modal-title" id="mkSectionModalTitle">Section</h4>
+                </div>
+                <button type="button" class="ms-knowledge-upload-modal-close" data-mk-section-close aria-label="Close">&times;</button>
+              </header>
+              <div class="ms-knowledge-section-modal-meta" id="mkSectionModalMeta" hidden></div>
+              <div id="mkSectionModalBody" class="ms-knowledge-section-modal-body"></div>
+              <footer class="ms-knowledge-section-modal-foot" id="mkSectionModalFoot" hidden>
+                <button type="button" class="ms-knowledge-chip-btn" data-mk-section-prev hidden>Previous</button>
+                <button type="button" class="ms-knowledge-chip-btn" data-mk-section-next hidden>Next section</button>
+              </footer>
+            </div>
+          </div>
         </div>
 
         <div class="ms-panel" data-ms-panel="billing" role="tabpanel" hidden>
@@ -675,23 +706,25 @@
           <div class="work-ws-panel hidden" id="workWsPanel" role="tabpanel"></div>
         </div>
         <div class="chat-log thread-chat-log" id="threadLog"></div>
-        <form class="thread-compose" id="threadComposeForm">
-          <input type="file" id="threadComposeFile" accept="image/*,video/*,audio/*" hidden multiple />
-          <button type="button" class="thread-compose-attach" id="threadComposeAttachBtn" aria-label="Add photo or video">
-            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="thread-compose-main">
-            <div class="thread-compose-pending-wrap hidden" id="threadComposePending"></div>
-            <input type="text" id="threadComposeInput" placeholder="Ask Sarah anything…" autocomplete="off" />
-          </div>
-          <button type="button" class="thread-compose-voice" id="threadComposeVoiceBtn" aria-label="Record voice note">
-            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 00-3 3v6a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 11a7 7 0 01-14 0"/><path d="M12 18v3"/></svg>
-          </button>
-          <button type="submit" class="ms-send-btn thread-send-btn" aria-label="Send">
-            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-          </button>
-        </form>
-        <p class="thread-footnote" id="threadFootnote">Booking approvals &amp; Sarah Network consent — Wave 2 screens</p>
+        <div class="thread-compose-zone" id="threadComposeZone">
+          <p class="thread-footnote" id="threadFootnote">Booking approvals &amp; Sarah Network consent — Wave 2 screens</p>
+          <form class="thread-compose" id="threadComposeForm">
+            <input type="file" id="threadComposeFile" accept="image/*,video/*,audio/*" hidden multiple />
+            <button type="button" class="thread-compose-attach" id="threadComposeAttachBtn" aria-label="Add photo or video">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="thread-compose-main">
+              <div class="thread-compose-pending-wrap hidden" id="threadComposePending"></div>
+              <input type="text" id="threadComposeInput" placeholder="Ask Sarah anything…" autocomplete="off" />
+            </div>
+            <button type="button" class="thread-compose-voice" id="threadComposeVoiceBtn" aria-label="Record voice note">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 00-3 3v6a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 11a7 7 0 01-14 0"/><path d="M12 18v3"/></svg>
+            </button>
+            <button type="submit" class="ms-send-btn thread-send-btn" aria-label="Send">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </form>
+        </div>
       </div>
     </section>
 

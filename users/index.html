@@ -55,29 +55,27 @@
   <meta name="apple-mobile-web-app-title" content="Sarah" />
   <title>Sarah</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" href="assets/favicon.png?v=0ca00f726421-6392df24" type="image/png" />
+  <link rel="icon" href="assets/favicon.png?v=8d0ecb02b424-435fd3ac" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=5" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" as="style" />
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-  <noscript><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" /></noscript>
-  <link rel="stylesheet" href="css/design-system.css?v=0ca00f726421-6392df24" />
-  <link rel="stylesheet" href="css/icons.css?v=0ca00f726421-6392df24" />
-  <link rel="stylesheet" href="css/app.css?v=0ca00f726421-6392df24" />
-  <script src="js/boot-inline.js?v=0ca00f726421-6392df24"></script>
-<script src="js/site-config.js?v=0ca00f726421-6392df24"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/design-system.css?v=8d0ecb02b424-435fd3ac" />
+  <link rel="stylesheet" href="css/icons.css?v=8d0ecb02b424-435fd3ac" />
+  <link rel="stylesheet" href="css/app.css?v=8d0ecb02b424-435fd3ac" />
+  <script src="js/boot-inline.js?v=8d0ecb02b424-435fd3ac"></script>
+<script src="js/site-config.js?v=8d0ecb02b424-435fd3ac"></script>
 </head>
 <body>
   <div id="appBootSplash" class="app-boot-splash" role="status" aria-live="polite" aria-busy="true" aria-label="Loading Sarah">
-    <img class="app-boot-splash__logo sarah-brand-img" src="assets/sarah-avatar.svg?v=0ca00f726421-6392df24" alt="Sarah" width="104" height="104" decoding="async" />
+    <img class="app-boot-splash__logo sarah-brand-img" src="assets/sarah-avatar.svg?v=8d0ecb02b424-435fd3ac" alt="Sarah" width="104" height="104" decoding="async" />
     <p class="app-boot-splash__brand">Powered by ZiricAI</p>
   </div>
   <div class="app-frame">
     <!-- Welcome -->
     <section class="view is-active" data-view="welcome">
       <div class="welcome-hero">
-        <div class="logo-ring"><img class="sarah-brand-img" src="assets/sarah-avatar.svg?v=0ca00f726421-6392df24" alt="Sarah" width="72" height="72" /></div>
+        <div class="logo-ring"><img class="sarah-brand-img" src="assets/sarah-avatar.svg?v=8d0ecb02b424-435fd3ac" alt="Sarah" width="72" height="72" /></div>
         <h1>Sarah</h1>
         <p>Your personal AI world — discover businesses, stay in control.</p>
         <div class="welcome-features">
@@ -270,8 +268,12 @@
           <button type="button" class="ms-segment-btn is-active" role="tab" id="msSegmentChat" data-ms-mode="chat" aria-selected="true">Chat</button>
           <button type="button" class="ms-segment-btn" role="tab" id="msSegmentWork" data-ms-mode="work" aria-selected="false">Work</button>
         </div>
-        <button type="button" class="ms-icon-tool" id="homeChatSearchBtn" aria-label="Search chats">
-          <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+        <button type="button" class="ms-icon-tool ms-icon-tool--notif" id="homeNotifBtn" aria-label="Notifications">
+          <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 3a5 5 0 00-5 5v2.2c0 .5-.2 1-.5 1.4L5 14.5V16h14v-1.5l-1.5-2.9a2 2 0 01-.5-1.4V8a5 5 0 00-5-5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M10 18a2 2 0 004 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <span class="ms-home-notif-badge hidden" id="homeNotifBadge" aria-hidden="true"></span>
         </button>
       </header>
       <p class="ms-live-status hidden" id="msLiveStatus" role="status"></p>
@@ -283,7 +285,7 @@
               <span class="ms-ring ms-ring--outer" aria-hidden="true"></span>
               <span class="ms-ring ms-ring--mid" aria-hidden="true"></span>
               <span class="ms-ring ms-ring--inner" aria-hidden="true"></span>
-              <img class="ms-avatar-main sarah-brand-img" src="assets/sarah-avatar.svg?v=0ca00f726421-6392df24" alt="Personal Sarah" width="120" height="120" />
+              <img class="ms-avatar-main sarah-brand-img" src="assets/sarah-avatar.svg?v=8d0ecb02b424-435fd3ac" alt="Personal Sarah" width="120" height="120" />
             </div>
             <p class="ms-greeting-bubble"></p>
             <div class="ms-quick-grid" id="msQuickGrid"></div>
@@ -292,27 +294,14 @@
               <label class="ms-home-static-toggle"><input type="checkbox" id="msHomeStaticPref" /> Steadier home cards (less behaviour-based)</label>
             </p>
           </section>
+        </div>
 
-          <section class="ms-work-home-zone hidden" id="msWorkHomeZone" aria-label="Sarah Work home" hidden>
-            <h5 class="ms-headline">Home for work</h5>
-            <p class="ms-work-lead">Pick a task below or start a new work item — Sarah tracks progress and follow-ups for you.</p>
-            <p class="ms-work-quota" id="msWorkQuota" role="status"></p>
+        <div class="ms-panel" data-ms-panel="tasks" role="tabpanel" hidden>
+          <h5 class="ms-headline">Tell Sarah what to get done</h5>
+          <p class="ms-work-lead">Work mode is for tasks — reminders, follow-ups, and actions Sarah runs on your behalf (prototype).</p>
+          <p class="ms-work-quota" id="msWorkQuota" role="status"></p>
 
-            <section class="sw-home-dashboard hidden" id="msWorkDashboard" aria-label="Sarah Work dashboard" hidden>
-              <article class="sw-home-ai-card" id="msWorkDaySummary">
-                <span class="sw-home-ai-kicker">Today</span>
-                <p class="sw-home-ai-text"></p>
-              </article>
-              <div class="sw-home-stats" id="msWorkStats" role="list"></div>
-              <div class="sw-home-cap-chips" id="msWorkCapabilityChips" role="list" aria-label="Assignments by capability"></div>
-              <header class="sw-home-section-head">
-                <h3>Priority assignments</h3>
-              </header>
-              <ul class="sw-home-priority-list" id="msWorkPriorityList"></ul>
-            </section>
-
-            <h3 class="ms-work-pick-title">Choose a task</h3>
-            <div class="ms-action-grid">
+          <div class="ms-action-grid">
             <article class="ms-card ms-card--primary">
               <h3 class="ms-card-title">Run a task with Sarah</h3>
               <p class="ms-card-desc">Describe the outcome — approve a booking, nudge a business, or plan your week.</p>
@@ -341,20 +330,42 @@
                 </span>
               </button>
             </div>
-            </div>
+          </div>
 
-            <section class="ms-history">
-              <header class="ms-section-head">
-                <h3>All assignments</h3>
-                <button type="button" class="ms-link-btn" data-ms-go-chat-home="">Open Chat</button>
-              </header>
-              <div class="ms-history-list" id="msHistoryList"></div>
-            </section>
+          <section class="ms-reminder-demo" aria-label="Sarah Reminders preview">
+            <h3 class="ms-reminder-demo-title">Sarah Reminders</h3>
+            <p class="ms-reminder-demo-lead">Alarm-style alerts when a reminder is due (PWA stage).</p>
+            <button type="button" class="ms-pill-btn ms-pill-btn--ghost" id="msTryReminderDemo">Try a 1-minute reminder</button>
           </section>
-        </div>
 
-        <div class="ms-panel" data-ms-panel="tasks" role="tabpanel" hidden aria-hidden="true">
-          <p class="ms-work-lead">Work lives on My Sarah home — use the Work tab there.</p>
+          <section class="ms-reminder" aria-label="Reminder">
+            <div class="ms-reminder-copy">
+              <span class="ms-reminder-label">Don't forget</span>
+              <p class="ms-reminder-text" id="msReminderText"></p>
+            </div>
+            <img class="ms-reminder-art sarah-brand-img" src="assets/sarah-avatar.svg?v=8d0ecb02b424-435fd3ac" alt="" width="56" height="56" />
+          </section>
+
+          <section class="sw-home-dashboard hidden" id="msWorkDashboard" aria-label="Sarah Work dashboard" hidden>
+            <article class="sw-home-ai-card" id="msWorkDaySummary">
+              <span class="sw-home-ai-kicker">Today</span>
+              <p class="sw-home-ai-text"></p>
+            </article>
+            <div class="sw-home-stats" id="msWorkStats" role="list"></div>
+            <div class="sw-home-cap-chips" id="msWorkCapabilityChips" role="list" aria-label="Assignments by capability"></div>
+            <header class="sw-home-section-head">
+              <h3>Priority assignments</h3>
+            </header>
+            <ul class="sw-home-priority-list" id="msWorkPriorityList"></ul>
+          </section>
+
+          <section class="ms-history">
+            <header class="ms-section-head">
+              <h3>All assignments</h3>
+              <button type="button" class="ms-link-btn" data-ms-mode="chat">Open Chat</button>
+            </header>
+            <div class="ms-history-list" id="msHistoryList"></div>
+          </section>
         </div>
 
         <div class="ms-panel" data-ms-panel="knowledge" role="tabpanel" hidden>
@@ -491,6 +502,37 @@
                 <button type="button" class="ms-knowledge-chip-btn ms-knowledge-chip-btn--danger" id="mkSuggestionRemove">Remove</button>
                 <button type="button" class="btn btn-secondary" data-mk-suggestion-close>Cancel</button>
               </div>
+            </div>
+          </div>
+
+          <div id="mkAreaPickerModal" class="ms-knowledge-upload-modal hidden" role="dialog" aria-modal="true" aria-labelledby="mkAreaPickerTitle" aria-hidden="true">
+            <div class="ms-knowledge-upload-modal-backdrop" data-mk-area-close tabindex="-1"></div>
+            <div class="ms-knowledge-upload-modal-panel ms-knowledge-section-modal-panel">
+              <header class="ms-knowledge-upload-modal-head">
+                <h4 class="ms-knowledge-upload-modal-title" id="mkAreaPickerTitle">My Knowledge</h4>
+                <button type="button" class="ms-knowledge-upload-modal-close" data-mk-area-close aria-label="Close">&times;</button>
+              </header>
+              <p class="ms-knowledge-upload-modal-lead" id="mkAreaPickerLead">Choose a section to view or edit.</p>
+              <div class="ms-knowledge-area-picker" id="mkAreaPickerList"></div>
+            </div>
+          </div>
+
+          <div id="mkSectionModal" class="ms-knowledge-upload-modal hidden" role="dialog" aria-modal="true" aria-labelledby="mkSectionModalTitle" aria-hidden="true">
+            <div class="ms-knowledge-upload-modal-backdrop" data-mk-section-close tabindex="-1"></div>
+            <div class="ms-knowledge-upload-modal-panel ms-knowledge-section-modal-panel">
+              <header class="ms-knowledge-upload-modal-head">
+                <div>
+                  <p class="ms-knowledge-detail-eyebrow" id="mkSectionModalEyebrow"></p>
+                  <h4 class="ms-knowledge-upload-modal-title" id="mkSectionModalTitle">Section</h4>
+                </div>
+                <button type="button" class="ms-knowledge-upload-modal-close" data-mk-section-close aria-label="Close">&times;</button>
+              </header>
+              <div class="ms-knowledge-section-modal-meta" id="mkSectionModalMeta" hidden></div>
+              <div id="mkSectionModalBody" class="ms-knowledge-section-modal-body"></div>
+              <footer class="ms-knowledge-section-modal-foot" id="mkSectionModalFoot" hidden>
+                <button type="button" class="ms-knowledge-chip-btn" data-mk-section-prev hidden>Previous</button>
+                <button type="button" class="ms-knowledge-chip-btn" data-mk-section-next hidden>Next section</button>
+              </footer>
             </div>
           </div>
         </div>
@@ -665,23 +707,25 @@
           <div class="work-ws-panel hidden" id="workWsPanel" role="tabpanel"></div>
         </div>
         <div class="chat-log thread-chat-log" id="threadLog"></div>
-        <form class="thread-compose" id="threadComposeForm">
-          <input type="file" id="threadComposeFile" accept="image/*,video/*,audio/*" hidden multiple />
-          <button type="button" class="thread-compose-attach" id="threadComposeAttachBtn" aria-label="Add photo or video">
-            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="thread-compose-main">
-            <div class="thread-compose-pending-wrap hidden" id="threadComposePending"></div>
-            <input type="text" id="threadComposeInput" placeholder="Ask Sarah anything…" autocomplete="off" />
-          </div>
-          <button type="button" class="thread-compose-voice" id="threadComposeVoiceBtn" aria-label="Record voice note">
-            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 00-3 3v6a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 11a7 7 0 01-14 0"/><path d="M12 18v3"/></svg>
-          </button>
-          <button type="submit" class="ms-send-btn thread-send-btn" aria-label="Send">
-            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-          </button>
-        </form>
-        <p class="thread-footnote" id="threadFootnote">Booking approvals &amp; Sarah Network consent — Wave 2 screens</p>
+        <div class="thread-compose-zone" id="threadComposeZone">
+          <p class="thread-footnote" id="threadFootnote">Booking approvals &amp; Sarah Network consent — Wave 2 screens</p>
+          <form class="thread-compose" id="threadComposeForm">
+            <input type="file" id="threadComposeFile" accept="image/*,video/*,audio/*" hidden multiple />
+            <button type="button" class="thread-compose-attach" id="threadComposeAttachBtn" aria-label="Add photo or video">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="thread-compose-main">
+              <div class="thread-compose-pending-wrap hidden" id="threadComposePending"></div>
+              <input type="text" id="threadComposeInput" placeholder="Ask Sarah anything…" autocomplete="off" />
+            </div>
+            <button type="button" class="thread-compose-voice" id="threadComposeVoiceBtn" aria-label="Record voice note">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 00-3 3v6a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 11a7 7 0 01-14 0"/><path d="M12 18v3"/></svg>
+            </button>
+            <button type="submit" class="ms-send-btn thread-send-btn" aria-label="Send">
+              <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </form>
+        </div>
       </div>
     </section>
 
@@ -945,7 +989,7 @@
           <span class="nav-sarah-app-ring nav-sarah-app-ring--outer"></span>
           <span class="nav-sarah-app-ring nav-sarah-app-ring--mid"></span>
           <span class="nav-sarah-app-ring nav-sarah-app-ring--inner"></span>
-          <img class="nav-sarah-app-icon sarah-brand-img" src="assets/sarah-avatar.svg?v=0ca00f726421-6392df24" alt="" width="26" height="26" decoding="async" />
+          <img class="nav-sarah-app-icon sarah-brand-img" src="assets/sarah-avatar.svg?v=8d0ecb02b424-435fd3ac" alt="" width="26" height="26" decoding="async" />
         </span>
       </span>
       My Sarah
@@ -974,14 +1018,14 @@
       }
     }
     </script>
-  <script src="js/ziricai-config.js?v=0ca00f726421-6392df24"></script>
-  <script type="module" src="js/live-bridge.mjs?v=0ca00f726421-6392df24"></script>
+  <script src="js/ziricai-config.js?v=8d0ecb02b424-435fd3ac"></script>
+  <script type="module" src="js/live-bridge.mjs?v=8d0ecb02b424-435fd3ac"></script>
   <!-- Classic scripts (mock UI works on file://; live Sarah needs http + API) -->
-  <script defer src="js/icons.js?v=0ca00f726421-6392df24"></script>
-  <script defer src="js/mock-data.js?v=0ca00f726421-6392df24"></script>
-  <script defer src="js/thread-rich-text.js?v=0ca00f726421-6392df24"></script>
-  <script defer src="js/sarah-behavior-options.js"></script>
-  <script defer src="js/app.js?v=0ca00f726421-6392df24"></script>
+  <script src="js/icons.js?v=8d0ecb02b424-435fd3ac"></script>
+  <script src="js/mock-data.js?v=8d0ecb02b424-435fd3ac"></script>
+  <script src="js/thread-rich-text.js?v=8d0ecb02b424-435fd3ac"></script>
+  <script src="js/sarah-behavior-options.js"></script>
+  <script src="js/app.js?v=8d0ecb02b424-435fd3ac"></script>
   <script defer>
     (function () {
       if (!('serviceWorker' in navigator)) return;

@@ -2538,20 +2538,17 @@ function setMySarahPanel(panel, prompt) {
 function openMyKnowledgeCategory(categoryKey) {
   const key = String(categoryKey || '').trim();
   if (!key) return;
-  const hash = `home/knowledge/${encodeURIComponent(key)}`;
+  setMySarahPanel('knowledge');
+  const hash = mySarahHashForPanel('knowledge', { knowledgeCategory: key });
   if (location.hash.replace(/^#/, '') !== hash) {
     location.hash = hash;
-  } else {
-    activateView();
   }
+  void openMkSectionModal(key);
 }
 
 function closeMyKnowledgeCategory() {
-  if (location.hash.replace(/^#/, '') !== 'home/knowledge') {
-    location.hash = 'home/knowledge';
-  } else {
-    renderKnowledge(null);
-  }
+  closeMkSectionModal();
+  closeMkAreaPickerModal();
 }
 
 const MS_SUBMODULE_PANELS = new Set(['knowledge', 'wallet', 'pay', 'organisations', 'tasks', 'billing', 'notifications']);
@@ -6269,6 +6266,27 @@ const MK_FAMILY_RELATIONSHIP_OPTIONS = [
   { value: 'other', label: 'Other' },
 ];
 
+const MK_FAMILY_CONTACT_FREQUENCY_OPTIONS = [
+  { value: '', label: 'How often you connect…' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'occasionally', label: 'Occasionally' },
+  { value: 'rarely', label: 'Rarely' },
+];
+
+const MK_FAMILY_LIVES_WITH_OPTIONS = [
+  { value: '', label: 'Where they live…' },
+  { value: 'same_home', label: 'Lives with me' },
+  { value: 'nearby', label: 'Nearby' },
+  { value: 'same_city', label: 'Same city / region' },
+  { value: 'long_distance', label: 'Long distance' },
+  { value: 'abroad', label: 'Lives abroad' },
+];
+
+const MK_FORM_SYNC_LEAD =
+  'Saves on this device and syncs when you are signed in. Personal Sarah uses sections you allow.';
+
 const MK_GOAL_KIND_OPTIONS = [
   { value: 'personal', label: 'Personal' },
   { value: 'career', label: 'Career' },
@@ -6493,9 +6511,19 @@ function renderMkFamilyForm(data) {
               <select class="ms-knowledge-input" id="fam_rel_${id}" data-fam-field="relationship">${mkRelationshipSelectHtml(p.relationship)}</select>
             </div>
           </div>
+          <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
+            <div>
+              <label class="ms-knowledge-label" for="fam_bday_${id}">Birthday <span class="ms-knowledge-optional">(optional)</span></label>
+              <input class="ms-knowledge-input" id="fam_bday_${id}" data-fam-field="birthday" type="date" value="${escapeHtml(p.birthday || '')}" />
+            </div>
+            <div>
+              <label class="ms-knowledge-label" for="fam_contact_${id}">How often you connect</label>
+              <select class="ms-knowledge-input" id="fam_contact_${id}" data-fam-field="contactFrequency">${mkPlainSelectHtml('contactFrequency', MK_FAMILY_CONTACT_FREQUENCY_OPTIONS, p.contactFrequency || '')}</select>
+            </div>
+          </div>
           <div class="ms-knowledge-field-row">
-            <label class="ms-knowledge-label" for="fam_bday_${id}">Birthday <span class="ms-knowledge-optional">(optional)</span></label>
-            <input class="ms-knowledge-input" id="fam_bday_${id}" data-fam-field="birthday" type="date" value="${escapeHtml(p.birthday || '')}" />
+            <label class="ms-knowledge-label" for="fam_lives_${id}">Where they live</label>
+            <select class="ms-knowledge-input" id="fam_lives_${id}" data-fam-field="livesWith">${mkPlainSelectHtml('livesWith', MK_FAMILY_LIVES_WITH_OPTIONS, p.livesWith || '')}</select>
           </div>
           <div class="ms-knowledge-field-row">
             <label class="ms-knowledge-label" for="fam_det_${id}">Important details</label>
@@ -6514,7 +6542,7 @@ function renderMkFamilyForm(data) {
   return `
     <form id="mkFamilyForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        Sarah does not assume relationships or invent facts about other people — only what you enter here. Saved in this browser until the My Knowledge API ships.
+        Sarah does not assume relationships or invent facts about other people — only what you enter here. ${MK_FORM_SYNC_LEAD}
       </p>
       <div class="ms-knowledge-family-actions-top">
         <button type="button" class="ms-knowledge-pill ms-knowledge-pill--secondary" id="mkFamilyAdd" data-mk-family-add>Add person</button>
@@ -6528,14 +6556,23 @@ function renderMkFamilyForm(data) {
 }
 
 function collectFamilyPeopleFromDom() {
-  const root = document.getElementById('mkFamilyList');
+  const root = mkScopedElement('mkFamilyList');
   if (!root) return [];
   const cards = root.querySelectorAll('[data-mk-family-person]');
   const people = [];
   cards.forEach((card) => {
     const id = card.getAttribute('data-mk-family-person');
     if (!id) return;
-    const row = { id, name: '', relationship: 'other', birthday: '', details: '', reminders: '' };
+    const row = {
+      id,
+      name: '',
+      relationship: 'other',
+      birthday: '',
+      contactFrequency: '',
+      livesWith: '',
+      details: '',
+      reminders: '',
+    };
     card.querySelectorAll('[data-fam-field]').forEach((el) => {
       const field = el.getAttribute('data-fam-field');
       if (!field) return;
@@ -6670,7 +6707,7 @@ function renderMkGoalsForm(data) {
   return `
     <form id="mkGoalsForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        Goals you save here can inform planning and follow-ups when permissions allow. Stored in this browser until the My Knowledge API ships.
+        Goals you save here can inform planning and follow-ups when permissions allow. ${MK_FORM_SYNC_LEAD}
       </p>
       <div class="ms-knowledge-goal-actions-top">
         <button type="button" class="ms-knowledge-pill ms-knowledge-pill--secondary" id="mkGoalsAdd" data-mk-goal-add>Add goal</button>
@@ -6684,7 +6721,7 @@ function renderMkGoalsForm(data) {
 }
 
 function collectGoalsFromDom() {
-  const root = document.getElementById('mkGoalsList');
+  const root = mkScopedElement('mkGoalsList');
   if (!root) return [];
   const cards = root.querySelectorAll('[data-mk-goal]');
   const goals = [];
@@ -6844,7 +6881,7 @@ function renderMkWorkForm(data) {
   return `
     <form id="mkWorkForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        Keep current and previous roles separate so Sarah does not merge employers. Saved in this browser until the My Knowledge API ships.
+        Keep current and previous roles separate so Sarah does not merge employers. ${MK_FORM_SYNC_LEAD}
       </p>
       <div class="ms-knowledge-work-actions-top">
         <button type="button" class="ms-knowledge-pill ms-knowledge-pill--secondary" id="mkWorkAdd" data-mk-work-add>Add role</button>
@@ -6858,7 +6895,7 @@ function renderMkWorkForm(data) {
 }
 
 function collectWorkRolesFromDom() {
-  const root = document.getElementById('mkWorkList');
+  const root = mkScopedElement('mkWorkList');
   if (!root) return [];
   const cards = root.querySelectorAll('[data-mk-work-role]');
   const roles = [];
@@ -7007,7 +7044,7 @@ function renderMkBusinessForm(data) {
   return `
     <form id="mkBusinessForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        Add one profile per business so goals, documents, and contacts stay scoped correctly. Stored in this browser until the My Knowledge API ships.
+        Add one profile per business so goals, documents, and contacts stay scoped correctly. ${MK_FORM_SYNC_LEAD}
       </p>
       <div class="ms-knowledge-biz-actions-top">
         <button type="button" class="ms-knowledge-pill ms-knowledge-pill--secondary" id="mkBusinessAdd" data-mk-biz-add>Add business</button>
@@ -7021,7 +7058,7 @@ function renderMkBusinessForm(data) {
 }
 
 function collectBusinessVenturesFromDom() {
-  const root = document.getElementById('mkBusinessList');
+  const root = mkScopedElement('mkBusinessList');
   if (!root) return [];
   const cards = root.querySelectorAll('[data-mk-biz]');
   const ventures = [];
@@ -7212,7 +7249,7 @@ function renderMkEducationForm(data) {
   return `
     <form id="mkEducationForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        Helps Sarah tune explanations to your level and remember what you are studying. Saved in this browser until the My Knowledge API ships.
+        Helps Sarah tune explanations to your level and remember what you are studying. ${MK_FORM_SYNC_LEAD}
       </p>
 
       <fieldset class="ms-knowledge-fieldset">
@@ -7279,8 +7316,8 @@ function renderMkEducationForm(data) {
 }
 
 function collectEducationLearningFromForm(form) {
-  const formalRoot = document.getElementById('mkEduFormalList');
-  const courseRoot = document.getElementById('mkEduCourseList');
+  const formalRoot = mkScopedElement('mkEduFormalList');
+  const courseRoot = mkScopedElement('mkEduCourseList');
   const formalPrograms = [];
   if (formalRoot) {
     formalRoot.querySelectorAll('[data-mk-edu-formal]').forEach((card) => {
@@ -7384,7 +7421,7 @@ function renderMkHealthForm(data) {
     <form id="mkHealthForm" class="ms-knowledge-form">
       <div class="ms-knowledge-health-callout" role="note">
         <strong>Prototype only — not medical advice.</strong> Sarah does not diagnose or change medications. This category stays off for “Sarah may use” and “learn from chat” until you opt in in MK‑06.
-        Sharing health details with Company Sarah requires separate consent. Stored only in this browser until the API ships.
+        Sharing health details with Company Sarah requires separate consent. ${MK_FORM_SYNC_LEAD}
       </div>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">General &amp; clinical notes</legend>
@@ -7526,10 +7563,20 @@ function renderMkFinancialForm(data) {
   return `
     <form id="mkFinancialForm" class="ms-knowledge-form">
       <div class="ms-knowledge-financial-callout" role="note">
-        <strong>Prototype only — not regulated financial advice.</strong> Do not store card numbers, CVVs, PINs, passwords, or full account numbers. This category stays off for “Sarah may use” and “learn from chat” until you opt in in MK‑06. Sharing with Company Sarah needs separate consent. Stored only in this browser until the API ships.
+        <strong>Not financial advice.</strong> Do not store card numbers, CVVs, PINs, passwords, or full account numbers. Sharing with Company Sarah needs separate consent. ${MK_FORM_SYNC_LEAD}
       </div>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Overview</legend>
+        <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
+          <div>
+            <label class="ms-knowledge-label" for="fn_employmentStatus">Employment status</label>
+            <select class="ms-knowledge-input" id="fn_employmentStatus" name="employmentStatus">${mkPlainSelectHtml('employmentStatus', MK_EMPLOYMENT_STATUS_OPTIONS, f.employmentStatus || '')}</select>
+          </div>
+          <div>
+            <label class="ms-knowledge-label" for="fn_primaryCurrency">Primary currency</label>
+            <select class="ms-knowledge-input" id="fn_primaryCurrency" name="primaryCurrency">${mkPlainSelectHtml('primaryCurrency', MK_CURRENCY_OPTIONS, f.primaryCurrency || '')}</select>
+          </div>
+        </div>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="fn_generalNotes">General financial notes</label>
           <textarea class="ms-knowledge-textarea" id="fn_generalNotes" name="generalNotes" rows="2" placeholder="High-level picture — currencies, life stage, what you want Sarah to remember…">${escapeHtml(f.generalNotes || '')}</textarea>
@@ -7601,6 +7648,8 @@ function renderMkFinancialForm(data) {
 function collectFinancialLifeFromForm(form) {
   const fd = new FormData(form);
   const keys = [
+    'employmentStatus',
+    'primaryCurrency',
     'generalNotes',
     'incomeSources',
     'monthlyBudgetOverview',
@@ -7662,7 +7711,7 @@ function renderMkLifestyleForm(data) {
   return `
     <form id="mkLifestyleForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        How you like day-to-day life, food, travel style, and downtime — distinct from health or money detail. Stored in this browser until the My Knowledge API ships.
+        Music, sport, social life, and what you do for fun — distinct from health or money detail. Syncs to Personal Sarah when you are signed in.
       </p>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Overview &amp; rhythm</legend>
@@ -7692,6 +7741,36 @@ function renderMkLifestyleForm(data) {
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="ls_leisure">Leisure &amp; weekends</label>
           <textarea class="ms-knowledge-textarea" id="ls_leisure" name="leisureWeekends" rows="2" placeholder="How you recharge — outings, sports, projects…">${escapeHtml(x.leisureWeekends || '')}</textarea>
+        </div>
+      </fieldset>
+      <fieldset class="ms-knowledge-fieldset">
+        <legend class="ms-knowledge-legend">Music, sport &amp; personality</legend>
+        <div class="ms-knowledge-field-row">
+          <label class="ms-knowledge-label" for="ls_music">Music you like</label>
+          <input class="ms-knowledge-input" id="ls_music" name="musicTastes" type="text" placeholder="Genres, artists, moods…" value="${escapeHtml(x.musicTastes || '')}" />
+        </div>
+        <div class="ms-knowledge-field-row">
+          <label class="ms-knowledge-label" for="ls_sports">Sports teams you support</label>
+          <input class="ms-knowledge-input" id="ls_sports" name="sportsTeams" type="text" placeholder="Teams, leagues, or sports you follow…" value="${escapeHtml(x.sportsTeams || '')}" />
+        </div>
+        <div class="ms-knowledge-field-row">
+          <label class="ms-knowledge-label" for="ls_socialStyle">Outgoing or reserved?</label>
+          <select class="ms-knowledge-input" id="ls_socialStyle" name="socialStyle">${mkPlainSelectHtml('socialStyle', MK_SOCIAL_STYLE_OPTIONS, x.socialStyle || '')}</select>
+        </div>
+        <div class="ms-knowledge-field-row">
+          <label class="ms-knowledge-label" for="ls_fun">What you do for fun</label>
+          <textarea class="ms-knowledge-textarea" id="ls_fun" name="leisureWeekends" rows="2" placeholder="Weekends, hobbies, how you recharge…">${escapeHtml(x.leisureWeekends || '')}</textarea>
+        </div>
+      </fieldset>
+      <fieldset class="ms-knowledge-fieldset">
+        <legend class="ms-knowledge-legend">Friends &amp; hangouts</legend>
+        <div class="ms-knowledge-field-row">
+          <label class="ms-knowledge-label" for="ls_friends">Close friends</label>
+          <textarea class="ms-knowledge-textarea" id="ls_friends" name="closeFriends" rows="2" placeholder="First names or groups Sarah should know about…">${escapeHtml(x.closeFriends || '')}</textarea>
+        </div>
+        <div class="ms-knowledge-field-row">
+          <label class="ms-knowledge-label" for="ls_hangouts">Where you usually hang out</label>
+          <textarea class="ms-knowledge-textarea" id="ls_hangouts" name="usualHangouts" rows="2" placeholder="Spots, suburbs, venues you frequent…">${escapeHtml(x.usualHangouts || '')}</textarea>
         </div>
       </fieldset>
       <fieldset class="ms-knowledge-fieldset">
@@ -7735,7 +7814,12 @@ function collectLifestylePreferencesFromForm(form) {
     'homeEnvironment',
     'foodDiningPreferences',
     'travelStyle',
+    'musicTastes',
+    'sportsTeams',
+    'socialStyle',
     'leisureWeekends',
+    'closeFriends',
+    'usualHangouts',
     'entertainmentMedia',
     'socialLife',
     'shoppingPreferences',
@@ -7854,7 +7938,7 @@ function renderMkImportantDatesForm(data) {
   return `
     <form id="mkDatesForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        Birthdays, renewals, travel, deadlines — one entry each so Sarah can keep them straight. Stored in this browser until the My Knowledge API ships.
+        Birthdays, renewals, travel, deadlines — one entry each so Sarah can keep them straight. ${MK_FORM_SYNC_LEAD}
       </p>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Catch-all notes</legend>
@@ -7876,7 +7960,7 @@ function renderMkImportantDatesForm(data) {
 
 function collectImportantDatesFromDom(form) {
   const generalNotes = String(new FormData(form).get('datesGeneralNotes') || '');
-  const root = document.getElementById('mkDatesList');
+  const root = mkScopedElement('mkDatesList');
   if (!root) return { events: [], generalNotes };
   const cards = root.querySelectorAll('[data-mk-important-date]');
   const events = [];
@@ -8012,7 +8096,7 @@ function renderMkDocumentsForm(data) {
   return `
     <form id="mkDocumentsForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        Record what you have and where it lives — distinct from approved memories or chat attachments. Sarah does not scan files in the prototype. Stored in this browser until the My Knowledge API ships.
+        Record what you have and where it lives — distinct from approved memories or chat attachments. Sarah does not scan files in the prototype. ${MK_FORM_SYNC_LEAD}
       </p>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Across your records</legend>
@@ -8034,7 +8118,7 @@ function renderMkDocumentsForm(data) {
 
 function collectDocumentsRecordsFromDom(form) {
   const generalNotes = String(new FormData(form).get('documentsGeneralNotes') || '');
-  const root = document.getElementById('mkDocumentsList');
+  const root = mkScopedElement('mkDocumentsList');
   if (!root) return { records: [], generalNotes };
   const cards = root.querySelectorAll('[data-mk-document]');
   const records = [];
@@ -8103,7 +8187,7 @@ function renderMkRoutinesForm(data) {
   return `
     <form id="mkRoutinesForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        Schedules, habits, and commitments — separate from health treatment detail (use Health when clinical). Stored in this browser until the My Knowledge API ships.
+        Schedules, habits, and commitments — separate from health treatment detail (use Health when clinical). ${MK_FORM_SYNC_LEAD}
       </p>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Overview</legend>
@@ -8294,7 +8378,7 @@ function renderMkPropertyForm(data) {
   return `
     <form id="mkPropertyForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        Homes, vehicles, equipment — one card each. Do not store full policy numbers or banking detail here (use Financial or Documents metadata). Stored in this browser until the My Knowledge API ships.
+        Homes, vehicles, equipment — one card each. Do not store full policy numbers or banking detail here (use Financial or Documents metadata). ${MK_FORM_SYNC_LEAD}
       </p>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Across your property</legend>
@@ -8316,7 +8400,7 @@ function renderMkPropertyForm(data) {
 
 function collectPropertyAssetsFromDom(form) {
   const generalNotes = String(new FormData(form).get('propertyGeneralNotes') || '');
-  const root = document.getElementById('mkPropertyList');
+  const root = mkScopedElement('mkPropertyList');
   if (!root) return { items: [], generalNotes };
   const cards = root.querySelectorAll('[data-mk-property]');
   const items = [];
@@ -8463,7 +8547,7 @@ function renderMkTravelForm(data) {
   return `
     <form id="mkTravelForm" class="ms-knowledge-form">
       <p class="ms-knowledge-detail-note">
-        Trips, destinations, and travel logistics notes — passports and scans stay in Documents until MK‑04. Stored in this browser until the My Knowledge API ships.
+        Trips, destinations, and travel logistics notes — passports and scans stay in Documents until MK‑04. ${MK_FORM_SYNC_LEAD}
       </p>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">Overview</legend>
@@ -8491,7 +8575,7 @@ function collectTravelPlacesFromDom(form) {
   const fd = new FormData(form);
   const generalNotes = String(fd.get('travelGeneralNotes') || '');
   const favoritePlaces = String(fd.get('favoritePlaces') || '');
-  const root = document.getElementById('mkTravelList');
+  const root = mkScopedElement('mkTravelList');
   if (!root) return { trips: [], generalNotes, favoritePlaces };
   const cards = root.querySelectorAll('[data-mk-travel-trip]');
   const trips = [];
@@ -8564,7 +8648,7 @@ function renderMkValuesForm(data) {
   return `
     <form id="mkValuesForm" class="ms-knowledge-form">
       <div class="ms-knowledge-values-callout" role="note">
-        <strong>Private by default in the prototype.</strong> “Sarah may use” and “learn from chat” stay off until you opt in in MK‑06. Sarah does not debate your worldview or pressure you to disclose more than you choose. Stored only in this browser until the API ships.
+        <strong>Private by default.</strong> Sarah does not debate your worldview or pressure you to disclose more than you choose. ${MK_FORM_SYNC_LEAD}
       </div>
       <fieldset class="ms-knowledge-fieldset">
         <legend class="ms-knowledge-legend">What matters to you</legend>
@@ -8669,6 +8753,159 @@ function collectSarahBehaviorFromForm(form, keys) {
   return behavior;
 }
 
+const MK_API_SECTION_BY_CATEGORY = {
+  identity: 'personal_profile',
+  financial: 'finance',
+  dates: 'important_dates',
+  work: 'career',
+};
+
+const MK_MARITAL_STATUS_OPTIONS = [
+  { value: '', label: 'Prefer not to say' },
+  { value: 'single', label: 'Single' },
+  { value: 'married', label: 'Married' },
+  { value: 'partnered', label: 'In a relationship / partnered' },
+  { value: 'divorced', label: 'Divorced' },
+  { value: 'widowed', label: 'Widowed' },
+];
+
+const MK_SEX_OPTIONS = [
+  { value: '', label: 'Prefer not to say' },
+  { value: 'female', label: 'Female' },
+  { value: 'male', label: 'Male' },
+  { value: 'non_binary', label: 'Non-binary' },
+  { value: 'other', label: 'Other' },
+];
+
+const MK_RELIGION_OPTIONS = [
+  { value: '', label: 'Prefer not to say' },
+  { value: 'christian', label: 'Christian' },
+  { value: 'muslim', label: 'Muslim' },
+  { value: 'jewish', label: 'Jewish' },
+  { value: 'hindu', label: 'Hindu' },
+  { value: 'buddhist', label: 'Buddhist' },
+  { value: 'traditional', label: 'Traditional / ancestral' },
+  { value: 'spiritual', label: 'Spiritual (not religious)' },
+  { value: 'atheist', label: 'Atheist / agnostic' },
+  { value: 'other', label: 'Other' },
+];
+
+const MK_HAS_CHILDREN_OPTIONS = [
+  { value: '', label: 'Prefer not to say' },
+  { value: 'no', label: 'No' },
+  { value: 'yes', label: 'Yes' },
+];
+
+const MK_CHILDREN_COUNT_OPTIONS = [
+  { value: '', label: '—' },
+  { value: '1', label: '1' },
+  { value: '2', label: '2' },
+  { value: '3', label: '3' },
+  { value: '4', label: '4' },
+  { value: '5plus', label: '5 or more' },
+];
+
+const MK_HOME_REGION_OPTIONS = [
+  { value: '', label: 'Select region…' },
+  { value: 'gauteng', label: 'Gauteng' },
+  { value: 'western_cape', label: 'Western Cape' },
+  { value: 'kwazulu_natal', label: 'KwaZulu-Natal' },
+  { value: 'eastern_cape', label: 'Eastern Cape' },
+  { value: 'free_state', label: 'Free State' },
+  { value: 'limpopo', label: 'Limpopo' },
+  { value: 'mpumalanga', label: 'Mpumalanga' },
+  { value: 'north_west', label: 'North West' },
+  { value: 'northern_cape', label: 'Northern Cape' },
+  { value: 'other', label: 'Other country / region' },
+];
+
+const MK_CAREER_FIELD_OPTIONS = [
+  { value: '', label: 'Select or type in notes…' },
+  { value: 'automotive', label: 'Automotive' },
+  { value: 'education', label: 'Education' },
+  { value: 'healthcare', label: 'Healthcare' },
+  { value: 'technology', label: 'Technology' },
+  { value: 'finance', label: 'Finance' },
+  { value: 'retail', label: 'Retail' },
+  { value: 'hospitality', label: 'Hospitality' },
+  { value: 'entrepreneur', label: 'Entrepreneur / business owner' },
+  { value: 'student', label: 'Student' },
+  { value: 'other', label: 'Other' },
+];
+
+const MK_SOCIAL_STYLE_OPTIONS = [
+  { value: '', label: 'Prefer not to say' },
+  { value: 'outgoing', label: 'Outgoing — energised by people' },
+  { value: 'balanced', label: 'Balanced' },
+  { value: 'reserved', label: 'Reserved — smaller circles' },
+  { value: 'introverted', label: 'Introverted — needs recharge time' },
+];
+
+const MK_COUNTRY_OPTIONS = [
+  { value: '', label: 'Select country…' },
+  { value: 'south_africa', label: 'South Africa' },
+  { value: 'botswana', label: 'Botswana' },
+  { value: 'namibia', label: 'Namibia' },
+  { value: 'zimbabwe', label: 'Zimbabwe' },
+  { value: 'mozambique', label: 'Mozambique' },
+  { value: 'lesotho', label: 'Lesotho' },
+  { value: 'eswatini', label: 'Eswatini' },
+  { value: 'united_kingdom', label: 'United Kingdom' },
+  { value: 'united_states', label: 'United States' },
+  { value: 'other', label: 'Other' },
+];
+
+const MK_CURRENCY_OPTIONS = [
+  { value: '', label: 'Primary currency…' },
+  { value: 'ZAR', label: 'ZAR (Rand)' },
+  { value: 'USD', label: 'USD' },
+  { value: 'EUR', label: 'EUR' },
+  { value: 'GBP', label: 'GBP' },
+  { value: 'BWP', label: 'BWP' },
+  { value: 'other', label: 'Other' },
+];
+
+const MK_EMPLOYMENT_STATUS_OPTIONS = [
+  { value: '', label: 'Employment status…' },
+  { value: 'employed_full', label: 'Employed full-time' },
+  { value: 'employed_part', label: 'Employed part-time' },
+  { value: 'self_employed', label: 'Self-employed' },
+  { value: 'business_owner', label: 'Business owner' },
+  { value: 'student', label: 'Student' },
+  { value: 'homemaker', label: 'Homemaker' },
+  { value: 'retired', label: 'Retired' },
+  { value: 'between_jobs', label: 'Between jobs' },
+  { value: 'other', label: 'Other' },
+];
+
+function mkPlainSelectHtml(name, options, selected) {
+  const sel = String(selected || '');
+  return options
+    .map((o) => `<option value="${escapeHtml(o.value)}"${sel === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`)
+    .join('');
+}
+
+function mkCategoryMeta(categoryKey) {
+  const mk = window.SARAH_PROTOTYPE?.MOCK_MY_KNOWLEDGE;
+  return mk?.categories?.find((c) => c.key === categoryKey) || null;
+}
+
+function mkApiSectionKey(categoryKey) {
+  return MK_API_SECTION_BY_CATEGORY[categoryKey] || categoryKey;
+}
+
+async function syncMkCategoryToServer(categoryKey, data, { sarahMayUse } = {}) {
+  if (!personalSarahLiveActive() || !window.SarahLive?.upsertPersonalKnowledgeSection) return { ok: false };
+  const cat = mkCategoryMeta(categoryKey);
+  const apiKey = mkApiSectionKey(categoryKey);
+  const mayUse = sarahMayUse ?? cat?.sarahMayUse ?? true;
+  const res = await window.SarahLive.upsertPersonalKnowledgeSection(apiKey, {
+    content: JSON.stringify({ version: 1, category: categoryKey, data }),
+    sarahMayUse: mayUse,
+  });
+  return res?.error ? { ok: false, error: res.error } : { ok: true };
+}
+
 async function syncPersonalProfileKnowledge(identity) {
   if (!personalSarahLiveActive() || !window.SarahLive?.upsertPersonalKnowledgeSection) return;
   const payload = {
@@ -8679,7 +8916,15 @@ async function syncPersonalProfileKnowledge(identity) {
     preferredLanguage: identity.preferredLanguage || '',
     country: identity.country || '',
     city: identity.city || '',
+    homeRegion: identity.homeRegion || '',
+    homeAddressNote: identity.homeAddressNote || '',
     locationNote: identity.locationNote || '',
+    maritalStatus: identity.maritalStatus || '',
+    sex: identity.sex || '',
+    religion: identity.religion || '',
+    careerField: identity.careerField || '',
+    hasChildren: identity.hasChildren || '',
+    childrenCount: identity.childrenCount || '',
     nationalityBackground: identity.nationalityBackground || '',
     educationQualifications: identity.educationQualifications || '',
     personalBiography: identity.personalBiography || '',
@@ -8697,16 +8942,292 @@ async function syncPersonalProfileKnowledge(identity) {
   });
 }
 
+const MK_CATEGORY_BY_API_SECTION = {
+  personal_profile: 'identity',
+  finance: 'financial',
+  important_dates: 'dates',
+  career: 'work',
+};
+
+function mkCategoryFromApiSection(sectionKey) {
+  return MK_CATEGORY_BY_API_SECTION[sectionKey] || String(sectionKey || '').trim();
+}
+
+let __mkServerHydratePromise = null;
+
+function applyMkServerSectionToLocal(categoryKey, content) {
+  const raw = String(content || '').trim();
+  if (!raw) return;
+  const key = String(categoryKey || '').trim();
+  if (key === 'identity') {
+    const { fields, sarahBehavior } = parsePersonalProfilePayloadClient(raw);
+    savePersonalIdentity({ ...fields, sarahBehavior: sarahBehavior || {} });
+    return;
+  }
+  try {
+    const j = JSON.parse(raw);
+    const data = j?.data != null ? j.data : j;
+    if (!data || typeof data !== 'object') return;
+    const apply = {
+      family: saveFamilyRelationships,
+      goals: saveGoalsAmbitions,
+      work: saveWorkProfessional,
+      business: saveBusinessEntrepreneurship,
+      education: saveEducationLearning,
+      health: saveHealthWellbeing,
+      financial: saveFinancialLife,
+      lifestyle: saveLifestylePreferences,
+      dates: saveImportantDatesEvents,
+      documents: saveDocumentsRecords,
+      routines: saveRoutinesDailyLife,
+      property: savePropertyAssets,
+      travel: saveTravelPlaces,
+      values: saveValuesPrinciples,
+    }[key];
+    if (apply) apply(data);
+  } catch {
+    /* ignore */
+  }
+}
+
+function ensureMkHydratedFromServer() {
+  if (!personalSarahLiveActive() || !window.SarahLive?.fetchPersonalKnowledgeSections) {
+    return Promise.resolve();
+  }
+  if (__mkServerHydratePromise) return __mkServerHydratePromise;
+  __mkServerHydratePromise = (async () => {
+    const res = await window.SarahLive.fetchPersonalKnowledgeSections();
+    if (res?.error || !Array.isArray(res.sections)) return;
+    res.sections.forEach((sec) => {
+      if (!sec?.content) return;
+      const cat = mkCategoryFromApiSection(sec.sectionKey);
+      if (!mkCategoryMeta(cat)) return;
+      applyMkServerSectionToLocal(cat, sec.content);
+    });
+  })();
+  return __mkServerHydratePromise;
+}
+
+function isMkSectionModalOpen() {
+  const modal = document.getElementById('mkSectionModal');
+  return modal && !modal.classList.contains('hidden');
+}
+
+function closeMkSectionModal() {
+  const modal = document.getElementById('mkSectionModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  const { msPanel, knowledgeCategory } = parseLocationHash();
+  if (msPanel === 'knowledge' && knowledgeCategory) {
+    const hash = mySarahHashForPanel('knowledge', {});
+    if (location.hash.replace(/^#/, '') !== hash) {
+      location.hash = hash;
+    }
+  }
+}
+
+function mkScopedElement(id) {
+  const sid = String(id || '').replace(/^#/, '');
+  if (!sid) return null;
+  if (isMkSectionModalOpen()) {
+    const inModal = document.getElementById('mkSectionModalBody')?.querySelector(`#${sid}`);
+    if (inModal) return inModal;
+  }
+  const inDetail = document.getElementById('mkCategoryRoot')?.querySelector(`#${sid}`);
+  if (inDetail) return inDetail;
+  return document.getElementById(sid);
+}
+
+function mkCategoryNavSiblings(categoryKey) {
+  const mk = window.SARAH_PROTOTYPE?.MOCK_MY_KNOWLEDGE;
+  const cat = mk?.categories?.find((c) => c.key === categoryKey);
+  if (!cat || !mk?.categories) return { prev: null, next: null };
+  const ordered = mk.categories.filter((c) => c.area === cat.area);
+  const i = ordered.findIndex((c) => c.key === categoryKey);
+  return {
+    prev: i > 0 ? ordered[i - 1].key : null,
+    next: i >= 0 && i < ordered.length - 1 ? ordered[i + 1].key : null,
+  };
+}
+
+function renderMkSectionModalMeta(cat) {
+  const meta = document.getElementById('mkSectionModalMeta');
+  if (!meta || !cat) {
+    meta?.setAttribute('hidden', '');
+    return;
+  }
+  const badgeClass = mkClassificationShort(cat.classification) === 'Sensitive' ? 'sensitive' : 'personal';
+  const mayUse = cat.sarahMayUse ? 'Sarah may use' : 'Private by default';
+  meta.innerHTML = `
+    <span class="ms-knowledge-badge ms-knowledge-badge--${badgeClass}">${escapeHtml(cat.classification)}</span>
+    <span class="ms-knowledge-meta-line">${escapeHtml(mayUse)}</span>
+    <span class="ms-knowledge-meta-line">Learn from chat: ${cat.learnFromConversations ? 'On' : 'Off'}</span>`;
+  meta.removeAttribute('hidden');
+}
+
+function updateMkSectionModalFoot(categoryKey) {
+  const foot = document.getElementById('mkSectionModalFoot');
+  if (!foot) return;
+  const { prev, next } = mkCategoryNavSiblings(categoryKey);
+  const prevBtn = foot.querySelector('[data-mk-section-prev]');
+  const nextBtn = foot.querySelector('[data-mk-section-next]');
+  if (prevBtn) {
+    prevBtn.hidden = !prev;
+    if (prev) prevBtn.setAttribute('data-mk-section-target', prev);
+    else prevBtn.removeAttribute('data-mk-section-target');
+  }
+  if (nextBtn) {
+    nextBtn.hidden = !next;
+    if (next) nextBtn.setAttribute('data-mk-section-target', next);
+    else nextBtn.removeAttribute('data-mk-section-target');
+  }
+  if (!prev && !next) foot.setAttribute('hidden', '');
+  else foot.removeAttribute('hidden');
+}
+
+function closeMkAreaPickerModal() {
+  const modal = document.getElementById('mkAreaPickerModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function renderMkCategoryFormBody(categoryKey) {
+  const key = String(categoryKey || '').trim();
+  if (key === 'identity') return renderMkPersonalIdentityForm(loadPersonalIdentity());
+  if (key === 'family') return renderMkFamilyForm(loadFamilyRelationships());
+  if (key === 'goals') return renderMkGoalsForm(loadGoalsAmbitions());
+  if (key === 'work') return renderMkWorkForm(loadWorkProfessional());
+  if (key === 'business') return renderMkBusinessForm(loadBusinessEntrepreneurship());
+  if (key === 'education') return renderMkEducationForm(loadEducationLearning());
+  if (key === 'health') return renderMkHealthForm(loadHealthWellbeing());
+  if (key === 'financial') return renderMkFinancialForm(loadFinancialLife());
+  if (key === 'lifestyle') return renderMkLifestyleForm(loadLifestylePreferences());
+  if (key === 'dates') return renderMkImportantDatesForm(loadImportantDatesEvents());
+  if (key === 'documents') return renderMkDocumentsForm(loadDocumentsRecords());
+  if (key === 'routines') return renderMkRoutinesForm(loadRoutinesDailyLife());
+  if (key === 'property') return renderMkPropertyForm(loadPropertyAssets());
+  if (key === 'travel') return renderMkTravelForm(loadTravelPlaces());
+  if (key === 'values') return renderMkValuesForm(loadValuesPrinciples());
+  const cat = mkCategoryMeta(key);
+  return cat ? renderMkCategoryPlaceholder(cat) : '<p class="ms-knowledge-detail-note">Category not found.</p>';
+}
+
+function refreshMkCategoryView(categoryKey) {
+  void openMkSectionModal(categoryKey);
+}
+
+function bindMkModalChromeOnce() {
+  if (window.__mkModalChromeBound) return;
+  window.__mkModalChromeBound = true;
+  document.getElementById('mkSectionModal')?.addEventListener('click', (e) => {
+    const nav = e.target.closest('[data-mk-section-prev],[data-mk-section-next]');
+    if (nav) {
+      e.preventDefault();
+      const target = nav.getAttribute('data-mk-section-target');
+      if (target) {
+        openMyKnowledgeCategory(target);
+      }
+      return;
+    }
+    if (e.target.closest('[data-mk-section-close]')) {
+      e.preventDefault();
+      closeMkSectionModal();
+    }
+  });
+  document.getElementById('mkAreaPickerModal')?.addEventListener('click', (e) => {
+    const pick = e.target.closest('[data-mk-area-pick]');
+    if (pick) {
+      const key = pick.getAttribute('data-mk-area-pick');
+      closeMkAreaPickerModal();
+      if (key) openMkSectionModal(key);
+      return;
+    }
+    if (e.target.closest('[data-mk-area-close]')) {
+      e.preventDefault();
+      closeMkAreaPickerModal();
+    }
+  });
+}
+
+function openMkAreaPickerModal(areaKey) {
+  bindMkModalChromeOnce();
+  const mk = window.SARAH_PROTOTYPE?.MOCK_MY_KNOWLEDGE;
+  const area = (mk?.areas || []).find((a) => a.key === areaKey);
+  const cats = (mk?.categories || []).filter((c) => c.area === areaKey);
+  if (!cats.length) return;
+  if (areaKey === 'understanding') {
+    document.getElementById('mkUnderstandingHeading')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (cats.length === 1) {
+    openMkSectionModal(cats[0].key);
+    return;
+  }
+  const modal = document.getElementById('mkAreaPickerModal');
+  const list = document.getElementById('mkAreaPickerList');
+  const title = document.getElementById('mkAreaPickerTitle');
+  const lead = document.getElementById('mkAreaPickerLead');
+  if (!modal || !list) {
+    openMkSectionModal(cats[0].key);
+    return;
+  }
+  if (title) title.textContent = area?.label || 'My Knowledge';
+  if (lead) lead.textContent = area?.description || 'Choose a section to fill in or update.';
+  list.innerHTML = cats
+    .map(
+      (c) => `
+      <button type="button" class="ms-knowledge-area-picker-btn" data-mk-area-pick="${escapeHtml(c.key)}">
+        <strong>${escapeHtml(c.label)}</strong>
+        <span>${escapeHtml(c.blurb || c.subtitle || '')}</span>
+      </button>`
+    )
+    .join('');
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+async function openMkSectionModal(categoryKey) {
+  bindMkModalChromeOnce();
+  bindMkCategoryDetailOnce();
+  const cat = mkCategoryMeta(categoryKey);
+  const modal = document.getElementById('mkSectionModal');
+  const body = document.getElementById('mkSectionModalBody');
+  const title = document.getElementById('mkSectionModalTitle');
+  const eyebrow = document.getElementById('mkSectionModalEyebrow');
+  if (!modal || !body || !cat) {
+    refreshMkCategoryView(categoryKey);
+    return;
+  }
+  if (title) title.textContent = cat.label;
+  if (eyebrow) eyebrow.textContent = cat.subtitle || cat.area || '';
+  setMkKnowledgeViewMode('home');
+  const hash = mySarahHashForPanel('knowledge', { knowledgeCategory: String(categoryKey) });
+  if (parseLocationHash().msPanel === 'knowledge' && location.hash.replace(/^#/, '') !== hash) {
+    location.hash = hash;
+  }
+  renderMkSectionModalMeta(cat);
+  updateMkSectionModalFoot(categoryKey);
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  body.innerHTML =
+    '<p class="ms-knowledge-detail-note" aria-live="polite">Loading your saved details…</p>';
+  await ensureMkHydratedFromServer();
+  body.innerHTML = renderMkCategoryFormBody(categoryKey);
+  body.querySelector('input, select, textarea')?.focus();
+}
+
 function renderMkPersonalIdentityForm(data) {
   const d = data || {};
   const behavior = getSarahBehaviorFromIdentity(d);
   const behaviorFields = SARAH_BEHAVIOR_IDENTITY_KEYS.map((k) => mkBehaviorSelectField(k, behavior)).join('');
   return `
     <form id="mkIdentityForm" class="ms-knowledge-form" autocomplete="on">
-      <p class="ms-knowledge-detail-note">Edits save in this browser for the prototype. Sync to your account arrives with the My Knowledge API.</p>
+      <p class="ms-knowledge-detail-note">Tell Sarah who you are. Saves on this device and syncs to your account when you are signed in — Personal Sarah uses this to address you by name and personalise replies.</p>
 
       <fieldset class="ms-knowledge-fieldset">
-        <legend class="ms-knowledge-legend">Identity & location</legend>
+        <legend class="ms-knowledge-legend">Who you are</legend>
         <div class="ms-knowledge-field-row">
           <label class="ms-knowledge-label" for="mk_fullName">Full name</label>
           <input class="ms-knowledge-input" id="mk_fullName" name="fullName" type="text" placeholder="Legal or full name" value="${escapeHtml(d.fullName || '')}" />
@@ -8727,12 +9248,52 @@ function renderMkPersonalIdentityForm(data) {
         </div>
         <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
           <div>
+            <label class="ms-knowledge-label" for="mk_sex">Sex</label>
+            <select class="ms-knowledge-input" id="mk_sex" name="sex">${mkPlainSelectHtml('sex', MK_SEX_OPTIONS, d.sex || '')}</select>
+          </div>
+          <div>
+            <label class="ms-knowledge-label" for="mk_maritalStatus">Marital status</label>
+            <select class="ms-knowledge-input" id="mk_maritalStatus" name="maritalStatus">${mkPlainSelectHtml('maritalStatus', MK_MARITAL_STATUS_OPTIONS, d.maritalStatus)}</select>
+          </div>
+        </div>
+        <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
+          <div>
+            <label class="ms-knowledge-label" for="mk_religion">Religion / spirituality</label>
+            <select class="ms-knowledge-input" id="mk_religion" name="religion">${mkPlainSelectHtml('religion', MK_RELIGION_OPTIONS, d.religion)}</select>
+          </div>
+          <div>
+            <label class="ms-knowledge-label" for="mk_careerField">Career field</label>
+            <select class="ms-knowledge-input" id="mk_careerField" name="careerField">${mkPlainSelectHtml('careerField', MK_CAREER_FIELD_OPTIONS, d.careerField)}</select>
+          </div>
+        </div>
+        <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
+          <div>
+            <label class="ms-knowledge-label" for="mk_hasChildren">Children</label>
+            <select class="ms-knowledge-input" id="mk_hasChildren" name="hasChildren">${mkPlainSelectHtml('hasChildren', MK_HAS_CHILDREN_OPTIONS, d.hasChildren)}</select>
+          </div>
+          <div>
+            <label class="ms-knowledge-label" for="mk_childrenCount">How many children</label>
+            <select class="ms-knowledge-input" id="mk_childrenCount" name="childrenCount">${mkPlainSelectHtml('childrenCount', MK_CHILDREN_COUNT_OPTIONS, d.childrenCount)}</select>
+          </div>
+        </div>
+        <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
+          <div>
             <label class="ms-knowledge-label" for="mk_country">Country</label>
-            <input class="ms-knowledge-input" id="mk_country" name="country" type="text" placeholder="Country you live in" value="${escapeHtml(d.country || '')}" />
+            <select class="ms-knowledge-input" id="mk_country" name="country">${mkPlainSelectHtml('country', MK_COUNTRY_OPTIONS, d.country || '')}</select>
           </div>
           <div>
             <label class="ms-knowledge-label" for="mk_city">City / area</label>
             <input class="ms-knowledge-input" id="mk_city" name="city" type="text" placeholder="City or main area" value="${escapeHtml(d.city || '')}" />
+          </div>
+        </div>
+        <div class="ms-knowledge-field-row ms-knowledge-field-row--half">
+          <div>
+            <label class="ms-knowledge-label" for="mk_homeRegion">Home region</label>
+            <select class="ms-knowledge-input" id="mk_homeRegion" name="homeRegion">${mkPlainSelectHtml('homeRegion', MK_HOME_REGION_OPTIONS, d.homeRegion)}</select>
+          </div>
+          <div>
+            <label class="ms-knowledge-label" for="mk_homeAddressNote">Address note <span class="ms-knowledge-optional">(optional)</span></label>
+            <input class="ms-knowledge-input" id="mk_homeAddressNote" name="homeAddressNote" type="text" placeholder="Suburb or area — not your street number" value="${escapeHtml(d.homeAddressNote || '')}" />
           </div>
         </div>
         <div class="ms-knowledge-field-row">
@@ -8811,78 +9372,12 @@ function renderMkCategoryPlaceholder(cat) {
 }
 
 function renderMkCategoryDetail(categoryKey) {
-  const key = String(categoryKey || '').trim();
-  const mk = window.SARAH_PROTOTYPE?.MOCK_MY_KNOWLEDGE;
-  const cat = mk?.categories?.find((c) => c.key === key);
-  const host = document.getElementById('mkCategoryRoot');
-  if (!host) return;
+  setMkKnowledgeViewMode('home');
+  void openMkSectionModal(categoryKey);
+}
 
-  setMkKnowledgeViewMode('detail');
-
-  if (!cat) {
-    host.innerHTML = `
-      <div class="ms-knowledge-detail-inner">
-        <button type="button" class="ms-knowledge-back" id="mkCategoryBack">Back</button>
-        <p class="ms-knowledge-detail-lead">Category not found.</p>
-      </div>`;
-    return;
-  }
-
-  const badgeClass = mkClassificationShort(cat.classification) === 'Sensitive' ? 'sensitive' : 'personal';
-  let body = '';
-  if (key === 'identity') {
-    body = renderMkPersonalIdentityForm(loadPersonalIdentity());
-  } else if (key === 'family') {
-    body = renderMkFamilyForm(loadFamilyRelationships());
-  } else if (key === 'goals') {
-    body = renderMkGoalsForm(loadGoalsAmbitions());
-  } else if (key === 'work') {
-    body = renderMkWorkForm(loadWorkProfessional());
-  } else if (key === 'business') {
-    body = renderMkBusinessForm(loadBusinessEntrepreneurship());
-  } else if (key === 'education') {
-    body = renderMkEducationForm(loadEducationLearning());
-  } else if (key === 'health') {
-    body = renderMkHealthForm(loadHealthWellbeing());
-  } else if (key === 'financial') {
-    body = renderMkFinancialForm(loadFinancialLife());
-  } else if (key === 'lifestyle') {
-    body = renderMkLifestyleForm(loadLifestylePreferences());
-  } else if (key === 'dates') {
-    body = renderMkImportantDatesForm(loadImportantDatesEvents());
-  } else if (key === 'documents') {
-    body = renderMkDocumentsForm(loadDocumentsRecords());
-  } else if (key === 'routines') {
-    body = renderMkRoutinesForm(loadRoutinesDailyLife());
-  } else if (key === 'property') {
-    body = renderMkPropertyForm(loadPropertyAssets());
-  } else if (key === 'travel') {
-    body = renderMkTravelForm(loadTravelPlaces());
-  } else if (key === 'values') {
-    body = renderMkValuesForm(loadValuesPrinciples());
-  } else {
-    body = renderMkCategoryPlaceholder(cat);
-  }
-
-  host.innerHTML = `
-    <div class="ms-knowledge-detail-inner">
-      <button type="button" class="ms-knowledge-back" id="mkCategoryBack" aria-label="Back to My Knowledge">
-        <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
-        Back
-      </button>
-      <header class="ms-knowledge-detail-head">
-        <div>
-          <p class="ms-knowledge-detail-eyebrow">${escapeHtml(cat.subtitle || cat.area)}</p>
-          <h3 class="ms-knowledge-detail-title">${escapeHtml(cat.label)}</h3>
-        </div>
-        <span class="ms-knowledge-badge ms-knowledge-badge--${badgeClass}">${escapeHtml(mkClassificationShort(cat.classification))}</span>
-      </header>
-      <dl class="ms-knowledge-detail-perms">
-        <div><dt>Sarah may use</dt><dd>${cat.sarahMayUse ? 'On' : 'Off'} <span class="ms-knowledge-hint">(MK‑06)</span></div>
-        <div><dt>Learn from chat</dt><dd>${cat.learnFromConversations ? 'On' : 'Off'} <span class="ms-knowledge-hint">(MK‑06)</span></div>
-      </dl>
-      ${body}
-    </div>`;
+function mkKnowledgeInteractionRoot(target) {
+  return target?.closest?.('#mkCategoryRoot, #mkSectionModalBody');
 }
 
 let __mkCategoryDetailBound = false;
@@ -8890,10 +9385,9 @@ let __mkCategoryDetailBound = false;
 function bindMkCategoryDetailOnce() {
   if (__mkCategoryDetailBound) return;
   __mkCategoryDetailBound = true;
-  const root = document.getElementById('mkCategoryRoot');
-  if (!root) return;
 
-  root.addEventListener('click', (e) => {
+  document.addEventListener('click', (e) => {
+    if (!mkKnowledgeInteractionRoot(e.target) && !e.target.closest('#mkCategoryBack')) return;
     const back = e.target.closest('#mkCategoryBack');
     if (back) {
       e.preventDefault();
@@ -8904,105 +9398,105 @@ function bindMkCategoryDetailOnce() {
     if (resetIdentity) {
       discardPersonalIdentityEdits();
       showProtoToast('Reset to prototype defaults');
-      renderMkCategoryDetail('identity');
+      refreshMkCategoryView('identity');
       return;
     }
     const resetFamily = e.target.closest('#mkFamilyReset');
     if (resetFamily) {
       discardFamilyRelationshipsEdits();
       showProtoToast('Family list reset to prototype defaults');
-      renderMkCategoryDetail('family');
+      refreshMkCategoryView('family');
       return;
     }
     const resetGoals = e.target.closest('#mkGoalsReset');
     if (resetGoals) {
       discardGoalsAmbitionsEdits();
       showProtoToast('Goals reset to prototype defaults');
-      renderMkCategoryDetail('goals');
+      refreshMkCategoryView('goals');
       return;
     }
     const resetWork = e.target.closest('#mkWorkReset');
     if (resetWork) {
       discardWorkProfessionalEdits();
       showProtoToast('Work profile reset to prototype defaults');
-      renderMkCategoryDetail('work');
+      refreshMkCategoryView('work');
       return;
     }
     const resetBusiness = e.target.closest('#mkBusinessReset');
     if (resetBusiness) {
       discardBusinessEntrepreneurshipEdits();
       showProtoToast('Business profiles reset to prototype defaults');
-      renderMkCategoryDetail('business');
+      refreshMkCategoryView('business');
       return;
     }
     const resetEducation = e.target.closest('#mkEducationReset');
     if (resetEducation) {
       discardEducationLearningEdits();
       showProtoToast('Education reset to prototype defaults');
-      renderMkCategoryDetail('education');
+      refreshMkCategoryView('education');
       return;
     }
     const resetHealth = e.target.closest('#mkHealthReset');
     if (resetHealth) {
       discardHealthWellbeingEdits();
       showProtoToast('Health notes reset to prototype defaults');
-      renderMkCategoryDetail('health');
+      refreshMkCategoryView('health');
       return;
     }
     const resetFinancial = e.target.closest('#mkFinancialReset');
     if (resetFinancial) {
       discardFinancialLifeEdits();
       showProtoToast('Financial notes reset to prototype defaults');
-      renderMkCategoryDetail('financial');
+      refreshMkCategoryView('financial');
       return;
     }
     const resetLifestyle = e.target.closest('#mkLifestyleReset');
     if (resetLifestyle) {
       discardLifestylePreferencesEdits();
       showProtoToast('Lifestyle preferences reset to prototype defaults');
-      renderMkCategoryDetail('lifestyle');
+      refreshMkCategoryView('lifestyle');
       return;
     }
     const resetDates = e.target.closest('#mkDatesReset');
     if (resetDates) {
       discardImportantDatesEventsEdits();
       showProtoToast('Dates & events reset to prototype defaults');
-      renderMkCategoryDetail('dates');
+      refreshMkCategoryView('dates');
       return;
     }
     const resetDocuments = e.target.closest('#mkDocumentsReset');
     if (resetDocuments) {
       discardDocumentsRecordsEdits();
       showProtoToast('Documents list reset to prototype defaults');
-      renderMkCategoryDetail('documents');
+      refreshMkCategoryView('documents');
       return;
     }
     const resetRoutines = e.target.closest('#mkRoutinesReset');
     if (resetRoutines) {
       discardRoutinesDailyLifeEdits();
       showProtoToast('Routines reset to prototype defaults');
-      renderMkCategoryDetail('routines');
+      refreshMkCategoryView('routines');
       return;
     }
     const resetProperty = e.target.closest('#mkPropertyReset');
     if (resetProperty) {
       discardPropertyAssetsEdits();
       showProtoToast('Property & assets reset to prototype defaults');
-      renderMkCategoryDetail('property');
+      refreshMkCategoryView('property');
       return;
     }
     const resetTravel = e.target.closest('#mkTravelReset');
     if (resetTravel) {
       discardTravelPlacesEdits();
       showProtoToast('Travel reset to prototype defaults');
-      renderMkCategoryDetail('travel');
+      refreshMkCategoryView('travel');
       return;
     }
     const resetValues = e.target.closest('#mkValuesReset');
     if (resetValues) {
       discardValuesPrinciplesEdits();
       showProtoToast('Values & principles reset to prototype defaults');
-      renderMkCategoryDetail('values');
+      refreshMkCategoryView('values');
       return;
     }
     const addFamily = e.target.closest('[data-mk-family-add]');
@@ -9013,11 +9507,13 @@ function bindMkCategoryDetailOnce() {
         name: '',
         relationship: 'close_friends',
         birthday: '',
+        contactFrequency: '',
+        livesWith: '',
         details: '',
         reminders: '',
       });
       saveFamilyRelationships(data);
-      renderMkCategoryDetail('family');
+      refreshMkCategoryView('family');
       showProtoToast('Person added — fill in and save');
       return;
     }
@@ -9027,7 +9523,7 @@ function bindMkCategoryDetailOnce() {
       const data = loadFamilyRelationships();
       data.people = (data.people || []).filter((p) => p.id !== pid);
       saveFamilyRelationships(data);
-      renderMkCategoryDetail('family');
+      refreshMkCategoryView('family');
       showProtoToast('Person removed');
       return;
     }
@@ -9050,7 +9546,7 @@ function bindMkCategoryDetailOnce() {
         goalKind: 'personal',
       });
       saveGoalsAmbitions(data);
-      renderMkCategoryDetail('goals');
+      refreshMkCategoryView('goals');
       showProtoToast('Goal added — fill in and save');
       return;
     }
@@ -9060,7 +9556,7 @@ function bindMkCategoryDetailOnce() {
       const data = loadGoalsAmbitions();
       data.goals = (data.goals || []).filter((g) => g.id !== gid);
       saveGoalsAmbitions(data);
-      renderMkCategoryDetail('goals');
+      refreshMkCategoryView('goals');
       showProtoToast('Goal removed');
       return;
     }
@@ -9086,7 +9582,7 @@ function bindMkCategoryDetailOnce() {
         documentsNotes: '',
       });
       saveWorkProfessional(data);
-      renderMkCategoryDetail('work');
+      refreshMkCategoryView('work');
       showProtoToast('Role added — fill in and save');
       return;
     }
@@ -9096,7 +9592,7 @@ function bindMkCategoryDetailOnce() {
       const data = loadWorkProfessional();
       data.roles = (data.roles || []).filter((r) => r.id !== wid);
       saveWorkProfessional(data);
-      renderMkCategoryDetail('work');
+      refreshMkCategoryView('work');
       showProtoToast('Role removed');
       return;
     }
@@ -9118,7 +9614,7 @@ function bindMkCategoryDetailOnce() {
         confidentialityLevel: 'internal',
       });
       saveBusinessEntrepreneurship(data);
-      renderMkCategoryDetail('business');
+      refreshMkCategoryView('business');
       showProtoToast('Business added — fill in and save');
       return;
     }
@@ -9128,7 +9624,7 @@ function bindMkCategoryDetailOnce() {
       const data = loadBusinessEntrepreneurship();
       data.ventures = (data.ventures || []).filter((v) => v.id !== bid);
       saveBusinessEntrepreneurship(data);
-      renderMkCategoryDetail('business');
+      refreshMkCategoryView('business');
       showProtoToast('Business removed');
       return;
     }
@@ -9147,7 +9643,7 @@ function bindMkCategoryDetailOnce() {
         documentsNote: '',
       });
       saveEducationLearning(data);
-      renderMkCategoryDetail('education');
+      refreshMkCategoryView('education');
       showProtoToast('Program added — fill in and save');
       return;
     }
@@ -9157,7 +9653,7 @@ function bindMkCategoryDetailOnce() {
       const data = loadEducationLearning();
       data.formalPrograms = (data.formalPrograms || []).filter((p) => p.id !== rid);
       saveEducationLearning(data);
-      renderMkCategoryDetail('education');
+      refreshMkCategoryView('education');
       showProtoToast('Program removed');
       return;
     }
@@ -9174,7 +9670,7 @@ function bindMkCategoryDetailOnce() {
         notes: '',
       });
       saveEducationLearning(data);
-      renderMkCategoryDetail('education');
+      refreshMkCategoryView('education');
       showProtoToast('Course added — fill in and save');
       return;
     }
@@ -9184,7 +9680,7 @@ function bindMkCategoryDetailOnce() {
       const data = loadEducationLearning();
       data.coursesAndCerts = (data.coursesAndCerts || []).filter((c) => c.id !== cid);
       saveEducationLearning(data);
-      renderMkCategoryDetail('education');
+      refreshMkCategoryView('education');
       showProtoToast('Course removed');
       return;
     }
@@ -9203,7 +9699,7 @@ function bindMkCategoryDetailOnce() {
         notes: '',
       });
       saveImportantDatesEvents(data);
-      renderMkCategoryDetail('dates');
+      refreshMkCategoryView('dates');
       showProtoToast('Date added — fill in and save');
       return;
     }
@@ -9213,7 +9709,7 @@ function bindMkCategoryDetailOnce() {
       const data = loadImportantDatesEvents();
       data.events = (data.events || []).filter((ev) => ev.id !== did);
       saveImportantDatesEvents(data);
-      renderMkCategoryDetail('dates');
+      refreshMkCategoryView('dates');
       showProtoToast('Date removed');
       return;
     }
@@ -9232,7 +9728,7 @@ function bindMkCategoryDetailOnce() {
         notes: '',
       });
       saveDocumentsRecords(data);
-      renderMkCategoryDetail('documents');
+      refreshMkCategoryView('documents');
       showProtoToast('Document added — fill in and save');
       return;
     }
@@ -9242,7 +9738,7 @@ function bindMkCategoryDetailOnce() {
       const data = loadDocumentsRecords();
       data.records = (data.records || []).filter((r) => r.id !== rid);
       saveDocumentsRecords(data);
-      renderMkCategoryDetail('documents');
+      refreshMkCategoryView('documents');
       showProtoToast('Document removed');
       return;
     }
@@ -9261,7 +9757,7 @@ function bindMkCategoryDetailOnce() {
         notes: '',
       });
       savePropertyAssets(data);
-      renderMkCategoryDetail('property');
+      refreshMkCategoryView('property');
       showProtoToast('Asset added — fill in and save');
       return;
     }
@@ -9271,7 +9767,7 @@ function bindMkCategoryDetailOnce() {
       const data = loadPropertyAssets();
       data.items = (data.items || []).filter((x) => x.id !== pid);
       savePropertyAssets(data);
-      renderMkCategoryDetail('property');
+      refreshMkCategoryView('property');
       showProtoToast('Asset removed');
       return;
     }
@@ -9291,7 +9787,7 @@ function bindMkCategoryDetailOnce() {
         notes: '',
       });
       saveTravelPlaces(data);
-      renderMkCategoryDetail('travel');
+      refreshMkCategoryView('travel');
       showProtoToast('Trip added — fill in and save');
       return;
     }
@@ -9301,7 +9797,7 @@ function bindMkCategoryDetailOnce() {
       const data = loadTravelPlaces();
       data.trips = (data.trips || []).filter((t) => t.id !== tid);
       saveTravelPlaces(data);
-      renderMkCategoryDetail('travel');
+      refreshMkCategoryView('travel');
       showProtoToast('Trip removed');
       return;
     }
@@ -9310,10 +9806,15 @@ function bindMkCategoryDetailOnce() {
     }
   });
 
-  root.addEventListener('submit', (e) => {
+  document.addEventListener('submit', (e) => {
     const form = e.target;
     if (!(form instanceof HTMLFormElement)) return;
+    if (!mkKnowledgeInteractionRoot(form)) return;
     e.preventDefault();
+    const mkSavedRemote = (categoryKey, data) => {
+      void syncMkCategoryToServer(categoryKey, data);
+      void refreshProfileSarahKnowledgeUi();
+    };
     if (form.id === 'mkIdentityForm') {
       const fd = new FormData(form);
       const partial = {};
@@ -9327,77 +9828,102 @@ function bindMkCategoryDetailOnce() {
       partial.responseStyle = partial.sarahBehavior.responseStyle || partial.responseStyle;
       const saved = savePersonalIdentity(partial);
       void syncPersonalProfileKnowledge(saved);
-      showProtoToast('Personal identity and Sarah preferences saved');
+      showProtoToast('Personal identity saved — Personal Sarah will use your name and details');
       return;
     }
     if (form.id === 'mkFamilyForm') {
       const people = collectFamilyPeopleFromDom();
-      saveFamilyRelationships({ people });
-      showProtoToast('Family & relationships saved (this device)');
+      const data = { people };
+      saveFamilyRelationships(data);
+      mkSavedRemote('family', data);
+      showProtoToast('Family & relationships saved');
       return;
     }
     if (form.id === 'mkGoalsForm') {
       const goals = collectGoalsFromDom();
-      saveGoalsAmbitions({ goals });
-      showProtoToast('Goals saved (this device)');
+      const data = { goals };
+      saveGoalsAmbitions(data);
+      mkSavedRemote('goals', data);
+      showProtoToast('Goals saved');
       return;
     }
     if (form.id === 'mkWorkForm') {
       const roles = collectWorkRolesFromDom();
-      saveWorkProfessional({ roles });
-      showProtoToast('Work profile saved (this device)');
+      const data = { roles };
+      saveWorkProfessional(data);
+      mkSavedRemote('work', data);
+      showProtoToast('Work profile saved');
       return;
     }
     if (form.id === 'mkBusinessForm') {
       const ventures = collectBusinessVenturesFromDom();
-      saveBusinessEntrepreneurship({ ventures });
-      showProtoToast('Business profiles saved (this device)');
+      const data = { ventures };
+      saveBusinessEntrepreneurship(data);
+      mkSavedRemote('business', data);
+      showProtoToast('Business profiles saved');
       return;
     }
     if (form.id === 'mkEducationForm') {
       const snapshot = collectEducationLearningFromForm(form);
       saveEducationLearning(snapshot);
-      showProtoToast('Education saved (this device)');
+      mkSavedRemote('education', snapshot);
+      showProtoToast('Education saved');
       return;
     }
     if (form.id === 'mkHealthForm') {
-      saveHealthWellbeing(collectHealthWellbeingFromForm(form));
-      showProtoToast('Health notes saved (this device)');
+      const snapshot = collectHealthWellbeingFromForm(form);
+      saveHealthWellbeing(snapshot);
+      mkSavedRemote('health', snapshot);
+      showProtoToast('Health notes saved');
       return;
     }
     if (form.id === 'mkFinancialForm') {
-      saveFinancialLife(collectFinancialLifeFromForm(form));
-      showProtoToast('Financial notes saved (this device)');
+      const snapshot = collectFinancialLifeFromForm(form);
+      saveFinancialLife(snapshot);
+      mkSavedRemote('financial', snapshot);
+      showProtoToast('Financial notes saved');
       return;
     }
     if (form.id === 'mkLifestyleForm') {
-      saveLifestylePreferences(collectLifestylePreferencesFromForm(form));
-      showProtoToast('Lifestyle preferences saved (this device)');
+      const snapshot = collectLifestylePreferencesFromForm(form);
+      saveLifestylePreferences(snapshot);
+      mkSavedRemote('lifestyle', snapshot);
+      showProtoToast('Lifestyle preferences saved');
       return;
     }
     if (form.id === 'mkDatesForm') {
-      saveImportantDatesEvents(collectImportantDatesFromDom(form));
-      showProtoToast('Dates & events saved (this device)');
+      const snapshot = collectImportantDatesFromDom(form);
+      saveImportantDatesEvents(snapshot);
+      mkSavedRemote('dates', snapshot);
+      showProtoToast('Dates & events saved');
       return;
     }
     if (form.id === 'mkDocumentsForm') {
-      saveDocumentsRecords(collectDocumentsRecordsFromDom(form));
-      showProtoToast('Documents & records saved (this device)');
+      const snapshot = collectDocumentsRecordsFromDom(form);
+      saveDocumentsRecords(snapshot);
+      mkSavedRemote('documents', snapshot);
+      showProtoToast('Documents & records saved');
       return;
     }
     if (form.id === 'mkRoutinesForm') {
-      saveRoutinesDailyLife(collectRoutinesDailyLifeFromForm(form));
-      showProtoToast('Routines saved (this device)');
+      const snapshot = collectRoutinesDailyLifeFromForm(form);
+      saveRoutinesDailyLife(snapshot);
+      mkSavedRemote('routines', snapshot);
+      showProtoToast('Routines saved');
       return;
     }
     if (form.id === 'mkPropertyForm') {
-      savePropertyAssets(collectPropertyAssetsFromDom(form));
-      showProtoToast('Property & assets saved (this device)');
+      const snapshot = collectPropertyAssetsFromDom(form);
+      savePropertyAssets(snapshot);
+      mkSavedRemote('property', snapshot);
+      showProtoToast('Property & assets saved');
       return;
     }
     if (form.id === 'mkTravelForm') {
-      saveTravelPlaces(collectTravelPlacesFromDom(form));
-      showProtoToast('Travel saved (this device)');
+      const snapshot = collectTravelPlacesFromDom(form);
+      saveTravelPlaces(snapshot);
+      mkSavedRemote('travel', snapshot);
+      showProtoToast('Travel saved');
       return;
     }
     if (form.id === 'mkValuesForm') {
@@ -9411,6 +9937,7 @@ function bindMkCategoryDetailOnce() {
       };
       savePersonalIdentity(merged);
       void syncPersonalProfileKnowledge(merged);
+      mkSavedRemote('values', values);
       showProtoToast('Values and Sarah boundaries saved');
     }
   });
@@ -10027,16 +10554,8 @@ function bindMyKnowledgePanelOnce() {
     const btn = e.target.closest('[data-mk-area-jump]');
     if (!btn) return;
     const area = btn.getAttribute('data-mk-area-jump');
-    if (area === 'understanding') {
-      document.getElementById('mkUnderstandingHeading')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-    const mk = window.SARAH_PROTOTYPE?.MOCK_MY_KNOWLEDGE;
-    const first = (mk?.categories || []).find((c) => c.area === area);
-    if (!first) return;
-    const raw = String(first.key);
-    const forSelector = raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    document.querySelector(`[data-mk-cat-key="${forSelector}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (!area) return;
+    openMkAreaPickerModal(area);
   });
 
   document.getElementById('mkHomeRoot')?.addEventListener('click', (e) => {
@@ -10111,7 +10630,7 @@ function renderKnowledge(knowledgeCategory) {
   const catKey = String(knowledgeCategory || '').trim() || null;
   if (catKey) {
     bindMyKnowledgePanelOnce();
-    renderMkCategoryDetail(catKey);
+    openMkSectionModal(catKey);
     return;
   }
 
