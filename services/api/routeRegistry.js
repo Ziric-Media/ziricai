@@ -231,6 +231,16 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/operations/recommendations/verification-queue", domain: "platform", tenantScoped: false, description: "REC offering verification queue (MC)" },
     { method: "GET", path: "/api/operations/recommendations/verification-queue/:caseId", domain: "platform", tenantScoped: false, description: "REC offering verification case detail" },
     { method: "POST", path: "/api/operations/recommendations/verification-queue/:caseId/decision", domain: "platform", tenantScoped: false, description: "REC offering verification decision (audited)" },
+    { method: "GET", path: "/api/companies/:companyId/recommendations/packages", domain: "tenant", tenantScoped: true, description: "RS09 campaign packages (planning tariffs)" },
+    { method: "GET", path: "/api/companies/:companyId/recommendations/campaigns", domain: "tenant", tenantScoped: true, description: "List recommendation campaigns" },
+    { method: "POST", path: "/api/companies/:companyId/recommendations/campaigns", domain: "tenant", tenantScoped: true, description: "Create recommendation campaign draft" },
+    { method: "PATCH", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId", domain: "tenant", tenantScoped: true, description: "Update draft campaign" },
+    { method: "POST", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId/submit", domain: "tenant", tenantScoped: true, description: "Submit campaign for MC approval" },
+    { method: "POST", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId/activate", domain: "tenant", tenantScoped: true, description: "Activate approved campaign (payment or pilot)" },
+    { method: "GET", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId/usage", domain: "tenant", tenantScoped: true, description: "Campaign allowance usage (current period)" },
+    { method: "GET", path: "/api/operations/recommendations/campaign-approval-queue", domain: "platform", tenantScoped: false, description: "REC campaign approval queue" },
+    { method: "GET", path: "/api/operations/recommendations/campaigns/:campaignId", domain: "platform", tenantScoped: false, description: "REC campaign detail (MC)" },
+    { method: "POST", path: "/api/operations/recommendations/campaigns/:campaignId/decision", domain: "platform", tenantScoped: false, description: "Approve/reject recommendation campaign" },
 
     // MC-PO — Platform governance (Mission Control)
     { method: "GET", path: "/api/platform/governance/consumers", domain: "platform", tenantScoped: false, description: "Consumer directory (metadata)" },

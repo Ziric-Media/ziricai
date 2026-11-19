@@ -19,6 +19,19 @@ import {
     getOfferingVerificationCase,
     decideOfferingVerification,
 } from "../recommendations/offeringVerificationService.js";
+import {
+    listCampaignsForCompany,
+    createCampaign,
+    updateCampaign,
+    submitCampaignForApproval,
+    getCampaignWithUsage,
+    activateCampaign,
+    listCampaignApprovalQueue,
+    getCampaignById,
+    decideCampaignApproval,
+    listRecCampaignPackages,
+    clientCampaign,
+} from "../recommendations/campaignService.js";
 
 function fail(res, err, fallbackCode) {
     res.status(err.status || 500).json({
@@ -150,6 +163,127 @@ export function mountRecommendationRoutes(app, deps = {}) {
             res.json({ ok: true, data: { case: kase } });
         } catch (err) {
             fail(res, err, "OFFERING_VERIFICATION_DECISION_FAILED");
+        }
+    });
+
+    app.get("/api/companies/:companyId/recommendations/packages", async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const companyId = String(req.params.companyId || "");
+            await authorize(req, companyId, { write: false });
+            res.json({ ok: true, data: { packages: listRecCampaignPackages() } });
+        } catch (err) {
+            fail(res, err, "REC_PACKAGES_FAILED");
+        }
+    });
+
+    app.get("/api/companies/:companyId/recommendations/campaigns", async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const companyId = String(req.params.companyId || "");
+            await authorize(req, companyId, { write: false });
+            const campaigns = await listCampaignsForCompany(companyId);
+            res.json({ ok: true, data: { campaigns } });
+        } catch (err) {
+            fail(res, err, "CAMPAIGNS_LIST_FAILED");
+        }
+    });
+
+    app.post("/api/companies/:companyId/recommendations/campaigns", async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const companyId = String(req.params.companyId || "");
+            const tenant = await authorize(req, companyId, { write: true });
+            const campaign = await createCampaign(companyId, req.body || {}, tenant.uid);
+            res.status(201).json({ ok: true, data: { campaign } });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_CREATE_FAILED");
+        }
+    });
+
+    app.patch("/api/companies/:companyId/recommendations/campaigns/:campaignId", async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const companyId = String(req.params.companyId || "");
+            const campaignId = String(req.params.campaignId || "");
+            const tenant = await authorize(req, companyId, { write: true });
+            const campaign = await updateCampaign(companyId, campaignId, req.body || {}, tenant.uid);
+            res.json({ ok: true, data: { campaign } });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_UPDATE_FAILED");
+        }
+    });
+
+    app.post("/api/companies/:companyId/recommendations/campaigns/:campaignId/submit", async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const companyId = String(req.params.companyId || "");
+            const campaignId = String(req.params.campaignId || "");
+            const tenant = await authorize(req, companyId, { write: true });
+            const campaign = await submitCampaignForApproval(companyId, campaignId, tenant.uid);
+            res.json({ ok: true, data: { campaign } });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_SUBMIT_FAILED");
+        }
+    });
+
+    app.post("/api/companies/:companyId/recommendations/campaigns/:campaignId/activate", async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const companyId = String(req.params.companyId || "");
+            const campaignId = String(req.params.campaignId || "");
+            const tenant = await authorize(req, companyId, { write: true });
+            const result = await activateCampaign(companyId, campaignId, tenant.uid);
+            res.json({ ok: true, data: result });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_ACTIVATE_FAILED");
+        }
+    });
+
+    app.get("/api/companies/:companyId/recommendations/campaigns/:campaignId/usage", async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const companyId = String(req.params.companyId || "");
+            const campaignId = String(req.params.campaignId || "");
+            await authorize(req, companyId, { write: false });
+            const data = await getCampaignWithUsage(companyId, campaignId);
+            if (!data) return res.status(404).json({ ok: false, error: { code: "CAMPAIGN_NOT_FOUND", message: "Not found." } });
+            res.json({ ok: true, data });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_USAGE_FAILED");
+        }
+    });
+
+    app.get("/api/operations/recommendations/campaign-approval-queue", guardRead, async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const cases = await listCampaignApprovalQueue({ status: req.query?.status, limit: Number(req.query?.limit) || 100 });
+            res.json({ ok: true, data: { campaigns: cases.map((c) => clientCampaign(c)) } });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_QUEUE_FAILED");
+        }
+    });
+
+    app.get("/api/operations/recommendations/campaigns/:campaignId", guardRead, async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const raw = await getCampaignById(String(req.params.campaignId || ""));
+            if (!raw) return res.status(404).json({ ok: false, error: { code: "CAMPAIGN_NOT_FOUND", message: "Not found." } });
+            res.json({ ok: true, data: { campaign: clientCampaign(raw) } });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_DETAIL_FAILED");
+        }
+    });
+
+    app.post("/api/operations/recommendations/campaigns/:campaignId/decision", guardDecide, async (req, res) => {
+        if (!ensureRecApiEnabled(res)) return;
+        try {
+            const campaignId = String(req.params.campaignId || "");
+            const actor = actorOf(req);
+            const campaign = await decideCampaignApproval(campaignId, req.body || {}, actor);
+            res.json({ ok: true, data: { campaign } });
+        } catch (err) {
+            fail(res, err, "CAMPAIGN_DECISION_FAILED");
         }
     });
 }
