@@ -61,8 +61,9 @@ Implements stakeholder decisions (2026-11-15): monthly tokens **expire**; **top-
 | Phase | Deliverable | Status |
 |-------|-------------|--------|
 | **REC-01** | [Master spec](./REC-01_SARAH_RECOMMENDATIONS_MASTER_SPEC.md) + [repo audit](./REC-01_REPOSITORY_READINESS_AUDIT.md) | **Gate 1 approved** ([record](./REC-01_GATE_01_APPROVAL.md)) |
-| **REC-01b** | [Technical architecture](./REC-01B_TECHNICAL_ARCHITECTURE.md) | **Drafted** — Gate 2 sign-off pending |
-| REC-02 … REC-11 | Verification → pilot → commercial launch | Not authorised |
+| **REC-01b** | [Technical architecture](./REC-01B_TECHNICAL_ARCHITECTURE.md) | **Gate 2 approved** ([record](./REC-01_GATE_02_APPROVAL.md)) |
+| **REC-02** | Offering verification + catalogue foundation | **Authorised** |
+| REC-03 … REC-11 | Catalogue → pilot → commercial launch | Sequenced after REC-02+; pilot/checkout gated |
 
 **Pilot:** 60–90 days; verified orgs only; Central Motors / Educare per readiness gates in REC-01 §18. **No implementation** until Gate 2 architecture approval.
 

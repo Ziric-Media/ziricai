@@ -49,7 +49,7 @@
 
 **Inputs:** [REC-01 Repository Readiness Audit](./REC-01_REPOSITORY_READINESS_AUDIT.md)
 
-**Exit:** Reply **REC-01 Gate 2 approved** → REC-02 implementation may begin (verification/offering entities first).
+**Exit:** **Closed** — [Gate 2 approval](./REC-01_GATE_02_APPROVAL.md) (2026-11-19).
 
 ---
 

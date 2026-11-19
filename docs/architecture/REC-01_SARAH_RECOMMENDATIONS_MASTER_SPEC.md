@@ -9,12 +9,12 @@
 | **Programme** | ZiricAI Revenue & Platform Expansion |
 | **Specification** | REC-01 |
 | **Version** | 1.0 |
-| **Status** | **Gate 1 approved** (2026-11-19) — [approval record](./REC-01_GATE_01_APPROVAL.md); **implementation not yet authorised** (awaiting Gate 2) |
+| **Status** | **Gates 1–2 approved** (2026-11-19) — [Gate 1](./REC-01_GATE_01_APPROVAL.md) · [Gate 2](./REC-01_GATE_02_APPROVAL.md); **REC-02 authorised**; production pilot/checkout still gated (Gates 5–7) |
 | **Launch market** | South Africa |
 | **Initial pilot** | Selected verified organisations |
 | **Commercial model** | Monthly sponsored recommendation campaigns |
 
-**Related:** [Gate 1 approval](./REC-01_GATE_01_APPROVAL.md) · [REC-01b Technical Architecture](./REC-01B_TECHNICAL_ARCHITECTURE.md) · [Repository readiness audit](./REC-01_REPOSITORY_READINESS_AUDIT.md) · [Revenue architecture RS09](./ZIRICAI_REVENUE_ARCHITECTURE.md#7-rs09--sarah-recommendations-sponsored-conversational-discovery) · [Trust & consent](./SARAH_APP_TRUST_AND_CONSENT.md)
+**Related:** [Gate 1](./REC-01_GATE_01_APPROVAL.md) · [Gate 2](./REC-01_GATE_02_APPROVAL.md) · [REC-01b Technical Architecture](./REC-01B_TECHNICAL_ARCHITECTURE.md) · [Repository readiness audit](./REC-01_REPOSITORY_READINESS_AUDIT.md) · [Revenue architecture RS09](./ZIRICAI_REVENUE_ARCHITECTURE.md#7-rs09--sarah-recommendations-sponsored-conversational-discovery) · [Trust & consent](./SARAH_APP_TRUST_AND_CONSENT.md)
 
 ---
 
@@ -373,4 +373,4 @@ Sarah Recommendations connects people who need offerings, verified providers, Sa
 
 ---
 
-**REC-01 specification status:** **GATE 1 APPROVED** — proceed to **Gate 2** (architecture + API contracts per [REC-01b path](./REC-01_GATE_01_APPROVAL.md#next-step--gate-2-architecture-approval)). REC-02+ implementation remains unauthorised until Gate 2 closes.
+**REC-01 specification status:** **GATES 1–2 APPROVED** — begin **REC-02** (verification). Commercial pilot and payments remain behind Gates 5–7 and REC-09/REC-10.

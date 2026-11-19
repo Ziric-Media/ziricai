@@ -4,8 +4,8 @@
 |-------|--------|
 | **Programme** | Sarah Recommendations (RS09) |
 | **Parent** | [REC-01 Master Spec](./REC-01_SARAH_RECOMMENDATIONS_MASTER_SPEC.md) |
-| **Gate** | **Gate 2 — Architecture approval** (proposed; implementation still blocked until Gate 2 closed) |
-| **Version** | 1.0-draft |
+| **Gate** | **Gate 2 — Architecture approval** — [approved](./REC-01_GATE_02_APPROVAL.md) 2026-11-19 |
+| **Version** | 1.0 |
 | **Date** | 2026-11-19 |
 
 **Prerequisites:** [Gate 1 approved](./REC-01_GATE_01_APPROVAL.md) · [Repository audit](./REC-01_REPOSITORY_READINESS_AUDIT.md)
@@ -426,9 +426,9 @@ Spencer may override before Gate 2 sign-off.
 | Idempotency defined | §4.4 |
 | Sarah integration path | §6 |
 | Tenant isolation reviewed | §9 |
-| Stakeholder sign-off | Pending — reply **REC-01 Gate 2 approved** |
+| Stakeholder sign-off | **Approved** — [REC-01 Gate 2](./REC-01_GATE_02_APPROVAL.md) |
 
-**REC-02 implementation authorised only after Gate 2 closed.**
+**REC-02 implementation is authorised** (see Gate 2 approval record).
 
 ---
 

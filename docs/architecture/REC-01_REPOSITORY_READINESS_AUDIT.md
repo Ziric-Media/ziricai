@@ -99,11 +99,12 @@ recommendationApiRoutes.js          → single entry for Sarah Integration Layer
 | **1 — Commercial model** | Packages, allowances, Discover separation | **Documented** in REC-01 |
 | **1 — Privacy principles** | §9–10, trust cross-links | **Documented**; enforcement pending |
 | **1 — Stakeholder approval** | Spencer / product sign-off | **Approved** — [REC-01 Gate 1](./REC-01_GATE_01_APPROVAL.md) (2026-11-19) |
-| **2 — Architecture audit** | This document + [REC-01b](./REC-01B_TECHNICAL_ARCHITECTURE.md) | **Draft complete** — awaiting Gate 2 sign-off |
-| **2 — API contracts** | REC-01b §5 | **Drafted** (route registry update at REC-05) |
-| **3–7** | Verification, campaigns, Sarah, pilot, launch | **Not started** |
+| **2 — Architecture audit** | This document + [REC-01b](./REC-01B_TECHNICAL_ARCHITECTURE.md) | **Approved** — [Gate 2](./REC-01_GATE_02_APPROVAL.md) |
+| **2 — API contracts** | REC-01b §5 | **Approved** (routes implemented per phase) |
+| **3 — Verification readiness** | REC-02 | **Authorised** |
+| **4–7** | Campaigns, Sarah, pilot, launch | **Not started** (blocked on prior phases) |
 
-**Implementation authorisation:** **None** until **Gate 2** architecture approval (Gate 1 **closed** 2026-11-19).
+**Implementation authorisation:** **REC-02** (verification / offerings) — Gate 2 **closed** 2026-11-19. REC-10 pilot and production checkout remain unauthorised.
 
 ---
 
