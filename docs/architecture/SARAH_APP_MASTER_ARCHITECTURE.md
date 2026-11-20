@@ -13,6 +13,9 @@
 | User accounts | **Shared Firebase identity** — one UID across Mission Control, Company Portal, and Sarah App |
 | Authorization | **Separate roles and data boundaries** per portal; consumer access never implies tenant membership |
 | Core channel | **Sarah Network** (first-party); WhatsApp and other integrations remain **optional** for businesses |
+| **SA-01 Navigation** | **AI-first** shell: My Sarah, **News**, Discover, Chats, Profile — **no social Status timeline** in primary navigation (Status remains portal/network where needed; consumer proactive intel → **Sarah News**, [SN-NEWS-00](./SN-NEWS-00_SARAH_NEWS_INTELLIGENCE.md)). |
+| **Usage (US)** | Monthly tokens **expire** at period end; **optional top-ups** when exhausted; **no auto-billing** without explicit purchase — [Subscription & Usage spec](./SARAH_APP_SUBSCRIPTION_AND_USAGE_SPEC.md) |
+| **Sarah Work (SW)** | **Automatic** per-assignment token budgeting within allowance — users do not set manual Work budgets — [Sarah Work spec](./SARAH_WORK_SPECIFICATION.md) |
 
 ---
 
@@ -63,15 +66,18 @@ Company Sarah today is implemented as **tenant-scoped portal Sarah** (`CLIENT_OP
 
 ## Consumer product modules (navigation)
 
+**SA-01 (locked):** Primary consumer navigation is **AI-first** — assistive product surfaces, not a social feed.
+
 | Module | Purpose |
 |--------|---------|
-| **Chats** | Per-company conversation threads with Company Sarah |
-| **My Sarah** | Personal assistant + My Knowledge entry points |
-| **Status** | Social timeline (companies, creators, users) — infinite scroll, engagement, RS03 Boost |
+| **My Sarah** | Personal assistant (**Chat** + **Work**), My Knowledge entry, notifications, billing drawer |
 | **Discover** | Business **profile** discovery — compact cards, industry browse, RS04 sponsored slots → company profile |
-| **Profile** | Account, privacy, consents, notifications, My Knowledge management |
+| **Chats** | Per-company conversation threads with Company Sarah |
+| **Profile** | Identity, **My Plan & Usage** ([US-03](./SARAH_APP_SUBSCRIPTION_AND_USAGE_SPEC.md#us-03--profile--my-plan--usage)), preferences Sarah may use, account, privacy, consents |
 
-Original three modules (Conversations, Chat, Status) map to **Chats**, **My Sarah**, and **Status**; **Discover** and **Profile** are required for onboarding and POPIA-grade control.
+**Removed from primary nav (SA-01):** consumer **Status** social timeline (U7 / RS03 Boost may continue from Company Portal or a later optional surface — not a core Sarah App tab).
+
+**Discover** and **Profile** remain required for onboarding, POPIA-grade control, and subscription transparency.
 
 ---
 
@@ -107,7 +113,7 @@ Platform engines (Social Content, Infinite Feed, Engagement, Follow/Notify, Busi
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ Sarah App — Web / Mobile (standalone brand)              │
-│  Chats · My Sarah · Status · Discover · Profile          │
+│  My Sarah · Discover · Chats · Profile (SA-01)           │
 └───────────────────────────┬─────────────────────────────┘
                             │ Bearer Firebase ID token
 ┌───────────────────────────▼─────────────────────────────┐

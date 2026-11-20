@@ -166,6 +166,17 @@
     </section>
 
     <!-- Discover — business directory -->
+    <section class="view snews-view" data-view="news">
+      <header class="discover-top">
+        <span class="discover-top-spacer" aria-hidden="true"></span>
+        <h1 class="discover-top-title">News</h1>
+        <span class="discover-top-spacer" aria-hidden="true"></span>
+      </header>
+      <div class="screen-body snews-body" id="snewsHost">
+        <p class="text-muted">Loading Sarah News…</p>
+      </div>
+    </section>
+
     <section class="view discover-view" data-view="discover">
       <header class="discover-top">
         <span class="discover-top-spacer" aria-hidden="true"></span>
@@ -1056,6 +1067,14 @@
     </div>
   </div>
 
+  <div id="snewsStoryOverlay" class="snews-story-overlay hidden" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="snews-story-backdrop" data-snews-story-close tabindex="-1"></div>
+    <div class="snews-story-panel">
+      <button type="button" class="snews-story-close" data-snews-story-close aria-label="Close">&times;</button>
+      <div id="snewsStoryBody" class="snews-story-body"></div>
+    </div>
+  </div>
+
   <nav class="bottom-nav hidden" aria-label="Primary">
     <button type="button" class="text-nav-label text-nav-label--sarah-app" data-route="home">
       <span class="nav-icon nav-icon--sarah-app" aria-hidden="true">
@@ -1067,6 +1086,10 @@
         </span>
       </span>
       My Sarah
+    </button>
+    <button type="button" class="text-nav-label" data-route="news">
+      <span class="nav-icon"><svg class="icon-svg icon-svg--nav" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12a2 2 0 012 2v14l-4-3-4 3-4-3-4 3V6a2 2 0 012-2z"/><path d="M8 8h8M8 12h6"/></svg></span>
+      News
     </button>
     <button type="button" class="text-nav-label" data-route="discover">
       <span class="nav-icon"><svg class="icon-svg icon-svg--nav" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="3"/></svg></span>
@@ -1098,6 +1121,7 @@
   <script src="js/mock-data.js"></script>
   <script src="js/thread-rich-text.js"></script>
   <script src="js/sarah-behavior-options.js"></script>
+  <script src="js/sarah-news.js"></script>
   <script src="js/app.js"></script>
   <script defer>
     (function () {

@@ -1866,13 +1866,14 @@ const VIEWS = [
   'auth',
   'register-details',
   'home',
+  'news',
   'discover',
   'discover-company',
   'chats',
   'chat-thread',
   'profile',
 ];
-const NAV_ROUTES = ['home', 'discover', 'chats', 'profile'];
+const NAV_ROUTES = ['home', 'news', 'discover', 'chats', 'profile'];
 const MY_SARAH_PANELS = ['home', 'tasks', 'knowledge', 'organisations', 'wallet', 'pay', 'billing', 'notifications'];
 
 const MW01_DEMO_STORAGE_KEY = 'sarah.prototype.myWallet.demo.v1';
@@ -2572,7 +2573,11 @@ function setRoute(route) {
     rt.threadReturnRoute =
       prev.route === 'discover-company'
         ? 'discover'
-        : prev.route === 'home' || prev.route === 'chats' || prev.route === 'discover' || prev.route === 'profile'
+        : prev.route === 'home' ||
+            prev.route === 'news' ||
+            prev.route === 'chats' ||
+            prev.route === 'discover' ||
+            prev.route === 'profile'
           ? prev.route
           : 'chats';
   }
@@ -12385,6 +12390,7 @@ function activateView() {
     }
   }
 
+  if (route === 'news' && window.SarahNews?.renderNewsPanel) window.SarahNews.renderNewsPanel();
   if (route === 'discover') renderDiscover();
   if (route === 'discover-company') {
     const { companyId } = parseLocationHash();

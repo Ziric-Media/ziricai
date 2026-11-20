@@ -639,6 +639,41 @@ export async function fetchPersonalKnowledgeSections() {
   return { sections: res.data?.sections || [] };
 }
 
+export async function fetchSarahNewsProfile() {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const res = await apiRequest('/api/personal-sarah/news/profile', { silent: true });
+  if (res.error) return { error: res.error, code: res.code };
+  const body = res.data || {};
+  return { profile: body.profile ?? body.data?.profile ?? null };
+}
+
+export async function saveSarahNewsProfile(profile) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const res = await apiRequest('/api/personal-sarah/news/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(profile || {}),
+  });
+  if (res.error) return { error: res.error, code: res.code };
+  const body = res.data || {};
+  return { profile: body.profile ?? body.data?.profile ?? profile };
+}
+
+export async function fetchSarahNewsEdition(slot = '') {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const q = slot ? `?slot=${encodeURIComponent(slot)}` : '';
+  const res = await apiRequest(`/api/personal-sarah/news/editions/latest${q}`, {
+    silent: true,
+    timeoutMs: 60000,
+  });
+  if (res.error) return { error: res.error, code: res.code };
+  const body = res.data || {};
+  return { edition: body.edition ?? body.data?.edition, profile: body.profile };
+}
+
 export async function fetchSarahHomeCards(mode = 'chat') {
   const blocked = await requireSignedInConsumer();
   if (blocked) return blocked;
