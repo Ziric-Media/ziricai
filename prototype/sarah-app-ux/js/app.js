@@ -1154,6 +1154,10 @@ function handlePushPayload(payload = {}) {
   markPushStarred(id);
   const rawType = String(data.type || data.pushType || '').toLowerCase();
   const channel = String(data.channel || '').toLowerCase();
+  const deepLink = String(data.deepLink || '').toLowerCase();
+  if (deepLink.startsWith('news') && typeof globalThis.setRoute === 'function') {
+    globalThis.setRoute('news');
+  }
   const kind =
     rawType === 'sarah_reminder' || rawType === 'reminders' || rawType.includes('reminder') || channel === 'reminders'
       ? 'reminder'
@@ -14446,6 +14450,19 @@ function init() {
     };
     void pollServerReminders();
     setInterval(pollServerReminders, 15000);
+    if (window.SarahLive?.pollSarahNewsDelivery) {
+      const pollNewsDelivery = async () => {
+        if (!window.SarahLive?.isSignedIn?.()) return;
+        const res = await window.SarahLive.pollSarahNewsDelivery();
+        if (res.error) return;
+        if ((res.briefings?.length || 0) + (res.breaking?.length || 0) > 0) {
+          void refreshLiveNotifications();
+          syncNotificationBadge();
+        }
+      };
+      void pollNewsDelivery();
+      setInterval(pollNewsDelivery, 60_000);
+    }
     import('./personal-geofence.mjs').then((geo) => {
       geo.startPersonalGeofenceWatch(async (coords) => {
         const res = await window.SarahLive.checkPersonalReminderGeofence(coords);

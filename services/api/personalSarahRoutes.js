@@ -29,6 +29,7 @@ import { persistPersonalSarahSession } from "../sarah/personal/personalSarahSess
 import { getSarahNewsProfile, setSarahNewsProfile } from "../sarah/news/sarahNewsProfileService.js";
 import { compileSarahNewsEdition } from "../sarah/news/sarahNewsEditionService.js";
 import { getSarahNewsStoryForUser } from "../sarah/news/sarahNewsIntelligenceService.js";
+import { pollSarahNewsDeliveryForUser } from "../sarah/news/sarahNewsDeliveryService.js";
 import { executePersonalSarahWorkRun } from "../sarah/personal/personalSarahWorkRunner.js";
 import { allocateWorkBudgetForSession } from "../sarah/personal/personalSarahWorkBudget.js";
 import {
@@ -872,6 +873,25 @@ export function mountPersonalSarahRoutes(app) {
             res.status(err.status || 500).json({
                 ok: false,
                 error: { code: err.code || "NEWS_EDITION_FAILED", message: err.message },
+            });
+        }
+    });
+
+    app.get("/api/personal-sarah/news/deliver/poll", requireConsumerScope(), async (req, res) => {
+        try {
+            const result = await pollSarahNewsDeliveryForUser(req.consumerAuth.uid);
+            if (!result.ok) {
+                res.status(404).json({
+                    ok: false,
+                    error: { code: result.code || "NEWS_DELIVER_FAILED", message: "Sarah News is not set up." },
+                });
+                return;
+            }
+            res.json({ ok: true, ...result });
+        } catch (err) {
+            res.status(err.status || 500).json({
+                ok: false,
+                error: { code: err.code || "NEWS_DELIVER_FAILED", message: err.message },
             });
         }
     });

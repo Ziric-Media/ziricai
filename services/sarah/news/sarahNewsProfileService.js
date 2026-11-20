@@ -4,6 +4,7 @@
 import { getConfiguredStorageBackend } from "../../storage/storageAdapter.js";
 import { getConsumerPreferences } from "../../users/consumerProfileService.js";
 import { setDoc, userPreferencesRef, serverTimestamp } from "../../database/firestoreClient.js";
+import { syncSarahNewsSubscriber } from "./sarahNewsSubscriberIndex.js";
 
 const memoryNewsProfiles = new Map();
 
@@ -94,6 +95,7 @@ export async function setSarahNewsProfile(uid, input = {}) {
     const profile = normalizeProfile(input);
     if (getConfiguredStorageBackend() === "memory") {
         memoryNewsProfiles.set(uid, profile);
+        await syncSarahNewsSubscriber(uid, profile);
         return profile;
     }
     await setDoc(
@@ -101,6 +103,7 @@ export async function setSarahNewsProfile(uid, input = {}) {
         { sarahNews: profile, updatedAt: serverTimestamp() },
         { merge: true }
     );
+    await syncSarahNewsSubscriber(uid, profile);
     return profile;
 }
 

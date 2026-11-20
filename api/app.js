@@ -2865,6 +2865,24 @@ export async function runBackgroundInit() {
         await initQueue();
         console.error("[startup] Storage backend:", adapter.name);
 
+        const sarahNewsSchedulerMs = Number(process.env.SARAH_NEWS_SCHEDULER_INTERVAL_MS || 120_000);
+        if (
+            sarahNewsSchedulerMs > 0 &&
+            String(process.env.SARAH_NEWS_SCHEDULER_ENABLED || "true").toLowerCase() !== "false"
+        ) {
+            const { runSarahNewsSchedulerTick } = await import(
+                "../services/sarah/news/sarahNewsDeliveryService.js"
+            );
+            const runNews = () => {
+                runSarahNewsSchedulerTick().catch((err) => {
+                    console.warn("[sarahNews] scheduler tick:", err.message);
+                });
+            };
+            setTimeout(runNews, 45_000);
+            setInterval(runNews, sarahNewsSchedulerMs);
+            console.error("[startup] Sarah News scheduler every", sarahNewsSchedulerMs, "ms");
+        }
+
         const proactiveIntervalMs = Number(process.env.PROACTIVE_DETECTION_INTERVAL_MS || 0);
         if (
             proactiveIntervalMs > 0 &&

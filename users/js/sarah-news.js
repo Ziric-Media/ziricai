@@ -317,7 +317,7 @@
         <section class="snews-setup-card snews-setup-card--toggle">
           <label class="snews-toggle-row">
             <input type="checkbox" id="snewsBreaking" ${p.breaking ? 'checked' : ''}/>
-            <span><strong>Breaking news alerts</strong><small>Coming soon — breaking pipeline (SN-04)</small></span>
+            <span><strong>Breaking news alerts</strong><small>Push when Sarah verifies a major developing story (max 3/day)</small></span>
           </label>
         </section>
         <button type="button" class="btn btn-primary snews-primary-cta" id="snewsSaveSetup">Save &amp; open briefing</button>

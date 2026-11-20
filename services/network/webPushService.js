@@ -8,6 +8,7 @@
  */
 import { createSign } from "node:crypto";
 import { listConsentedPushTokens } from "./pushDeviceService.js";
+import { getConsumerNotificationPrefs, shouldDeliverPushForPrefs } from "./consumerNotificationPrefsService.js";
 
 /** @type {Array<{ uid: string, title: string, body: string, at: string, sent?: number }>} */
 const testLog = [];
@@ -163,8 +164,14 @@ async function sendFcmV1(deviceToken, payload) {
                 data: {
                     notificationId: String(payload.notificationId || ""),
                     snId: String(payload.snId || ""),
-                    type: "sarah_network",
+                    type: String(payload.pushType || payload.channel || "sarah_network"),
+                    channel: String(payload.channel || ""),
+                    deepLink: String(payload.deepLink || ""),
+                    storyId: String(payload.storyId || ""),
+                    slot: String(payload.slot || ""),
                 },
+                android: { priority: "high" },
+                apns: { headers: { "apns-priority": "10" } },
             },
         }),
     });
@@ -176,6 +183,11 @@ async function sendFcmV1(deviceToken, payload) {
  * @param {{ title: string, body?: string, notificationId?: string, snId?: string }} payload
  */
 export async function sendPushToUser(uid, payload) {
+    const channel = payload.channel || payload.pushChannel || "";
+    const { prefs } = await getConsumerNotificationPrefs(uid);
+    if (!shouldDeliverPushForPrefs(prefs, channel)) {
+        return { sent: 0, skipped: "prefs_or_quiet_hours" };
+    }
     const tokens = await listConsentedPushTokens(uid);
     if (!tokens.length) return { sent: 0, skipped: "no_devices" };
     const mode = fcmMode();

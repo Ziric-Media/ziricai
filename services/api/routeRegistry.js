@@ -36,6 +36,7 @@ export const ROUTE_CATALOG = [
     { method: "PUT", path: "/api/personal-sarah/news/profile", domain: "consumer", tenantScoped: false, description: "Sarah News — save preferences" },
     { method: "GET", path: "/api/personal-sarah/news/editions/latest", domain: "consumer", tenantScoped: false, description: "Sarah News — compile latest headline edition (RSS v1)" },
     { method: "GET", path: "/api/personal-sarah/news/stories/:storyId", domain: "consumer", tenantScoped: false, description: "Sarah News — story room (facts, timeline, related, sources)" },
+    { method: "GET", path: "/api/personal-sarah/news/deliver/poll", domain: "consumer", tenantScoped: false, description: "Sarah News — poll briefing/breaking delivery (inbox + push)" },
     { method: "GET", path: "/api/personal-sarah/sessions/active", domain: "consumer", tenantScoped: false, description: "Latest Personal Sarah session" },
     { method: "GET", path: "/api/personal-sarah/sessions/:id/work/report", domain: "consumer", tenantScoped: false, description: "Sarah Work deliverable report after runner completes" },
     { method: "GET", path: "/api/personal-sarah/sessions/:id/work/deliverables", domain: "consumer", tenantScoped: false, description: "Sarah Work deliverables + reference files index" },

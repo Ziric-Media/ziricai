@@ -58,6 +58,18 @@ export async function listConsentedPushTokens(uid) {
     return rows.filter((r) => r.consent !== false).map((r) => r.token);
 }
 
+/** Distinct uids with at least one consented push token (scheduler fallback). */
+export async function listDistinctPushSubscriberUids(limit = 400) {
+    const rows = await col.list({ limit: 800 });
+    const uids = new Set();
+    for (const row of rows) {
+        const uid = row.uid;
+        if (uid && row.consent !== false) uids.add(uid);
+        if (uids.size >= limit) break;
+    }
+    return [...uids];
+}
+
 export function clearPushDevicesForTests() {
     col.clearMemory();
 }

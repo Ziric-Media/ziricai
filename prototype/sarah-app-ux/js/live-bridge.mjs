@@ -586,6 +586,19 @@ export async function pollDuePersonalReminders() {
   return { delivered: res.data?.delivered ?? 0, items: res.data?.items || [] };
 }
 
+export async function pollSarahNewsDelivery() {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const res = await apiRequest('/api/personal-sarah/news/deliver/poll', { silent: true });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  const body = res.data || {};
+  return {
+    briefings: body.briefings || [],
+    breaking: body.breaking || [],
+    dueSlots: body.dueSlots || [],
+  };
+}
+
 export async function checkPersonalReminderGeofence({ lat, lng } = {}) {
   if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
     return { error: 'lat and lng required', code: 'GEO_INVALID' };
@@ -1420,6 +1433,7 @@ function mountPublicApi() {
     fetchPersonalWorkEstimate,
     createPersonalReminder,
     pollDuePersonalReminders,
+    pollSarahNewsDelivery,
     checkPersonalReminderGeofence,
     fetchSarahHomeCards,
     fetchSarahNewsProfile,
