@@ -31,6 +31,9 @@ function matchDemoPersonalIntent(message) {
             args: { companyId: "smilemore-demo" },
         };
     }
+    if (/\bnews\b|\bheadlines?\b|\bbreaking\b|\bwhat'?s happening\b|\btoday'?s news\b/i.test(lower)) {
+        return { tool: "fetchSarahNewsHeadlines", args: {} };
+    }
     if (/\bremind\b|\breminder\b|\bremember to\b/.test(lower)) {
         const titleMatch = message.match(/remind(?: me)?(?: to)?\s+(.+)/i);
         const rawTitle = (titleMatch?.[1] || "Reminder").trim().slice(0, 120);

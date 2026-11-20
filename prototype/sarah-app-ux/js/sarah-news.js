@@ -223,7 +223,7 @@
       .join(' · ');
     const hasImg = Boolean(s.imageUrl);
     const banner = hasImg
-      ? `<div class="snews-story-banner${featured ? ' snews-story-banner--featured' : ''}"><img class="snews-story-banner-img" src="${escapeHtml(s.imageUrl)}" alt="" loading="lazy"/></div>`
+      ? `<div class="snews-story-banner${featured ? ' snews-story-banner--featured' : ''}"><img class="snews-story-banner-img" src="${escapeHtml(s.imageUrl)}" alt="" loading="lazy" decoding="async" width="640" height="360"/></div>`
       : `<div class="snews-story-banner snews-story-banner--placeholder${featured ? ' snews-story-banner--featured' : ''}" aria-hidden="true"></div>`;
     return `
       <article class="snews-story-card snews-story-card--banner${featured ? ' snews-story-card--featured' : ''}" data-news-story="${escapeHtml(s.storyId)}" role="button" tabindex="0">
