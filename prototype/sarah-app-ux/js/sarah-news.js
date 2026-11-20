@@ -216,26 +216,26 @@
       .filter(Boolean);
   }
 
-  function storyCard(s) {
+  function storyCard(s, { featured = false } = {}) {
     const meta = [s.region ? REGIONS.find((r) => r.id === s.region)?.label : null, s.publisher]
       .filter(Boolean)
       .join(' · ');
     const hasImg = Boolean(s.imageUrl);
-    const thumb = hasImg
-      ? `<img class="snews-story-thumb" src="${escapeHtml(s.imageUrl)}" alt="" loading="lazy" width="96" height="96"/>`
-      : '';
-    const inner = `
-        <div class="snews-story-card-top">
-          ${s.breaking ? '<span class="snews-badge snews-badge--breaking">Breaking</span>' : ''}
-          ${meta ? `<span class="snews-story-meta">${escapeHtml(meta)}</span>` : ''}
-        </div>
-        <h4 class="snews-story-head">${escapeHtml(s.headline)}</h4>
-        <p class="snews-story-sum">${escapeHtml(s.summary)}</p>
-        <span class="snews-story-more">Read in Sarah News →</span>`;
+    const banner = hasImg
+      ? `<div class="snews-story-banner${featured ? ' snews-story-banner--featured' : ''}"><img class="snews-story-banner-img" src="${escapeHtml(s.imageUrl)}" alt="" loading="lazy"/></div>`
+      : `<div class="snews-story-banner snews-story-banner--placeholder${featured ? ' snews-story-banner--featured' : ''}" aria-hidden="true"></div>`;
     return `
-      <article class="snews-story-card${hasImg ? ' snews-story-card--has-img' : ''}" data-news-story="${escapeHtml(s.storyId)}" role="button" tabindex="0">
-        ${thumb}
-        <div class="snews-story-card-inner">${inner}</div>
+      <article class="snews-story-card snews-story-card--banner${featured ? ' snews-story-card--featured' : ''}" data-news-story="${escapeHtml(s.storyId)}" role="button" tabindex="0">
+        ${banner}
+        <div class="snews-story-card-inner">
+          <div class="snews-story-card-top">
+            ${s.breaking ? '<span class="snews-badge snews-badge--breaking">Breaking</span>' : ''}
+            ${meta ? `<span class="snews-story-meta">${escapeHtml(meta)}</span>` : ''}
+          </div>
+          <h4 class="snews-story-head">${escapeHtml(s.headline)}</h4>
+          <p class="snews-story-sum">${escapeHtml(s.summary)}</p>
+          <span class="snews-story-more">Read in Sarah News →</span>
+        </div>
       </article>`;
   }
 
@@ -284,7 +284,7 @@
         <p class="snews-regions">${escapeHtml(regionSummary(profile))}</p>
         <p class="snews-disclaimer">${escapeHtml(disclaimer)}</p>
       </header>
-      ${top.length ? `<section class="snews-block"><h3 class="snews-block-title">Top stories</h3><div class="snews-story-list">${top.map(storyCard).join('')}</div></section>` : ''}
+      ${top.length ? `<section class="snews-block"><h3 class="snews-block-title">Top stories</h3><div class="snews-story-list">${top.map((s) => storyCard(s, { featured: true })).join('')}</div></section>` : ''}
       <section class="snews-block">
         <h3 class="snews-block-title">Headlines</h3>
         <div class="snews-story-list">${headlines.length ? headlines.map(storyCard).join('') : '<p class="snews-empty">No headlines matched your filters right now. Try adding World or more interests.</p>'}</div>
