@@ -148,7 +148,7 @@ export const MODULE_PERMISSIONS = {
 
   activity: 'canManageStaff',
 
-  marketplace: 'canManageStaff',
+  marketplace: 'canManageNetwork',
 
   support: null,
 

@@ -77,6 +77,15 @@ function url(value, field) {
     return v;
 }
 
+/** Product/gallery images: https listing media or platform asset paths from dental presets. */
+function discoverMediaUrl(value, field) {
+    const v = str(value, 500, field);
+    if (!v) return null;
+    if (/^assets\//i.test(v)) return v;
+    if (/^https:\/\/[^\s]+$/i.test(v)) return v;
+    throw bad(`${field} must be an https:// URL or an assets/ image path.`, "PROFILE_INVALID", { field });
+}
+
 function list(value, max, itemMax, field) {
     if (value === null || value === undefined) return [];
     if (!Array.isArray(value)) throw bad(`${field} must be a list.`, "PROFILE_INVALID", { field });
@@ -95,7 +104,7 @@ function galleryList(value) {
     return value
         .map((row) => {
             if (!row || typeof row !== "object") return null;
-            const imageUrl = url(row.imageUrl, "gallery.imageUrl");
+            const imageUrl = discoverMediaUrl(row.imageUrl, "gallery.imageUrl");
             if (!imageUrl) return null;
             const caption = row.caption ? str(row.caption, 160, "gallery.caption") : null;
             const id = str(String(row.id || slugId("gal")), 40, "gallery.id") || slugId("gal");
@@ -116,7 +125,7 @@ function productsList(value) {
             const id = str(String(row.id || slugId("prd")), 40, "products.id") || slugId("prd");
             const description = row.description ? str(row.description, 400, "products.description") : null;
             const price = row.price ? str(row.price, 40, "products.price") : null;
-            const imageUrl = row.imageUrl ? url(row.imageUrl, "products.imageUrl") : null;
+            const imageUrl = row.imageUrl ? discoverMediaUrl(row.imageUrl, "products.imageUrl") : null;
             const promotion = row.promotion ? str(row.promotion, 80, "products.promotion") : null;
             return {
                 id,

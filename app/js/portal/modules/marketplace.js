@@ -124,7 +124,6 @@ function drawerHtml(copy, product = null) {
 
 export async function renderMarketplace(container) {
   const companyId = requireCompanyId();
-  const canEdit = can(state.profile?.role, 'canManageStaff');
   const industry = state.hubData?.industry || state.company?.industry || '';
   const copy = industryProductCopy(industry);
 
@@ -136,6 +135,8 @@ export async function renderMarketplace(container) {
     container.innerHTML = `${pageHeader(copy.title, copy.subtitle)}${errorState(listingRes.error)}`;
     return;
   }
+
+  const canEdit = Boolean(listingRes.data?.canEdit) || can(state.profile?.role, 'canManageNetwork');
 
   let products = [...(listingRes.data?.profile?.products || [])];
   const published = Boolean(listingRes.data?.published);
@@ -188,7 +189,7 @@ export async function renderMarketplace(container) {
     editingId = product?.id || null;
     const host = container.querySelector('#discoProductDrawerHost');
     if (host) host.innerHTML = drawerHtml(copy, product);
-    bindImageUploads(container);
+    bindImageUploads(container, companyId);
     const drawer = container.querySelector('#discoProductDrawer');
     drawer.hidden = false;
     container.querySelector('#discoProductBackdrop')?.addEventListener('click', closeDrawer);
