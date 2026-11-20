@@ -49,6 +49,7 @@ export const SMILEMORE_CHANNELS = Object.freeze([
     { id: "phone", label: "Phone" },
     { id: "walk-in", label: "Walk-in" },
     { id: "sarah-sales", label: "Sarah Sales" },
+    { id: "sarah_app", label: "Sarah App" },
     { id: "portal", label: "Practice desk" },
     { id: "other", label: "Other" },
 ]);

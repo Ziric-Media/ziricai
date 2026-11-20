@@ -1,6 +1,7 @@
 /**
  * Appointment service — tenant-scoped scheduling.
  */
+import { randomUUID } from "crypto";
 import { ServiceBase } from "../core/serviceBase.js";
 import { TENANT_COLLECTIONS } from "../database/schema.js";
 
@@ -42,4 +43,26 @@ export async function cancelAppointment(companyId, appointmentId) {
 
 export async function listUpcomingAppointments(companyId) {
     return appointmentService.listUpcoming(companyId);
+}
+
+/** Single diary row — used by dental booking tools and claims. */
+export async function getAppointment(companyId, appointmentId) {
+    if (!companyId || !appointmentId) return null;
+    return appointmentService.get(companyId, appointmentId);
+}
+
+/** Create or replace a full appointment record (SmileMore diary ledger). */
+export async function saveAppointmentRecord(companyId, data = {}) {
+    const id = data.id || randomUUID();
+    const record = { ...data, companyId };
+    const existing = await appointmentService.get(companyId, id).catch(() => null);
+    if (existing) {
+        return appointmentService.update(companyId, id, record);
+    }
+    return appointmentService.create(companyId, record, id);
+}
+
+/** Partial update for diary rows. */
+export async function patchAppointmentRecord(companyId, appointmentId, patch = {}) {
+    return appointmentService.update(companyId, appointmentId, patch);
 }

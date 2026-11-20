@@ -5,8 +5,6 @@ import {
     updateSmilemoreBooking,
 } from "./dentalBookingService.js";
 import { getDentalPatient } from "./dentalPatientService.js";
-import { listDentalClaims } from "./dentalClaimService.js";
-import { listDentalSales } from "./dentalSaleService.js";
 import { moduleKeyFromPortalSurface } from "../sarah/portalSarahSurfaces.js";
 import { publish, EventTypes } from "../events/index.js";
 import {
@@ -190,6 +188,8 @@ export const getDentalPatientTool = {
     },
     requiredPermissions: ["canViewInbox"],
     async execute(ctx, args = {}) {
+        const { listDentalClaims } = await import("./dentalClaimService.js");
+        const { listDentalSales } = await import("./dentalSaleService.js");
         const patient = await getDentalPatient(ctx.companyId, args.phone);
         const bookings = (await listSmilemoreBookings(ctx.companyId)).filter((item) => {
             const phone = String(item.phone || item.customerId || "").replace(/\D/g, "");
@@ -271,6 +271,7 @@ export const listDentalSalesTool = {
                 message: "Till receipts belong to Sarah Finance. Sarah Admin can also read them.",
             };
         }
+        const { listDentalSales } = await import("./dentalSaleService.js");
         const items = await listDentalSales(ctx.companyId);
         return {
             ok: true,
@@ -307,6 +308,7 @@ export const listDentalClaimsTool = {
                 message: "Medical-aid worksheets belong to Sarah Finance. Sarah Admin can also read them.",
             };
         }
+        const { listDentalClaims } = await import("./dentalClaimService.js");
         const items = await listDentalClaims(ctx.companyId);
         return {
             ok: true,
