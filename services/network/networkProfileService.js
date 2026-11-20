@@ -253,9 +253,17 @@ export async function getListing(companyId, deps = {}) {
  * @param {object} input
  * @param {string|null} actorUid
  */
+function normalizeListingDraftInput(input = {}) {
+    if (input?.profile && typeof input.profile === "object" && !Array.isArray(input.profile)) {
+        const { profile, ...rest } = input;
+        return { ...rest, ...profile };
+    }
+    return input;
+}
+
 export async function saveListingDraft(companyId, input, actorUid = null, deps = {}) {
     await tenantRecord(companyId, deps);
-    const { profile, restricted } = validateProfilePatch(input);
+    const { profile, restricted } = validateProfilePatch(normalizeListingDraftInput(input));
     const entry = await loadEntry(companyId);
     const draft = { ...(entry?.draft || {}), ...profile };
     const nextRestricted = { ...(entry?.restricted || {}), ...restricted };

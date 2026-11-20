@@ -151,7 +151,7 @@ export async function renderMarketplace(container) {
       showToast('You do not have permission to edit products.', 'error');
       return false;
     }
-    const res = await saveNetworkListingDraft(companyId, { profile: { products: nextProducts } });
+    const res = await saveNetworkListingDraft(companyId, { products: nextProducts });
     if (res.error) {
       showToast(res.error, 'error');
       return false;

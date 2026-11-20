@@ -52,6 +52,19 @@ const FULL = {
     registrationNumber: "2020/123456/07",
 };
 
+test("saveListingDraft accepts nested profile wrapper from older portal clients", async () => {
+    reset();
+    await saveListingDraft(
+        PROD.id,
+        { profile: { products: [{ name: "Whitening kit", price: "From R 499", imageUrl: "https://cdn.example/w.jpg" }] } },
+        "owner-1",
+        deps
+    );
+    const listing = await getListing(PROD.id, deps);
+    assert.equal(listing.profile.products.length, 1);
+    assert.equal(listing.profile.products[0].name, "Whitening kit");
+});
+
 test("validation: rejects non-editable fields (verified), bad URLs, unknown categories, bad email", () => {
     assert.throws(() => validateProfilePatch({ verified: true }), { code: "PROFILE_FIELD_NOT_ALLOWED" });
     assert.throws(() => validateProfilePatch({ logoUrl: "http://insecure.example/a.png" }), { code: "PROFILE_INVALID" });
@@ -89,6 +102,10 @@ test("published tenant is discoverable with SN-ID + derived category; restricted
     assert.equal(companies.length, 1);
     assert.equal(companies[0].snId, listing.snId);
     assert.equal(companies[0].verified, false);
+    assert.deepEqual(companies[0].hours, FULL.hours, "every published tenant exposes hours on Discover cards");
+    assert.equal(companies[0].contact?.phone, FULL.contact.phone);
+    assert.equal(companies[0].contact?.email, FULL.contact.email);
+    assert.equal(companies[0].contact?.website, FULL.contact.website);
     assert.ok(!JSON.stringify(companies[0]).includes("2020/123456"));
     assert.ok(!JSON.stringify(companies[0]).includes("Pty"));
 
