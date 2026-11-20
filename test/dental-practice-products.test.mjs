@@ -16,4 +16,7 @@ test("dental product catalog is discover-shaped and under listing cap", () => {
         assert.ok(row.description);
     }
     assert.ok(dentalProductsCatalogIsCurrent(products));
+    const prices = products.map((p) => String(p.price));
+    assert.equal(prices[0], "From R1 200");
+    assert.ok(String(prices.at(-1)).includes("45 000"));
 });

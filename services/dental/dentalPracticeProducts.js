@@ -2,7 +2,9 @@
  * Default Discover "Products" catalog for all dental-clinic preset tenants.
  * Indicative ZAR ranges are for orientation only — final fees at consultation.
  */
-export const DENTAL_PRODUCTS_CATALOG_VERSION = 1;
+export const DENTAL_PRODUCTS_CATALOG_VERSION = 2;
+
+export const DENTAL_PRODUCT_IMAGE_FALLBACK = "assets/dental-products/fallback.svg";
 
 /** @typedef {{ id: string, name: string, description: string, category: string, price?: string, imageUrl?: string, promotion?: string }} DentalProduct */
 
@@ -15,7 +17,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Stainless steel brackets and archwires bonded to the teeth, widely used for complex bite and alignment corrections.",
         price: "From R28 000",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Dental_braces.jpg/640px-Dental_braces.jpg",
+        imageUrl: "assets/dental-products/braces.svg",
     },
     {
         id: "ortho-ceramic-braces",
@@ -24,7 +26,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Tooth-colored or translucent brackets that blend with natural teeth for a less noticeable look.",
         price: "From R32 000",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Ceramic_braces.jpg/640px-Ceramic_braces.jpg",
+        imageUrl: "assets/dental-products/braces.svg",
     },
     {
         id: "ortho-self-ligating",
@@ -33,7 +35,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Specialized brackets (including Damon-style systems) with built-in clips instead of elastic bands, lowering friction and adjustment visits.",
         price: "From R35 000",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Dental_braces.jpg/640px-Dental_braces.jpg",
+        imageUrl: "assets/dental-products/braces.svg",
         promotion: "Braces",
     },
     {
@@ -43,7 +45,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Custom metal brackets bonded on the tongue side of the teeth so they are hidden from view.",
         price: "From R45 000",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Dental_braces.jpg/640px-Dental_braces.jpg",
+        imageUrl: "assets/dental-products/braces.svg",
         promotion: "Braces",
     },
     {
@@ -53,7 +55,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Widely used clear aligner system with custom 3D-planned removable trays to gradually shift teeth.",
         price: "From R38 000",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Invisalign_brand_logo.svg/320px-Invisalign_brand_logo.svg.png",
+        imageUrl: "assets/dental-products/aligners.svg",
     },
     {
         id: "align-active",
@@ -62,7 +64,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "South African clear aligner brand (Smile Club) offered by local dentists for mild-to-moderate straightening.",
         price: "From R25 000",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Orthodontic_clear_aligners.jpg/640px-Orthodontic_clear_aligners.jpg",
+        imageUrl: "assets/dental-products/aligners.svg",
     },
     {
         id: "align-spark",
@@ -71,7 +73,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Medical-grade, stain-resistant clear aligners often prescribed as an alternative to other aligner systems.",
         price: "From R36 000",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Orthodontic_clear_aligners.jpg/640px-Orthodontic_clear_aligners.jpg",
+        imageUrl: "assets/dental-products/aligners.svg",
         promotion: "Clear aligners",
     },
     {
@@ -81,7 +83,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Clear aligner system used by orthodontists and general dentists for staged tooth movement.",
         price: "From R34 000",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Orthodontic_clear_aligners.jpg/640px-Orthodontic_clear_aligners.jpg",
+        imageUrl: "assets/dental-products/aligners.svg",
         promotion: "Clear aligners",
     },
     {
@@ -91,7 +93,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Essix (clear) retainers, Hawley plates, or bonded fixed wires to keep teeth stable after braces or aligners.",
         price: "From R2 500",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Orthodontic_retainer.jpg/640px-Orthodontic_retainer.jpg",
+        imageUrl: "assets/dental-products/retainer.svg",
     },
     {
         id: "appliance-night-guard",
@@ -100,7 +102,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Hard or soft splints to protect against bruxism (night grinding) and ease jaw tension.",
         price: "From R1 800",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Mouthguard.jpg/640px-Mouthguard.jpg",
+        imageUrl: "assets/dental-products/guard.svg",
     },
     {
         id: "appliance-sports-guard",
@@ -109,7 +111,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Shock-absorbing guards moulded to the teeth for contact sports such as rugby, hockey, or boxing.",
         price: "From R1 200",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Mouthguard.jpg/640px-Mouthguard.jpg",
+        imageUrl: "assets/dental-products/guard.svg",
         promotion: "Guards",
     },
     {
@@ -119,7 +121,7 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Mandibular advancement devices that hold the lower jaw slightly forward during sleep to help keep the airway open.",
         price: "From R4 500",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Mouthguard.jpg/640px-Mouthguard.jpg",
+        imageUrl: "assets/dental-products/guard.svg",
         promotion: "Sleep",
     },
     {
@@ -129,22 +131,29 @@ export const DENTAL_PRACTICE_PRODUCTS = Object.freeze([
         description:
             "Lab-made prosthetic restorations to replace missing teeth or restore damaged teeth after assessment.",
         price: "From R3 500 per unit",
-        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Dental_crowns.jpg/640px-Dental_crowns.jpg",
+        imageUrl: "assets/dental-products/restorative.svg",
     },
 ]);
 
+export function parseDentalProductPriceMinor(price = "") {
+    const digits = String(price).replace(/[^\d]/g, "");
+    return digits ? Number(digits) : 99_999_999;
+}
+
 /**
- * Discover listing shape (Sarah App company profile).
+ * Discover listing shape (Sarah App company profile), cheapest first.
  */
 export function buildDentalPracticeDiscoverProducts() {
-    return DENTAL_PRACTICE_PRODUCTS.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: p.price || null,
-        imageUrl: p.imageUrl || null,
-        promotion: p.promotion || p.category,
-    }));
+    return [...DENTAL_PRACTICE_PRODUCTS]
+        .sort((a, b) => parseDentalProductPriceMinor(a.price) - parseDentalProductPriceMinor(b.price))
+        .map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            price: p.price || null,
+            imageUrl: p.imageUrl || DENTAL_PRODUCT_IMAGE_FALLBACK,
+            promotion: p.promotion || p.category,
+        }));
 }
 
 export function buildDentalPracticeProductsKnowledgeText() {
@@ -172,5 +181,12 @@ Prices are indicative only and vary by case complexity, lab fees, and medical-ai
 export function dentalProductsCatalogIsCurrent(products = []) {
     if (!Array.isArray(products) || !products.length) return false;
     const ids = new Set(products.map((p) => p.id));
-    return ids.has("ortho-metal-braces") && ids.has("align-invisalign") && ids.has("prosthetic-restorations");
+    const metal = products.find((p) => p.id === "ortho-metal-braces");
+    const hasLocalImages = String(metal?.imageUrl || "").includes("assets/dental-products/");
+    return (
+        ids.has("ortho-metal-braces") &&
+        ids.has("align-invisalign") &&
+        ids.has("prosthetic-restorations") &&
+        hasLocalImages
+    );
 }

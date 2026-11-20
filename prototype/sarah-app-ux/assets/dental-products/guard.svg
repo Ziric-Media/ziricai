@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="Mouth guard">
+  <rect width="400" height="300" fill="#fff7ed"/>
+  <path d="M110 165 Q200 120 290 165 Q200 210 110 165Z" fill="#fdba74" stroke="#ea580c" stroke-width="6"/>
+  <path d="M140 165 Q200 140 260 165" fill="none" stroke="#fff" stroke-width="4" opacity=".7"/>
+  <text x="200" y="250" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" fill="#9a3412">Guards &amp; splints</text>
+</svg>

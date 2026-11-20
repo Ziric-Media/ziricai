@@ -5740,7 +5740,7 @@ function getCompanyGallery(company) {
 }
 
 function getCompanyProducts(company) {
-  if (company.products && company.products.length) return company.products;
+  if (company.products && company.products.length) return sortDiscoverProducts(company.products);
   if (company.live) return [];
   return [
     {
@@ -5791,8 +5791,34 @@ function resolveListingMediaUrl(url) {
   return raw;
 }
 
+function parseProductPriceSortValue(price) {
+  const digits = String(price || '').replace(/[^\d]/g, '');
+  return digits ? Number(digits) : Number.MAX_SAFE_INTEGER;
+}
+
+function sortDiscoverProducts(products) {
+  return [...(products || [])].sort(
+    (a, b) => parseProductPriceSortValue(a.price) - parseProductPriceSortValue(b.price)
+  );
+}
+
+function formatDiscoverProductPrice(price) {
+  const s = String(price || '').trim();
+  if (!s) return 'Quote at consultation';
+  if (/^from\b/i.test(s) || /^R\s/i.test(s)) return s;
+  return `From R ${s}`;
+}
+
+function resolveDiscoverProductImage(url, cardFallback) {
+  const raw = String(url || '').trim();
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith('assets/')) return prototypeAsset(raw);
+  return resolveListingMediaUrl(raw || cardFallback || '');
+}
+
 function discoverImgAttrs(src, company) {
-  const fallback = company.imageFallback || company.image || 'assets/discover/green-haven-fallback.svg';
+  const fallback =
+    company.imageFallback || company.image || 'assets/dental-products/fallback.svg';
   const safeFb = escapeHtml(prototypeAsset(fallback));
   const resolved = resolveListingMediaUrl(src) || src;
   const safeSrc = escapeHtml(prototypeAsset(resolved));
@@ -13212,12 +13238,14 @@ function mapLiveDiscoverCard(card) {
     gallery: (card.gallery || [])
       .map((g) => resolveListingMediaUrl(typeof g === 'string' ? g : g.imageUrl))
       .filter(Boolean),
-    products: (card.products || []).map((p) => ({
+    products: sortDiscoverProducts(card.products || []).map((p) => ({
       id: p.id || p.name,
       name: p.name,
       price: p.price || '',
-      image: resolveListingMediaUrl(p.imageUrl || card.coverUrl || card.logoUrl),
+      image: resolveDiscoverProductImage(p.imageUrl, card.coverUrl || card.logoUrl),
+      imageFallback: prototypeAsset('assets/dental-products/fallback.svg'),
       description: p.description || '',
+      promotion: p.promotion || '',
     })),
     hours: Array.isArray(card.hours) ? card.hours.filter((h) => h && h.day && h.time) : [],
     contact:
@@ -13638,11 +13666,11 @@ function renderCompanyDetail(companyId) {
       <article class="product-card">
         <div class="product-card-media">
           ${promoBadge}
-          <img ${discoverImgAttrs(p.image || p.imageUrl || company.image, company)} />
+          <img ${discoverImgAttrs(p.image || p.imageUrl, { imageFallback: p.imageFallback || 'assets/dental-products/fallback.svg' })} />
         </div>
         <h3 class="product-card-title">${escapeHtml(p.name)}</h3>
         ${p.description ? `<p class="product-card-desc">${escapeHtml(p.description)}</p>` : ''}
-        <p class="product-card-price">R ${escapeHtml(String(p.price))}</p>
+        <p class="product-card-price">${escapeHtml(formatDiscoverProductPrice(p.price))}</p>
         <div class="product-card-actions">
           <button type="button" class="product-like ${liked ? 'is-active' : ''}" data-product-like="${escapeHtml(p.id)}" aria-label="Like product">${DISCOVER_SVG.heart}</button>
           <button type="button" class="product-buy" data-product-buy="${escapeHtml(p.id)}">Buy</button>

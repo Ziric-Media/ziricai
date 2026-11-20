@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="Dental crowns and restorations">
+  <rect width="400" height="300" fill="#faf5ff"/>
+  <g transform="translate(200 150)">
+    <path d="M-40 40 L0 -45 L40 40 Z" fill="#e9d5ff" stroke="#9333ea" stroke-width="5"/>
+    <rect x="-55" y="40" width="110" height="18" rx="6" fill="#c084fc"/>
+  </g>
+  <text x="200" y="250" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" fill="#6b21a8">Crowns &amp; dentures</text>
+</svg>
