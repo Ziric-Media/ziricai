@@ -464,6 +464,8 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
       'icons.js',
       'mock-data.js',
       'thread-rich-text.js',
+      'sarah-behavior-options.js',
+      'sarah-news.js',
       'app.js',
     ]) {
       out = out.replace(
@@ -707,6 +709,11 @@ function prepareApp() {
     copyFile(path.join(ROOT, 'css', css), path.join(dir, 'css', css));
   }
   copyPlatformBrandAssets(dir, ['favicon-portal.svg']);
+
+  const dentalAssets = path.join(ROOT, 'prototype/sarah-app-ux/assets/dental-products');
+  if (fs.existsSync(dentalAssets)) {
+    copyDir(dentalAssets, path.join(dir, 'assets/dental-products'));
+  }
 }
 
 function prepareUsers() {
@@ -753,6 +760,14 @@ function prepareUsers() {
     'icon-maskable-512.png',
     'apple-touch-icon.png',
   ]);
+
+  const sarahAvatarPng = path.join(prototypeDir, 'assets/sarah-avatar.png');
+  if (fs.existsSync(sarahAvatarPng)) {
+    const assetsDir = path.join(dir, 'assets');
+    fs.mkdirSync(assetsDir, { recursive: true });
+    copyFile(sarahAvatarPng, path.join(assetsDir, 'favicon.png'));
+    copyFile(sarahAvatarPng, path.join(assetsDir, 'apple-touch-icon.png'));
+  }
 
   const apiTarget = PRODUCTION_API_URL;
   fs.writeFileSync(
