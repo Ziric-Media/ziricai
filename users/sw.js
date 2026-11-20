@@ -2,7 +2,7 @@
  * Sarah App PWA — precache shell; API always network.
  * Never cache /api/* or authenticated responses.
  */
-const STATIC_CACHE = 'sarah-app-static-v20';
+const STATIC_CACHE = 'sarah-app-static-v86';
 
 /** Shell only — large / lazy scripts are cached on first use via fetch handler. */
 const PRECACHE = [
@@ -17,8 +17,10 @@ const PRECACHE = [
   '/js/site-config.js',
   '/js/ziricai-config.js',
   '/js/icons.js',
+  '/js/mock-data.js',
   '/js/app.js',
   '/js/live-bridge.mjs',
+  '/js/sarah-news.js',
   '/assets/favicon.png',
   '/assets/icon-192.png',
   '/assets/icon-512.png',
@@ -80,15 +82,53 @@ try {
   const messaging = firebase.messaging();
   messaging.onBackgroundMessage((payload) => {
     const title = payload?.notification?.title || 'Sarah';
+    const data = payload?.data || {};
+    const isReminder = data.type === 'sarah_reminder' || data.type === 'reminders';
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      clients.forEach((client) => {
+        try {
+          client.postMessage({ type: 'sarah-push', payload, at: Date.now() });
+        } catch {
+          /* ignore */
+        }
+      });
+    });
     return self.registration.showNotification(title, {
       body: payload?.notification?.body || '',
-      data: payload?.data || {},
+      data,
       icon: '/assets/icon-192.png',
+      badge: '/assets/icon-192.png',
+      tag: isReminder ? `sarah-reminder-${data.notificationId || Date.now()}` : `sarah-${Date.now()}`,
+      requireInteraction: isReminder,
+      vibrate: isReminder ? [300, 120, 300, 120, 300] : undefined,
+      renotify: true,
     });
   });
 } catch (err) {
   console.warn('[Sarah SW] FCM init skipped', err);
 }
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const data = event.notification?.data || {};
+  const target =
+    data.type === 'sarah_reminder' || data.type === 'reminders'
+      ? '/#home/notifications'
+      : data.openPanel === 'notifications'
+        ? '/#home/notifications'
+        : '/#home/notifications';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const c of clients) {
+        if ('focus' in c) {
+          c.navigate?.(target);
+          return c.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
+    })
+  );
+});
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
@@ -118,8 +158,26 @@ self.addEventListener('fetch', (event) => {
 
   if (!isStatic) return;
 
+  const isAppCode =
+    url.pathname === '/js/app.js' ||
+    url.pathname === '/js/live-bridge.mjs' ||
+    url.pathname === '/js/sarah-news.js' ||
+    url.pathname === '/js/boot-inline.js';
+
   event.respondWith(
     caches.open(STATIC_CACHE).then(async (cache) => {
+      if (isAppCode) {
+        try {
+          const res = await fetch(event.request);
+          if (res.ok) {
+            await cache.put(event.request, res.clone());
+          }
+          return res;
+        } catch {
+          const cached = await cache.match(event.request, { ignoreSearch: true });
+          return cached || new Response('', { status: 504, statusText: 'Offline' });
+        }
+      }
       const cached = await cache.match(event.request, { ignoreSearch: true });
       if (cached) return cached;
       try {

@@ -174,7 +174,7 @@ flowchart TB
 |--------|------|---------|
 | GET/PUT | `/api/personal-sarah/news/profile` | Regions, interests, briefings, breaking, language |
 | GET | `/api/personal-sarah/news/editions/latest` | Query: `slot=morning\|lunch\|evening\|breaking` |
-| GET | `/api/personal-sarah/news/stories/:storyId` | Story room payload |
+| GET | `/api/personal-sarah/news/stories/:storyId` | Story room payload (facts, timeline, related, sources) — **live** |
 | POST | `/api/personal-sarah/news/compile` | On-demand compile (rate limited; US-04 tokens) |
 | POST | `/api/personal-sarah/news/stories/:storyId/ask` | Optional: start thread with story context |
 

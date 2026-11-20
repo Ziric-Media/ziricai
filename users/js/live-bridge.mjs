@@ -667,11 +667,26 @@ export async function fetchSarahNewsEdition(slot = '') {
   const q = slot ? `?slot=${encodeURIComponent(slot)}` : '';
   const res = await apiRequest(`/api/personal-sarah/news/editions/latest${q}`, {
     silent: true,
-    timeoutMs: 60000,
+    timeoutMs: 120000,
   });
-  if (res.error) return { error: res.error, code: res.code };
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
   const body = res.data || {};
   return { edition: body.edition ?? body.data?.edition, profile: body.profile };
+}
+
+export async function fetchSarahNewsStory(storyId, slot = '') {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const id = encodeURIComponent(String(storyId || '').trim());
+  if (!id) return { error: 'storyId required', code: 'INVALID_REQUEST' };
+  const q = slot ? `?slot=${encodeURIComponent(slot)}` : '';
+  const res = await apiRequest(`/api/personal-sarah/news/stories/${id}${q}`, {
+    silent: true,
+    timeoutMs: 120000,
+  });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  const body = res.data || {};
+  return { story: body.story ?? body.data?.story, edition: body.edition };
 }
 
 export async function fetchSarahHomeCards(mode = 'chat') {
@@ -1404,6 +1419,10 @@ function mountPublicApi() {
     pollDuePersonalReminders,
     checkPersonalReminderGeofence,
     fetchSarahHomeCards,
+    fetchSarahNewsProfile,
+    saveSarahNewsProfile,
+    fetchSarahNewsEdition,
+    fetchSarahNewsStory,
     upsertPersonalKnowledgeSection,
     fetchPersonalKnowledgeSections,
     saveSarahHomePrefsLocal,

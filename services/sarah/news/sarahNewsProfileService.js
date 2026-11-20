@@ -11,9 +11,31 @@ export const DEFAULT_SARAH_NEWS_PROFILE = Object.freeze({
     regions: ["za", "zw", "world"],
     interests: ["shorts", "business", "tech", "sports", "politics"],
     briefings: { morning: true, lunch: true, evening: true },
+    briefingTimes: { morning: "07:00", lunch: "12:30", evening: "18:30" },
+    followTopics: [],
     breaking: false,
     language: "en",
 });
+
+function normalizeBriefingTimes(input = {}) {
+    const base = { ...DEFAULT_SARAH_NEWS_PROFILE.briefingTimes };
+    for (const key of ["morning", "lunch", "evening"]) {
+        const raw = input[key];
+        if (!raw) continue;
+        const m = String(raw).match(/^(\d{1,2}):(\d{2})$/);
+        if (m) base[key] = `${String(m[1]).padStart(2, "0")}:${m[2]}`;
+    }
+    return base;
+}
+
+function normalizeFollowTopics(input) {
+    const fromArray = Array.isArray(input) ? input : [];
+    const topics = fromArray
+        .map((t) => String(t || "").trim())
+        .filter(Boolean)
+        .slice(0, 24);
+    return [...new Set(topics.map((t) => t.slice(0, 80)))];
+}
 
 function normalizeProfile(input = {}) {
     const briefings = { ...DEFAULT_SARAH_NEWS_PROFILE.briefings, ...(input.briefings || {}) };
@@ -21,10 +43,39 @@ function normalizeProfile(input = {}) {
         regions: Array.isArray(input.regions) ? input.regions.map(String).slice(0, 12) : [],
         interests: Array.isArray(input.interests) ? input.interests.map(String).slice(0, 20) : [],
         briefings,
+        briefingTimes: normalizeBriefingTimes(input.briefingTimes || {}),
+        followTopics: normalizeFollowTopics(input.followTopics),
         breaking: Boolean(input.breaking),
         language: String(input.language || "en").slice(0, 12),
         updatedAt: new Date().toISOString(),
     };
+}
+
+/**
+ * @param {object} profile
+ * @param {string} topic
+ */
+export async function addSarahNewsFollowTopic(uid, profile, topic) {
+    const next = normalizeFollowTopics([...(profile?.followTopics || []), topic]);
+    if (next.length === (profile?.followTopics || []).length) {
+        return { profile, added: false, topic: String(topic).trim() };
+    }
+    const updated = await setSarahNewsProfile(uid, { ...profile, followTopics: next });
+    return { profile: updated, added: true, topic: String(topic).trim() };
+}
+
+/**
+ * @param {object} profile
+ * @param {string} topic
+ */
+export async function removeSarahNewsFollowTopic(uid, profile, topic) {
+    const needle = String(topic || "").trim().toLowerCase();
+    const next = (profile?.followTopics || []).filter((t) => String(t).toLowerCase() !== needle);
+    if (next.length === (profile?.followTopics || []).length) {
+        return { profile, removed: false, topic: String(topic).trim() };
+    }
+    const updated = await setSarahNewsProfile(uid, { ...profile, followTopics: next });
+    return { profile: updated, removed: true, topic: String(topic).trim() };
 }
 
 export async function getSarahNewsProfile(uid) {

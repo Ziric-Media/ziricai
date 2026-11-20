@@ -28,6 +28,7 @@ import {
 import { persistPersonalSarahSession } from "../sarah/personal/personalSarahSessionStore.js";
 import { getSarahNewsProfile, setSarahNewsProfile } from "../sarah/news/sarahNewsProfileService.js";
 import { compileSarahNewsEdition } from "../sarah/news/sarahNewsEditionService.js";
+import { getSarahNewsStoryForUser } from "../sarah/news/sarahNewsIntelligenceService.js";
 import { executePersonalSarahWorkRun } from "../sarah/personal/personalSarahWorkRunner.js";
 import { allocateWorkBudgetForSession } from "../sarah/personal/personalSarahWorkBudget.js";
 import {
@@ -859,12 +860,35 @@ export function mountPersonalSarahRoutes(app) {
                 return;
             }
             const slot = String(req.query.slot || "").trim() || undefined;
-            const edition = await compileSarahNewsEdition(profile, { slot });
+            const edition = await compileSarahNewsEdition(profile, { slot, uid, persistEdition: true });
             res.json({ ok: true, edition, profile });
         } catch (err) {
             res.status(err.status || 500).json({
                 ok: false,
                 error: { code: err.code || "NEWS_EDITION_FAILED", message: err.message },
+            });
+        }
+    });
+
+    app.get("/api/personal-sarah/news/stories/:storyId", requireConsumerScope(), async (req, res) => {
+        try {
+            const uid = req.consumerAuth.uid;
+            const storyId = String(req.params.storyId || "").trim();
+            const slot = String(req.query.slot || "").trim() || undefined;
+            const result = await getSarahNewsStoryForUser(uid, storyId, { slot });
+            if (!result.success) {
+                const status = result.code === "STORY_NOT_FOUND" ? 404 : result.code === "NEWS_PROFILE_MISSING" ? 404 : 400;
+                res.status(status).json({
+                    ok: false,
+                    error: { code: result.code || "STORY_READ_FAILED", message: result.error },
+                });
+                return;
+            }
+            res.json({ ok: true, story: result.story, edition: result.edition });
+        } catch (err) {
+            res.status(err.status || 500).json({
+                ok: false,
+                error: { code: err.code || "STORY_READ_FAILED", message: err.message },
             });
         }
     });

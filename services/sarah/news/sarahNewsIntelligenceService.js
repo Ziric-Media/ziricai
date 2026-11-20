@@ -3,6 +3,7 @@
  */
 import { getSarahNewsProfile } from "./sarahNewsProfileService.js";
 import { compileSarahNewsEdition } from "./sarahNewsEditionService.js";
+import { buildSarahNewsStoryRoom } from "./sarahNewsStoryService.js";
 
 /**
  * @param {string} uid
@@ -20,7 +21,11 @@ export async function getSarahNewsSnapshotForUser(uid, opts = {}) {
             code: "NEWS_PROFILE_MISSING",
         };
     }
-    const edition = await compileSarahNewsEdition(profile, { slot: opts.slot });
+    const edition = await compileSarahNewsEdition(profile, {
+        slot: opts.slot,
+        uid,
+        persistEdition: opts.persistEdition === true,
+    });
     let headlines = [...(edition.topStories || []), ...(edition.headlines || [])];
     const seen = new Set();
     headlines = headlines.filter((h) => {
@@ -69,6 +74,40 @@ export async function getSarahNewsSnapshotForUser(uid, opts = {}) {
  * Format headlines for LLM tool output (compact).
  * @param {Awaited<ReturnType<typeof getSarahNewsSnapshotForUser>>} snap
  */
+/**
+ * @param {string} uid
+ * @param {string} storyId
+ * @param {{ slot?: string }} [opts]
+ */
+export async function getSarahNewsStoryForUser(uid, storyId, opts = {}) {
+    if (!uid || !storyId) {
+        return { success: false, error: "uid and storyId required", code: "INVALID_REQUEST" };
+    }
+    const profile = await getSarahNewsProfile(uid);
+    if (!profile?.regions?.length) {
+        return {
+            success: false,
+            error: "Sarah News is not set up yet.",
+            code: "NEWS_PROFILE_MISSING",
+        };
+    }
+    const edition = await compileSarahNewsEdition(profile, {
+        slot: opts.slot,
+        uid,
+        persistEdition: false,
+    });
+    const base = edition.storiesById?.[storyId];
+    if (!base) {
+        return { success: false, error: "Story not found in current edition.", code: "STORY_NOT_FOUND" };
+    }
+    const room = buildSarahNewsStoryRoom(base, edition);
+    return {
+        success: true,
+        story: { ...base, ...room },
+        edition: { slot: edition.slot, compiledAt: edition.compiledAt, editionDay: edition.editionDay },
+    };
+}
+
 export function formatSarahNewsSnapshotForModel(snap) {
     if (!snap.success) return snap.error || "No news snapshot.";
     const lines = snap.headlines.map(

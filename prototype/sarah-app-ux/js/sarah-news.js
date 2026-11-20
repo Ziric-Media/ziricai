@@ -101,6 +101,73 @@
     return 'Good morning';
   }
 
+  function slotForNow(date = new Date()) {
+    const h = date.getHours();
+    if (h < 11) return 'morning';
+    if (h < 16) return 'lunch';
+    return 'evening';
+  }
+
+  function storyStatusBadge(story) {
+    const status = String(story?.storyStatus || '').toLowerCase();
+    if (status === 'updated') return '<span class="snews-badge snews-badge--updated">Updated</span>';
+    if (status === 'repeat') return '';
+    return '';
+  }
+
+  function renderStoryIntelSections(story) {
+    const facts = Array.isArray(story.facts) ? story.facts : [];
+    const related = Array.isArray(story.related) ? story.related : [];
+    const sources = Array.isArray(story.sources) ? story.sources : [];
+    const timeline = Array.isArray(story.timeline) ? story.timeline : [];
+    const parts = [];
+    if (facts.length) {
+      parts.push(
+        `<section class="snews-intel-block"><h3 class="snews-block-title">Key facts</h3><ul class="snews-facts">${facts
+          .map((f) => `<li>${escapeHtml(f)}</li>`)
+          .join('')}</ul></section>`
+      );
+    }
+    if (timeline.length) {
+      parts.push(
+        `<section class="snews-intel-block"><h3 class="snews-block-title">Timeline</h3><ol class="snews-timeline">${timeline
+          .map((t) => {
+            const when = t.at ? new Date(t.at).toLocaleString() : '';
+            return `<li><span class="snews-timeline-when">${escapeHtml(when)}</span> — ${escapeHtml(t.label || '')}</li>`;
+          })
+          .join('')}</ol></section>`
+      );
+    }
+    if (related.length) {
+      parts.push(
+        `<section class="snews-intel-block"><h3 class="snews-block-title">Related reporting</h3><ul class="snews-related">${related
+          .map(
+            (r) =>
+              `<li><button type="button" class="snews-related-link" data-news-story="${escapeHtml(r.storyId)}">${escapeHtml(r.headline)}</button> <span class="snews-story-meta">${escapeHtml(r.publisher || '')}</span></li>`
+          )
+          .join('')}</ul></section>`
+      );
+    }
+    if (sources.length) {
+      parts.push(
+        `<section class="snews-intel-block"><h3 class="snews-block-title">Sources</h3><ul class="snews-sources">${sources
+          .map(
+            (src) =>
+              `<li>${escapeHtml(src.publisher || 'Publisher')}${
+                src.link
+                  ? ` · <a href="${escapeHtml(src.link)}" rel="noopener noreferrer" target="_blank">Original report</a>`
+                  : ''
+              }</li>`
+          )
+          .join('')}</ul></section>`
+      );
+    }
+  if (story.background) {
+      parts.push(`<p class="snews-intel-bg">${escapeHtml(story.background)}</p>`);
+    }
+    return parts.join('');
+  }
+
   function editionMeta(edition) {
     const d = new Date(edition?.compiledAt || Date.now());
     const day = d.toLocaleDateString(undefined, { weekday: 'long' }).toUpperCase();
@@ -247,6 +314,7 @@
         <div class="snews-story-card-inner">
           <div class="snews-story-card-top">
             ${s.breaking ? '<span class="snews-badge snews-badge--breaking">Breaking</span>' : ''}
+            ${storyStatusBadge(s)}
             ${meta ? `<span class="snews-story-meta">${escapeHtml(meta)}</span>` : ''}
           </div>
           <h4 class="snews-story-head">${escapeHtml(s.headline)}</h4>
@@ -337,10 +405,14 @@
     });
   }
 
-  function openStory(storyId, storiesById) {
+  async function openStory(storyId, storiesById) {
     const map = storiesById || activeEdition?.storiesById || {};
-    const story = map[storyId];
+    let story = map[storyId];
     if (!story) return;
+    if (isLive() && global.SarahLive?.fetchSarahNewsStory) {
+      const res = await global.SarahLive.fetchSarahNewsStory(storyId, activeEdition?.slot || slotForNow());
+      if (res.story) story = { ...story, ...res.story };
+    }
     const host = document.getElementById('snewsHost');
     if (!host || !activeEdition) return;
     const scroller = host.closest('.snews-body') || host.parentElement || host;
@@ -367,6 +439,7 @@
           <h1 class="snews-article-title">${escapeHtml(story.headline)}</h1>
           <p class="snews-article-byline">Written for you by Sarah</p>
           <div class="snews-article-body">${paras}</div>
+          ${renderStoryIntelSections(story)}
           <footer class="snews-article-foot">${escapeHtml(foot)}</footer>
           <section class="snews-opinion-card" aria-labelledby="snewsOpinionHeading">
             <h3 id="snewsOpinionHeading">Sarah's take</h3>
@@ -378,6 +451,7 @@
       </article>`;
 
     bindStoryBannerImages(host);
+    bindStoryCards(host, activeEdition?.storiesById || map);
 
     host.querySelector('#snewsArticleBack')?.addEventListener('click', () => {
       renderDigest(host, activeProfile, activeEdition);
@@ -446,7 +520,7 @@
   async function loadDigest(host, profile) {
     renderLoading(host, 'Sarah is reading publisher feeds…');
     if (isLive()) {
-      const res = await global.SarahLive.fetchSarahNewsEdition();
+      const res = await global.SarahLive.fetchSarahNewsEdition(slotForNow());
       if (res.edition) {
         renderDigest(host, profile, res.edition);
         return;
@@ -458,7 +532,7 @@
         if (needsSetup) {
           const synced = await syncProfileToCloud(profile);
           if (synced?.regions?.length) {
-            const retry = await global.SarahLive.fetchSarahNewsEdition();
+            const retry = await global.SarahLive.fetchSarahNewsEdition(slotForNow());
             if (retry.edition) {
               renderDigest(host, synced, retry.edition);
               return;

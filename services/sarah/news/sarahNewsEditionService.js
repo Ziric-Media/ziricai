@@ -19,6 +19,17 @@ import {
     storyHasPublishableDetail,
 } from "./sarahNewsArticleComposer.js";
 import { publisherStockImage, resolveStoryImageUrl } from "./sarahNewsImageService.js";
+import {
+    getSarahNewsEditionSnapshot,
+    previousBriefingSlot,
+    saveSarahNewsEditionSnapshot,
+    localDayKey,
+} from "./sarahNewsEditionStore.js";
+import {
+    applyCrossSlotDedupe,
+    backfillEditionStories,
+    rankStoriesForSlot,
+} from "./sarahNewsSlotPolicy.js";
 
 function storyId(seed) {
     return `story_${createHash("sha256").update(seed).digest("hex").slice(0, 16)}`;
@@ -49,7 +60,7 @@ function matchesInterestFilter(interest, item) {
 
 /**
  * @param {object} profile
- * @param {{ slot?: string }} [opts]
+ * @param {{ slot?: string, uid?: string, persistEdition?: boolean }} [opts]
  */
 export async function compileSarahNewsEdition(profile = {}, opts = {}) {
     const merged = {
@@ -57,9 +68,19 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
         ...profile,
         regions: profile.regions?.length ? profile.regions : DEFAULT_SARAH_NEWS_PROFILE.regions,
         interests: profile.interests?.length ? profile.interests : DEFAULT_SARAH_NEWS_PROFILE.interests,
+        followTopics: profile.followTopics?.length
+            ? profile.followTopics
+            : DEFAULT_SARAH_NEWS_PROFILE.followTopics,
     };
 
     const slot = opts.slot || slotForNow();
+    const uid = opts.uid;
+    const dayKey = localDayKey();
+    let previousEdition = null;
+    const prevSlot = previousBriefingSlot(slot);
+    if (uid && prevSlot) {
+        previousEdition = await getSarahNewsEditionSnapshot(uid, prevSlot, dayKey);
+    }
     const feedMap = new Map();
 
     function addFeeds(list, tag) {
@@ -131,6 +152,7 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                         publishedAt: item.publishedAt,
                         confidence: "confirmed",
                         breaking: false,
+                        storyStatus: "developing",
                     });
                     if (item.link) seenLinks.add(item.link);
                 }
@@ -140,9 +162,15 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
         })
     );
 
-    stories.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+    let ranked = rankStoriesForSlot(stories, merged.followTopics, {
+        slot,
+        previousCompiledAt: previousEdition?.compiledAt,
+    });
 
-    const forImages = stories.slice(0, 36);
+    const dedupe = applyCrossSlotDedupe(ranked, previousEdition);
+    ranked = backfillEditionStories(dedupe.stories, stories, 10);
+
+    const forImages = ranked.slice(0, 36);
     let ogBudget = 28;
     await Promise.all(
         forImages.map(async (s) => {
@@ -163,28 +191,49 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
             delete s._rssImage;
         })
     );
-    for (const s of stories.slice(36)) {
+    for (const s of ranked.slice(36)) {
         s.imageUrl = publisherStockImage(s.publisher);
         s.imageFallback = s.imageUrl;
         delete s._rssImage;
     }
 
-    const publisherVariety = new Set(stories.map((s) => s.publisher).filter(Boolean));
+    const publisherVariety = new Set(ranked.map((s) => s.publisher).filter(Boolean));
 
-    const top = stories.slice(0, 1).map((s) => ({ ...s, breaking: false }));
-    const headlines = stories.slice(0, 28);
+    const top = ranked.slice(0, 1).map((s) => ({ ...s, breaking: false }));
+    const headlines = ranked.slice(0, 28);
+    const compiledAt = new Date().toISOString();
+    const allFeatured = [...top, ...headlines];
+
+    if (uid && opts.persistEdition === true) {
+        await saveSarahNewsEditionSnapshot(uid, {
+            slot,
+            compiledAt,
+            stories: allFeatured.map((s) => ({
+                storyId: s.storyId,
+                headline: s.headline,
+                publishedAt: s.publishedAt,
+                link: s.link,
+            })),
+        });
+    }
 
     return {
         ok: true,
         slot,
-        compiledAt: new Date().toISOString(),
-        sourcePolicy: "multi-publisher-rss-v3",
+        compiledAt,
+        editionDay: dayKey,
+        sourcePolicy: "multi-publisher-rss-v4",
+        slotStats: {
+            suppressedFromPriorSlot: dedupe.suppressed,
+            updatedFromPriorSlot: dedupe.updated,
+            priorSlot: prevSlot || null,
+        },
         publishers: [...publisherVariety],
         allowlistSize: SARAH_NEWS_PUBLISHER_ALLOWLIST.length,
         disclaimer:
             "Sarah compiles in-app briefings from your chosen regions and topics across multiple media houses (SA, Zimbabwe, Africa, world, tech, and more).",
         topStories: top,
         headlines,
-        storiesById: Object.fromEntries([...top, ...headlines].map((s) => [s.storyId, s])),
+        storiesById: Object.fromEntries(allFeatured.map((s) => [s.storyId, s])),
     };
 }

@@ -4,6 +4,8 @@
 (function initSarahNews(global) {
   const STORAGE_KEY = 'sarah.news.profile.v1';
   let activeEdition = null;
+  let activeProfile = null;
+  let digestScrollTop = 0;
 
   const REGIONS = [
     { id: 'za', label: 'South Africa' },
@@ -13,6 +15,7 @@
   ];
 
   const INTERESTS = [
+    { id: 'shorts', label: 'Shorts & trending' },
     { id: 'politics', label: 'Politics' },
     { id: 'business', label: 'Business & finance' },
     { id: 'tech', label: 'Technology & AI' },
@@ -57,19 +60,31 @@
   function defaultProfile() {
     return {
       regions: ['za', 'zw', 'world'],
-      interests: ['business', 'tech', 'sports', 'politics'],
+      interests: ['shorts', 'business', 'tech', 'sports', 'politics'],
       briefings: { morning: true, lunch: true, evening: true },
       breaking: false,
       language: 'en',
     };
   }
 
+  async function syncProfileToCloud(profile) {
+    if (!isLive() || !profile?.regions?.length) return profile;
+    const saved = await global.SarahLive.saveSarahNewsProfile(profile);
+    if (saved.profile?.regions?.length) return saved.profile;
+    if (saved.error) global.showProtoToast?.(saved.error);
+    return profile;
+  }
+
   async function resolveProfile() {
-    if (isLive()) {
-      const res = await global.SarahLive.fetchSarahNewsProfile();
-      if (res.profile?.regions?.length) return res.profile;
+    const local = loadLocalProfile();
+    if (!isLive()) return local;
+    const res = await global.SarahLive.fetchSarahNewsProfile();
+    if (res.profile?.regions?.length) {
+      saveLocalProfile(res.profile);
+      return res.profile;
     }
-    return loadLocalProfile();
+    if (local?.regions?.length) return syncProfileToCloud(local);
+    return null;
   }
 
   function escapeHtml(s) {
@@ -84,6 +99,73 @@
     if (slot === 'lunch') return 'Good afternoon';
     if (slot === 'evening') return 'Good evening';
     return 'Good morning';
+  }
+
+  function slotForNow(date = new Date()) {
+    const h = date.getHours();
+    if (h < 11) return 'morning';
+    if (h < 16) return 'lunch';
+    return 'evening';
+  }
+
+  function storyStatusBadge(story) {
+    const status = String(story?.storyStatus || '').toLowerCase();
+    if (status === 'updated') return '<span class="snews-badge snews-badge--updated">Updated</span>';
+    if (status === 'repeat') return '';
+    return '';
+  }
+
+  function renderStoryIntelSections(story) {
+    const facts = Array.isArray(story.facts) ? story.facts : [];
+    const related = Array.isArray(story.related) ? story.related : [];
+    const sources = Array.isArray(story.sources) ? story.sources : [];
+    const timeline = Array.isArray(story.timeline) ? story.timeline : [];
+    const parts = [];
+    if (facts.length) {
+      parts.push(
+        `<section class="snews-intel-block"><h3 class="snews-block-title">Key facts</h3><ul class="snews-facts">${facts
+          .map((f) => `<li>${escapeHtml(f)}</li>`)
+          .join('')}</ul></section>`
+      );
+    }
+    if (timeline.length) {
+      parts.push(
+        `<section class="snews-intel-block"><h3 class="snews-block-title">Timeline</h3><ol class="snews-timeline">${timeline
+          .map((t) => {
+            const when = t.at ? new Date(t.at).toLocaleString() : '';
+            return `<li><span class="snews-timeline-when">${escapeHtml(when)}</span> — ${escapeHtml(t.label || '')}</li>`;
+          })
+          .join('')}</ol></section>`
+      );
+    }
+    if (related.length) {
+      parts.push(
+        `<section class="snews-intel-block"><h3 class="snews-block-title">Related reporting</h3><ul class="snews-related">${related
+          .map(
+            (r) =>
+              `<li><button type="button" class="snews-related-link" data-news-story="${escapeHtml(r.storyId)}">${escapeHtml(r.headline)}</button> <span class="snews-story-meta">${escapeHtml(r.publisher || '')}</span></li>`
+          )
+          .join('')}</ul></section>`
+      );
+    }
+    if (sources.length) {
+      parts.push(
+        `<section class="snews-intel-block"><h3 class="snews-block-title">Sources</h3><ul class="snews-sources">${sources
+          .map(
+            (src) =>
+              `<li>${escapeHtml(src.publisher || 'Publisher')}${
+                src.link
+                  ? ` · <a href="${escapeHtml(src.link)}" rel="noopener noreferrer" target="_blank">Original report</a>`
+                  : ''
+              }</li>`
+          )
+          .join('')}</ul></section>`
+      );
+    }
+  if (story.background) {
+      parts.push(`<p class="snews-intel-bg">${escapeHtml(story.background)}</p>`);
+    }
+    return parts.join('');
   }
 
   function editionMeta(edition) {
@@ -140,7 +222,7 @@
         <div class="snews-setup-hero">
           <p class="snews-setup-eyebrow">Sarah News</p>
           <h2 class="snews-setup-heading">Your briefing, your world</h2>
-          <p class="snews-setup-lead">Choose regions and topics. Sarah compiles headlines from trusted publisher feeds — you tap through for the full story.</p>
+          <p class="snews-setup-lead">Pick regions and topics. Sarah pulls from many media houses — SA, Zimbabwe, Africa, world, tech, sports, shorts — and writes everything in-app.</p>
         </div>
         ${chipGroup('Where should Sarah look?', 'regions', REGIONS, p.regions || [])}
         ${chipGroup('What interests you?', 'interests', INTERESTS, p.interests || [])}
@@ -186,19 +268,59 @@
     });
   }
 
-  function storyCard(s) {
+  function localArticleBody(story) {
+    const summary = String(story.summary || story.headline || '').trim();
+    return [
+      `Here's what I'm seeing: ${summary}`,
+      'Sarah is summarising verified reporting for you inside the app.',
+    ].join('\n\n');
+  }
+
+  function articleParagraphs(story) {
+    const raw = story.articleBody || localArticleBody(story);
+    return String(raw)
+      .split(/\n\n+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }
+
+  function bindStoryBannerImages(host) {
+    host.querySelectorAll('.snews-story-banner-img').forEach((img) => {
+      img.referrerPolicy = 'no-referrer';
+      const fallback = img.getAttribute('data-fallback');
+      if (!fallback) return;
+      img.addEventListener(
+        'error',
+        () => {
+          if (img.src !== fallback) img.src = fallback;
+        },
+        { once: true }
+      );
+    });
+  }
+
+  function storyCard(s, { featured = false } = {}) {
     const meta = [s.region ? REGIONS.find((r) => r.id === s.region)?.label : null, s.publisher]
       .filter(Boolean)
       .join(' · ');
+    const src = s.imageUrl || s.imageFallback || '';
+    const fallback = escapeHtml(s.imageFallback || s.imageUrl || '');
+    const banner = src
+      ? `<div class="snews-story-banner${featured ? ' snews-story-banner--featured' : ''}"><img class="snews-story-banner-img" src="${escapeHtml(src)}" data-fallback="${fallback}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="640" height="360"/></div>`
+      : `<div class="snews-story-banner snews-story-banner--placeholder${featured ? ' snews-story-banner--featured' : ''}" aria-hidden="true"></div>`;
     return `
-      <article class="snews-story-card" data-news-story="${escapeHtml(s.storyId)}" role="button" tabindex="0">
-        <div class="snews-story-card-top">
-          ${s.breaking ? '<span class="snews-badge snews-badge--breaking">Breaking</span>' : ''}
-          ${meta ? `<span class="snews-story-meta">${escapeHtml(meta)}</span>` : ''}
+      <article class="snews-story-card snews-story-card--banner${featured ? ' snews-story-card--featured' : ''}" data-news-story="${escapeHtml(s.storyId)}" role="button" tabindex="0">
+        ${banner}
+        <div class="snews-story-card-inner">
+          <div class="snews-story-card-top">
+            ${s.breaking ? '<span class="snews-badge snews-badge--breaking">Breaking</span>' : ''}
+            ${storyStatusBadge(s)}
+            ${meta ? `<span class="snews-story-meta">${escapeHtml(meta)}</span>` : ''}
+          </div>
+          <h4 class="snews-story-head">${escapeHtml(s.headline)}</h4>
+          <p class="snews-story-sum">${escapeHtml(s.summary)}</p>
+          <span class="snews-story-more">Read in Sarah News →</span>
         </div>
-        <h4 class="snews-story-head">${escapeHtml(s.headline)}</h4>
-        <p class="snews-story-sum">${escapeHtml(s.summary)}</p>
-        <span class="snews-story-more">Read story →</span>
       </article>`;
   }
 
@@ -231,11 +353,17 @@
 
   function renderDigest(host, profile, edition) {
     activeEdition = edition;
+    activeProfile = profile;
+    host.classList.remove('snews-host--article');
     const storiesById = edition.storiesById || {};
     const top = edition.topStories || [];
     const headlines = edition.headlines || [];
     const disclaimer =
-      edition.disclaimer || 'Headlines from publisher RSS feeds. Tap for source article.';
+      edition.disclaimer || 'Headlines from your selected media houses. Tap for the in-app article.';
+    const pubs = Array.isArray(edition.publishers) ? edition.publishers.filter(Boolean).slice(0, 8) : [];
+    const pubLine = pubs.length
+      ? `<p class="snews-publishers">Today from ${escapeHtml(pubs.join(' · '))}${pubs.length < (edition.publishers?.length || 0) ? ' · …' : ''}</p>`
+      : '';
 
     host.innerHTML = `
       <header class="snews-hero-card">
@@ -244,8 +372,9 @@
         <p class="snews-edition">${escapeHtml(editionMeta(edition))}</p>
         <p class="snews-regions">${escapeHtml(regionSummary(profile))}</p>
         <p class="snews-disclaimer">${escapeHtml(disclaimer)}</p>
+        ${pubLine}
       </header>
-      ${top.length ? `<section class="snews-block"><h3 class="snews-block-title">Top stories</h3><div class="snews-story-list">${top.map(storyCard).join('')}</div></section>` : ''}
+      ${top.length ? `<section class="snews-block"><h3 class="snews-block-title">Top stories</h3><div class="snews-story-list">${top.map((s) => storyCard(s, { featured: true })).join('')}</div></section>` : ''}
       <section class="snews-block">
         <h3 class="snews-block-title">Headlines</h3>
         <div class="snews-story-list">${headlines.length ? headlines.map(storyCard).join('') : '<p class="snews-empty">No headlines matched your filters right now. Try adding World or more interests.</p>'}</div>
@@ -265,6 +394,7 @@
       </div>`;
 
     bindStoryCards(host, storiesById);
+    bindStoryBannerImages(host);
     bindAskButtons(host);
 
     host.querySelector('#snewsEditSetup')?.addEventListener('click', () => {
@@ -275,53 +405,108 @@
     });
   }
 
-  function openStory(storyId, storiesById) {
+  async function openStory(storyId, storiesById) {
     const map = storiesById || activeEdition?.storiesById || {};
-    const story = map[storyId];
+    let story = map[storyId];
     if (!story) return;
-    const overlay = document.getElementById('snewsStoryOverlay');
-    const body = document.getElementById('snewsStoryBody');
-    if (!overlay || !body) return;
-    const link = story.link
-      ? `<a class="snews-source-link" href="${escapeHtml(story.link)}" target="_blank" rel="noopener noreferrer">Open article at ${escapeHtml(story.publisher || 'publisher')}</a>`
-      : '';
-    body.innerHTML = `
-      <p class="snews-story-meta">${escapeHtml(story.publisher || 'Source')}</p>
-      <h3 class="snews-room-title">${escapeHtml(story.headline)}</h3>
-      <p class="snews-confidence">Source status: ${escapeHtml(story.confidence || 'confirmed')}</p>
-      <p class="snews-room-body">${escapeHtml(story.summary)}</p>
-      ${link}
-      <div class="snews-quick snews-quick--room">
-        <button type="button" class="snews-quick-btn" data-story-ask="How does this affect ordinary people in South Africa?">How does this affect people?</button>
-        <button type="button" class="snews-quick-btn" data-story-ask="Give me more background on this headline">More background</button>
-      </div>`;
-    body.querySelectorAll('[data-story-ask]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const q = `${btn.getAttribute('data-story-ask')} Headline: ${story.headline}`;
-        closeStory();
-        if (typeof global.deliverPersonalSarahMessage === 'function') {
-          void global.deliverPersonalSarahMessage(q);
-          global.setRoute?.('home');
-        }
+    if (isLive() && global.SarahLive?.fetchSarahNewsStory) {
+      const res = await global.SarahLive.fetchSarahNewsStory(storyId, activeEdition?.slot || slotForNow());
+      if (res.story) story = { ...story, ...res.story };
+    }
+    const host = document.getElementById('snewsHost');
+    if (!host || !activeEdition) return;
+    const scroller = host.closest('.snews-body') || host.parentElement || host;
+    digestScrollTop = scroller.scrollTop || 0;
+    host.classList.add('snews-host--article');
+    scroller.scrollTop = 0;
+
+    const hero = story.imageUrl
+      ? `<div class="snews-article-hero"><img class="snews-story-banner-img" src="${escapeHtml(story.imageUrl)}" data-fallback="${escapeHtml(story.imageFallback || story.imageUrl || '')}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="640" height="360"/></div>`
+      : '<div class="snews-article-hero snews-article-hero--placeholder" aria-hidden="true"></div>';
+    const paras = articleParagraphs(story)
+      .map((p) => `<p>${escapeHtml(p)}</p>`)
+      .join('');
+    const foot =
+      story.sourceNote ||
+      (story.publisher ? `Story taken from ${story.publisher}.` : 'Story compiled by Sarah from verified publisher feeds.');
+
+    host.innerHTML = `
+      <article class="snews-article-page">
+        <button type="button" class="snews-article-back" id="snewsArticleBack" aria-label="Back to briefing">← Back to briefing</button>
+        ${hero}
+        <div class="snews-article-main">
+          <span class="snews-story-meta">${escapeHtml(story.publisher || 'News')}</span>
+          <h1 class="snews-article-title">${escapeHtml(story.headline)}</h1>
+          <p class="snews-article-byline">Written for you by Sarah</p>
+          <div class="snews-article-body">${paras}</div>
+          ${renderStoryIntelSections(story)}
+          <footer class="snews-article-foot">${escapeHtml(foot)}</footer>
+          <section class="snews-opinion-card" aria-labelledby="snewsOpinionHeading">
+            <h3 id="snewsOpinionHeading">Sarah's take</h3>
+            <p class="snews-opinion-lead">Ask Sarah for her opinion on this story — she answers here, without sending you to another site.</p>
+            <button type="button" class="btn btn-primary" id="snewsAskOpinion">Ask Sarah for her opinion</button>
+            <div class="snews-opinion-reply hidden" id="snewsOpinionReply" role="status"></div>
+          </section>
+        </div>
+      </article>`;
+
+    bindStoryBannerImages(host);
+    bindStoryCards(host, activeEdition?.storiesById || map);
+
+    host.querySelector('#snewsArticleBack')?.addEventListener('click', () => {
+      renderDigest(host, activeProfile, activeEdition);
+      const scrollBack = host.closest('.snews-body') || host.parentElement || host;
+      requestAnimationFrame(() => {
+        scrollBack.scrollTop = digestScrollTop;
       });
     });
-    overlay.classList.remove('hidden');
-    overlay.setAttribute('aria-hidden', 'false');
-  }
 
-  function closeStory() {
-    const overlay = document.getElementById('snewsStoryOverlay');
-    if (!overlay) return;
-    overlay.classList.add('hidden');
-    overlay.setAttribute('aria-hidden', 'true');
+    host.querySelector('#snewsAskOpinion')?.addEventListener('click', async () => {
+      const replyEl = host.querySelector('#snewsOpinionReply');
+      const btn = host.querySelector('#snewsAskOpinion');
+      if (!replyEl || !btn) return;
+      if (!global.SarahLive?.sendPersonalMessage && !global.deliverPersonalSarahMessage) {
+        global.showProtoToast?.('Sign in to ask Sarah');
+        return;
+      }
+      btn.disabled = true;
+      replyEl.classList.remove('hidden');
+      replyEl.textContent = '';
+      replyEl.classList.add('snews-opinion-loading');
+      replyEl.textContent = 'Sarah is thinking…';
+      const prompt = [
+        'Give a clear, balanced personal opinion on this news story for a Sarah News reader.',
+        'Stay factual, note uncertainty, and avoid telling them to open external websites.',
+        `Headline: ${story.headline}`,
+        `Publisher feed: ${story.publisher || 'unknown'}`,
+        `Article: ${articleParagraphs(story).join(' ')}`,
+      ].join('\n\n');
+      try {
+        let reply = '';
+        if (global.SarahLive?.sendPersonalMessage) {
+          const res = await global.SarahLive.sendPersonalMessage(prompt);
+          if (res.error) {
+            replyEl.textContent = res.error;
+            btn.disabled = false;
+            return;
+          }
+          reply = res.reply || '';
+        } else {
+          await global.deliverPersonalSarahMessage(prompt);
+          reply = 'I added this to your My Sarah chat — open My Sarah to continue the thread.';
+        }
+        replyEl.classList.remove('snews-opinion-loading');
+        replyEl.textContent = reply;
+      } catch (err) {
+        replyEl.classList.remove('snews-opinion-loading');
+        replyEl.textContent = err?.message || 'Could not reach Sarah right now.';
+        btn.disabled = false;
+      }
+    });
   }
 
   function bindStoryOverlayOnce() {
-    if (global.__snewsOverlayBound) return;
-    global.__snewsOverlayBound = true;
-    document.getElementById('snewsStoryOverlay')?.addEventListener('click', (e) => {
-      if (e.target.closest('[data-snews-story-close]')) closeStory();
-    });
+    /* legacy overlay unused — in-app article reader (SN-02) */
   }
 
   function renderLoading(host, message) {
@@ -335,12 +520,28 @@
   async function loadDigest(host, profile) {
     renderLoading(host, 'Sarah is reading publisher feeds…');
     if (isLive()) {
-      const res = await global.SarahLive.fetchSarahNewsEdition();
+      const res = await global.SarahLive.fetchSarahNewsEdition(slotForNow());
       if (res.edition) {
         renderDigest(host, profile, res.edition);
         return;
       }
       if (res.error) {
+        const needsSetup =
+          res.code === 'NEWS_PROFILE_MISSING' ||
+          /setup first/i.test(String(res.error || ''));
+        if (needsSetup) {
+          const synced = await syncProfileToCloud(profile);
+          if (synced?.regions?.length) {
+            const retry = await global.SarahLive.fetchSarahNewsEdition(slotForNow());
+            if (retry.edition) {
+              renderDigest(host, synced, retry.edition);
+              return;
+            }
+          }
+          renderSetup(host, profile || defaultProfile(), (next) => loadDigest(host, next));
+          global.showProtoToast?.('Set up Sarah News, then tap Save & open briefing.');
+          return;
+        }
         host.innerHTML = `<p class="snews-error">${escapeHtml(res.error)}</p><button type="button" class="btn btn-secondary" id="snewsRetry">Try again</button>`;
         host.querySelector('#snewsRetry')?.addEventListener('click', () => loadDigest(host, profile));
         return;
