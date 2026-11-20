@@ -2811,6 +2811,11 @@ export async function runBackgroundInit() {
             if (sm.migrated) {
                 console.error("[startup] Smile More Dentists production dental preset ensured for", sm.companyId);
             }
+            const { seedSmilemoreDentalSarahPilot } = await import("../services/storage/seedSmilemoreDentalPilot.js");
+            const seed = await seedSmilemoreDentalSarahPilot();
+            if (seed.knowledgeUpserted || seed.discoverUpdated || seed.agentCreated) {
+                console.error("[startup] Smile More Sarah pilot seed:", JSON.stringify(seed));
+            }
         } catch (err) {
             console.error("[startup] Smile More dental production ensure skipped:", err.message);
         }

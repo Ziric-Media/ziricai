@@ -12,6 +12,7 @@ import {
     SMILEMORE_CHANNELS,
     SMILEMORE_TIMEZONE,
     SMILEMORE_SLOT_MINUTES,
+    SMILEMORE_PUBLIC_WEBSITE,
 } from "../dental/smilemorePractice.js";
 
 const SMILEMORE_PRACTICE_OVERRIDES = {
@@ -35,7 +36,7 @@ export async function ensureSmilemoreDentalProductionTenant() {
             status: "active",
             email: "inquiries@smilemoredentists.co.za",
             phone: SMILEMORE_CONTACTS.phone,
-            website: "https://smilemoredentists.co.za",
+            website: SMILEMORE_PUBLIC_WEBSITE,
             owner: "Dr. Priya Naidoo",
             ownerEmail: "priya@smilemore.co.za",
             settings: {

@@ -7,6 +7,9 @@ import { isDentalPracticeCompany } from "./dentalIndustryPreset.js";
 
 export const SMILEMORE_DEMO_COMPANY_ID = "smilemore-demo";
 
+/** Public marketing site (Sarah may share this link; knowledge is still authoritative for hours/locations). */
+export const SMILEMORE_PUBLIC_WEBSITE = "https://www.smilemoredentists.co.za";
+
 export const SMILEMORE_TIMEZONE = "Africa/Johannesburg";
 
 export const SMILEMORE_SLOT_MINUTES = 30;
@@ -231,6 +234,7 @@ export function smilemorePracticePrompt() {
     const services = SMILEMORE_SERVICES.map((item) => `${item.id}: ${item.label}`).join("; ");
     const team = SMILEMORE_PUBLIC_TEAM.join(", ");
     return `SmileMore Dentists — published practice facts (mandatory; do not add to this list):
+- Official website: ${SMILEMORE_PUBLIC_WEBSITE} — share when someone wants to browse online; do not invent page content beyond what knowledge and this block provide.
 - Family-centred dental practice in Rustenburg.
 - Locations: ${locations}. A location listing does not prove a service is available at that site with a particular person.
 - Hours: Monday–Friday 09:00–17:00, Saturday 09:00–13:00, Africa/Johannesburg. Sunday is not published as open. Published hours are not live availability.
