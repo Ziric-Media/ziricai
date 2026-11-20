@@ -5811,9 +5811,14 @@ function formatDiscoverProductPrice(price) {
 
 function resolveDiscoverProductImage(url, cardFallback) {
   const raw = String(url || '').trim();
-  if (/^https?:\/\//i.test(raw)) return raw;
   if (raw.startsWith('assets/')) return prototypeAsset(raw);
-  return resolveListingMediaUrl(raw || cardFallback || '');
+  if (raw) {
+    const resolved = resolveListingMediaUrl(raw);
+    if (resolved) return resolved;
+  }
+  const fb = String(cardFallback || '').trim();
+  if (fb.startsWith('assets/')) return prototypeAsset(fb);
+  return resolveListingMediaUrl(fb) || fb || '';
 }
 
 function discoverImgAttrs(src, company) {

@@ -79,9 +79,18 @@ function url(value, field) {
 
 /** Product/gallery images: https listing media or platform asset paths from dental presets. */
 function discoverMediaUrl(value, field) {
-    const v = str(value, 500, field);
+    let v = str(value, 500, field);
     if (!v) return null;
+    try {
+        const u = new URL(v, "https://ziricai.local");
+        if (u.pathname.includes("/api/network/v1/listing-media/") && u.pathname.endsWith("/content")) {
+            v = `${u.pathname}${u.search}`;
+        }
+    } catch {
+        /* keep v */
+    }
     if (/^assets\//i.test(v)) return v;
+    if (/^\/api\/network\/v1\/listing-media\//i.test(v)) return v;
     if (/^https:\/\/[^\s]+$/i.test(v)) return v;
     throw bad(`${field} must be an https:// URL or an assets/ image path.`, "PROFILE_INVALID", { field });
 }

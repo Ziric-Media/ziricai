@@ -9,6 +9,7 @@ import { fetchNetworkListing, saveNetworkListingDraft, publishNetworkListing } f
 import { can } from '../permissions.js';
 import { navigateTo } from '../router.js';
 import { imageUploadControlHtml, bindImageUploads, readImageUploadUrl } from './portalImageUpload.js';
+import { resolveListingMediaDisplayUrl } from '../../shared/listingMediaUrl.js';
 
 function industryProductCopy(industry = '') {
   const i = String(industry || '').toLowerCase();
@@ -58,8 +59,9 @@ function formatPrice(price) {
 
 function productCardHtml(product, { canEdit }) {
   const promo = product.promotion ? `<span class="disco-product-promo">${escapeHtml(product.promotion)}</span>` : '';
-  const media = product.imageUrl
-    ? `<img src="${escapeHtml(product.imageUrl)}" alt="" loading="lazy" />`
+  const imgSrc = resolveListingMediaDisplayUrl(product.imageUrl || product.image || '');
+  const media = imgSrc
+    ? `<img src="${escapeHtml(imgSrc)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
     : '<div class="disco-product-card-placeholder" aria-hidden="true"><i class="fa-solid fa-image"></i></div>';
   const price = product.price ? `<p class="disco-product-card-price">${escapeHtml(formatPrice(product.price))}</p>` : '';
   const desc = product.description

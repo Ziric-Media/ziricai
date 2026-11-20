@@ -43,6 +43,16 @@ test("validateProfilePatch accepts gallery and products", () => {
         products: [{ name: "Braces", imageUrl: "assets/dental-products/braces.svg" }],
     });
     assert.equal(seeded.profile.products[0].imageUrl, "assets/dental-products/braces.svg");
+    const uploaded = validateProfilePatch({
+        products: [
+            {
+                name: "Kit",
+                imageUrl:
+                    "https://sarah.ziricai.com/api/network/v1/listing-media/lmed_test/content?token=abc",
+            },
+        ],
+    });
+    assert.ok(uploaded.profile.products[0].imageUrl.startsWith("/api/network/v1/listing-media/"));
 });
 
 test("status posts CRUD and public feed respects published discoverability", async () => {
