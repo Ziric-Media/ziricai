@@ -8,12 +8,22 @@ process.env.STORAGE_BACKEND = "memory";
 
 const { compileSarahNewsEdition } = await import("../services/sarah/news/sarahNewsEditionService.js");
 const { parseRssItems } = await import("../services/sarah/news/sarahNewsRss.js");
+const { storyHasPublishableDetail } = await import("../services/sarah/news/sarahNewsArticleComposer.js");
 
 const sample = `<?xml version="1.0"?><rss><channel><item><title>Test</title><link>https://example.com/a</link><description>Hello</description><media:thumbnail url="https://cdn.example.com/x.jpg"/></item></channel></rss>`;
 const items = parseRssItems(sample);
 assert.equal(items.length, 1);
 assert.equal(items[0].title, "Test");
 assert.equal(items[0].imageUrl, "https://cdn.example.com/x.jpg");
+assert.equal(storyHasPublishableDetail({ headline: "Only title", summary: "Only title" }), false);
+assert.equal(
+    storyHasPublishableDetail({
+        headline: "Long",
+        summary:
+            "South African police and marchers clashed in Gqeberha during protests over immigration policy, with several arrests reported.",
+    }),
+    true
+);
 
 const edition = await compileSarahNewsEdition({
     regions: ["world"],

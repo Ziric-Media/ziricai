@@ -2,6 +2,8 @@
  * SN-02 — in-app reader copy in Sarah's voice (from RSS facts, no outbound read required).
  */
 
+export const MIN_STORY_DETAIL_CHARS = 80;
+
 function splitSentences(text) {
     const clean = String(text || "").replace(/\s+/g, " ").trim();
     if (!clean) return [];
@@ -9,13 +11,37 @@ function splitSentences(text) {
 }
 
 /**
+ * @param {{ headline?: string, summary?: string, description?: string }} story
+ */
+export function storyHasPublishableDetail(story) {
+    const headline = String(story.headline || "").trim();
+    const summary = String(story.summary ?? story.description ?? "").trim();
+    if (!headline || summary.length < MIN_STORY_DETAIL_CHARS) return false;
+
+    const normTitle = headline.replace(/\s+/g, " ").toLowerCase();
+    const normSum = summary.replace(/\s+/g, " ").toLowerCase();
+    if (normSum === normTitle) return false;
+    if (normSum.startsWith(normTitle) && summary.length < headline.length + 40) return false;
+
+    const sentences = splitSentences(summary);
+    if (!sentences.length) return false;
+    const longest = sentences.reduce((a, s) => Math.max(a, s.length), 0);
+    if (longest < 50 && summary.length < MIN_STORY_DETAIL_CHARS + 20) return false;
+
+    return true;
+}
+
+/**
  * @param {{ headline?: string, summary?: string, region?: string|null }} story
+ * @returns {string|null} null when feed detail is too thin to publish
  */
 export function composeSarahArticleBody(story) {
+    if (!storyHasPublishableDetail(story)) return null;
+
     const headline = String(story.headline || "Today's story").trim();
     const summary = String(story.summary || "").trim();
     const sentences = splitSentences(summary);
-    const lead = sentences[0] || summary || headline;
+    const lead = sentences[0] || summary;
     const rest = sentences.slice(1).join(" ");
 
     const regionNote =
@@ -25,14 +51,14 @@ export function composeSarahArticleBody(story) {
               ? "This one matters for Zimbabwe and the wider region — I'll watch for follow-up reporting."
               : "";
 
-    const paragraphs = [
-        `Here's what I'm seeing: ${lead}`,
-        rest
-            ? `What else is known so far: ${rest}`
-            : "Publisher feeds are still thin on detail — I'll refresh when more is confirmed.",
-        regionNote,
-        "This briefing is Sarah's summary of verified reporting. It is not legal or financial advice; use your judgment before you act on any of it.",
-    ].filter(Boolean);
+    const paragraphs = [`Here's what I'm seeing: ${lead}`];
+    if (rest && rest.length >= 40) {
+        paragraphs.push(`What else is known so far: ${rest}`);
+    }
+    if (regionNote) paragraphs.push(regionNote);
+    paragraphs.push(
+        "This briefing is Sarah's summary of verified reporting. It is not legal or financial advice; use your judgment before you act on any of it."
+    );
 
     return paragraphs.join("\n\n");
 }

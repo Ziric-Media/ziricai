@@ -13,7 +13,11 @@ import {
 } from "./sarahNewsSources.js";
 import { fetchRssFeed } from "./sarahNewsRss.js";
 import { DEFAULT_SARAH_NEWS_PROFILE } from "./sarahNewsProfileService.js";
-import { composeSarahArticleBody, heroImageUrl } from "./sarahNewsArticleComposer.js";
+import {
+    composeSarahArticleBody,
+    heroImageUrl,
+    storyHasPublishableDetail,
+} from "./sarahNewsArticleComposer.js";
 
 function storyId(seed) {
     return `story_${createHash("sha256").update(seed).digest("hex").slice(0, 16)}`;
@@ -83,10 +87,20 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                     const regionTag = meta.tags.find((t) => t.startsWith("region:"))?.slice(7);
                     if (regionTag && !matchesRegionFilter(regionTag, item, meta)) continue;
 
+                    const summary = String(item.description || "").trim();
+                    if (
+                        !storyHasPublishableDetail({
+                            headline: item.title,
+                            summary,
+                        })
+                    ) {
+                        continue;
+                    }
+
                     const id = storyId(item.link || item.title);
                     const interestTag = meta.tags.find((t) => t.startsWith("interest:"))?.slice(9);
                     if (interestTag && !matchesInterestFilter(interestTag, item)) continue;
-                    const summary = item.description || "Sarah is monitoring this story for more detail.";
+
                     const imageUrl = heroImageUrl(item.imageUrl);
                     const draft = {
                         headline: item.title,
@@ -94,6 +108,7 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                         region: regionTag || null,
                     };
                     const articleBody = composeSarahArticleBody(draft);
+                    if (!articleBody) continue;
                     let sourceNote = `Story taken from ${meta.publisher}.`;
                     if (
                         regionTag === "za" &&

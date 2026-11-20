@@ -52,13 +52,17 @@ export function parseRssItems(xml) {
         const block = m[1];
         const title = pickTag(block, "title");
         const link = pickTag(block, "link");
-        const description = pickTag(block, "description");
+        let description = pickTag(block, "description");
+        const encoded = pickTag(block, "content:encoded");
+        if (encoded.length > description.length) description = encoded;
+        const summary = pickTag(block, "summary");
+        if (summary.length > description.length) description = summary;
         const pubDate = pickTag(block, "pubDate");
         if (!title) continue;
         items.push({
             title,
             link: link || null,
-            description: description.slice(0, 1200),
+            description: description.slice(0, 2400),
             imageUrl: pickFirstImageUrl(block),
             pubDate: pubDate || null,
             publishedAt: pubDate ? Date.parse(pubDate) : null,

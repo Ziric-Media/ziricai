@@ -12,6 +12,7 @@ export const REGION_FEED_LISTS = Object.freeze({
         { url: "https://citizen.co.za/feed/", publisher: "The Citizen", nativeRegion: "za" },
         { url: "https://www.dailymaverick.co.za/dmrss/", publisher: "Daily Maverick", nativeRegion: "za" },
         { url: "https://businesstech.co.za/news/feed/", publisher: "BusinessTech", nativeRegion: "za" },
+        /* eNCA: no stable public RSS at SN-03 — attributed in footnotes for SA stories */
         { url: "https://feeds.bbci.co.uk/news/world/africa/rss.xml", publisher: "BBC News" },
         { url: "http://rss.cnn.com/rss/edition_africa.rss", publisher: "CNN" },
         { url: "https://www.aljazeera.com/xml/rss/all.xml", publisher: "Al Jazeera" },
@@ -19,11 +20,13 @@ export const REGION_FEED_LISTS = Object.freeze({
     zw: [
         { url: "https://newsday.co.zw/feed/", publisher: "NewsDay Zimbabwe", nativeRegion: "zw" },
         { url: "https://www.herald.co.zw/feed/", publisher: "The Herald", nativeRegion: "zw" },
+        { url: "https://www.zbcnews.co.zw/feed/", publisher: "ZBC News", nativeRegion: "zw" },
         { url: "https://feeds.bbci.co.uk/news/world/africa/rss.xml", publisher: "BBC News" },
         { url: "http://rss.cnn.com/rss/edition_africa.rss", publisher: "CNN" },
         { url: "https://www.aljazeera.com/xml/rss/all.xml", publisher: "Al Jazeera" },
     ],
     africa: [
+        { url: "https://africanews.com/feed/", publisher: "Africanews" },
         { url: "https://feeds.bbci.co.uk/news/world/africa/rss.xml", publisher: "BBC News" },
         { url: "http://rss.cnn.com/rss/edition_africa.rss", publisher: "CNN" },
         { url: "https://www.aljazeera.com/xml/rss/all.xml", publisher: "Al Jazeera" },
@@ -32,6 +35,7 @@ export const REGION_FEED_LISTS = Object.freeze({
         { url: "https://www.theguardian.com/world/rss", publisher: "The Guardian" },
     ],
     world: [
+        { url: "https://africanews.com/feed/", publisher: "Africanews" },
         { url: "https://feeds.bbci.co.uk/news/world/rss.xml", publisher: "BBC News" },
         { url: "http://rss.cnn.com/rss/edition_world.rss", publisher: "CNN" },
         { url: "https://www.theguardian.com/world/rss", publisher: "The Guardian" },
@@ -151,12 +155,15 @@ export const ENC_AVAILABLE_ATTRIBUTION = "eNCA";
 /** Human-readable list for edition metadata. */
 export const SARAH_NEWS_PUBLISHER_ALLOWLIST = Object.freeze([
     "SABC News",
+    "eNCA",
     "IOL",
     "The Citizen",
     "Daily Maverick",
     "BusinessTech",
     "NewsDay Zimbabwe",
     "The Herald",
+    "ZBC News",
+    "Africanews",
     "BBC News",
     "BBC Sport",
     "CNN",

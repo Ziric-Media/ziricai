@@ -326,13 +326,13 @@
     if (!story) return;
     const host = document.getElementById('snewsHost');
     if (!host || !activeEdition) return;
-    digestScrollTop = host.parentElement?.scrollTop ?? host.scrollTop;
+    const scroller = host.closest('.snews-body') || host.parentElement || host;
+    digestScrollTop = scroller.scrollTop || 0;
     host.classList.add('snews-host--article');
-    host.scrollTop = 0;
-    if (host.parentElement) host.parentElement.scrollTop = 0;
+    scroller.scrollTop = 0;
 
     const hero = story.imageUrl
-      ? `<div class="snews-article-hero"><img src="${escapeHtml(story.imageUrl)}" alt="" loading="lazy"/></div>`
+      ? `<div class="snews-article-hero"><img src="${escapeHtml(story.imageUrl)}" alt="" loading="lazy" decoding="async" width="640" height="360"/></div>`
       : '<div class="snews-article-hero snews-article-hero--placeholder" aria-hidden="true"></div>';
     const paras = articleParagraphs(story)
       .map((p) => `<p>${escapeHtml(p)}</p>`)
@@ -362,9 +362,9 @@
 
     host.querySelector('#snewsArticleBack')?.addEventListener('click', () => {
       renderDigest(host, activeProfile, activeEdition);
-      const scroller = host.parentElement || host;
+      const scrollBack = host.closest('.snews-body') || host.parentElement || host;
       requestAnimationFrame(() => {
-        scroller.scrollTop = digestScrollTop;
+        scrollBack.scrollTop = digestScrollTop;
       });
     });
 
