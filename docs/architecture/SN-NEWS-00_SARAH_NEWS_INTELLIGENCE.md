@@ -1,8 +1,10 @@
 # SN-NEWS-00 — Sarah News & Intelligence (strategic direction)
 
-**Status:** Explore / Phase 0 — architecture and UX prototype (not production news pipeline)  
+**Status:** Engineering architecture — **R1 Sarah News in production pilot** (RSS multi-publisher, in-app stories, Personal Sarah tool)  
 **Owner:** Sarah App consumer experience  
 **Principle:** One **Sarah Intelligence** engine powers Personal Sarah (on-demand) and Sarah News (proactive). No duplicate research stacks.
+
+**Product specification:** [SN-NEWS-01 — Duta-Inspired Edition](./SN-NEWS-01_SARAH_NEWS_PRODUCT_SPEC_DUTA.md) (authoritative product scope, categories, dual UX, releases R1–R4).
 
 **Related:** [SHI-01_SARAH_HOME_INTELLIGENCE.md](./SHI-01_SARAH_HOME_INTELLIGENCE.md), [SARAH_APP_MASTER_ARCHITECTURE.md](./SARAH_APP_MASTER_ARCHITECTURE.md)
 
@@ -196,13 +198,14 @@ Breaking pushes reference `storyId` + `editionId` for deep link.
 
 | Phase | Scope | Exit criteria |
 |-------|--------|---------------|
-| **SN-00** | This doc + UX prototype (mock editions) | Nav + setup + story room UI sign-off |
-| **SN-01** | Profile API + static/RSS pilot (SA + ZW) | Real morning edition for test users |
-| **SN-02** | Story room + Ask Sarah context | Follow-up questions cite sources |
-| **SN-03** | Lunch/evening schedulers + push | Three slots reliable 7 days |
-| **SN-04** | Breaking detector + confidence | No false “BREAKING” in acceptance suite |
-| **SN-05** | Entity follows + Duta-style chat tools | Weather/currency/translate unified in tool registry |
-| **SN-06** | Publisher partnerships / sponsorship policy | Legal review; ads labelled |
+| **SN-00** | Architecture + nav | Nav + spec sign-off |
+| **SN-01** | Profile API + RSS pilot | Real editions for signed-in users |
+| **SN-02** | In-app story room + images + Ask Sarah | No thin-only stories; opinion in-app |
+| **SN-03** | Multi-publisher allow-list + intelligence bridge | Personal Sarah `fetchSarahNewsHeadlines`; 8+ publishers in mix |
+| **SN-03b** | Briefing schedulers + push (R2 product) | Three slots reliable 7 days |
+| **SN-04** | Breaking detector + confidence (R3 product) | No false “BREAKING” in acceptance suite |
+| **SN-05** | Topic follows + Duta chat tools + trends (R4 partial) | Follow/unfollow via chat; weather/currency in tool registry |
+| **SN-06** | Publisher partnerships / sponsorship (R4) | Legal review; ads labelled |
 
 **Do not** launch SN-04 before credibility rules are tested.
 
@@ -225,11 +228,11 @@ Breaking pushes reference `storyId` + `editionId` for deep link.
 
 ---
 
-## 14. Prototype (SN-00)
+## 14. Sarah App deployment (R1)
 
-- `prototype/sarah-app-ux/js/sarah-news.js` — local prefs + **illustrative** headlines (not live journalism).
-- News tab in bottom nav between My Sarah and Discover.
-- Labels: “Illustrative preview — not actual news reports.”
+- **Source of truth:** `prototype/sarah-app-ux/` → `prepare-sites.js users` → sarah.ziricai.com.
+- **Newsroom:** `js/sarah-news.js` — live editions via `GET /api/personal-sarah/news/editions/latest`.
+- **Assistant:** Personal Sarah tool `fetchSarahNewsHeadlines` (same compiler).
 
 ---
 

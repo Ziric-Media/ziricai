@@ -13,7 +13,7 @@
 | User accounts | **Shared Firebase identity** — one UID across Mission Control, Company Portal, and Sarah App |
 | Authorization | **Separate roles and data boundaries** per portal; consumer access never implies tenant membership |
 | Core channel | **Sarah Network** (first-party); WhatsApp and other integrations remain **optional** for businesses |
-| **SA-01 Navigation** | **AI-first** shell: My Sarah, **News**, Discover, Chats, Profile — **no social Status timeline** in primary navigation (Status remains portal/network where needed; consumer proactive intel → **Sarah News**, [SN-NEWS-00](./SN-NEWS-00_SARAH_NEWS_INTELLIGENCE.md)). |
+| **SA-01 Navigation** | **AI-first** shell: My Sarah, **News**, Discover, Chats, Profile — **no social Status timeline** in primary navigation (Status remains portal/network where needed; consumer proactive intel → **Sarah News**, [SN-NEWS-01 product spec](./SN-NEWS-01_SARAH_NEWS_PRODUCT_SPEC_DUTA.md) · [SN-NEWS-00 engineering](./SN-NEWS-00_SARAH_NEWS_INTELLIGENCE.md)). |
 | **Usage (US)** | Monthly tokens **expire** at period end; **optional top-ups** when exhausted; **no auto-billing** without explicit purchase — [Subscription & Usage spec](./SARAH_APP_SUBSCRIPTION_AND_USAGE_SPEC.md) |
 | **Sarah Work (SW)** | **Automatic** per-assignment token budgeting within allowance — users do not set manual Work budgets — [Sarah Work spec](./SARAH_WORK_SPECIFICATION.md) |
 
