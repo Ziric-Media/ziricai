@@ -5,6 +5,8 @@ import {
     updateSmilemoreBooking,
 } from "./dentalBookingService.js";
 import { getDentalPatient } from "./dentalPatientService.js";
+import { createPersonalReminder } from "../sarah/personal/personalSarahTaskStore.js";
+import { getAppointment } from "../tenants/appointmentService.js";
 import { moduleKeyFromPortalSurface } from "../sarah/portalSarahSurfaces.js";
 import { publish, EventTypes } from "../events/index.js";
 import {
@@ -13,6 +15,8 @@ import {
     SMILEMORE_CHANNELS,
     SMILEMORE_PUBLIC_TEAM,
     SMILEMORE_BOOKING_STATUSES,
+    parsePracticeDateTime,
+    formatPracticeLabel,
 } from "./smilemorePractice.js";
 
 const locationEnum = SMILEMORE_LOCATIONS.map((item) => item.id);
@@ -329,11 +333,112 @@ export const listDentalClaimsTool = {
     },
 };
 
+export const scheduleDentalAppointmentReminderTool = {
+    name: "scheduleDentalAppointmentReminder",
+    description:
+        "Schedule a Sarah App personal reminder (push + My Notifications) before a dental appointment. Call when the patient asks to be reminded (e.g. day before). Requires appointment time or bookingId from a recent createDentalBooking.",
+    parameters: {
+        type: "object",
+        properties: {
+            bookingId: { type: "string", description: "SmileMore diary booking id when known" },
+            appointmentAt: {
+                type: "string",
+                description: "Appointment ISO instant or practice wall time YYYY-MM-DDTHH:mm",
+            },
+            remindBeforeHours: {
+                type: "number",
+                description: "Hours before appointment to fire the reminder (default 24 for day before)",
+            },
+            title: { type: "string", description: "Short reminder title override" },
+            notes: { type: "string", description: "Extra context (location, service)" },
+        },
+    },
+    requiredPermissions: ["canReply"],
+    async execute(ctx, args = {}) {
+        const uid = String(ctx.customerId || ctx.uid || "").trim();
+        if (!uid) {
+            return {
+                ok: false,
+                success: false,
+                message: "A signed-in Sarah App user is required to schedule reminders.",
+            };
+        }
+
+        let appointmentAt = args.appointmentAt ? String(args.appointmentAt).trim() : "";
+        let booking = null;
+        if (args.bookingId) {
+            booking = await getAppointment(ctx.companyId, args.bookingId);
+            if (booking?.scheduledAt) appointmentAt = booking.scheduledAt;
+        }
+        if (!appointmentAt) {
+            const recent = (await listSmilemoreBookings(ctx.companyId)).filter((b) => {
+                const phone = String(b.phone || "").replace(/\D/g, "");
+                const ctxPhone = String(ctx.customerPhone || "").replace(/\D/g, "");
+                return phone && ctxPhone && phone === ctxPhone;
+            });
+            const latest = recent.sort((a, b) =>
+                String(b.scheduledAt || "").localeCompare(String(a.scheduledAt || ""))
+            )[0];
+            if (latest) {
+                booking = latest;
+                appointmentAt = latest.scheduledAt;
+            }
+        }
+        if (!appointmentAt) {
+            return {
+                ok: false,
+                success: false,
+                message: "No appointment time on file. Confirm the booking date and time, then call this tool again.",
+            };
+        }
+
+        const start = parsePracticeDateTime(appointmentAt);
+        const hours = Number.isFinite(Number(args.remindBeforeHours)) ? Number(args.remindBeforeHours) : 24;
+        let due = new Date(start.getTime() - hours * 60 * 60 * 1000);
+        if (due.getTime() < Date.now()) {
+            due = new Date(start.getTime() - 60 * 60 * 1000);
+        }
+        if (due.getTime() < Date.now()) {
+            return {
+                ok: false,
+                success: false,
+                message: "That appointment is too soon to schedule a day-before reminder. Offer to remind one hour before instead.",
+            };
+        }
+
+        const label = formatPracticeLabel(start);
+        const location = booking?.locationLabel || booking?.location || "";
+        const service = booking?.service || "";
+        const title =
+            String(args.title || "").trim() ||
+            `Dental appointment${service ? ` — ${service}` : ""}`;
+        const notes =
+            String(args.notes || "").trim() ||
+            [label, location, booking?.id ? `Booking ${booking.id}` : ""].filter(Boolean).join(" · ");
+
+        const task = await createPersonalReminder(uid, {
+            title: title.slice(0, 120),
+            dueAt: due.toISOString(),
+            notes: notes.slice(0, 500),
+            triggerMode: "time",
+        });
+
+        return {
+            ok: true,
+            success: true,
+            message: `Reminder set for ${formatPracticeLabel(due)} (before your appointment on ${label}). You will get a push and it will appear under My Notifications.`,
+            data: { reminder: { id: task.id, dueAt: task.dueAt, title: task.title }, appointmentAt: start.toISOString() },
+            uiHints: [{ navigate: "notifications" }],
+        };
+    },
+};
+
 export const SMILEMORE_DENTAL_TOOLS = [
     listDentalBookingsTool,
     checkDentalAvailabilityTool,
     createDentalBookingTool,
     updateDentalBookingTool,
+    scheduleDentalAppointmentReminderTool,
     getDentalPatientTool,
     listDentalSalesTool,
     listDentalClaimsTool,

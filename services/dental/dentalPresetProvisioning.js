@@ -11,6 +11,7 @@ import {
     DENTAL_CLINIC_PRESET_VERSION,
     resolveDentalIndustryKey,
 } from "./dentalIndustryPreset.js";
+import { ensureDentalPracticeDiscoverProducts } from "./dentalDiscoverDefaults.js";
 
 const TEMPLATE_PATH = path.join(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -45,7 +46,7 @@ export async function applyDentalClinicPreset(companyId, options = {}) {
         enabled: true,
     };
 
-    return updateCompany(companyId, {
+    const updated = await updateCompany(companyId, {
         industry: "dental",
         industryPresetId: DENTAL_CLINIC_PRESET_ID,
         industryPresetVersion: preset._resolvedVersion || DENTAL_CLINIC_PRESET_VERSION,
@@ -57,6 +58,12 @@ export async function applyDentalClinicPreset(companyId, options = {}) {
             dentalPractice,
         },
     });
+    try {
+        await ensureDentalPracticeDiscoverProducts(companyId);
+    } catch (err) {
+        console.warn("[dental-preset] discover products seed:", err.message);
+    }
+    return updated;
 }
 
 /**

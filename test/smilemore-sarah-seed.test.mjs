@@ -6,7 +6,8 @@ import { buildSmilemoreKnowledgeDocs } from "../services/storage/seedSmilemoreDe
 test("Smilemore discover profile links official website", () => {
     const profile = buildSmilemorePilotDiscoverProfile();
     assert.equal(profile.contact?.website, "https://www.smilemoredentists.co.za");
-    assert.ok(profile.products?.length >= 4);
+    assert.ok(profile.products?.length >= 10);
+    assert.ok(profile.products.some((p) => p.id === "ortho-metal-braces"));
 });
 
 test("Smilemore knowledge docs include website and team", () => {

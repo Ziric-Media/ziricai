@@ -91,6 +91,7 @@ export const SMILEMORE_WHATSAPP_TOOL_NAMES = Object.freeze([
     "checkDentalAvailability",
     "createDentalBooking",
     "updateDentalBooking",
+    "scheduleDentalAppointmentReminder",
     "getDentalPatient",
 ]);
 
@@ -254,7 +255,12 @@ Booking diary (the booking board is the only availability authority):
 - Never say a slot is free, held, or confirmed from memory.
 - The booking diary, client file, till, medical-aid worksheet, and CRM are one record matched by phone. Call getDentalPatient before describing a returning person. Diary visits, till treatment names, and worksheet status are only what that tool returns. If it is not listed, say it is not on file.
 - Do not invent medical history, the next procedure, fees, or what a medical scheme will pay. Do not read out a rand amount from a receipt. If they ask what something cost or what was paid, say reception has the receipt and give ${SMILEMORE_CONTACTS.phone}.
-- Medical-aid details are only what the client file already stores or what the person has just read from their card. Never guess a scheme, option, membership number, or dependant code. A claim worksheet is not a submitted or paid claim.`;
+- Medical-aid details are only what the client file already stores or what the person has just read from their card. Never guess a scheme, option, membership number, or dependant code. A claim worksheet is not a submitted or paid claim.
+
+Sarah App reminders:
+- When the patient asks to be reminded about an appointment, call scheduleDentalAppointmentReminder. Reminders are personal Sarah App notifications (push + My Notifications).
+- Never say reminders are unavailable or that the patient must use their own calendar only — schedule the reminder when they agree on timing (default 24 hours before the visit).
+- Use orthodontic product and appliance facts from the company Knowledge Centre and Discover products list; indicative prices are not final quotes.`;
 }
 
 /** Portal Sarah role links for SmileMore. WhatsApp reception does not use this. */

@@ -9,8 +9,8 @@ import {
     SMILEMORE_CONTACTS,
     SMILEMORE_DEMO_COMPANY_ID,
     SMILEMORE_PUBLIC_WEBSITE,
-    SMILEMORE_SERVICES,
 } from "../dental/smilemorePractice.js";
+import { buildDentalPracticeDiscoverProducts } from "../dental/dentalPracticeProducts.js";
 
 /** Public Discover profile for Smile More Dentists (pilot + startup seed). */
 export function buildSmilemorePilotDiscoverProfile() {
@@ -36,11 +36,7 @@ export function buildSmilemorePilotDiscoverProfile() {
             { day: "Saturday", time: "9:00 AM – 1:00 PM" },
             { day: "Sunday", time: "Closed" },
         ],
-        products: SMILEMORE_SERVICES.map((s) => ({
-            id: s.id,
-            name: s.label,
-            description: "Ask Sarah about booking this service — fees are confirmed at reception.",
-        })),
+        products: buildDentalPracticeDiscoverProducts(),
         verified: true,
         verificationSummary: {
             state: "verified",

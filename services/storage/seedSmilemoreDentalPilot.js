@@ -20,6 +20,8 @@ import {
     saveBusinessDirectoryEntry,
 } from "../users/businessDirectoryService.js";
 import { buildSmilemorePilotDiscoverProfile } from "../network/pilotListings.js";
+import { buildDentalPracticeProductsKnowledgeText } from "../dental/dentalPracticeProducts.js";
+import { ensureDentalPracticeDiscoverProducts } from "../dental/dentalDiscoverDefaults.js";
 
 const KNOWLEDGE_BASE_ID = "kb-smilemore-demo";
 
@@ -102,6 +104,12 @@ Email: ${SMILEMORE_CONTACTS.email}
 Emergency contact: ${SMILEMORE_CONTACTS.emergency}
 Website: ${SMILEMORE_PUBLIC_WEBSITE}`,
         },
+        {
+            id: "sm-kn-products",
+            title: "Orthodontic products & appliances",
+            type: "faq",
+            content: buildDentalPracticeProductsKnowledgeText(),
+        },
     ];
 }
 
@@ -158,28 +166,47 @@ async function ensureSmilemoreDiscoverProfile(companyId) {
     const needsWebsite = !contact.website || !String(contact.website).includes("smilemoredentists.co.za");
     const needsDesc = !existing.shortDescription || !String(existing.shortDescription).includes("smilemoredentists");
 
+    const productResult = await ensureDentalPracticeDiscoverProducts(companyId, {
+        displayName: profile.displayName,
+        industry: profile.industry,
+        location: profile.location,
+        address: profile.address,
+        shortDescription: profile.shortDescription,
+        tags: profile.tags,
+        contact,
+        hours: profile.hours,
+        verified: existing.verified ?? profile.verified,
+        verificationSummary: existing.verificationSummary ?? profile.verificationSummary,
+        seeded: existing.seeded ?? true,
+        discoverability: "public",
+    });
+
     if (
+        !productResult.updated &&
         existing.displayName === profile.displayName &&
         existing.address &&
         Array.isArray(existing.hours) &&
         existing.hours.length &&
         !needsWebsite &&
-        !needsDesc &&
-        Array.isArray(existing.products) &&
-        existing.products.length
+        !needsDesc
     ) {
         return { updated: false };
     }
 
-    await saveBusinessDirectoryEntry(companyId, {
-        discoverability: "public",
-        ...profile,
-        contact,
-        verified: existing.verified ?? profile.verified,
-        verificationSummary: existing.verificationSummary ?? profile.verificationSummary,
-        seeded: existing.seeded ?? true,
-    });
-    return { updated: true };
+    if (!productResult.updated && (needsWebsite || needsDesc)) {
+        await saveBusinessDirectoryEntry(companyId, {
+            discoverability: "public",
+            ...profile,
+            contact,
+            products: profile.products,
+            verified: existing.verified ?? profile.verified,
+            verificationSummary: existing.verificationSummary ?? profile.verificationSummary,
+            seeded: existing.seeded ?? true,
+        });
+        return { updated: true };
+    }
+
+    return { updated: Boolean(productResult.updated) };
 }
 
 /**

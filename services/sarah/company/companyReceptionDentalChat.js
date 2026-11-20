@@ -141,6 +141,9 @@ export async function runCompanySarahDentalTurn(params) {
         "Default serviceId cleaning-polish for routine visits unless the patient specifies another advertised service.",
         "Use channel sarah_app when creating bookings.",
         "After a successful createDentalBooking, summarise location, date, time, and status (requested vs confirmed).",
+        "When the patient asks for a reminder (e.g. day before), call scheduleDentalAppointmentReminder with remindBeforeHours 24 unless they specify otherwise.",
+        "Never say you cannot send reminders — Sarah App delivers push and in-app notifications via that tool.",
+        "Product questions: use COMPANY KNOWLEDGE and published Discover products (braces, aligners, retainers, guards) — prices are indicative only.",
     ].join("\n");
 
     const practiceBlock = smilemorePracticePrompt();
