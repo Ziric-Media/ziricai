@@ -64,12 +64,24 @@
     };
   }
 
+  async function syncProfileToCloud(profile) {
+    if (!isLive() || !profile?.regions?.length) return profile;
+    const saved = await global.SarahLive.saveSarahNewsProfile(profile);
+    if (saved.profile?.regions?.length) return saved.profile;
+    if (saved.error) global.showProtoToast?.(saved.error);
+    return profile;
+  }
+
   async function resolveProfile() {
-    if (isLive()) {
-      const res = await global.SarahLive.fetchSarahNewsProfile();
-      if (res.profile?.regions?.length) return res.profile;
+    const local = loadLocalProfile();
+    if (!isLive()) return local;
+    const res = await global.SarahLive.fetchSarahNewsProfile();
+    if (res.profile?.regions?.length) {
+      saveLocalProfile(res.profile);
+      return res.profile;
     }
-    return loadLocalProfile();
+    if (local?.regions?.length) return syncProfileToCloud(local);
+    return null;
   }
 
   function escapeHtml(s) {
@@ -341,6 +353,22 @@
         return;
       }
       if (res.error) {
+        const needsSetup =
+          res.code === 'NEWS_PROFILE_MISSING' ||
+          /setup first/i.test(String(res.error || ''));
+        if (needsSetup) {
+          const synced = await syncProfileToCloud(profile);
+          if (synced?.regions?.length) {
+            const retry = await global.SarahLive.fetchSarahNewsEdition();
+            if (retry.edition) {
+              renderDigest(host, synced, retry.edition);
+              return;
+            }
+          }
+          renderSetup(host, profile || defaultProfile(), (next) => loadDigest(host, next));
+          global.showProtoToast?.('Set up Sarah News, then tap Save & open briefing.');
+          return;
+        }
         host.innerHTML = `<p class="snews-error">${escapeHtml(res.error)}</p><button type="button" class="btn btn-secondary" id="snewsRetry">Try again</button>`;
         host.querySelector('#snewsRetry')?.addEventListener('click', () => loadDigest(host, profile));
         return;

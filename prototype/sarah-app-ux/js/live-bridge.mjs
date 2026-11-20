@@ -669,7 +669,7 @@ export async function fetchSarahNewsEdition(slot = '') {
     silent: true,
     timeoutMs: 60000,
   });
-  if (res.error) return { error: res.error, code: res.code };
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
   const body = res.data || {};
   return { edition: body.edition ?? body.data?.edition, profile: body.profile };
 }
