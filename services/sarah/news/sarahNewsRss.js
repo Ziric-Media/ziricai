@@ -21,6 +21,26 @@ function pickTag(block, tag) {
     return m ? decodeEntities(m[1]) : "";
 }
 
+function pickAttr(block, tag, attr) {
+    const re = new RegExp(`<${tag}[^>]*\\b${attr}=["']([^"']+)["']`, "i");
+    const m = block.match(re);
+    return m ? decodeEntities(m[1]) : "";
+}
+
+function pickFirstImageUrl(block) {
+    const thumb = pickAttr(block, "media:thumbnail", "url");
+    if (thumb) return thumb;
+    const enclosure = pickAttr(block, "enclosure", "url");
+    if (enclosure && /\.(jpe?g|png|webp|gif)/i.test(enclosure)) return enclosure;
+    const mediaContent = block.match(/<media:content\b[^>]*\burl=["']([^"']+)["'][^>]*>/i);
+    if (mediaContent?.[1] && /image|jpeg|jpg|png/i.test(mediaContent[0])) {
+        return decodeEntities(mediaContent[1]);
+    }
+    const imgInDesc = block.match(/<description[^>]*>[\s\S]*?<img[^>]+src=["']([^"']+)["']/i);
+    if (imgInDesc?.[1]) return decodeEntities(imgInDesc[1]);
+    return null;
+}
+
 /**
  * @param {string} xml
  */
@@ -38,7 +58,8 @@ export function parseRssItems(xml) {
         items.push({
             title,
             link: link || null,
-            description: description.slice(0, 500),
+            description: description.slice(0, 1200),
+            imageUrl: pickFirstImageUrl(block),
             pubDate: pubDate || null,
             publishedAt: pubDate ? Date.parse(pubDate) : null,
         });

@@ -3,13 +3,15 @@
  */
 import { createHash } from "node:crypto";
 import {
-    REGION_FEEDS,
-    INTEREST_FEEDS,
+    REGION_FEED_LISTS,
+    INTEREST_FEED_LISTS,
     ZIMBABWE_KEYWORDS,
     SOUTH_AFRICA_KEYWORDS,
+    ENC_AVAILABLE_ATTRIBUTION,
 } from "./sarahNewsSources.js";
 import { fetchRssFeed } from "./sarahNewsRss.js";
 import { DEFAULT_SARAH_NEWS_PROFILE } from "./sarahNewsProfileService.js";
+import { composeSarahArticleBody, heroImageUrl } from "./sarahNewsArticleComposer.js";
 
 function storyId(seed) {
     return `story_${createHash("sha256").update(seed).digest("hex").slice(0, 16)}`;
@@ -46,17 +48,18 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
     const slot = opts.slot || slotForNow();
     const feedMap = new Map();
 
+    function addFeeds(list, tag) {
+        for (const feed of list || []) {
+            const prev = feedMap.get(feed.url);
+            if (prev) prev.tags.push(tag);
+            else feedMap.set(feed.url, { ...feed, tags: [tag] });
+        }
+    }
     for (const region of merged.regions) {
-        const feed = REGION_FEEDS[region];
-        if (feed) feedMap.set(feed.url, { ...feed, tags: [`region:${region}`] });
+        addFeeds(REGION_FEED_LISTS[region], `region:${region}`);
     }
     for (const interest of merged.interests) {
-        const feed = INTEREST_FEEDS[interest];
-        if (feed) {
-            const prev = feedMap.get(feed.url);
-            if (prev) prev.tags.push(`interest:${interest}`);
-            else feedMap.set(feed.url, { ...feed, tags: [`interest:${interest}`] });
-        }
+        addFeeds(INTEREST_FEED_LISTS[interest], `interest:${interest}`);
     }
 
     const stories = [];
@@ -73,17 +76,36 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
 
                     const id = storyId(item.link || item.title);
                     const interestTag = meta.tags.find((t) => t.startsWith("interest:"))?.slice(9);
+                    const summary = item.description || "Sarah is monitoring this story for more detail.";
+                    const imageUrl = heroImageUrl(item.imageUrl);
+                    const draft = {
+                        headline: item.title,
+                        summary,
+                        region: regionTag || null,
+                    };
+                    const articleBody = composeSarahArticleBody(draft);
+                    let sourceNote = `Story taken from ${meta.publisher}.`;
+                    if (
+                        regionTag === "za" &&
+                        SOUTH_AFRICA_KEYWORDS.test(`${item.title} ${item.description}`) &&
+                        meta.publisher !== ENC_AVAILABLE_ATTRIBUTION
+                    ) {
+                        sourceNote = `Story taken from ${meta.publisher}. Also widely reported by ${ENC_AVAILABLE_ATTRIBUTION} and other South African outlets.`;
+                    }
                     stories.push({
                         storyId: id,
                         headline: item.title,
-                        summary: item.description || "Tap to read more at the publisher.",
-                        link: item.link,
+                        summary,
+                        articleBody,
+                        imageUrl,
+                        sourceNote,
                         publisher: meta.publisher,
                         region: regionTag || null,
                         interest: interestTag || null,
                         publishedAt: item.publishedAt,
                         confidence: "confirmed",
                         breaking: false,
+                        link: item.link,
                     });
                     if (item.link) seenLinks.add(item.link);
                 }
@@ -102,8 +124,8 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
         ok: true,
         slot,
         compiledAt: new Date().toISOString(),
-        sourcePolicy: "bbc-rss-v1",
-        disclaimer: "Headlines and summaries from publisher RSS feeds. Tap a story for the original article.",
+        sourcePolicy: "multi-rss-sarah-reader-v2",
+        disclaimer: "Sarah adapts verified publisher feeds into in-app briefings. Tap a story to read inside Sarah News.",
         topStories: top,
         headlines,
         storiesById: Object.fromEntries([...top, ...headlines].map((s) => [s.storyId, s])),

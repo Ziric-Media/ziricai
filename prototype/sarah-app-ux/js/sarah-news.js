@@ -4,6 +4,8 @@
 (function initSarahNews(global) {
   const STORAGE_KEY = 'sarah.news.profile.v1';
   let activeEdition = null;
+  let activeProfile = null;
+  let digestScrollTop = 0;
 
   const REGIONS = [
     { id: 'za', label: 'South Africa' },
@@ -152,7 +154,7 @@
         <div class="snews-setup-hero">
           <p class="snews-setup-eyebrow">Sarah News</p>
           <h2 class="snews-setup-heading">Your briefing, your world</h2>
-          <p class="snews-setup-lead">Choose regions and topics. Sarah compiles headlines from trusted publisher feeds — you tap through for the full story.</p>
+          <p class="snews-setup-lead">Choose regions and topics. Sarah writes each story in-app from BBC, CNN, and South African outlets — no jumping to other websites.</p>
         </div>
         ${chipGroup('Where should Sarah look?', 'regions', REGIONS, p.regions || [])}
         ${chipGroup('What interests you?', 'interests', INTERESTS, p.interests || [])}
@@ -198,19 +200,42 @@
     });
   }
 
+  function localArticleBody(story) {
+    const summary = String(story.summary || story.headline || '').trim();
+    return [
+      `Here's what I'm seeing: ${summary}`,
+      'Sarah is summarising verified reporting for you inside the app.',
+    ].join('\n\n');
+  }
+
+  function articleParagraphs(story) {
+    const raw = story.articleBody || localArticleBody(story);
+    return String(raw)
+      .split(/\n\n+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }
+
   function storyCard(s) {
     const meta = [s.region ? REGIONS.find((r) => r.id === s.region)?.label : null, s.publisher]
       .filter(Boolean)
       .join(' · ');
-    return `
-      <article class="snews-story-card" data-news-story="${escapeHtml(s.storyId)}" role="button" tabindex="0">
+    const hasImg = Boolean(s.imageUrl);
+    const thumb = hasImg
+      ? `<img class="snews-story-thumb" src="${escapeHtml(s.imageUrl)}" alt="" loading="lazy" width="96" height="96"/>`
+      : '';
+    const inner = `
         <div class="snews-story-card-top">
           ${s.breaking ? '<span class="snews-badge snews-badge--breaking">Breaking</span>' : ''}
           ${meta ? `<span class="snews-story-meta">${escapeHtml(meta)}</span>` : ''}
         </div>
         <h4 class="snews-story-head">${escapeHtml(s.headline)}</h4>
         <p class="snews-story-sum">${escapeHtml(s.summary)}</p>
-        <span class="snews-story-more">Read story →</span>
+        <span class="snews-story-more">Read in Sarah News →</span>`;
+    return `
+      <article class="snews-story-card${hasImg ? ' snews-story-card--has-img' : ''}" data-news-story="${escapeHtml(s.storyId)}" role="button" tabindex="0">
+        ${thumb}
+        <div class="snews-story-card-inner">${inner}</div>
       </article>`;
   }
 
@@ -243,6 +268,8 @@
 
   function renderDigest(host, profile, edition) {
     activeEdition = edition;
+    activeProfile = profile;
+    host.classList.remove('snews-host--article');
     const storiesById = edition.storiesById || {};
     const top = edition.topStories || [];
     const headlines = edition.headlines || [];
@@ -291,49 +318,96 @@
     const map = storiesById || activeEdition?.storiesById || {};
     const story = map[storyId];
     if (!story) return;
-    const overlay = document.getElementById('snewsStoryOverlay');
-    const body = document.getElementById('snewsStoryBody');
-    if (!overlay || !body) return;
-    const link = story.link
-      ? `<a class="snews-source-link" href="${escapeHtml(story.link)}" target="_blank" rel="noopener noreferrer">Open article at ${escapeHtml(story.publisher || 'publisher')}</a>`
-      : '';
-    body.innerHTML = `
-      <p class="snews-story-meta">${escapeHtml(story.publisher || 'Source')}</p>
-      <h3 class="snews-room-title">${escapeHtml(story.headline)}</h3>
-      <p class="snews-confidence">Source status: ${escapeHtml(story.confidence || 'confirmed')}</p>
-      <p class="snews-room-body">${escapeHtml(story.summary)}</p>
-      ${link}
-      <div class="snews-quick snews-quick--room">
-        <button type="button" class="snews-quick-btn" data-story-ask="How does this affect ordinary people in South Africa?">How does this affect people?</button>
-        <button type="button" class="snews-quick-btn" data-story-ask="Give me more background on this headline">More background</button>
-      </div>`;
-    body.querySelectorAll('[data-story-ask]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const q = `${btn.getAttribute('data-story-ask')} Headline: ${story.headline}`;
-        closeStory();
-        if (typeof global.deliverPersonalSarahMessage === 'function') {
-          void global.deliverPersonalSarahMessage(q);
-          global.setRoute?.('home');
-        }
+    const host = document.getElementById('snewsHost');
+    if (!host || !activeEdition) return;
+    digestScrollTop = host.parentElement?.scrollTop ?? host.scrollTop;
+    host.classList.add('snews-host--article');
+    host.scrollTop = 0;
+    if (host.parentElement) host.parentElement.scrollTop = 0;
+
+    const hero = story.imageUrl
+      ? `<div class="snews-article-hero"><img src="${escapeHtml(story.imageUrl)}" alt="" loading="lazy"/></div>`
+      : '<div class="snews-article-hero snews-article-hero--placeholder" aria-hidden="true"></div>';
+    const paras = articleParagraphs(story)
+      .map((p) => `<p>${escapeHtml(p)}</p>`)
+      .join('');
+    const foot =
+      story.sourceNote ||
+      (story.publisher ? `Story taken from ${story.publisher}.` : 'Story compiled by Sarah from verified publisher feeds.');
+
+    host.innerHTML = `
+      <article class="snews-article-page">
+        <button type="button" class="snews-article-back" id="snewsArticleBack" aria-label="Back to briefing">← Back to briefing</button>
+        ${hero}
+        <div class="snews-article-main">
+          <span class="snews-story-meta">${escapeHtml(story.publisher || 'News')}</span>
+          <h1 class="snews-article-title">${escapeHtml(story.headline)}</h1>
+          <p class="snews-article-byline">Written for you by Sarah</p>
+          <div class="snews-article-body">${paras}</div>
+          <footer class="snews-article-foot">${escapeHtml(foot)}</footer>
+          <section class="snews-opinion-card" aria-labelledby="snewsOpinionHeading">
+            <h3 id="snewsOpinionHeading">Sarah's take</h3>
+            <p class="snews-opinion-lead">Ask Sarah for her opinion on this story — she answers here, without sending you to another site.</p>
+            <button type="button" class="btn btn-primary" id="snewsAskOpinion">Ask Sarah for her opinion</button>
+            <div class="snews-opinion-reply hidden" id="snewsOpinionReply" role="status"></div>
+          </section>
+        </div>
+      </article>`;
+
+    host.querySelector('#snewsArticleBack')?.addEventListener('click', () => {
+      renderDigest(host, activeProfile, activeEdition);
+      const scroller = host.parentElement || host;
+      requestAnimationFrame(() => {
+        scroller.scrollTop = digestScrollTop;
       });
     });
-    overlay.classList.remove('hidden');
-    overlay.setAttribute('aria-hidden', 'false');
-  }
 
-  function closeStory() {
-    const overlay = document.getElementById('snewsStoryOverlay');
-    if (!overlay) return;
-    overlay.classList.add('hidden');
-    overlay.setAttribute('aria-hidden', 'true');
+    host.querySelector('#snewsAskOpinion')?.addEventListener('click', async () => {
+      const replyEl = host.querySelector('#snewsOpinionReply');
+      const btn = host.querySelector('#snewsAskOpinion');
+      if (!replyEl || !btn) return;
+      if (!global.SarahLive?.sendPersonalMessage && !global.deliverPersonalSarahMessage) {
+        global.showProtoToast?.('Sign in to ask Sarah');
+        return;
+      }
+      btn.disabled = true;
+      replyEl.classList.remove('hidden');
+      replyEl.textContent = '';
+      replyEl.classList.add('snews-opinion-loading');
+      replyEl.textContent = 'Sarah is thinking…';
+      const prompt = [
+        'Give a clear, balanced personal opinion on this news story for a Sarah News reader.',
+        'Stay factual, note uncertainty, and avoid telling them to open external websites.',
+        `Headline: ${story.headline}`,
+        `Publisher feed: ${story.publisher || 'unknown'}`,
+        `Article: ${articleParagraphs(story).join(' ')}`,
+      ].join('\n\n');
+      try {
+        let reply = '';
+        if (global.SarahLive?.sendPersonalMessage) {
+          const res = await global.SarahLive.sendPersonalMessage(prompt);
+          if (res.error) {
+            replyEl.textContent = res.error;
+            btn.disabled = false;
+            return;
+          }
+          reply = res.reply || '';
+        } else {
+          await global.deliverPersonalSarahMessage(prompt);
+          reply = 'I added this to your My Sarah chat — open My Sarah to continue the thread.';
+        }
+        replyEl.classList.remove('snews-opinion-loading');
+        replyEl.textContent = reply;
+      } catch (err) {
+        replyEl.classList.remove('snews-opinion-loading');
+        replyEl.textContent = err?.message || 'Could not reach Sarah right now.';
+        btn.disabled = false;
+      }
+    });
   }
 
   function bindStoryOverlayOnce() {
-    if (global.__snewsOverlayBound) return;
-    global.__snewsOverlayBound = true;
-    document.getElementById('snewsStoryOverlay')?.addEventListener('click', (e) => {
-      if (e.target.closest('[data-snews-story-close]')) closeStory();
-    });
+    /* legacy overlay unused — in-app article reader (SN-02) */
   }
 
   function renderLoading(host, message) {
