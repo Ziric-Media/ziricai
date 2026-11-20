@@ -104,7 +104,7 @@ export async function resolveStoryImageUrl(input, opts = {}) {
 
     const link = String(input.link || "").trim();
     if (opts.allowOgFetch !== false && link) {
-        const og = await fetchOgImageFromPage(link);
+        const og = await fetchOgImageFromPage(link, { timeoutMs: opts.timeoutMs });
         if (og) return og;
     }
     return publisherStockImage(input.publisher);

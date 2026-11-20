@@ -661,13 +661,16 @@ export async function saveSarahNewsProfile(profile) {
   return { profile: body.profile ?? body.data?.profile ?? profile };
 }
 
-export async function fetchSarahNewsEdition(slot = '') {
+export async function fetchSarahNewsEdition(slot = '', { refresh = false } = {}) {
   const blocked = await requireSignedInConsumer();
   if (blocked) return blocked;
-  const q = slot ? `?slot=${encodeURIComponent(slot)}` : '';
+  const qs = new URLSearchParams();
+  if (slot) qs.set('slot', slot);
+  if (refresh) qs.set('refresh', '1');
+  const q = qs.toString() ? `?${qs.toString()}` : '';
   const res = await apiRequest(`/api/personal-sarah/news/editions/latest${q}`, {
     silent: true,
-    timeoutMs: 120000,
+    timeoutMs: 90000,
   });
   if (res.error) return { error: res.error, code: res.code, status: res.status };
   const body = res.data || {};

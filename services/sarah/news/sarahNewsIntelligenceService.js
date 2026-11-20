@@ -25,6 +25,8 @@ export async function getSarahNewsSnapshotForUser(uid, opts = {}) {
         slot: opts.slot,
         uid,
         persistEdition: opts.persistEdition === true,
+        refresh: opts.refresh === true,
+        useCache: opts.useCache !== false,
     });
     let headlines = [...(edition.topStories || []), ...(edition.headlines || [])];
     const seen = new Set();
@@ -95,6 +97,7 @@ export async function getSarahNewsStoryForUser(uid, storyId, opts = {}) {
         slot: opts.slot,
         uid,
         persistEdition: false,
+        useCache: true,
     });
     const base = edition.storiesById?.[storyId];
     if (!base) {

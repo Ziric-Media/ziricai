@@ -860,7 +860,13 @@ export function mountPersonalSarahRoutes(app) {
                 return;
             }
             const slot = String(req.query.slot || "").trim() || undefined;
-            const edition = await compileSarahNewsEdition(profile, { slot, uid, persistEdition: true });
+            const refresh = String(req.query.refresh || "") === "1";
+            const edition = await compileSarahNewsEdition(profile, {
+                slot,
+                uid,
+                persistEdition: true,
+                refresh,
+            });
             res.json({ ok: true, edition, profile });
         } catch (err) {
             res.status(err.status || 500).json({

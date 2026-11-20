@@ -11,7 +11,12 @@ import {
     MINING_KEYWORDS,
     SARAH_NEWS_PUBLISHER_ALLOWLIST,
 } from "./sarahNewsSources.js";
-import { fetchRssFeed } from "./sarahNewsRss.js";
+import { fetchRssFeedCached } from "./sarahNewsRssCache.js";
+import {
+    editionCacheKey,
+    getCachedSarahNewsEdition,
+    setCachedSarahNewsEdition,
+} from "./sarahNewsEditionCache.js";
 import { DEFAULT_SARAH_NEWS_PROFILE } from "./sarahNewsProfileService.js";
 import {
     composeSarahArticleBody,
@@ -60,7 +65,7 @@ function matchesInterestFilter(interest, item) {
 
 /**
  * @param {object} profile
- * @param {{ slot?: string, uid?: string, persistEdition?: boolean }} [opts]
+ * @param {{ slot?: string, uid?: string, persistEdition?: boolean, refresh?: boolean, useCache?: boolean }} [opts]
  */
 export async function compileSarahNewsEdition(profile = {}, opts = {}) {
     const merged = {
@@ -76,6 +81,12 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
     const slot = opts.slot || slotForNow();
     const uid = opts.uid;
     const dayKey = localDayKey();
+    const useCache = opts.useCache !== false && !opts.refresh;
+    if (uid && useCache) {
+        const cacheKey = editionCacheKey(uid, slot, dayKey, merged);
+        const cached = getCachedSarahNewsEdition(cacheKey);
+        if (cached) return cached;
+    }
     let previousEdition = null;
     const prevSlot = previousBriefingSlot(slot);
     if (uid && prevSlot) {
@@ -103,7 +114,7 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
     await Promise.all(
         [...feedMap.entries()].map(async ([url, meta]) => {
             try {
-                const items = await fetchRssFeed(url);
+                const items = await fetchRssFeedCached(url);
                 for (const item of items) {
                     if (item.link && seenLinks.has(item.link)) continue;
                     const regionTag = meta.tags.find((t) => t.startsWith("region:"))?.slice(7);
@@ -170,28 +181,35 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
     const dedupe = applyCrossSlotDedupe(ranked, previousEdition);
     ranked = backfillEditionStories(dedupe.stories, stories, 10);
 
-    const forImages = ranked.slice(0, 36);
-    let ogBudget = 28;
+    const IMAGE_ENRICH_LIMIT = 14;
+    const MAX_OG_FETCHES = 6;
+    const forImages = ranked.slice(0, IMAGE_ENRICH_LIMIT);
+    let ogBudget = MAX_OG_FETCHES;
     await Promise.all(
         forImages.map(async (s) => {
             const rssHero = heroImageUrl(s._rssImage);
+            const fallback = publisherStockImage(s.publisher);
             if (rssHero) {
                 s.imageUrl = rssHero;
-                s.imageFallback = publisherStockImage(s.publisher);
+                s.imageFallback = fallback;
                 delete s._rssImage;
                 return;
             }
             const allowOg = ogBudget > 0;
             if (allowOg) ogBudget -= 1;
-            s.imageUrl = await resolveStoryImageUrl(
-                { link: s.link, publisher: s.publisher, rssImage: null },
-                { allowOgFetch: allowOg }
-            );
-            s.imageFallback = publisherStockImage(s.publisher);
+            if (allowOg && s.link) {
+                s.imageUrl = await resolveStoryImageUrl(
+                    { link: s.link, publisher: s.publisher, rssImage: null },
+                    { allowOgFetch: true, timeoutMs: 3500 }
+                );
+            } else {
+                s.imageUrl = fallback;
+            }
+            s.imageFallback = fallback;
             delete s._rssImage;
         })
     );
-    for (const s of ranked.slice(36)) {
+    for (const s of ranked.slice(IMAGE_ENRICH_LIMIT)) {
         s.imageUrl = publisherStockImage(s.publisher);
         s.imageFallback = s.imageUrl;
         delete s._rssImage;
@@ -217,12 +235,12 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
         });
     }
 
-    return {
+    const edition = {
         ok: true,
         slot,
         compiledAt,
         editionDay: dayKey,
-        sourcePolicy: "multi-publisher-rss-v4",
+        sourcePolicy: "multi-publisher-rss-v4-fast",
         slotStats: {
             suppressedFromPriorSlot: dedupe.suppressed,
             updatedFromPriorSlot: dedupe.updated,
@@ -236,4 +254,9 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
         headlines,
         storiesById: Object.fromEntries(allFeatured.map((s) => [s.storyId, s])),
     };
+
+    if (uid && useCache) {
+        setCachedSarahNewsEdition(editionCacheKey(uid, slot, dayKey, merged), edition);
+    }
+    return edition;
 }

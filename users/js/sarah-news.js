@@ -3,6 +3,8 @@
  */
 (function initSarahNews(global) {
   const STORAGE_KEY = 'sarah.news.profile.v1';
+  const EDITION_CACHE_KEY = 'sarah.news.edition.v1';
+  const EDITION_CACHE_TTL_MS = 4 * 60 * 1000;
   let activeEdition = null;
   let activeProfile = null;
   let digestScrollTop = 0;
@@ -95,10 +97,95 @@
       .replace(/"/g, '&quot;');
   }
 
-  function greetingForSlot(slot) {
-    if (slot === 'lunch') return 'Good afternoon';
-    if (slot === 'evening') return 'Good evening';
-    return 'Good morning';
+  function readerFirstName() {
+    const p = global.SarahLive?.getConsumerProfile?.();
+    const name = String(p?.preferredName || p?.firstName || '').trim();
+    return name.split(/\s+/)[0] || '';
+  }
+
+  function greetingForSlot(slot, firstName) {
+    const base =
+      slot === 'lunch' ? 'Good afternoon' : slot === 'evening' ? 'Good evening' : 'Good morning';
+    const who = String(firstName || readerFirstName() || '').trim();
+    return who ? `${base}, ${who}` : base;
+  }
+
+  function editionFingerprint(profile) {
+    const slot = slotForNow();
+    return JSON.stringify({
+      slot,
+      regions: profile?.regions || [],
+      interests: profile?.interests || [],
+    });
+  }
+
+  function loadEditionCache(profile) {
+    try {
+      const raw = sessionStorage.getItem(EDITION_CACHE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (data.fp !== editionFingerprint(profile)) return null;
+      if (!data.edition?.headlines?.length) return null;
+      if (Date.now() - Number(data.savedAt || 0) > EDITION_CACHE_TTL_MS) return null;
+      return data.edition;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveEditionCache(profile, edition) {
+    try {
+      sessionStorage.setItem(
+        EDITION_CACHE_KEY,
+        JSON.stringify({ fp: editionFingerprint(profile), edition, savedAt: Date.now() })
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function tokenizeHeadline(text) {
+    const stop = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'says', 'said']);
+    return String(text || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !stop.has(w));
+  }
+
+  function enrichStoryLocally(story) {
+    const pool = [...(activeEdition?.topStories || []), ...(activeEdition?.headlines || [])];
+    const facts = String(story.summary || '')
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 24)
+      .slice(0, 4);
+    if (!facts.length && story.headline) facts.push(story.headline);
+    const tok = new Set(tokenizeHeadline(story.headline));
+    const related = [];
+    for (const other of pool) {
+      if (!other?.storyId || other.storyId === story.storyId) continue;
+      const ot = tokenizeHeadline(other.headline);
+      let overlap = 0;
+      for (const w of tok) if (ot.includes(w)) overlap += 1;
+      if (overlap >= 2) related.push(other);
+      if (related.length >= 4) break;
+    }
+    const sources = story.link
+      ? [{ publisher: story.publisher || 'Publisher', link: story.link, role: 'primary' }]
+      : [];
+    return {
+      facts,
+      timeline: story.publishedAt
+        ? [{ at: new Date(story.publishedAt).toISOString(), label: 'Published by source' }]
+        : [],
+      related: related.map((r) => ({
+        storyId: r.storyId,
+        headline: r.headline,
+        publisher: r.publisher,
+      })),
+      sources,
+    };
   }
 
   function slotForNow(date = new Date()) {
@@ -401,18 +488,14 @@
       renderSetup(host, profile, (next) => loadDigest(host, next));
     });
     host.querySelector('#snewsRefreshEdition')?.addEventListener('click', () => {
-      loadDigest(host, profile);
+      loadDigest(host, profile, { refresh: true });
     });
   }
 
   async function openStory(storyId, storiesById) {
     const map = storiesById || activeEdition?.storiesById || {};
-    let story = map[storyId];
-    if (!story) return;
-    if (isLive() && global.SarahLive?.fetchSarahNewsStory) {
-      const res = await global.SarahLive.fetchSarahNewsStory(storyId, activeEdition?.slot || slotForNow());
-      if (res.story) story = { ...story, ...res.story };
-    }
+    let story = { ...map[storyId], ...enrichStoryLocally(map[storyId]) };
+    if (!story?.headline) return;
     const host = document.getElementById('snewsHost');
     if (!host || !activeEdition) return;
     const scroller = host.closest('.snews-body') || host.parentElement || host;
@@ -517,11 +600,18 @@
       </div>`;
   }
 
-  async function loadDigest(host, profile) {
-    renderLoading(host, 'Sarah is reading publisher feeds…');
+  async function loadDigest(host, profile, opts = {}) {
+    const refresh = Boolean(opts.refresh);
+    const cached = !refresh ? loadEditionCache(profile) : null;
+    if (cached && !opts.skipCachePaint) {
+      renderDigest(host, profile, cached);
+    } else if (!opts.silentUpdate) {
+      renderLoading(host, cached ? 'Updating your briefing…' : 'Sarah is reading publisher feeds…');
+    }
     if (isLive()) {
-      const res = await global.SarahLive.fetchSarahNewsEdition(slotForNow());
+      const res = await global.SarahLive.fetchSarahNewsEdition(slotForNow(), { refresh });
       if (res.edition) {
+        saveEditionCache(profile, res.edition);
         renderDigest(host, profile, res.edition);
         return;
       }
@@ -532,8 +622,9 @@
         if (needsSetup) {
           const synced = await syncProfileToCloud(profile);
           if (synced?.regions?.length) {
-            const retry = await global.SarahLive.fetchSarahNewsEdition(slotForNow());
+            const retry = await global.SarahLive.fetchSarahNewsEdition(slotForNow(), { refresh: true });
             if (retry.edition) {
+              saveEditionCache(synced, retry.edition);
               renderDigest(host, synced, retry.edition);
               return;
             }
@@ -561,12 +652,19 @@
     const host = document.getElementById('snewsHost');
     if (!host) return;
     bindStoryOverlayOnce();
-    renderLoading(host);
     const profile = await resolveProfile();
     if (!profile?.regions?.length) {
+      renderLoading(host);
       renderSetup(host, profile, (next) => loadDigest(host, next));
       return;
     }
+    const cached = loadEditionCache(profile);
+    if (cached) {
+      renderDigest(host, profile, cached);
+      await loadDigest(host, profile, { skipCachePaint: true, silentUpdate: true });
+      return;
+    }
+    renderLoading(host);
     await loadDigest(host, profile);
   }
 
