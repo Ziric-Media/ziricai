@@ -26,6 +26,7 @@ import {
 import { ADMISSION_PRIVACY_NOTICE_VERSION } from "../education/educareAdmissionConfig.js";
 import { getCompany, updateCompany } from "../tenants/companyService.js";
 import { EDUCARE_CAMPUSES } from "../education/educareDefaults.js";
+import { listParentConcernsForSchool } from "../education/schoolParentConcernService.js";
 
 function fail(res, err, fallbackCode) {
     res.status(err.status || 500).json({
@@ -267,6 +268,18 @@ export function mountEducationRoutes(app) {
             res.json({ ok: true, data: { application: app } });
         } catch (err) {
             fail(res, err, "ADMISSION_DOCUMENT_STAFF_FAILED");
+        }
+    });
+
+    app.get("/api/education/v1/orgs/:companyId/parent-concerns", async (req, res) => {
+        try {
+            const companyId = String(req.params.companyId || "").trim();
+            await authorize(req, companyId, { write: false });
+            const status = String(req.query.status || "open").trim();
+            const items = await listParentConcernsForSchool(companyId, { status, limit: req.query.limit });
+            res.json({ ok: true, data: { concerns: items } });
+        } catch (err) {
+            fail(res, err, "PARENT_CONCERNS_FAILED");
         }
     });
 }

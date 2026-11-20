@@ -2275,6 +2275,159 @@ function sub01OpenSubscribeFlow(companyId) {
   openSub01RegisterModal(id, { edit: isOrgSubscribedSub01(id) });
 }
 
+function bindEduAdmissionModalOnce() {
+  if (window.__eduAdmissionBound) return;
+  window.__eduAdmissionBound = true;
+
+  const close = () => {
+    const modal = document.getElementById('eduAdmissionModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  };
+
+  document.getElementById('eduAdmissionModal')?.addEventListener('click', (e) => {
+    if (e.target.closest('[data-edu-admission-close]')) close();
+  });
+
+  document.getElementById('eduAdmissionSubmit')?.addEventListener('click', async () => {
+    const companyId = document.getElementById('eduAdmissionCompanyId')?.value?.trim();
+    if (!companyId) return;
+    const btn = document.getElementById('eduAdmissionSubmit');
+    if (btn) btn.disabled = true;
+    try {
+      const ok = await submitEducareAdmissionLive(companyId);
+      if (ok) close();
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+}
+
+function openEducareAdmissionModal(companyId, opts = {}) {
+  bindEduAdmissionModalOnce();
+  const id = String(companyId || '').trim();
+  if (discoverFind(id)?.live && !requireLiveSignIn('submit a school registration')) return;
+  const company = discoverFind(id);
+  const modal = document.getElementById('eduAdmissionModal');
+  if (!modal) return;
+
+  document.getElementById('eduAdmissionCompanyId').value = id;
+  const orgEl = document.getElementById('eduAdmissionOrgName');
+  if (orgEl) orgEl.textContent = company?.name || id;
+
+  const pre = opts.prefill || {};
+  const setVal = (elId, v) => {
+    const el = document.getElementById(elId);
+    if (el && v) el.value = v;
+  };
+  setVal('eduGradeApplying', pre.gradeApplyingFor);
+  setVal('eduCampus', pre.campusId);
+  setVal('eduGuardianName', pre.parentName);
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  document.getElementById('eduChildFirstName')?.focus();
+}
+
+async function submitEducareAdmissionLive(companyId) {
+  const first = document.getElementById('eduChildFirstName')?.value?.trim();
+  const surname = document.getElementById('eduChildSurname')?.value?.trim();
+  const dob = document.getElementById('eduChildDob')?.value?.trim();
+  const grade = document.getElementById('eduGradeApplying')?.value?.trim();
+  const campusId = document.getElementById('eduCampus')?.value?.trim();
+  const guardianName = document.getElementById('eduGuardianName')?.value?.trim();
+  const mobile = document.getElementById('eduGuardianMobile')?.value?.trim();
+  const email = document.getElementById('eduGuardianEmail')?.value?.trim();
+  const notes = document.getElementById('eduNotes')?.value?.trim();
+
+  if (!first || !surname || !dob || !grade || !campusId || !guardianName) {
+    showProtoToast('Complete all required enrolment fields');
+    return false;
+  }
+  if (!mobile && !email) {
+    showProtoToast('Add a mobile number or email for admissions follow-up');
+    return false;
+  }
+  if (!document.getElementById('eduAdmissionConsent')?.checked) {
+    showProtoToast('Admissions privacy consent is required');
+    return false;
+  }
+
+  const token = await window.SarahLive?.getIdToken?.();
+  if (!token) {
+    showProtoToast('Sign in required');
+    return false;
+  }
+
+  const base = `/api/education/v1/orgs/${encodeURIComponent(companyId)}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+  const academicYear = String(new Date().getFullYear() + 1);
+
+  let draftRes;
+  try {
+    draftRes = await fetch(`${base}/admission-applications`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        applicationType: 'new',
+        academicYear,
+        gradeApplyingFor: grade,
+        campusId,
+        learner: { legalFirstName: first, legalSurname: surname, dateOfBirth: dob },
+        guardian: { fullName: guardianName, mobile, email, relationship: 'parent' },
+        emergencyContact: notes ? { notes } : null,
+      }),
+    });
+  } catch {
+    showProtoToast('Could not reach admissions service');
+    return false;
+  }
+  const draftJson = await draftRes.json().catch(() => ({}));
+  if (!draftRes.ok || draftJson.ok === false) {
+    showProtoToast(draftJson.error?.message || 'Could not start application');
+    return false;
+  }
+  const appRow = draftJson.data?.application || draftJson.data;
+  const applicationId = appRow?.applicationId;
+  if (!applicationId) {
+    showProtoToast('Application id missing from server');
+    return false;
+  }
+
+  let submitRes;
+  try {
+    submitRes = await fetch(`${base}/admission-applications/${encodeURIComponent(applicationId)}/submit`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ consent: true }),
+    });
+  } catch {
+    showProtoToast('Application saved as draft — submit failed; try again from school chat');
+    return false;
+  }
+  const submitJson = await submitRes.json().catch(() => ({}));
+  if (!submitRes.ok || submitJson.ok === false) {
+    showProtoToast(submitJson.error?.message || 'Could not submit application');
+    return false;
+  }
+  const ref = submitJson.data?.application?.reference || submitJson.data?.reference || appRow?.reference || applicationId;
+  showProtoToast(`Registration submitted · ref ${ref}`);
+  return true;
+}
+
+function applyCompanySarahUiHints(hints = [], companyId = '') {
+  if (!Array.isArray(hints) || !hints.length) return;
+  for (const hint of hints) {
+    if (hint?.action === 'openEducareAdmissionForm') {
+      openEducareAdmissionModal(hint.companyId || companyId, { prefill: hint.prefill || {} });
+    }
+  }
+}
+
 function parseHomeSubRoute(raw) {
   const legacy = raw.replace(/^my-sarah/, 'home');
   if (raw === 'chat' || legacy === 'chat') {
@@ -5811,6 +5964,7 @@ function formatDiscoverProductPrice(price) {
 
 function resolveDiscoverProductImage(url, cardFallback) {
   const raw = String(url || '').trim();
+  if (/^https?:\/\//i.test(raw)) return raw;
   if (raw.startsWith('assets/')) return prototypeAsset(raw);
   if (raw) {
     const resolved = resolveListingMediaUrl(raw);
@@ -13664,21 +13818,19 @@ function renderCompanyDetail(companyId) {
   const productsHtml = products
     .map((p) => {
       const liked = isProductLiked(company.id, p.id);
-      const promoBadge = p.promotion
-        ? `<span class="product-card-promo">${escapeHtml(p.promotion)}</span>`
-        : '';
       return `
       <article class="product-card">
         <div class="product-card-media">
-          ${promoBadge}
           <img ${discoverImgAttrs(p.image || p.imageUrl, { imageFallback: p.imageFallback || 'assets/dental-products/fallback.svg' })} />
         </div>
-        <h3 class="product-card-title">${escapeHtml(p.name)}</h3>
-        ${p.description ? `<p class="product-card-desc">${escapeHtml(p.description)}</p>` : ''}
-        <p class="product-card-price">${escapeHtml(formatDiscoverProductPrice(p.price))}</p>
-        <div class="product-card-actions">
-          <button type="button" class="product-like ${liked ? 'is-active' : ''}" data-product-like="${escapeHtml(p.id)}" aria-label="Like product">${DISCOVER_SVG.heart}</button>
-          <button type="button" class="product-buy" data-product-buy="${escapeHtml(p.id)}">Buy</button>
+        <div class="product-card-body">
+          <h3 class="product-card-title">${escapeHtml(p.name)}</h3>
+          ${p.description ? `<p class="product-card-desc">${escapeHtml(p.description)}</p>` : ''}
+          <p class="product-card-price">${escapeHtml(formatDiscoverProductPrice(p.price))}</p>
+          <div class="product-card-actions">
+            <button type="button" class="product-like ${liked ? 'is-active' : ''}" data-product-like="${escapeHtml(p.id)}" aria-label="Like product">${DISCOVER_SVG.heart}</button>
+            <button type="button" class="product-buy" data-product-buy="${escapeHtml(p.id)}">Buy</button>
+          </div>
         </div>
       </article>`;
     })
@@ -14155,6 +14307,7 @@ function init() {
           return;
         }
         const payload = res.data || {};
+        applyCompanySarahUiHints(payload.uiHints, companyId);
         const rt = getSarahRuntime();
         if (payload.messages && rt.threads[companyId]) {
           rt.threads[companyId].messages = mapApiMessagesToThread(payload.messages);

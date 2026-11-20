@@ -47,6 +47,15 @@ import {
     runCompanySarahDentalTurn,
     shouldRunDentalReceptionChat,
 } from "./companyReceptionDentalChat.js";
+import {
+    runCompanySarahEducareTurn,
+    shouldRunEducareReceptionChat,
+} from "./companyReceptionEducareChat.js";
+import {
+    buildEducareCompanySarahGreeting,
+    extractEducareUiHints,
+} from "../../education/educareSchoolChatTools.js";
+import { shouldRunEducareSchoolChat } from "../../education/educareIndustryPreset.js";
 import { retrieveAgentKnowledgeContext } from "../../ai-core/aiCoreBridge.js";
 
 /**
@@ -62,7 +71,10 @@ export async function ensureCompanyChatThread(uid, companyId, consumerProfile = 
     await syncMessagesFromTenant(conv);
     let messages = getUserConversationMessages(conv.id);
     if (!messages.length) {
-        const greeting = buildCompanySarahGreeting(preferredName, conv.companyName);
+        let greeting = buildCompanySarahGreeting(preferredName, conv.companyName);
+        if (await shouldRunEducareSchoolChat(companyId)) {
+            greeting = buildEducareCompanySarahGreeting(preferredName, conv.companyName);
+        }
         await appendUserConversationMessage(conv, { role: "assistant", content: greeting, source: "greeting" });
         messages = getUserConversationMessages(conv.id);
     }
@@ -197,10 +209,13 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
     let toolVehicles = [...prefetchedVehicles];
     let automotiveTurn = null;
     let dentalTurn = null;
+    let educareTurn = null;
+    let uiHints = [];
 
     try {
         const useAutomotive = await shouldRunAutomotiveSalesChat(companyId);
         const useDental = !useAutomotive && (await shouldRunDentalReceptionChat(companyId));
+        const useEducare = !useAutomotive && !useDental && (await shouldRunEducareReceptionChat(companyId));
         if (useAutomotive) {
             automotiveTurn = await runCompanySarahAutomotiveTurn({
                 uid,
@@ -234,6 +249,23 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
                 history,
             });
             reply = dentalTurn.reply || "Thanks for your message.";
+        } else if (useEducare) {
+            const liveName =
+                consumerProfile.preferredName ||
+                consumerProfile.firstName ||
+                consumerProfile.displayName ||
+                conv.consumerDisplayName;
+            educareTurn = await runCompanySarahEducareTurn({
+                uid,
+                companyId,
+                companyName: conv.companyName,
+                consumerDisplayName: liveName,
+                consumerProfile,
+                text: customerText,
+                history,
+            });
+            reply = educareTurn.reply || "Thanks for your message.";
+            uiHints = extractEducareUiHints(educareTurn.toolResults || []);
         } else {
             const liveName =
                 consumerProfile.preferredName ||
@@ -312,6 +344,8 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
         companyName: conv.companyName,
         reply,
         messages: getUserConversationMessages(conv.id),
+        ...(uiHints.length ? { uiHints } : {}),
+        ...(educareTurn?.parentMode ? { parentMode: educareTurn.parentMode } : {}),
     };
 }
 

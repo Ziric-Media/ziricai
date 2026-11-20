@@ -29,6 +29,16 @@ async function fetchQueue(status = '') {
   return parseEducationResponse(res);
 }
 
+async function fetchParentConcerns(status = 'open') {
+  const cid = companyId();
+  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+  const res = await apiRequest(`/api/education/v1/orgs/${encodeURIComponent(cid)}/parent-concerns${q}`, {
+    silent: true,
+  });
+  const data = parseEducationResponse(res);
+  return data.concerns || [];
+}
+
 async function fetchDetail(applicationId) {
   const cid = companyId();
   const res = await apiRequest(
@@ -100,6 +110,11 @@ export async function renderSchoolAdmissions(container) {
       <div class="bos-card" id="admQueue"><p>Loading applications…</p></div>
       <div class="bos-card" id="admDetail"><p class="text-muted">Select an application to review.</p></div>
     </div>
+    <section class="bos-card" style="margin-top:16px" id="admConcernsCard">
+      <h3 style="margin-bottom:8px">Parent concerns (Sarah App)</h3>
+      <p class="text-muted" style="margin-bottom:10px">Escalations from verified guardians via Company Sarah.</p>
+      <div id="admConcerns"><p>Loading…</p></div>
+    </section>
   `;
 
   const queueHost = container.querySelector('#admQueue');
@@ -212,6 +227,39 @@ export async function renderSchoolAdmissions(container) {
     }
   };
 
+  const concernsHost = container.querySelector('#admConcerns');
+
+  const renderConcerns = async () => {
+    if (!concernsHost) return;
+    concernsHost.innerHTML = '<p>Loading…</p>';
+    try {
+      const rows = await fetchParentConcerns('open');
+      if (!rows.length) {
+        concernsHost.innerHTML = '<p class="text-muted">No open parent concerns.</p>';
+        return;
+      }
+      concernsHost.innerHTML = `
+        <table class="bos-table">
+          <thead><tr><th>Ref</th><th>Child</th><th>Grade</th><th>Category</th><th>Issue</th></tr></thead>
+          <tbody>
+            ${rows
+              .map(
+                (c) => `<tr>
+              <td>${c.reference || '—'}</td>
+              <td>${c.childName || '—'}</td>
+              <td>${c.childGrade || '—'}</td>
+              <td>${c.category || '—'}</td>
+              <td>${String(c.issue || '').slice(0, 120)}${String(c.issue || '').length > 120 ? '…' : ''}</td>
+            </tr>`
+              )
+              .join('')}
+          </tbody>
+        </table>`;
+    } catch (e) {
+      concernsHost.innerHTML = `<p class="text-danger">${e.message}</p>`;
+    }
+  };
+
   bindFilters();
-  await renderQueue();
+  await Promise.all([renderQueue(), renderConcerns()]);
 }

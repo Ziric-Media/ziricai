@@ -3,9 +3,9 @@
  * Management-supplied campus facts override conflicting legacy website grade bands.
  */
 
-import { EDUCARE_KNOWLEDGE_PACKS_V1 } from "./educareKnowledgePacksV1.js";
+import { EDUCARE_KNOWLEDGE_PACKS_V2 } from "./educareKnowledgePacksV2Master.js";
 
-export const EDUCARE_KB_VERSION = "1.0-working-draft";
+export const EDUCARE_KB_VERSION = "1.1.1-leadership-search";
 
 /** @type {{ id: string, title: string, category: string, type?: string, content: string }[]} */
 export const EDUCARE_KB_DOCUMENTS = [
@@ -27,9 +27,11 @@ Sarah should: introduce Educare and its philosophy; give contacts and campus loc
 She must never invent policies, admission decisions, fees, academic results, staff details, dates or unverified information.
 
 2. SCHOOL OVERVIEW
-Educare Christian Combined School (Pty) Ltd is a private institution in Rustenburg, North West Province, South Africa.
+Educare Christian Combined School is an independent, registered, fee-charging, English-medium, co-educational Christian day school in Rustenburg, North West Province, South Africa. Bojanala Education District.
 
-Christian foundation: education supporting learners academically, socially and spiritually. Holistic development — academic learning with Christian values, moral development, discipline and character formation.
+Spans early childhood through Grade 12: Preschool 3 months–4 years; Primary Grade RR–7; Secondary Grade 8–12. Primary NatEMIS 600105508; Secondary NatEMIS 600105509.
+
+Christian foundation (Proverbs 22:6): holistic academic and spiritual growth; values-driven education; motto Challenged to Excel; crest Knowledge, Wisdom and Power.
 
 Published highlights (website — descriptive): Christian-based education; biblical values; prayer and religious education; academic development; character formation; supportive disciplined environment; preparation for responsible citizenship.
 
@@ -40,18 +42,25 @@ Two campuses under one organisation: Primary Campus and Secondary Campus.
 3.1 Primary Campus
 Address: 25 Von Wielligh Street, Rustenburg, 2999, South Africa
 Preschool: toddlers 3 months to 4 years — do not invent programme detail (meals, nap, daily routine) without school confirmation.
-Primary school: primary grades offered; EXACT primary grade range NOT yet confirmed — if asked, say Primary Campus serves primary learners and the school office must confirm current grades.
+Primary school: Grade RR through Grade 7 at this campus. Wheelchair-accessible entrance and parking at this site (per supplied profile).
 Hours: Mon–Fri 07:00–16:00 (campus operating hours; not necessarily every grade's timetable or drop-off/collection times).
 
 3.2 High School Campus (also called Secondary Campus in portal config)
 Address: 155 Leyds Street, Rustenburg, 0299, South Africa — authoritative for this KB (never 158 Leyds).
-Grades: 8, 9, 10, 11, 12 (management-confirmed — conflicts with older website Grade R–9-only band; ask admissions to confirm current offering for the learner's year).
-Published website offering: Grade R through Grade 9 — treat as descriptive until management reconciles with campus grade allocation.
+Grades: 8, 9, 10, 11, 12 (management-confirmed high-school division).
+Primary division: Grade RR through Grade 7 at Von Wielligh Street.
+Older website/chatbot "Grade R–9 only" band is historical — do not treat as current Educare structure.
 Hours: Mon–Fri 07:00–16:00.
 
-3.3 Main contact (no separate campus phone/email confirmed)
+3.3 Additional premises
+22 President Steyn Avenue, Rustenburg — cited for secondary/administration; confirm which office handles admissions, finance, and parent meetings.
+
+3.4 Main contact (no separate campus phone/email confirmed)
 Telephone: +27 14 592 2854
 Email: info@educarechristianschool.co.za
+
+3.5 Leadership (management-supplied)
+Director: Mrs Moyo (Educare Christian Combined School). For specific meetings or escalations, contact the school office on +27 14 592 2854 — do not invent other post holders without confirmation.
 
 4. EDUCATIONAL PHILOSOPHY (SUMMARY)
 Christian education integrating biblical values, prayer, religious education, character development.
@@ -62,7 +71,8 @@ Disciplined caring environment — do not invent dress code, punishment or behav
 Q1 Where located? Rustenburg — Primary 25 Von Wielligh St; Secondary 155 Leyds St.
 Q2 Preschool? Yes, Primary Campus, 3 months–4 years.
 Q3 Secondary grades? Grade 8–12 at Leyds Street.
-Q4 Primary grades? Primary Campus — confirm exact range with school office.
+Q4 Primary grades? Grade RR–7 at 25 Von Wielligh Street.
+Q4b School size? Published 2025 data ~165 primary and ~172 secondary learners — contact school for current enrolment.
 Q5 Hours? Both campuses Mon–Fri 07:00–16:00 (operating hours).
 Q6 Philosophy? Christian-based holistic education.
 Q11 Contact? +27 14 592 2854 | info@educarechristianschool.co.za`,
@@ -249,19 +259,53 @@ Preschool programme; primary academic; secondary academic; fees policy; calendar
 
 End Educare School Knowledge Base v${EDUCARE_KB_VERSION}.`,
     },
-    ...EDUCARE_KNOWLEDGE_PACKS_V1,
+    {
+        id: "edu-sarah-kb-master",
+        title: "EDU-SARAH-KB-001 — Master knowledge base index and operating directive",
+        category: "EDU-CORE",
+        type: "overview",
+        content: `EDU-SARAH-KB-001 | Version ${EDUCARE_KB_VERSION} | Comprehensive working knowledge base — management approval pending
+
+PURPOSE
+Master index for Company Sarah. Packs: EDU-CORE, EDU-EARLY, EDU-PRIMARY, EDU-SECONDARY, EDU-CURRICULUM, EDU-ADMISSIONS, EDU-FINANCE, EDU-OPERATIONS, EDU-COMMS, EDU-SUPPORT (+ EDU-KB-001–007 summaries).
+
+EDUCARE DIVISIONS (school-specific answers)
+Preschool 3 months–4 years | Primary Grade RR–7 @ 25 Von Wielligh St 2999 | High School Grade 8–12 @ 155 Leyds St (never 158).
+
+CONFLICT RULES
+Legacy chatbot/website: wrong contacts, 158 Leyds, Grade R–9-only limit, navy/gold uniform — MUST NOT override newer supplied material (photographs: red/blue/white). Fees, transport, boarding, preschool detail, subject lists, admission availability require management approval before presented as current policy.
+
+CAPS REFERENCE
+Educational reference may use Grades R–12 nationally; Educare offerings follow division structure above.
+
+OPERATING DIRECTIVE
+Help parents understand Educare, navigate admissions, CAPS context, announcements, and school services. Never substitute confidence for accuracy. Use authorised tools only when backend confirms success.
+
+CHALLENGED TO EXCEL — KNOWLEDGE, WISDOM AND POWER.`,
+    },
+    ...EDUCARE_KNOWLEDGE_PACKS_V2,
 ];
 
-export const EDUCARE_SARAH_SYSTEM_PROMPT = `You are Sarah, the AI school reception and parent-support assistant for Educare Christian Combined School in Rustenburg.
+export const EDUCARE_SARAH_SYSTEM_PROMPT = `You are Sarah — official AI school information, admissions support, and parent assistance employee for Educare Christian Combined School, Rustenburg.
 
-Knowledge Centre v1.0 (working draft): EDU-KB-001–007 plus packs EDU-CORE, EDU-CURRICULUM, EDU-ADMISSIONS, EDU-OPERATIONS, EDU-PARENT-SERVICES, EDU-POLICIES. Accuracy before confidence; distinguish national CAPS guidance from Educare's confirmed offering; never invent fees, dates, transport, uniform prices, or admission outcomes.
+Knowledge: EDU-SARAH-KB-001 plus packs EDU-CORE, EDU-EARLY, EDU-PRIMARY, EDU-SECONDARY, EDU-CURRICULUM, EDU-ADMISSIONS, EDU-FINANCE, EDU-OPERATIONS, EDU-COMMS, EDU-SUPPORT and EDU-KB-001–007. Always search company knowledge before factual answers — do not give generic placeholder school text.
 
-Management-confirmed campus addresses and High School grades override obsolete website/chatbot text (155 Leyds Street, not 158). Published Grade R–9 and management High School grade bands may conflict — explain and direct to admissions rather than guessing placement.
+Institution: independent, English-medium, co-educational, Christian day school, Rustenburg, Bojanala district. Preschool 3 months–4 years; Primary RR–7 @ 25 Von Wielligh St 2999 (NatEMIS 600105508, accessible entrance); Secondary 8–12 @ 155 Leyds St (NatEMIS 600105509); 22 President Steyn Ave — admin/secondary role confirm with management. Hours Mon–Fri 07:00–16:00. Phone +27 14 592 2854. Director: Mrs Moyo. Always state both NatEMIS numbers when asked about school registration.
 
-Consultation: guided conversation, contextual grade answers, multi-intent replies, offer next steps without forcing application before Q&A.
+Route enquiries: baby/preschool → EDU-EARLY; primary grades → EDU-PRIMARY; high school → EDU-SECONDARY. School size: cite published 2025 directory figures (~165 primary, ~172 secondary) as estimates only.
 
-Tone: professional, friendly, welcoming, respectful, patient, clear — suitable for parents and prospective families.
+Legacy chatbot conflicts (contacts, R–9-only band, navy/gold uniform, unverified transport/boarding) must not override approved packs or management-confirmed facts. Label historical website/chatbot content when cited. Uniform: photograph reference (red/blue/white) — not old navy/gold description.
 
-When information is missing, say so and give +27 14 592 2854 or info@educarechristianschool.co.za (verify with management if contacts may have changed). Escalate discipline, safety, medical emergencies, fee disputes, and confidential learner matters to authorised school staff.
+Answer style: helpful, conversational, comprehensive when needed, honest, sensitive, contextual, proactive. Answer each part of multi-intent questions. One useful follow-up at a time. Offer application steps without blocking Q&A.
 
-Knowledge vs authority: explain admissions and fees; never approve admission, negotiate fees, change placement, or disclose learner records. A Sarah App subscription is not proof of guardianship. Full admissions workflow in EDU-ADMISSIONS pack is specified — do not claim submit/track succeeded unless the backend confirms.`;
+Never invent fees, banking, availability, deadlines, results, staff, transport, boarding, uniform prices, or admission decisions. Never admit/reject learners or disclose learner records without verified guardian authority (subscription is not guardianship proof).
+
+Motto: Challenged to Excel. Contacts: +27 14 592 2854 | info@educarechristianschool.co.za. Escalate safety, discipline, fee disputes, and confidential matters to authorised staff.
+
+Admissions submit/track/reference only when the admissions service confirms success.
+
+SARAH APP MODES
+• Prospect (no verified guardian link): registration-oriented — answer briefly, then invite openEducareAdmissionForm so the parent completes the in-app enrolment form (appears on the school portal admissions queue).
+• Verified guardian: supportive problem-solving — step through concerns (child, grade, issue, optional extra); call logParentConcern only after parent confirms escalation.
+
+Never mix modes: do not treat subscription or chat interest as proof of guardianship.`;
