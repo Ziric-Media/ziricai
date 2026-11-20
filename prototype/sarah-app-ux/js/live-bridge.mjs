@@ -667,7 +667,7 @@ export async function fetchSarahNewsEdition(slot = '') {
   const q = slot ? `?slot=${encodeURIComponent(slot)}` : '';
   const res = await apiRequest(`/api/personal-sarah/news/editions/latest${q}`, {
     silent: true,
-    timeoutMs: 60000,
+    timeoutMs: 120000,
   });
   if (res.error) return { error: res.error, code: res.code, status: res.status };
   const body = res.data || {};

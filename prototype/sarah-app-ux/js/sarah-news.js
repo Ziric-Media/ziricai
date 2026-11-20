@@ -217,13 +217,29 @@
       .filter(Boolean);
   }
 
+  function bindStoryBannerImages(host) {
+    host.querySelectorAll('.snews-story-banner-img').forEach((img) => {
+      img.referrerPolicy = 'no-referrer';
+      const fallback = img.getAttribute('data-fallback');
+      if (!fallback) return;
+      img.addEventListener(
+        'error',
+        () => {
+          if (img.src !== fallback) img.src = fallback;
+        },
+        { once: true }
+      );
+    });
+  }
+
   function storyCard(s, { featured = false } = {}) {
     const meta = [s.region ? REGIONS.find((r) => r.id === s.region)?.label : null, s.publisher]
       .filter(Boolean)
       .join(' · ');
-    const hasImg = Boolean(s.imageUrl);
-    const banner = hasImg
-      ? `<div class="snews-story-banner${featured ? ' snews-story-banner--featured' : ''}"><img class="snews-story-banner-img" src="${escapeHtml(s.imageUrl)}" alt="" loading="lazy" decoding="async" width="640" height="360"/></div>`
+    const src = s.imageUrl || s.imageFallback || '';
+    const fallback = escapeHtml(s.imageFallback || s.imageUrl || '');
+    const banner = src
+      ? `<div class="snews-story-banner${featured ? ' snews-story-banner--featured' : ''}"><img class="snews-story-banner-img" src="${escapeHtml(src)}" data-fallback="${fallback}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="640" height="360"/></div>`
       : `<div class="snews-story-banner snews-story-banner--placeholder${featured ? ' snews-story-banner--featured' : ''}" aria-hidden="true"></div>`;
     return `
       <article class="snews-story-card snews-story-card--banner${featured ? ' snews-story-card--featured' : ''}" data-news-story="${escapeHtml(s.storyId)}" role="button" tabindex="0">
@@ -310,6 +326,7 @@
       </div>`;
 
     bindStoryCards(host, storiesById);
+    bindStoryBannerImages(host);
     bindAskButtons(host);
 
     host.querySelector('#snewsEditSetup')?.addEventListener('click', () => {
@@ -332,7 +349,7 @@
     scroller.scrollTop = 0;
 
     const hero = story.imageUrl
-      ? `<div class="snews-article-hero"><img src="${escapeHtml(story.imageUrl)}" alt="" loading="lazy" decoding="async" width="640" height="360"/></div>`
+      ? `<div class="snews-article-hero"><img class="snews-story-banner-img" src="${escapeHtml(story.imageUrl)}" data-fallback="${escapeHtml(story.imageFallback || story.imageUrl || '')}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="640" height="360"/></div>`
       : '<div class="snews-article-hero snews-article-hero--placeholder" aria-hidden="true"></div>';
     const paras = articleParagraphs(story)
       .map((p) => `<p>${escapeHtml(p)}</p>`)
@@ -359,6 +376,8 @@
           </section>
         </div>
       </article>`;
+
+    bindStoryBannerImages(host);
 
     host.querySelector('#snewsArticleBack')?.addEventListener('click', () => {
       renderDigest(host, activeProfile, activeEdition);

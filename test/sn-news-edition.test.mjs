@@ -34,6 +34,7 @@ assert.ok(edition.headlines.length >= 1, "expected headlines from BBC feeds");
 assert.ok(edition.headlines[0].headline);
 assert.ok(edition.headlines[0].articleBody);
 assert.ok(edition.headlines[0].sourceNote);
+assert.ok(edition.headlines[0].imageUrl, "expected imageUrl on headlines");
 assert.ok(Array.isArray(edition.publishers) && edition.publishers.length >= 2, "expected multiple publishers");
 
 console.log(

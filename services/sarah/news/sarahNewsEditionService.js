@@ -18,6 +18,7 @@ import {
     heroImageUrl,
     storyHasPublishableDetail,
 } from "./sarahNewsArticleComposer.js";
+import { publisherStockImage, resolveStoryImageUrl } from "./sarahNewsImageService.js";
 
 function storyId(seed) {
     return `story_${createHash("sha256").update(seed).digest("hex").slice(0, 16)}`;
@@ -101,7 +102,6 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                     const interestTag = meta.tags.find((t) => t.startsWith("interest:"))?.slice(9);
                     if (interestTag && !matchesInterestFilter(interestTag, item)) continue;
 
-                    const imageUrl = heroImageUrl(item.imageUrl);
                     const draft = {
                         headline: item.title,
                         summary,
@@ -122,7 +122,8 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                         headline: item.title,
                         summary,
                         articleBody,
-                        imageUrl,
+                        _rssImage: item.imageUrl,
+                        link: item.link,
                         sourceNote,
                         publisher: meta.publisher,
                         region: regionTag || null,
@@ -130,7 +131,6 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                         publishedAt: item.publishedAt,
                         confidence: "confirmed",
                         breaking: false,
-                        link: item.link,
                     });
                     if (item.link) seenLinks.add(item.link);
                 }
@@ -141,6 +141,33 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
     );
 
     stories.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+
+    const forImages = stories.slice(0, 36);
+    let ogBudget = 28;
+    await Promise.all(
+        forImages.map(async (s) => {
+            const rssHero = heroImageUrl(s._rssImage);
+            if (rssHero) {
+                s.imageUrl = rssHero;
+                s.imageFallback = publisherStockImage(s.publisher);
+                delete s._rssImage;
+                return;
+            }
+            const allowOg = ogBudget > 0;
+            if (allowOg) ogBudget -= 1;
+            s.imageUrl = await resolveStoryImageUrl(
+                { link: s.link, publisher: s.publisher, rssImage: null },
+                { allowOgFetch: allowOg }
+            );
+            s.imageFallback = publisherStockImage(s.publisher);
+            delete s._rssImage;
+        })
+    );
+    for (const s of stories.slice(36)) {
+        s.imageUrl = publisherStockImage(s.publisher);
+        s.imageFallback = s.imageUrl;
+        delete s._rssImage;
+    }
 
     const publisherVariety = new Set(stories.map((s) => s.publisher).filter(Boolean));
 
