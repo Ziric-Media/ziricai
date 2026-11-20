@@ -8,6 +8,8 @@ import {
     ZIMBABWE_KEYWORDS,
     SOUTH_AFRICA_KEYWORDS,
     ENC_AVAILABLE_ATTRIBUTION,
+    MINING_KEYWORDS,
+    SARAH_NEWS_PUBLISHER_ALLOWLIST,
 } from "./sarahNewsSources.js";
 import { fetchRssFeed } from "./sarahNewsRss.js";
 import { DEFAULT_SARAH_NEWS_PROFILE } from "./sarahNewsProfileService.js";
@@ -24,13 +26,20 @@ function slotForNow(date = new Date()) {
     return "evening";
 }
 
-function matchesRegionFilter(region, item) {
+function matchesRegionFilter(region, item, feedMeta) {
+    if (feedMeta?.nativeRegion === region) return true;
     const hay = `${item.title} ${item.description}`;
     if (region === "zw") return ZIMBABWE_KEYWORDS.test(hay);
     if (region === "za") return SOUTH_AFRICA_KEYWORDS.test(hay);
     if (region === "africa") return true;
     if (region === "world") return true;
     return true;
+}
+
+function matchesInterestFilter(interest, item) {
+    if (interest !== "mining") return true;
+    const hay = `${item.title} ${item.description}`;
+    return MINING_KEYWORDS.test(hay);
 }
 
 /**
@@ -72,10 +81,11 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                 for (const item of items) {
                     if (item.link && seenLinks.has(item.link)) continue;
                     const regionTag = meta.tags.find((t) => t.startsWith("region:"))?.slice(7);
-                    if (regionTag && !matchesRegionFilter(regionTag, item)) continue;
+                    if (regionTag && !matchesRegionFilter(regionTag, item, meta)) continue;
 
                     const id = storyId(item.link || item.title);
                     const interestTag = meta.tags.find((t) => t.startsWith("interest:"))?.slice(9);
+                    if (interestTag && !matchesInterestFilter(interestTag, item)) continue;
                     const summary = item.description || "Sarah is monitoring this story for more detail.";
                     const imageUrl = heroImageUrl(item.imageUrl);
                     const draft = {
@@ -117,15 +127,20 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
 
     stories.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
 
+    const publisherVariety = new Set(stories.map((s) => s.publisher).filter(Boolean));
+
     const top = stories.slice(0, 1).map((s) => ({ ...s, breaking: false }));
-    const headlines = stories.slice(0, 18);
+    const headlines = stories.slice(0, 28);
 
     return {
         ok: true,
         slot,
         compiledAt: new Date().toISOString(),
-        sourcePolicy: "multi-rss-sarah-reader-v2",
-        disclaimer: "Sarah adapts verified publisher feeds into in-app briefings. Tap a story to read inside Sarah News.",
+        sourcePolicy: "multi-publisher-rss-v3",
+        publishers: [...publisherVariety],
+        allowlistSize: SARAH_NEWS_PUBLISHER_ALLOWLIST.length,
+        disclaimer:
+            "Sarah compiles in-app briefings from your chosen regions and topics across multiple media houses (SA, Zimbabwe, Africa, world, tech, and more).",
         topStories: top,
         headlines,
         storiesById: Object.fromEntries([...top, ...headlines].map((s) => [s.storyId, s])),

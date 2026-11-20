@@ -9,7 +9,7 @@ const memoryNewsProfiles = new Map();
 
 export const DEFAULT_SARAH_NEWS_PROFILE = Object.freeze({
     regions: ["za", "zw", "world"],
-    interests: ["business", "tech", "sports", "politics"],
+    interests: ["shorts", "business", "tech", "sports", "politics"],
     briefings: { morning: true, lunch: true, evening: true },
     breaking: false,
     language: "en",

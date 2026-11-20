@@ -15,6 +15,7 @@
   ];
 
   const INTERESTS = [
+    { id: 'shorts', label: 'Shorts & trending' },
     { id: 'politics', label: 'Politics' },
     { id: 'business', label: 'Business & finance' },
     { id: 'tech', label: 'Technology & AI' },
@@ -59,7 +60,7 @@
   function defaultProfile() {
     return {
       regions: ['za', 'zw', 'world'],
-      interests: ['business', 'tech', 'sports', 'politics'],
+      interests: ['shorts', 'business', 'tech', 'sports', 'politics'],
       briefings: { morning: true, lunch: true, evening: true },
       breaking: false,
       language: 'en',
@@ -154,7 +155,7 @@
         <div class="snews-setup-hero">
           <p class="snews-setup-eyebrow">Sarah News</p>
           <h2 class="snews-setup-heading">Your briefing, your world</h2>
-          <p class="snews-setup-lead">Choose regions and topics. Sarah writes each story in-app from BBC, CNN, and South African outlets — no jumping to other websites.</p>
+          <p class="snews-setup-lead">Pick regions and topics. Sarah pulls from many media houses — SA, Zimbabwe, Africa, world, tech, sports, shorts — and writes everything in-app.</p>
         </div>
         ${chipGroup('Where should Sarah look?', 'regions', REGIONS, p.regions || [])}
         ${chipGroup('What interests you?', 'interests', INTERESTS, p.interests || [])}
@@ -274,7 +275,11 @@
     const top = edition.topStories || [];
     const headlines = edition.headlines || [];
     const disclaimer =
-      edition.disclaimer || 'Headlines from publisher RSS feeds. Tap for source article.';
+      edition.disclaimer || 'Headlines from your selected media houses. Tap for the in-app article.';
+    const pubs = Array.isArray(edition.publishers) ? edition.publishers.filter(Boolean).slice(0, 8) : [];
+    const pubLine = pubs.length
+      ? `<p class="snews-publishers">Today from ${escapeHtml(pubs.join(' · '))}${pubs.length < (edition.publishers?.length || 0) ? ' · …' : ''}</p>`
+      : '';
 
     host.innerHTML = `
       <header class="snews-hero-card">
@@ -283,6 +288,7 @@
         <p class="snews-edition">${escapeHtml(editionMeta(edition))}</p>
         <p class="snews-regions">${escapeHtml(regionSummary(profile))}</p>
         <p class="snews-disclaimer">${escapeHtml(disclaimer)}</p>
+        ${pubLine}
       </header>
       ${top.length ? `<section class="snews-block"><h3 class="snews-block-title">Top stories</h3><div class="snews-story-list">${top.map((s) => storyCard(s, { featured: true })).join('')}</div></section>` : ''}
       <section class="snews-block">
