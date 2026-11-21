@@ -22,6 +22,7 @@ import {
     buildWorldIntelligencePrefetchBlock,
     shouldPrefetchWorldIntelligence,
 } from "./personalSarahWorldIntelPrefetch.js";
+import { buildOpenWebPrefetchBlock, shouldPrefetchOpenWeb } from "./personalSarahOpenWebPrefetch.js";
 
 bootstrapEnv();
 
@@ -137,6 +138,14 @@ export async function handlePersonalSarahChat(auth, input) {
             await recordPersonalSarahAction(session, { tool: "prefetchWorldIntelligence", success: true });
         } catch (err) {
             console.warn("[personalSarah] world intel prefetch failed", err?.message || err);
+        }
+    } else if (shouldPrefetchOpenWeb(message)) {
+        try {
+            const prefetch = await buildOpenWebPrefetchBlock(message);
+            systemPrompt += `\n\n${prefetch.block}`;
+            await recordPersonalSarahAction(session, { tool: "prefetchOpenWeb", success: true });
+        } catch (err) {
+            console.warn("[personalSarah] open web prefetch failed", err?.message || err);
         }
     }
     const messages = [{ role: "system", content: systemPrompt }];
