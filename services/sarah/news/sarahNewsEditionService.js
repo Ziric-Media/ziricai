@@ -277,5 +277,9 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
     if (uid && useCache) {
         setCachedSarahNewsEdition(editionCacheKey(uid, slot, dayKey, merged), edition);
     }
+
+    const { ingestEditionIntoMemoryIfEnabled } = await import("../intelligence/sarahIntelligenceMemoryIngest.js");
+    ingestEditionIntoMemoryIfEnabled(edition).catch(() => {});
+
     return edition;
 }

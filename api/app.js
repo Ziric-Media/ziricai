@@ -2883,6 +2883,24 @@ export async function runBackgroundInit() {
             console.error("[startup] Sarah News scheduler every", sarahNewsSchedulerMs, "ms");
         }
 
+        const worldMonitorMs = Number(process.env.SARAH_WORLD_MONITOR_INTERVAL_MS || 0);
+        if (
+            worldMonitorMs > 0 &&
+            String(process.env.SARAH_WORLD_MONITOR_ENABLED || "").toLowerCase() === "true"
+        ) {
+            const { runSarahWorldMonitorTick } = await import(
+                "../services/sarah/intelligence/sarahWorldMonitorService.js"
+            );
+            const runWorld = () => {
+                runSarahWorldMonitorTick().catch((err) => {
+                    console.warn("[sarahWorldMonitor] tick:", err.message);
+                });
+            };
+            setTimeout(runWorld, 90_000);
+            setInterval(runWorld, worldMonitorMs);
+            console.error("[startup] Sarah World Monitor every", worldMonitorMs, "ms");
+        }
+
         const proactiveIntervalMs = Number(process.env.PROACTIVE_DETECTION_INTERVAL_MS || 0);
         if (
             proactiveIntervalMs > 0 &&

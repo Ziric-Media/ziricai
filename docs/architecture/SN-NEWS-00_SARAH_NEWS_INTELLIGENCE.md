@@ -4,9 +4,11 @@
 **Owner:** Sarah App consumer experience  
 **Principle:** One **Sarah Intelligence** engine powers Personal Sarah (on-demand) and Sarah News (proactive). No duplicate research stacks.
 
+**Four pillars (platform):** Sarah Network · Open Web Intelligence (News RSS) · Personal Knowledge · **[Sarah Intelligence Memory](./SWI-00_SARAH_WORLD_INTELLIGENCE.md)** — see **Sarah World Monitor** (hybrid central + personal monitoring).
+
 **Product specification:** [SN-NEWS-01 — Duta-Inspired Edition](./SN-NEWS-01_SARAH_NEWS_PRODUCT_SPEC_DUTA.md) (authoritative product scope, categories, dual UX, releases R1–R4).
 
-**Related:** [SHI-01_SARAH_HOME_INTELLIGENCE.md](./SHI-01_SARAH_HOME_INTELLIGENCE.md), [SARAH_APP_MASTER_ARCHITECTURE.md](./SARAH_APP_MASTER_ARCHITECTURE.md)
+**Related:** [SWI-00](./SWI-00_SARAH_WORLD_INTELLIGENCE.md), [SWI-01 phases](./SWI-01_PROGRAMME_PHASES.md), [SHI-01](./SHI-01_SARAH_HOME_INTELLIGENCE.md), [SARAH_APP_MASTER_ARCHITECTURE.md](./SARAH_APP_MASTER_ARCHITECTURE.md)
 
 ---
 
