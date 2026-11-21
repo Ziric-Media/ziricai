@@ -1,29 +1,33 @@
 /**
- * SWI-M0 — Intelligence Memory store (memory adapter; replace with Firestore in M1).
+ * SWI — Intelligence Memory store (in-process + optional Firestore durability in M1).
  */
 import { evaluateMemoryAdmission, buildMemorySubjectKey } from "./sarahIntelligenceMemoryAdmission.js";
+import {
+    loadWorldMemoryObservation,
+    queryWorldMemoryObservations,
+    saveWorldMemoryObservation,
+    worldMemoryPersistenceEnabled,
+} from "./sarahIntelligenceMemoryPersistence.js";
+import { syncEntityProfilesForObservation } from "./sarahIntelligenceEntityProfiles.js";
+import { recordIntelligenceTimelineEvent } from "./sarahIntelligenceTimelineService.js";
 
 /** @type {Map<string, object>} */
 const observations = new Map();
 
 /**
  * @param {object} input
+ * @param {object|null} prev
  * @param {{ pillar?: string }} [meta]
  */
-export function recordIntelligenceObservation(input, meta = {}) {
-    const admission = evaluateMemoryAdmission(input);
-    if (!admission.admit) {
-        return { ok: false, stored: false, admission };
-    }
-
-    const subjectKey = admission.subjectKey || buildMemorySubjectKey(input);
+function buildObservationRow(input, prev, meta = {}) {
+    const subjectKey =
+        (input.subjectKey && String(input.subjectKey)) || buildMemorySubjectKey(input);
     const ts = new Date().toISOString();
-    const prev = observations.get(subjectKey);
-    const row = {
+    return {
         subjectKey,
-        domain: admission.domain,
-        confidence: admission.confidence,
-        pillar: meta.pillar || "open_web",
+        domain: input.domain,
+        confidence: input.confidence,
+        pillar: meta.pillar || input.pillar || "open_web",
         headline: String(input.headline || "").slice(0, 500),
         summary: String(input.summary || "").slice(0, 1200),
         publisher: input.publisher || null,
@@ -39,16 +43,54 @@ export function recordIntelligenceObservation(input, meta = {}) {
             { publisher: input.publisher, link: input.link, seenAt: ts },
         ].slice(-8),
     };
+}
+
+/**
+ * @param {object} input
+ * @param {{ pillar?: string, source?: string }} [meta]
+ */
+export async function recordIntelligenceObservation(input, meta = {}) {
+    const admission = evaluateMemoryAdmission(input);
+    if (!admission.admit) {
+        return { ok: false, stored: false, admission };
+    }
+
+    const subjectKey = admission.subjectKey || buildMemorySubjectKey(input);
+    const prev =
+        observations.get(subjectKey) ||
+        (worldMemoryPersistenceEnabled() ? await loadWorldMemoryObservation(subjectKey) : null);
+    const row = buildObservationRow(
+        {
+            ...input,
+            domain: admission.domain,
+            confidence: admission.confidence,
+            subjectKey,
+        },
+        prev,
+        meta
+    );
     observations.set(subjectKey, row);
+    if (worldMemoryPersistenceEnabled()) {
+        await saveWorldMemoryObservation(subjectKey, row);
+        await recordIntelligenceTimelineEvent(row, meta);
+        await syncEntityProfilesForObservation(row);
+    } else {
+        await recordIntelligenceTimelineEvent(row, meta);
+    }
     return { ok: true, stored: true, admission, observation: row };
 }
 
 /**
  * @param {{ domain?: string, region?: string, query?: string, limit?: number }} [opts]
  */
-export function listIntelligenceObservations(opts = {}) {
+export async function listIntelligenceObservations(opts = {}) {
     const limit = Math.min(Math.max(Number(opts.limit) || 20, 1), 100);
     const q = String(opts.query || "").trim().toLowerCase();
+
+    const persisted = await queryWorldMemoryObservations(opts);
+    if (persisted.length) return persisted;
+    // Firestore may be enabled but still warming — keep serving in-process rows until data exists.
+
     let rows = [...observations.values()];
     if (opts.domain) rows = rows.filter((r) => r.domain === opts.domain);
     if (opts.region) rows = rows.filter((r) => r.region === opts.region);
@@ -62,8 +104,16 @@ export function listIntelligenceObservations(opts = {}) {
 /**
  * @param {string} subjectKey
  */
-export function getIntelligenceObservation(subjectKey) {
-    return observations.get(String(subjectKey || "").trim()) || null;
+export async function getIntelligenceObservation(subjectKey) {
+    const key = String(subjectKey || "").trim();
+    if (!key) return null;
+    if (observations.has(key)) return observations.get(key);
+    if (worldMemoryPersistenceEnabled()) {
+        const row = await loadWorldMemoryObservation(key);
+        if (row) observations.set(key, row);
+        return row;
+    }
+    return null;
 }
 
 export function clearIntelligenceMemoryForTests() {
@@ -71,12 +121,12 @@ export function clearIntelligenceMemoryForTests() {
 }
 
 /**
- * Compare stored context with a fresh headline (M0 — same subject only).
+ * Compare stored context with a fresh headline (same subject cluster).
  * @param {string} subjectKey
  * @param {{ headline?: string, summary?: string }} current
  */
-export function compareWithMemory(subjectKey, current = {}) {
-    const prior = getIntelligenceObservation(subjectKey);
+export async function compareWithMemory(subjectKey, current = {}) {
+    const prior = await getIntelligenceObservation(subjectKey);
     if (!prior) {
         return { hasHistory: false, prior: null, current };
     }

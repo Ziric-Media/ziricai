@@ -20,6 +20,15 @@
 - [x] Optional edition → memory ingest when `SARAH_INTELLIGENCE_MEMORY_ENABLED=true`  
 - [x] Unit test `swi-memory-admission.test.mjs`  
 
+## M1 acceptance (this branch)
+
+- [x] `sarahIntelligenceMemoryPersistence.js` — platform Firestore paths (observations, timeline, entities) when Admin + Firestore backend  
+- [x] `sarahIntelligenceMemoryStore.js` — merge in-process cache with durable load/save on admit  
+- [x] `sarahIntelligenceTimelineService.js` — version / headline change timeline  
+- [x] `sarahIntelligenceEntityProfiles.js` — lightweight topic/region profiles from headlines  
+- [x] `sarahIntelligenceRecallService.js` + `personalSarahIntelligenceTools.js` — `recallWorldContext` tool for Personal Sarah  
+- [x] Unit test `swi-memory-admission.test.mjs` (store versions + recall when flagged)  
+
 ### M0 environment (optional — default off in production)
 
 | Variable | Purpose |

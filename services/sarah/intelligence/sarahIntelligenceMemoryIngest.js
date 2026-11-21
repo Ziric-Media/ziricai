@@ -12,7 +12,7 @@ export async function ingestHeadlinesIntoMemory(headlines = [], meta = {}) {
     let rejected = 0;
     const samples = [];
     for (const h of headlines) {
-        const result = recordIntelligenceObservation(
+        const result = await recordIntelligenceObservation(
             {
                 headline: h.headline,
                 summary: h.summary,

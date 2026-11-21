@@ -19,6 +19,10 @@ import {
     PERSONAL_SARAH_NEWS_TOOL_DEFINITIONS,
     executePersonalSarahNewsTool,
 } from "./personalSarahNewsTools.js";
+import {
+    PERSONAL_SARAH_INTELLIGENCE_TOOL_DEFINITIONS,
+    executePersonalSarahIntelligenceTool,
+} from "./personalSarahIntelligenceTools.js";
 
 function defaultDueAtIso(minutesFromNow = 30) {
     return new Date(Date.now() + minutesFromNow * 60_000).toISOString();
@@ -137,6 +141,7 @@ const PERSONAL_SARAH_CORE_TOOL_DEFINITIONS = [
 export const PERSONAL_SARAH_TOOL_DEFINITIONS = [
     ...PERSONAL_SARAH_CORE_TOOL_DEFINITIONS,
     ...PERSONAL_SARAH_NEWS_TOOL_DEFINITIONS,
+    ...PERSONAL_SARAH_INTELLIGENCE_TOOL_DEFINITIONS,
     ...PERSONAL_SARAH_NETWORK_TOOL_DEFINITIONS,
     ...PERSONAL_SARAH_RECOMMENDATION_TOOL_DEFINITIONS,
 ];
@@ -150,6 +155,9 @@ export async function executePersonalSarahTool(toolName, ctx, args = {}, opts = 
     }
     if (PERSONAL_SARAH_NEWS_TOOL_DEFINITIONS.some((t) => t.function.name === toolName)) {
         return executePersonalSarahNewsTool(toolName, ctx, args);
+    }
+    if (PERSONAL_SARAH_INTELLIGENCE_TOOL_DEFINITIONS.some((t) => t.function.name === toolName)) {
+        return executePersonalSarahIntelligenceTool(toolName, ctx, args);
     }
     if (toolName === "createPersonalReminder") {
         try {

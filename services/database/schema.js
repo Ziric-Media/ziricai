@@ -786,3 +786,38 @@ export function platformIntelligencePeriodClaimPath(claimId) {
 
 /** Platform-wide rollup bucket (not a tenant). */
 export const PLATFORM_INTELLIGENCE_PLATFORM_COMPANY_ID = "__platform__";
+
+/** SWI-M1 — Sarah World Intelligence Memory (platform-scoped, no PII). */
+export const PLATFORM_SARAH_WORLD_MEMORY = {
+    ROOT_DOC: "sarahWorldMemory",
+    OBSERVATIONS: "observations",
+    ENTITIES: "entities",
+    TIMELINE: "timeline",
+};
+
+export function platformSarahWorldMemoryObservationsCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_SARAH_WORLD_MEMORY.ROOT_DOC}/${PLATFORM_SARAH_WORLD_MEMORY.OBSERVATIONS}`;
+}
+
+export function platformSarahWorldMemoryObservationPath(subjectKey) {
+    const safe = String(subjectKey || "unknown").replace(/[/\\]/g, "_");
+    return `${platformSarahWorldMemoryObservationsCollectionPath()}/${safe}`;
+}
+
+export function platformSarahWorldMemoryEntitiesCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_SARAH_WORLD_MEMORY.ROOT_DOC}/${PLATFORM_SARAH_WORLD_MEMORY.ENTITIES}`;
+}
+
+export function platformSarahWorldMemoryEntityPath(entityId) {
+    const safe = String(entityId || "unknown").replace(/[/\\]/g, "_");
+    return `${platformSarahWorldMemoryEntitiesCollectionPath()}/${safe}`;
+}
+
+export function platformSarahWorldMemoryTimelineCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_SARAH_WORLD_MEMORY.ROOT_DOC}/${PLATFORM_SARAH_WORLD_MEMORY.TIMELINE}`;
+}
+
+export function platformSarahWorldMemoryTimelinePath(timelineId) {
+    const safe = String(timelineId || "unknown").replace(/[/\\]/g, "_");
+    return `${platformSarahWorldMemoryTimelineCollectionPath()}/${safe}`;
+}
