@@ -219,7 +219,7 @@ Introduce via Personal Sarah tools / SHI cards — **not** all as primary nav ta
 | Category | Examples |
 |----------|----------|
 | International | Reuters, AP, BBC, Al Jazeera, CNN, Guardian |
-| South Africa | SABC, IOL, Citizen, Daily Maverick, BusinessTech; eNCA, News24 (partner/RSS) |
+| South Africa | SABC, **News24** (capi24 RSS), Fin24, IOL, Citizen, Daily Maverick, Sowetan, Moneyweb, MyBroadband, TechCentral; eNCA footnote only (no public RSS) |
 | Zimbabwe | NewsDay, Herald, ZBC |
 | Business / tech / sports | FT, Bloomberg, TechCrunch, Verge, BBC Sport, etc. |
 

@@ -8,11 +8,14 @@
 export const REGION_FEED_LISTS = Object.freeze({
     za: [
         { url: "https://www.sabcnews.com/sabcnews/feed/", publisher: "SABC News", nativeRegion: "za" },
+        { url: "https://feeds.capi24.com/v1/Search/articles/news24/southafrica/rss", publisher: "News24", nativeRegion: "za" },
         { url: "https://www.iol.co.za/rss", publisher: "IOL", nativeRegion: "za" },
         { url: "https://citizen.co.za/feed/", publisher: "The Citizen", nativeRegion: "za" },
         { url: "https://www.dailymaverick.co.za/dmrss/", publisher: "Daily Maverick", nativeRegion: "za" },
+        { url: "https://www.sowetan.co.za/arc/outboundfeeds/rss/", publisher: "Sowetan", nativeRegion: "za" },
         { url: "https://businesstech.co.za/news/feed/", publisher: "BusinessTech", nativeRegion: "za" },
-        /* eNCA: no stable public RSS at SN-03 — attributed in footnotes for SA stories */
+        { url: "https://feeds.capi24.com/v1/Search/articles/news24/world/rss", publisher: "News24" },
+        /* eNCA: no stable public RSS at SN-06 — attributed in footnotes when relevant */
         { url: "https://feeds.bbci.co.uk/news/world/africa/rss.xml", publisher: "BBC News" },
         { url: "http://rss.cnn.com/rss/edition_africa.rss", publisher: "CNN" },
         { url: "https://www.aljazeera.com/xml/rss/all.xml", publisher: "Al Jazeera" },
@@ -53,6 +56,8 @@ const TECH_FEEDS = [
     { url: "https://techcrunch.com/feed/", publisher: "TechCrunch" },
     { url: "https://www.theverge.com/rss/index.xml", publisher: "The Verge" },
     { url: "https://businesstech.co.za/news/feed/", publisher: "BusinessTech" },
+    { url: "https://mybroadband.co.za/news/feed", publisher: "MyBroadband" },
+    { url: "https://techcentral.co.za/feed", publisher: "TechCentral" },
 ];
 
 const BUSINESS_FEEDS = [
@@ -60,6 +65,9 @@ const BUSINESS_FEEDS = [
     { url: "http://rss.cnn.com/rss/money_latest.rss", publisher: "CNN" },
     { url: "https://www.dailymaverick.co.za/dmrss/", publisher: "Daily Maverick" },
     { url: "https://businesstech.co.za/news/feed/", publisher: "BusinessTech" },
+    { url: "https://feeds.capi24.com/v1/Search/articles/fin24/topstories/rss", publisher: "Fin24" },
+    { url: "https://feeds.capi24.com/v1/Search/articles/news24/business/rss", publisher: "News24" },
+    { url: "https://www.moneyweb.co.za/feed/", publisher: "Moneyweb" },
     { url: "https://www.theguardian.com/uk/business/rss", publisher: "The Guardian" },
 ];
 
@@ -77,6 +85,7 @@ export const INTEREST_FEED_LISTS = Object.freeze({
         { url: "http://rss.cnn.com/rss/cnn_allpolitics.rss", publisher: "CNN" },
         { url: "https://www.theguardian.com/politics/rss", publisher: "The Guardian" },
         { url: "https://www.aljazeera.com/xml/rss/all.xml", publisher: "Al Jazeera" },
+        { url: "https://feeds.capi24.com/v1/Search/articles/news24/southafrica/rss", publisher: "News24" },
     ],
     business: BUSINESS_FEEDS,
     tech: TECH_FEEDS,
@@ -155,10 +164,16 @@ export const ENC_AVAILABLE_ATTRIBUTION = "eNCA";
 /** Human-readable list for edition metadata. */
 export const SARAH_NEWS_PUBLISHER_ALLOWLIST = Object.freeze([
     "SABC News",
+    "News24",
+    "Fin24",
     "eNCA",
     "IOL",
     "The Citizen",
     "Daily Maverick",
+    "Sowetan",
+    "Moneyweb",
+    "MyBroadband",
+    "TechCentral",
     "BusinessTech",
     "NewsDay Zimbabwe",
     "The Herald",

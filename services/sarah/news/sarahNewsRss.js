@@ -91,9 +91,16 @@ export async function fetchRssFeed(url, opts = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+        const headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; ZiricAI-SarahNews/1.0; +https://sarah.ziricai.com)",
+            Accept: "application/rss+xml, application/xml, text/xml, */*",
+        };
+        if (/capi24\.com|feeds\.news24\.com/i.test(url)) {
+            headers.Referer = "https://www.news24.com/";
+        }
         const res = await fetch(url, {
             signal: controller.signal,
-            headers: { "User-Agent": "ZiricAI-SarahNews/1.0 (+https://sarah.ziricai.com)" },
+            headers,
         });
         if (!res.ok) {
             throw Object.assign(new Error(`Feed HTTP ${res.status}`), { status: res.status });
