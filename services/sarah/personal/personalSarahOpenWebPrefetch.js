@@ -7,6 +7,7 @@ import {
     searchOpenWeb,
 } from "../openWeb/openWebSearchService.js";
 import { shouldPrefetchWorldIntelligence } from "./personalSarahWorldIntelPrefetch.js";
+import { shouldPrefetchLocalAffairs } from "./personalSarahLocalAffairsPrefetch.js";
 
 const OPEN_WEB_TRIGGERS =
     /\bwhat is\b|\bwho is\b|\bwho was\b|\bhow to\b|\bhow do i\b|\bdefine\b|\bmeaning of\b|\bweather\b|\bpopulation of\b|\bcapital of\b|\bexchange rate\b|\bconvert\b|\bwhen did\b|\bwhere is\b|\bprice of\b|\bscore\b|\brecipe for\b|\bwikipedia\b/i;
@@ -14,6 +15,7 @@ const OPEN_WEB_TRIGGERS =
 export function shouldPrefetchOpenWeb(message = "") {
     const m = String(message || "");
     if (!personalSarahOpenWebEnabled()) return false;
+    if (shouldPrefetchLocalAffairs(m, [], {})) return false;
     if (shouldPrefetchWorldIntelligence(m)) return false;
     if (/\bnews\b|\bheadlines?\b|\bbreaking\b/i.test(m)) return false;
     return OPEN_WEB_TRIGGERS.test(m);

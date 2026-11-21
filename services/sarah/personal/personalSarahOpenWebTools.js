@@ -8,6 +8,7 @@ import {
     readOpenWebPage,
     searchOpenWeb,
 } from "../openWeb/openWebSearchService.js";
+import { enrichQueryWithUserLocale, resolvePersonalSarahUserLocale } from "./personalSarahUserLocale.js";
 
 export const PERSONAL_SARAH_OPEN_WEB_TOOL_DEFINITIONS = [
     {
@@ -15,7 +16,7 @@ export const PERSONAL_SARAH_OPEN_WEB_TOOL_DEFINITIONS = [
         function: {
             name: "searchOpenWeb",
             description:
-                "Search the public internet for factual answers: definitions, who/what/when, how-to, places, sports, weather summaries, exchange rates, general knowledge. Use for anything not covered by Sarah News headlines. Returns Wikipedia, DuckDuckGo, and optional Brave web snippets with URLs.",
+                "Search the public internet (Google News RSS, Wikipedia, DuckDuckGo, optional Brave). Use for local politics, elections, coalition talks, current events in the user's country, definitions, facts, how-to — **prefer this over Sarah News** for local/current affairs. Automatically biases toward the user's profile country/city.",
             parameters: {
                 type: "object",
                 properties: {
@@ -60,7 +61,13 @@ export async function executePersonalSarahOpenWebTool(toolName, ctx, args = {}) 
             return { success: false, tool: toolName, error: "query is required" };
         }
         try {
-            const payload = await searchOpenWeb(query, { maxResults: args.maxResults });
+            const locale = resolvePersonalSarahUserLocale(ctx);
+            const enriched = enrichQueryWithUserLocale(query, locale);
+            const payload = await searchOpenWeb(enriched, {
+                maxResults: args.maxResults,
+                localeHint: locale,
+                includeGoogleNews: true,
+            });
             const message = formatOpenWebSearchForModel(payload);
             return {
                 success: payload.ok,

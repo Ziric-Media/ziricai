@@ -23,6 +23,7 @@ import {
     shouldPrefetchWorldIntelligence,
 } from "./personalSarahWorldIntelPrefetch.js";
 import { buildOpenWebPrefetchBlock, shouldPrefetchOpenWeb } from "./personalSarahOpenWebPrefetch.js";
+import { buildLocalAffairsPrefetchBlock, shouldPrefetchLocalAffairs } from "./personalSarahLocalAffairsPrefetch.js";
 
 bootstrapEnv();
 
@@ -131,7 +132,15 @@ export async function handlePersonalSarahChat(auth, input) {
     if (userExplicitlyAsksFounderDetail(message)) {
         systemPrompt += `\n\n${buildFounderCompanyIdentityFullReferenceBlock()}`;
     }
-    if (shouldPrefetchWorldIntelligence(message)) {
+    if (shouldPrefetchLocalAffairs(message, history, ctx)) {
+        try {
+            const prefetch = await buildLocalAffairsPrefetchBlock(ctx, message, history);
+            systemPrompt += `\n\n${prefetch.block}`;
+            await recordPersonalSarahAction(session, { tool: "prefetchLocalAffairs", success: true });
+        } catch (err) {
+            console.warn("[personalSarah] local affairs prefetch failed", err?.message || err);
+        }
+    } else if (shouldPrefetchWorldIntelligence(message)) {
         try {
             const prefetch = await buildWorldIntelligencePrefetchBlock(ctx, message);
             systemPrompt += `\n\n${prefetch.block}`;

@@ -2,6 +2,7 @@
  * Personal Sarah — open web search (Wikipedia, DuckDuckGo instant answers, optional Brave).
  */
 import { htmlToPlainText, safeFetchText } from "./openWebSafeFetch.js";
+import { fetchRssFeed } from "../news/sarahNewsRss.js";
 
 export function personalSarahOpenWebEnabled() {
     return String(process.env.PERSONAL_SARAH_OPEN_WEB_ENABLED || "true").toLowerCase() !== "false";
@@ -88,6 +89,43 @@ async function searchDuckDuckGoInstant(query) {
 /**
  * @param {string} query
  */
+/**
+ * @param {string} query
+ * @param {{ googleNewsGl?: string, googleNewsHl?: string }} [locale]
+ */
+async function searchGoogleNewsRss(query, locale = {}) {
+    const q = String(query || "").trim();
+    if (!q) return [];
+    const hl = locale.googleNewsHl || "en-ZA";
+    const gl = locale.googleNewsGl || "ZA";
+    const ceid = `${gl}:en`;
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${encodeURIComponent(hl)}&gl=${encodeURIComponent(gl)}&ceid=${encodeURIComponent(ceid)}`;
+    try {
+        const items = await fetchRssFeed(url, { timeoutMs: 14_000 });
+        return (items || []).slice(0, 8).map((h) => ({
+            source: "google_news",
+            title: h.title || h.headline || "News",
+            url: h.link || null,
+            snippet: String(h.description || h.summary || "").slice(0, 500),
+            publishedAt: h.publishedAt || null,
+        }));
+    } catch {
+        return [];
+    }
+}
+
+function filterTopicalResults(results, topicalFilter) {
+    if (!topicalFilter || topicalFilter !== "politics") return results;
+    return results.filter((r) => {
+        const hay = `${r.title || ""} ${r.snippet || ""}`.toLowerCase();
+        if (/\brugby\b|\bspringbok|\bireland vs\b|\bfootball score\b|\bcricket\b/.test(hay)) return false;
+        if (/\bnetanyahu\b|\bisrael\b|\bfrance 24\b/.test(hay) && !/\bsouth africa\b|\bsa politics\b/.test(hay)) {
+            return false;
+        }
+        return true;
+    });
+}
+
 async function searchBraveWeb(query) {
     const key = String(process.env.BRAVE_SEARCH_API_KEY || "").trim();
     if (!key) return [];
@@ -118,7 +156,7 @@ async function searchBraveWeb(query) {
 
 /**
  * @param {string} query
- * @param {{ maxResults?: number }} [opts]
+ * @param {{ maxResults?: number, localeHint?: object, includeGoogleNews?: boolean, topicalFilter?: string }} [opts]
  */
 export async function searchOpenWeb(query, opts = {}) {
     if (!personalSarahOpenWebEnabled()) {
@@ -128,23 +166,37 @@ export async function searchOpenWeb(query, opts = {}) {
     if (!q) {
         return { ok: false, active: true, error: "query is required" };
     }
-    const maxResults = Math.min(Math.max(Number(opts.maxResults) || 6, 1), 10);
+    const maxResults = Math.min(Math.max(Number(opts.maxResults) || 6, 1), 12);
+    const locale = opts.localeHint || {};
 
-    const [brave, wiki, ddg] = await Promise.all([
+    const wantNews =
+        opts.includeGoogleNews === true ||
+        /\bnews\b|\belection\b|\bcoalition\b|\btoday\b|\blatest\b|\brecent\b|\bpolitics\b/i.test(q);
+
+    const tasks = [
         searchBraveWeb(q).catch(() => []),
         searchWikipedia(q).catch(() => []),
         searchDuckDuckGoInstant(q).catch(() => []),
-    ]);
+    ];
+    if (wantNews) {
+        tasks.push(searchGoogleNewsRss(q, locale).catch(() => []));
+    }
+    const settled = await Promise.all(tasks);
+    const brave = settled[0] || [];
+    const wiki = settled[1] || [];
+    const ddg = settled[2] || [];
+    const gnews = wantNews ? settled[3] || [] : [];
 
-    const merged = [];
+    let merged = [];
     const seen = new Set();
-    for (const row of [...brave, ...wiki, ...ddg]) {
+    for (const row of [...gnews, ...brave, ...wiki, ...ddg]) {
         const key = `${row.title}|${row.url}`;
         if (seen.has(key)) continue;
         seen.add(key);
         merged.push(row);
         if (merged.length >= maxResults) break;
     }
+    merged = filterTopicalResults(merged, opts.topicalFilter);
 
     return {
         ok: true,
@@ -153,6 +205,7 @@ export async function searchOpenWeb(query, opts = {}) {
         resultCount: merged.length,
         results: merged,
         providers: {
+            googleNews: gnews.length > 0,
             brave: brave.length > 0,
             wikipedia: wiki.length > 0,
             duckduckgo: ddg.length > 0,
@@ -168,7 +221,7 @@ export function formatOpenWebSearchForModel(payload) {
         return payload?.error || "Open web search failed.";
     }
     if (!payload.results?.length) {
-        return `No open-web snippets found for "${payload.query}". Try rephrasing, or use fetchSarahNewsHeadlines for current news.`;
+        return `No open-web snippets found for "${payload.query}". Call searchOpenWeb again with a more specific query including the user's country; do not fall back to generic explanations.`;
     }
     const lines = [
         `Open web search for "${payload.query}" (summarise in your own words; cite source titles/URLs; note results may be incomplete):`,
