@@ -40,7 +40,7 @@ function storyId(seed) {
     return `story_${createHash("sha256").update(seed).digest("hex").slice(0, 16)}`;
 }
 
-function slotForNow(date = new Date()) {
+export function slotForNow(date = new Date()) {
     const h = date.getHours();
     if (h < 11) return "morning";
     if (h < 16) return "lunch";

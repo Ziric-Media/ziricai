@@ -11531,6 +11531,20 @@ async function activateSarahHomeCard(card) {
     void renderSarahHomeIntelligence();
   }
 
+  if (action?.type === 'route' && action.route === 'news') {
+    setRoute('news');
+    return;
+  }
+  if (action?.type === 'news_story' && action.storyId) {
+    try {
+      sessionStorage.setItem('sarah.news.openStory', String(action.storyId));
+    } catch {
+      /* ignore */
+    }
+    setRoute('news');
+    return;
+  }
+
   if (action?.type === 'thread' && action.sessionId) {
     const sid = action.sessionId;
     await openPersonalSarahThread(sid);
@@ -11558,6 +11572,19 @@ function bindSarahHomeCardAction(card) {
   }
   if (action.type === 'route' && action.route === 'profile') {
     setRoute('profile');
+    return true;
+  }
+  if (action.type === 'route' && action.route === 'news') {
+    setRoute('news');
+    return true;
+  }
+  if (action.type === 'news_story' && action.storyId) {
+    try {
+      sessionStorage.setItem('sarah.news.openStory', String(action.storyId));
+    } catch {
+      /* ignore */
+    }
+    setRoute('news');
     return true;
   }
   if (action.type === 'thread' && action.sessionId) {
@@ -14458,6 +14485,9 @@ function init() {
         if ((res.briefings?.length || 0) + (res.breaking?.length || 0) > 0) {
           void refreshLiveNotifications();
           syncNotificationBadge();
+          if (document.querySelector('.my-sarah-view')?.dataset.msPanel === 'home') {
+            void renderSarahHomeIntelligence();
+          }
         }
       };
       void pollNewsDelivery();

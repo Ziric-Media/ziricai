@@ -5,6 +5,7 @@
   const STORAGE_KEY = 'sarah.news.profile.v1';
   const EDITION_CACHE_KEY = 'sarah.news.edition.v1';
   const EDITION_CACHE_TTL_MS = 4 * 60 * 1000;
+  const OPEN_STORY_KEY = 'sarah.news.openStory';
   let activeEdition = null;
   let activeProfile = null;
   let digestScrollTop = 0;
@@ -483,6 +484,16 @@
     bindStoryCards(host, storiesById);
     bindStoryBannerImages(host);
     bindAskButtons(host);
+
+    try {
+      const pendingStory = sessionStorage.getItem(OPEN_STORY_KEY);
+      if (pendingStory && storiesById[pendingStory]) {
+        sessionStorage.removeItem(OPEN_STORY_KEY);
+        void openStory(pendingStory, storiesById);
+      }
+    } catch {
+      /* ignore */
+    }
 
     host.querySelector('#snewsEditSetup')?.addEventListener('click', () => {
       renderSetup(host, profile, (next) => loadDigest(host, next));
