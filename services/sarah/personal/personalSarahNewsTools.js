@@ -109,6 +109,7 @@ export async function executePersonalSarahNewsTool(toolName, ctx, args = {}) {
         const snap = await getSarahNewsSnapshotForUser(ctx.uid, {
             query: args.query,
             maxItems: args.maxItems,
+            useDefaultProfileIfMissing: true,
         });
         if (!snap.success) {
             return {

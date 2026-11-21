@@ -18,6 +18,10 @@ import {
 import { PERSONAL_SARAH_TOOL_DEFINITIONS, executePersonalSarahTool, resolveReminderDueAt } from "./personalSarahTools.js";
 import { maybeCompleteSarahWorkTask } from "./personalSarahWorkCompletion.js";
 import { buildRecommendationsUiFromActions } from "./personalSarahRecommendationsUi.js";
+import {
+    buildWorldIntelligencePrefetchBlock,
+    shouldPrefetchWorldIntelligence,
+} from "./personalSarahWorldIntelPrefetch.js";
 
 bootstrapEnv();
 
@@ -125,6 +129,15 @@ export async function handlePersonalSarahChat(auth, input) {
     let systemPrompt = buildPersonalSarahSystemPrompt(ctx);
     if (userExplicitlyAsksFounderDetail(message)) {
         systemPrompt += `\n\n${buildFounderCompanyIdentityFullReferenceBlock()}`;
+    }
+    if (shouldPrefetchWorldIntelligence(message)) {
+        try {
+            const prefetch = await buildWorldIntelligencePrefetchBlock(ctx, message);
+            systemPrompt += `\n\n${prefetch.block}`;
+            await recordPersonalSarahAction(session, { tool: "prefetchWorldIntelligence", success: true });
+        } catch (err) {
+            console.warn("[personalSarah] world intel prefetch failed", err?.message || err);
+        }
     }
     const messages = [{ role: "system", content: systemPrompt }];
     for (const turn of history) {

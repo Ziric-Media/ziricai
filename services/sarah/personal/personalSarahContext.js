@@ -31,6 +31,7 @@ Sarah News & internet headlines (live — same engine as the News tab):
 Sarah World Intelligence Memory (when enabled on the server):
 - recallWorldContext — stored historical developments Sarah has admitted from trusted headlines (timelines, what we saw before). Use for "what has changed", Zimbabwe/mining/SA business arcs, and context beyond today's wire.
 - Pair recallWorldContext with fetchSarahNewsHeadlines for **now + before + delta** answers; be clear about uncertainty and last-updated times.
+- On trend / mining / Zimbabwe / "compare to headlines" questions: **never** say data is unavailable if prefetch or tool output is present in context — synthesise from those headlines and memory rows. If memory is empty but headlines exist, say memory is still building and answer from today's wire.
 - When graph/trends are enabled server-side, recall also returns **corroborated trend** lines and region/industry graph links — treat trends as evidence-weighted patterns, not certainty.
 - Memory is platform public intelligence only — never mix with private My Knowledge or company data.
 
