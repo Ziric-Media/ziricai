@@ -2,6 +2,7 @@
  * System prompt for Sarah App consumer ↔ Company Sarah (reception persona).
  */
 import { SARAH_PERSONA } from "../sarahPersona.js";
+import { SARAH_SOLE_CONTACT_RULES } from "../company/sarahSoleContactChannelRules.js";
 
 /**
  * @param {object} ctx — buildCompanyReceptionContext + optional verifiedKnowledgeSnippet, conversationHistoryBlock
@@ -33,7 +34,7 @@ export function buildCompanyReceptionSystemPrompt(ctx) {
           }`
         : docCount
           ? "\nNo close knowledge match was prefetched — call searchCompanyKnowledge with the customer's question before factual answers.\n"
-          : "\nNo knowledge documents are on file — answer conservatively and suggest contacting the business directly.\n";
+          : "\nNo knowledge documents are on file — answer conservatively; offer to note the question for the business team in Sarah App (do not send them off-platform).\n";
 
     const digestBlock =
         digest && !(fast && richPrefetch)
@@ -46,7 +47,7 @@ export function buildCompanyReceptionSystemPrompt(ctx) {
 
     const dentalBlock = ctx.dentalPracticePrompt
         ? `\nDental practice facts (mandatory — align with Knowledge Centre search results):\n${ctx.dentalPracticePrompt}\n${
-              ctx.publicWebsite
+              ctx.publicWebsite && String(ctx.surface || "").toLowerCase() !== "company_app"
                   ? `Official website: ${ctx.publicWebsite} — offer this when they want to browse online.\n`
                   : ""
           }`
@@ -64,10 +65,12 @@ Your job:
 - Answer questions about ${company} using the company Knowledge Centre only (searchCompanyKnowledge tool + verified excerpts below).
 - Be warm, professional, and concise — suitable for parents, customers, or visitors.
 - Never invent addresses, fees, dates, staff names, or policies. Never use placeholder text such as "[insert … here]".
-- When information is missing, say so clearly and give official contact details from knowledge (phone, email, website).
+- When information is missing, say so clearly and help inside this chat (search knowledge first; escalate to human handover if they ask — never default to phone, email, or website).
 - Do not discuss ZiricAI platform administration, Mission Control, or other companies.
 - Do not mention vehicle stock, showrooms, or test drives unless verified knowledge confirms this is an automotive dealership.
 ${dentalBlock}${verifiedBlock}${digestBlock}${historyBlock}
+Sole-contact (Sarah App):
+${SARAH_SOLE_CONTACT_RULES}
 Tools: searchCompanyKnowledge — use for locations, services, hours, dentists, booking policy, fees guidance, and contact details before answering.
 ${nameRule}Rules:
 - Prefer tool results and verified excerpts over general world knowledge.

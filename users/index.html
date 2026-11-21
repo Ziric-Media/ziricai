@@ -55,27 +55,27 @@
   <meta name="apple-mobile-web-app-title" content="Sarah" />
   <title>Sarah</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" href="assets/favicon.png?v=4dfcd4ce05ba-435fd3ac" type="image/png" />
+  <link rel="icon" href="assets/favicon.png?v=59a942ba3f35-435fd3ac" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=5" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/design-system.css?v=4dfcd4ce05ba-435fd3ac" />
-  <link rel="stylesheet" href="css/icons.css?v=4dfcd4ce05ba-435fd3ac" />
-  <link rel="stylesheet" href="css/app.css?v=4dfcd4ce05ba-435fd3ac" />
-  <script src="js/boot-inline.js?v=4dfcd4ce05ba-435fd3ac"></script>
-<script src="js/site-config.js?v=4dfcd4ce05ba-435fd3ac"></script>
+  <link rel="stylesheet" href="css/design-system.css?v=59a942ba3f35-435fd3ac" />
+  <link rel="stylesheet" href="css/icons.css?v=59a942ba3f35-435fd3ac" />
+  <link rel="stylesheet" href="css/app.css?v=59a942ba3f35-435fd3ac" />
+  <script src="js/boot-inline.js?v=59a942ba3f35-435fd3ac"></script>
+<script src="js/site-config.js?v=59a942ba3f35-435fd3ac"></script>
 </head>
 <body>
   <div id="appBootSplash" class="app-boot-splash" role="status" aria-live="polite" aria-busy="true" aria-label="Loading Sarah">
-    <img class="app-boot-splash__logo sarah-brand-img" src="assets/sarah-avatar.svg?v=4dfcd4ce05ba-435fd3ac" alt="Sarah" width="104" height="104" decoding="async" />
+    <img class="app-boot-splash__logo sarah-brand-img" src="assets/sarah-avatar.svg?v=59a942ba3f35-435fd3ac" alt="Sarah" width="104" height="104" decoding="async" />
     <p class="app-boot-splash__brand">Powered by ZiricAI</p>
   </div>
   <div class="app-frame">
     <!-- Welcome -->
     <section class="view is-active" data-view="welcome">
       <div class="welcome-hero">
-        <div class="logo-ring"><img class="sarah-brand-img" src="assets/sarah-avatar.svg?v=4dfcd4ce05ba-435fd3ac" alt="Sarah" width="72" height="72" /></div>
+        <div class="logo-ring"><img class="sarah-brand-img" src="assets/sarah-avatar.svg?v=59a942ba3f35-435fd3ac" alt="Sarah" width="72" height="72" /></div>
         <h1>Sarah</h1>
         <p>Your personal AI world — discover businesses, stay in control.</p>
         <div class="welcome-features">
@@ -296,7 +296,7 @@
               <span class="ms-ring ms-ring--outer" aria-hidden="true"></span>
               <span class="ms-ring ms-ring--mid" aria-hidden="true"></span>
               <span class="ms-ring ms-ring--inner" aria-hidden="true"></span>
-              <img class="ms-avatar-main sarah-brand-img" src="assets/sarah-avatar.svg?v=4dfcd4ce05ba-435fd3ac" alt="Personal Sarah" width="120" height="120" />
+              <img class="ms-avatar-main sarah-brand-img" src="assets/sarah-avatar.svg?v=59a942ba3f35-435fd3ac" alt="Personal Sarah" width="120" height="120" />
             </div>
             <p class="ms-greeting-bubble"></p>
             <div class="ms-quick-grid" id="msQuickGrid"></div>
@@ -354,7 +354,7 @@
               <span class="ms-reminder-label">Don't forget</span>
               <p class="ms-reminder-text" id="msReminderText"></p>
             </div>
-            <img class="ms-reminder-art sarah-brand-img" src="assets/sarah-avatar.svg?v=4dfcd4ce05ba-435fd3ac" alt="" width="56" height="56" />
+            <img class="ms-reminder-art sarah-brand-img" src="assets/sarah-avatar.svg?v=59a942ba3f35-435fd3ac" alt="" width="56" height="56" />
           </section>
 
           <section class="sw-home-dashboard hidden" id="msWorkDashboard" aria-label="Sarah Work dashboard" hidden>
@@ -666,81 +666,6 @@
           <button type="button" class="btn btn-primary" id="sub01RegisterSubmit">Save subscription</button>
           <button type="button" class="btn btn-secondary hidden" id="sub01RegisterRemove">Remove subscription</button>
           <button type="button" class="btn btn-secondary" data-sub01-register-close>Cancel</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="eduAdmissionModal" class="ms-knowledge-upload-modal hidden" role="dialog" aria-modal="true" aria-labelledby="eduAdmissionTitle" aria-hidden="true">
-      <div class="ms-knowledge-upload-modal-backdrop" data-edu-admission-close tabindex="-1"></div>
-      <div class="ms-knowledge-upload-modal-card edu-admission-modal-card">
-        <div class="ms-knowledge-upload-modal-header">
-          <h4 class="ms-knowledge-upload-modal-title" id="eduAdmissionTitle">Enrolment &amp; registration</h4>
-          <button type="button" class="ms-knowledge-upload-modal-close" data-edu-admission-close aria-label="Close">&times;</button>
-        </div>
-        <p class="ms-knowledge-upload-modal-lead" id="eduAdmissionLead">Complete this application for Educare admissions. Submitted applications appear on the school portal for staff review.</p>
-        <input type="hidden" id="eduAdmissionCompanyId" value="" />
-        <p class="sub01-register-org" id="eduAdmissionOrgName"></p>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="eduChildFirstName">Child first name</label>
-          <input class="ms-knowledge-input" id="eduChildFirstName" type="text" autocomplete="given-name" required />
-        </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="eduChildSurname">Child surname</label>
-          <input class="ms-knowledge-input" id="eduChildSurname" type="text" autocomplete="family-name" required />
-        </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="eduChildDob">Date of birth</label>
-          <input class="ms-knowledge-input" id="eduChildDob" type="date" required />
-        </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="eduGradeApplying">Grade applying for</label>
-          <select class="ms-knowledge-input" id="eduGradeApplying" required>
-            <option value="">Select grade</option>
-            <option value="RR">Grade RR</option>
-            <option value="R">Grade R</option>
-            <option value="1">Grade 1</option>
-            <option value="2">Grade 2</option>
-            <option value="3">Grade 3</option>
-            <option value="4">Grade 4</option>
-            <option value="5">Grade 5</option>
-            <option value="6">Grade 6</option>
-            <option value="7">Grade 7</option>
-            <option value="8">Grade 8</option>
-            <option value="9">Grade 9</option>
-            <option value="10">Grade 10</option>
-            <option value="11">Grade 11</option>
-            <option value="12">Grade 12</option>
-          </select>
-        </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="eduCampus">Campus</label>
-          <select class="ms-knowledge-input" id="eduCampus" required>
-            <option value="">Select campus</option>
-            <option value="primary">Primary (Von Wielligh St)</option>
-            <option value="secondary">Secondary (Leyds St)</option>
-          </select>
-        </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="eduGuardianName">Parent / guardian full name</label>
-          <input class="ms-knowledge-input" id="eduGuardianName" type="text" autocomplete="name" required />
-        </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="eduGuardianMobile">Mobile</label>
-          <input class="ms-knowledge-input" id="eduGuardianMobile" type="tel" autocomplete="tel" />
-        </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="eduGuardianEmail">Email</label>
-          <input class="ms-knowledge-input" id="eduGuardianEmail" type="email" autocomplete="email" />
-        </div>
-        <div class="ms-knowledge-field-row">
-          <label class="ms-knowledge-label" for="eduNotes">Notes (optional)</label>
-          <textarea class="ms-knowledge-input" id="eduNotes" rows="2" placeholder="Transport, boarding, medical info…"></textarea>
-        </div>
-        <label class="sub01-check"><input type="checkbox" id="eduAdmissionConsent" /> I confirm the information is correct and agree to the school admissions privacy notice (POPIA).</label>
-        <p class="sub01-register-foot">EDU-04 · Submitted applications are visible in the school Admissions workspace.</p>
-        <div class="ms-knowledge-upload-modal-actions">
-          <button type="button" class="btn btn-primary" id="eduAdmissionSubmit">Submit registration</button>
-          <button type="button" class="btn btn-secondary" data-edu-admission-close>Cancel</button>
         </div>
       </div>
     </div>
@@ -1083,7 +1008,7 @@
           <span class="nav-sarah-app-ring nav-sarah-app-ring--outer"></span>
           <span class="nav-sarah-app-ring nav-sarah-app-ring--mid"></span>
           <span class="nav-sarah-app-ring nav-sarah-app-ring--inner"></span>
-          <img class="nav-sarah-app-icon sarah-brand-img" src="assets/sarah-avatar.svg?v=4dfcd4ce05ba-435fd3ac" alt="" width="26" height="26" decoding="async" />
+          <img class="nav-sarah-app-icon sarah-brand-img" src="assets/sarah-avatar.svg?v=59a942ba3f35-435fd3ac" alt="" width="26" height="26" decoding="async" />
         </span>
       </span>
       My Sarah
@@ -1116,15 +1041,15 @@
       }
     }
     </script>
-  <script src="js/ziricai-config.js?v=4dfcd4ce05ba-435fd3ac"></script>
-  <script type="module" src="js/live-bridge.mjs?v=4dfcd4ce05ba-435fd3ac"></script>
+  <script src="js/ziricai-config.js?v=59a942ba3f35-435fd3ac"></script>
+  <script type="module" src="js/live-bridge.mjs?v=59a942ba3f35-435fd3ac"></script>
   <!-- Classic scripts (mock UI works on file://; live Sarah needs http + API) -->
-  <script src="js/icons.js?v=4dfcd4ce05ba-435fd3ac"></script>
-  <script src="js/mock-data.js?v=4dfcd4ce05ba-435fd3ac"></script>
-  <script src="js/thread-rich-text.js?v=4dfcd4ce05ba-435fd3ac"></script>
-  <script src="js/sarah-behavior-options.js"></script>
-  <script src="js/sarah-news.js"></script>
-  <script src="js/app.js?v=4dfcd4ce05ba-435fd3ac"></script>
+  <script src="js/icons.js?v=59a942ba3f35-435fd3ac"></script>
+  <script src="js/mock-data.js?v=59a942ba3f35-435fd3ac"></script>
+  <script src="js/thread-rich-text.js?v=59a942ba3f35-435fd3ac"></script>
+  <script src="js/sarah-behavior-options.js?v=59a942ba3f35-435fd3ac"></script>
+  <script src="js/sarah-news.js?v=59a942ba3f35-435fd3ac"></script>
+  <script src="js/app.js?v=59a942ba3f35-435fd3ac"></script>
   <script defer>
     (function () {
       if (!('serviceWorker' in navigator)) return;
