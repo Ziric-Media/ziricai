@@ -6125,6 +6125,42 @@ body.is-feed-comment-open {
   text-justify: inter-word;
 }
 
+/* Chat — long URLs and tokens wrap; no horizontal page drift */
+.thread-chat-log,
+.ms-chat-log,
+.chat-log.ms-chat-log {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+.thread-turn,
+.thread-msg--assistant,
+.thread-msg--user,
+.thread-prose,
+.thread-prose--rich,
+.thread-rich-card {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.thread-prose,
+.thread-prose--rich,
+.thread-prose--rich p,
+.thread-prose--rich li,
+.thread-list,
+.thread-list li,
+.thread-msg-caption {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.thread-prose a,
+.thread-prose--rich a {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
 .thread-heading {
   margin: 0 0 0.65em;
   font-weight: 700;
