@@ -233,6 +233,7 @@ Breaking pushes reference `storyId` + `editionId` for deep link.
 - **Source of truth:** `prototype/sarah-app-ux/` → `prepare-sites.js users` → sarah.ziricai.com.
 - **Newsroom:** `js/sarah-news.js` — live editions via `GET /api/personal-sarah/news/editions/latest`.
 - **Assistant:** Personal Sarah tool `fetchSarahNewsHeadlines` (same compiler).
+- **API (SN-06):** Ship Sarah News backend via Railway from commit `b8675ce`+ (clean worktree `git worktree add` then `railway up --detach -s ziricai -e production`). Post-deploy: `node scripts/sn-news-prod-spotcheck.mjs` (optional `SARAH_NEWS_ID_TOKEN` for live prod edition).
 
 ---
 
