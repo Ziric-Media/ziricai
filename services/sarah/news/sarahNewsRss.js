@@ -2,17 +2,37 @@
  * SN-01 — minimal RSS 2.0 item parse (no external deps).
  */
 
-function decodeEntities(text) {
-    return String(text || "")
+export function decodeEntities(text) {
+    let s = String(text || "")
         .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+        .replace(/<[^>]+>/g, " ");
+    s = s
+        .replace(/&nbsp;/gi, " ")
         .replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+        .replace(/&apos;/gi, "'");
+    s = s.replace(/&#(\d+);/g, (_, n) => {
+        const code = Number(n);
+        return Number.isFinite(code) && code > 0 && code < 0x10ffff ? String.fromCodePoint(code) : _;
+    });
+    s = s.replace(/&#x([0-9a-f]+);/gi, (_, h) => {
+        const code = parseInt(h, 16);
+        return Number.isFinite(code) && code > 0 && code < 0x10ffff ? String.fromCodePoint(code) : _;
+    });
+  return s.replace(/\s+/g, " ").trim();
+}
+
+/** Short line for feed cards — full detail stays in articleBody only. */
+export function newsCardTeaser(text, maxLen = 200) {
+    const clean = decodeEntities(text);
+    if (clean.length <= maxLen) return clean;
+    const slice = clean.slice(0, maxLen);
+    const lastSpace = slice.lastIndexOf(" ");
+    const cut = lastSpace > maxLen * 0.55 ? slice.slice(0, lastSpace) : slice;
+    return `${cut.trim()}…`;
 }
 
 function pickTag(block, tag) {

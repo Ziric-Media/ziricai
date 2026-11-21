@@ -1,6 +1,7 @@
 /**
  * SN-04 — story images: RSS, og:image fallback, publisher stock art.
  */
+import { createHash } from "node:crypto";
 
 const PUBLISHER_STOCK_IMAGES = Object.freeze({
     "TechCrunch": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop",
@@ -14,7 +15,29 @@ const PUBLISHER_STOCK_IMAGES = Object.freeze({
     "ZBC News": "https://images.unsplash.com/photo-1526304640581-334ff57c57c4?w=800&auto=format&fit=crop",
     Africanews: "https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800&auto=format&fit=crop",
     default: "https://images.unsplash.com/photo-1495020689066-aaa043865bcc?w=800&auto=format&fit=crop",
+    News24: "https://images.unsplash.com/photo-1586339949916-3e9457bef6f3?w=800&auto=format&fit=crop",
+    Fin24: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop",
+    "The Citizen": "https://images.unsplash.com/photo-1529107386315-d1f67428c3d5?w=800&auto=format&fit=crop",
+    "Al Jazeera": "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&auto=format&fit=crop",
+    "France 24": "https://images.unsplash.com/photo-1585829365295-ab4807a6e70a?w=800&auto=format&fit=crop",
+    "The Guardian": "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&auto=format&fit=crop",
 });
+
+/** Varied Unsplash heroes when RSS/OG fail — one distinct image per story seed. */
+const STORY_STOCK_POOL = Object.freeze([
+    "https://images.unsplash.com/photo-1495020689066-aaa043865bcc?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1526304640581-334ff57c57c4?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1529107386315-d1f67428c3d5?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1586339949916-3e9457bef6f3?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1585829365295-ab4807a6e70a?w=800&auto=format&fit=crop",
+]);
 
 /** @type {Map<string, string|null>} */
 const ogImageCache = new Map();
@@ -95,6 +118,23 @@ export function publisherStockImage(publisher) {
 }
 
 /**
+ * Per-story stock art (seed = storyId or any stable string).
+ * @param {string|null|undefined} publisher
+ * @param {string} seed
+ */
+export function publisherStoryStockImage(publisher, seed) {
+    const pubDefault = publisherStockImage(publisher);
+    const h = createHash("sha256").update(String(seed || publisher || "x")).digest();
+    const idx = h.readUInt32BE(0) % STORY_STOCK_POOL.length;
+    const picked = STORY_STOCK_POOL[idx];
+    if (picked === pubDefault) {
+        const alt = STORY_STOCK_POOL[(idx + 3) % STORY_STOCK_POOL.length];
+        return alt;
+    }
+    return picked;
+}
+
+/**
  * @param {{ link?: string|null, publisher?: string, rssImage?: string|null }} input
  * @param {{ allowOgFetch?: boolean }} [opts]
  */
@@ -107,7 +147,7 @@ export async function resolveStoryImageUrl(input, opts = {}) {
         const og = await fetchOgImageFromPage(link, { timeoutMs: opts.timeoutMs });
         if (og) return og;
     }
-    return publisherStockImage(input.publisher);
+    return publisherStoryStockImage(input.publisher, input.link || input.publisher);
 }
 
 export function clearSarahNewsImageCacheForTests() {

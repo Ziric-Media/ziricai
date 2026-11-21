@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 process.env.STORAGE_BACKEND = "memory";
 
 const { compileSarahNewsEdition } = await import("../services/sarah/news/sarahNewsEditionService.js");
-const { parseRssItems } = await import("../services/sarah/news/sarahNewsRss.js");
+const { parseRssItems, decodeEntities, newsCardTeaser } = await import("../services/sarah/news/sarahNewsRss.js");
+const { publisherStoryStockImage } = await import("../services/sarah/news/sarahNewsImageService.js");
 const { storyHasPublishableDetail } = await import("../services/sarah/news/sarahNewsArticleComposer.js");
 
 const sample = `<?xml version="1.0"?><rss><channel><item><title>Test</title><link>https://example.com/a</link><description>Hello</description><media:thumbnail url="https://cdn.example.com/x.jpg"/></item></channel></rss>`;
@@ -15,6 +16,14 @@ const items = parseRssItems(sample);
 assert.equal(items.length, 1);
 assert.equal(items[0].title, "Test");
 assert.equal(items[0].imageUrl, "https://cdn.example.com/x.jpg");
+const decoded = decodeEntities("Sandpapergate &#8216;storm&#8217; and &#8220;quotes&#8221;");
+assert.match(decoded, /Sandpapergate .storm. and .quotes./);
+assert.ok(!decoded.includes("&#821"));
+assert.ok(newsCardTeaser("a".repeat(300)).length <= 202);
+assert.notEqual(
+    publisherStoryStockImage("BBC News", "story_a"),
+    publisherStoryStockImage("BBC News", "story_b")
+);
 assert.equal(storyHasPublishableDetail({ headline: "Only title", summary: "Only title" }), false);
 assert.equal(
     storyHasPublishableDetail({

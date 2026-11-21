@@ -90,12 +90,42 @@
     return null;
   }
 
+  function decodePlainText(s) {
+    let t = String(s || '');
+    t = t
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/gi, "'");
+    t = t.replace(/&#(\d+);/g, (_, n) => {
+      const code = Number(n);
+      return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : _;
+    });
+    t = t.replace(/&#x([0-9a-f]+);/gi, (_, h) => {
+      const code = parseInt(h, 16);
+      return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : _;
+    });
+    return t.replace(/\s+/g, ' ').trim();
+  }
+
   function escapeHtml(s) {
-    return String(s || '')
+    return String(decodePlainText(s) || '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function cardTeaser(summary, maxLen = 180) {
+    const clean = decodePlainText(summary);
+    if (clean.length <= maxLen) return clean;
+    const slice = clean.slice(0, maxLen);
+    const lastSpace = slice.lastIndexOf(' ');
+    return `${(lastSpace > maxLen * 0.55 ? slice.slice(0, lastSpace) : slice).trim()}…`;
   }
 
   function readerFirstName() {
@@ -156,11 +186,11 @@
 
   function enrichStoryLocally(story) {
     const pool = [...(activeEdition?.topStories || []), ...(activeEdition?.headlines || [])];
-    const facts = String(story.summary || '')
+    const facts = decodePlainText(story.summary || '')
       .split(/(?<=[.!?])\s+/)
       .map((s) => s.trim())
-      .filter((s) => s.length > 24)
-      .slice(0, 4);
+      .filter((s) => s.length > 24 && s.length < 320)
+      .slice(0, 3);
     if (!facts.length && story.headline) facts.push(story.headline);
     const tok = new Set(tokenizeHeadline(story.headline));
     const related = [];
@@ -376,14 +406,17 @@
     host.querySelectorAll('.snews-story-banner-img').forEach((img) => {
       img.referrerPolicy = 'no-referrer';
       const fallback = img.getAttribute('data-fallback');
-      if (!fallback) return;
-      img.addEventListener(
-        'error',
-        () => {
-          if (img.src !== fallback) img.src = fallback;
-        },
-        { once: true }
-      );
+      let attempts = 0;
+      img.addEventListener('error', () => {
+        attempts += 1;
+        if (attempts === 1 && fallback && img.src !== fallback) {
+          img.src = fallback;
+          return;
+        }
+        const wrap = img.closest('.snews-story-banner, .snews-article-hero');
+        img.remove();
+        wrap?.classList.add('snews-story-banner--placeholder');
+      });
     });
   }
 
@@ -406,7 +439,7 @@
             ${meta ? `<span class="snews-story-meta">${escapeHtml(meta)}</span>` : ''}
           </div>
           <h4 class="snews-story-head">${escapeHtml(s.headline)}</h4>
-          <p class="snews-story-sum">${escapeHtml(s.summary)}</p>
+          <p class="snews-story-sum">${escapeHtml(cardTeaser(s.summary))}</p>
           <span class="snews-story-more">Read in Sarah News →</span>
         </div>
       </article>`;
@@ -604,10 +637,15 @@
   }
 
   function renderLoading(host, message) {
+    const msg = message || 'Loading your briefing';
     host.innerHTML = `
-      <div class="snews-loading">
-        <div class="snews-loading-shimmer" aria-hidden="true"></div>
-        <p>${escapeHtml(message || 'Sarah is compiling your briefing…')}</p>
+      <div class="snews-loading" role="status" aria-live="polite">
+        <div class="snews-loading-visual" aria-hidden="true">
+          <div class="snews-loading-ring"></div>
+          <div class="snews-loading-dots"><span></span><span></span><span></span></div>
+        </div>
+        <p class="snews-loading-title">${escapeHtml(msg)}</p>
+        <p class="snews-loading-sub">Sarah is reading your publisher feeds</p>
       </div>`;
   }
 

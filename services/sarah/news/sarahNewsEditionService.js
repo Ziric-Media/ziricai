@@ -12,6 +12,7 @@ import {
     SARAH_NEWS_PUBLISHER_ALLOWLIST,
 } from "./sarahNewsSources.js";
 import { fetchRssFeedCached } from "./sarahNewsRssCache.js";
+import { decodeEntities, newsCardTeaser } from "./sarahNewsRss.js";
 import {
     editionCacheKey,
     getCachedSarahNewsEdition,
@@ -23,7 +24,7 @@ import {
     heroImageUrl,
     storyHasPublishableDetail,
 } from "./sarahNewsArticleComposer.js";
-import { publisherStockImage, resolveStoryImageUrl } from "./sarahNewsImageService.js";
+import { publisherStoryStockImage, resolveStoryImageUrl } from "./sarahNewsImageService.js";
 import {
     getSarahNewsEditionSnapshot,
     previousBriefingSlot,
@@ -120,11 +121,12 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                     const regionTag = meta.tags.find((t) => t.startsWith("region:"))?.slice(7);
                     if (regionTag && !matchesRegionFilter(regionTag, item, meta)) continue;
 
-                    const summary = String(item.description || "").trim();
+                    const detail = decodeEntities(item.description || "");
+                    const headline = decodeEntities(item.title || "");
                     if (
                         !storyHasPublishableDetail({
-                            headline: item.title,
-                            summary,
+                            headline,
+                            summary: detail,
                         })
                     ) {
                         continue;
@@ -134,9 +136,10 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                     const interestTag = meta.tags.find((t) => t.startsWith("interest:"))?.slice(9);
                     if (interestTag && !matchesInterestFilter(interestTag, item)) continue;
 
+                    const summary = newsCardTeaser(detail, 200);
                     const draft = {
-                        headline: item.title,
-                        summary,
+                        headline,
+                        summary: detail,
                         region: regionTag || null,
                     };
                     const articleBody = composeSarahArticleBody(draft);
@@ -144,14 +147,14 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                     let sourceNote = `Story taken from ${meta.publisher}.`;
                     if (
                         regionTag === "za" &&
-                        SOUTH_AFRICA_KEYWORDS.test(`${item.title} ${item.description}`) &&
+                        SOUTH_AFRICA_KEYWORDS.test(`${headline} ${detail}`) &&
                         meta.publisher !== ENC_AVAILABLE_ATTRIBUTION
                     ) {
                         sourceNote = `Story taken from ${meta.publisher}. Also widely reported by ${ENC_AVAILABLE_ATTRIBUTION} and other South African outlets.`;
                     }
                     stories.push({
                         storyId: id,
-                        headline: item.title,
+                        headline,
                         summary,
                         articleBody,
                         _rssImage: item.imageUrl,
@@ -181,14 +184,14 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
     const dedupe = applyCrossSlotDedupe(ranked, previousEdition);
     ranked = backfillEditionStories(dedupe.stories, stories, 10);
 
-    const IMAGE_ENRICH_LIMIT = 14;
-    const MAX_OG_FETCHES = 6;
+    const IMAGE_ENRICH_LIMIT = 28;
+    const MAX_OG_FETCHES = 14;
     const forImages = ranked.slice(0, IMAGE_ENRICH_LIMIT);
     let ogBudget = MAX_OG_FETCHES;
     await Promise.all(
         forImages.map(async (s) => {
             const rssHero = heroImageUrl(s._rssImage);
-            const fallback = publisherStockImage(s.publisher);
+            const fallback = publisherStoryStockImage(s.publisher, s.storyId);
             if (rssHero) {
                 s.imageUrl = rssHero;
                 s.imageFallback = fallback;
@@ -205,14 +208,30 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
             } else {
                 s.imageUrl = fallback;
             }
-            s.imageFallback = fallback;
+            if (!s.imageUrl) {
+                s.imageUrl = fallback;
+            }
+            s.imageFallback = publisherStoryStockImage(s.publisher, `${s.storyId}:alt`);
             delete s._rssImage;
         })
     );
     for (const s of ranked.slice(IMAGE_ENRICH_LIMIT)) {
-        s.imageUrl = publisherStockImage(s.publisher);
-        s.imageFallback = s.imageUrl;
+        s.imageUrl = publisherStoryStockImage(s.publisher, s.storyId);
+        s.imageFallback = publisherStoryStockImage(s.publisher, `${s.storyId}:alt`);
         delete s._rssImage;
+    }
+
+    const usedHeroUrls = new Set();
+    for (const s of ranked) {
+        let url = s.imageUrl;
+        if (url && usedHeroUrls.has(url)) {
+            url = publisherStoryStockImage(s.publisher, `${s.storyId}:dup`);
+        }
+        usedHeroUrls.add(url);
+        s.imageUrl = url;
+        if (!s.imageFallback || s.imageFallback === s.imageUrl) {
+            s.imageFallback = publisherStoryStockImage(s.publisher, `${s.storyId}:fb`);
+        }
     }
 
     const publisherVariety = new Set(ranked.map((s) => s.publisher).filter(Boolean));
@@ -240,7 +259,7 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
         slot,
         compiledAt,
         editionDay: dayKey,
-        sourcePolicy: "multi-publisher-rss-v4-fast",
+        sourcePolicy: "multi-publisher-rss-v4-reader",
         slotStats: {
             suppressedFromPriorSlot: dedupe.suppressed,
             updatedFromPriorSlot: dedupe.updated,

@@ -2,7 +2,11 @@
  * SN-02 — in-app reader copy in Sarah's voice (from RSS facts, no outbound read required).
  */
 
+import { decodeEntities } from "./sarahNewsRss.js";
+
 export const MIN_STORY_DETAIL_CHARS = 80;
+const MAX_DETAIL_FOR_BODY = 1400;
+const MAX_BODY_SENTENCES = 4;
 
 function splitSentences(text) {
     const clean = String(text || "").replace(/\s+/g, " ").trim();
@@ -38,11 +42,14 @@ export function storyHasPublishableDetail(story) {
 export function composeSarahArticleBody(story) {
     if (!storyHasPublishableDetail(story)) return null;
 
-    const headline = String(story.headline || "Today's story").trim();
-    const summary = String(story.summary || "").trim();
-    const sentences = splitSentences(summary);
+    const headline = decodeEntities(story.headline || "Today's story");
+    let summary = decodeEntities(story.summary || "");
+    if (summary.length > MAX_DETAIL_FOR_BODY) {
+        summary = `${summary.slice(0, MAX_DETAIL_FOR_BODY).replace(/\s+\S*$/, "").trim()}…`;
+    }
+    const sentences = splitSentences(summary).slice(0, MAX_BODY_SENTENCES);
     const lead = sentences[0] || summary;
-    const rest = sentences.slice(1).join(" ");
+    const rest = sentences.slice(1, 3).join(" ");
 
     const regionNote =
         story.region === "za"
