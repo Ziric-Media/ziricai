@@ -66,6 +66,7 @@ function normalizeLearner(input = {}) {
         currentGrade: String(input.currentGrade || "").trim().slice(0, 40) || null,
         previousSchool: String(input.previousSchool || "").trim().slice(0, 200) || null,
         lastGradeCompleted: String(input.lastGradeCompleted || "").trim().slice(0, 40) || null,
+        gender: String(input.gender || "").trim().slice(0, 24) || null,
     };
 }
 

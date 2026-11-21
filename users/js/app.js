@@ -2428,7 +2428,7 @@ function applyCompanySarahUiHints(hints = [], companyId = '') {
   if (!Array.isArray(hints) || !hints.length) return;
   for (const hint of hints) {
     if (hint?.action === 'openEducareAdmissionForm') {
-      openEducareAdmissionModal(hint.companyId || companyId, { prefill: hint.prefill || {} });
+      showProtoToast?.('Sarah will complete your enrolment enquiry here in chat — no form needed.');
     }
   }
 }
@@ -14313,7 +14313,7 @@ function init() {
     const ctx = getActiveThreadContext();
     const input = document.getElementById('threadComposeInput');
     const text = input?.value.trim();
-    if (!text) return;
+    if (!text && !threadComposePending.items.length) return;
     if (ctx.kind === 'personal') {
       await deliverPersonalSarahMessage(text, { threadId: ctx.id, work: ctx.work });
       if (input) input.value = '';

@@ -93,13 +93,13 @@ export async function renderSchoolAdmissions(container) {
 
   container.innerHTML = `
     <section class="bos-module-head">
-      <h2>Admissions</h2>
-      <p class="text-muted">Review learner applications, documents, and authorised decisions. Pilot workspace — school sign-off required before live intake.</p>
+      <h2>Admissions &amp; new enquiries</h2>
+      <p class="text-muted">New enquiries from Sarah App chat appear as submitted or draft applications. Review documents, parent concerns, and authorised decisions.</p>
     </section>
     <div class="bos-card" style="margin-bottom:12px">
       <div class="bos-inline-actions" id="admFilterBar">
         <button type="button" class="btn btn-secondary btn-sm" data-filter="">All active</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-filter="submitted">Submitted</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-filter="submitted">New enquiries</button>
         <button type="button" class="btn btn-secondary btn-sm" data-filter="under_review">Under review</button>
         <button type="button" class="btn btn-secondary btn-sm" data-filter="documents_pending">Documents</button>
         <button type="button" class="btn btn-secondary btn-sm" data-filter="provisional_offer">Offers</button>

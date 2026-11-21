@@ -14,6 +14,7 @@ import {
     getEducareOpenAIToolDefinitions,
     getParentEducareStatusSummary,
 } from "../../education/educareSchoolChatTools.js";
+import { SARAH_SOLE_CONTACT_RULES } from "./sarahSoleContactChannelRules.js";
 
 const CHANNEL = "sarah_app";
 
@@ -68,10 +69,11 @@ function modeDirective(status) {
     }
     return [
         "PARENT MODE: PROSPECT — not yet a verified guardian.",
-        "Primary goal: registration-oriented conversation — every helpful answer should gently invite admission.",
-        "After admission/fees/subjects info, offer openEducareAdmissionForm when they show intent.",
+        "Primary goal: conversational new enquiry — ask one question at a time (child name, age or DOB, gender, grade, campus, parent contact).",
+        "Use saveEducareAdmissionFromChat as fields are collected; submitEducareAdmissionFromChat after they confirm and consent.",
+        "Never open an external form or tell them to call/email the school.",
         "Never claim a child is enrolled or admitted without tool confirmation.",
-        "Tone: warm, WhatsApp-style Educare reception — welcoming, clear, one follow-up at a time.",
+        "Tone: warm Educare reception — welcoming, clear, one follow-up at a time.",
     ].join("\n");
 }
 
@@ -87,6 +89,7 @@ export async function runCompanySarahEducareTurn(params) {
         consumerProfile = {},
         text,
         history = [],
+        attachments = [],
     } = params;
 
     const displayName =
@@ -123,13 +126,14 @@ export async function runCompanySarahEducareTurn(params) {
 
     const channelRules = [
         "CHANNEL: Sarah App consumer chat with Educare (not legacy WhatsApp).",
+        SARAH_SOLE_CONTACT_RULES,
         phoneLine,
         `Parent display name: ${displayName}.`,
         "Call getParentEducareStatus when unsure whether to focus on registration or parent support.",
-        "Never say a registration was submitted unless openEducareAdmissionForm or admission APIs confirm success.",
+        "Never say a registration was submitted unless submitEducareAdmissionFromChat returned success.",
         "Never say a concern was escalated unless logParentConcern returned success.",
-        "For factual policy (fees, transport, boarding, uniform prices, availability) use COMPANY KNOWLEDGE — if missing, say management must confirm.",
-        "Encourage completing the in-app admission form rather than collecting full enrolment details only in chat.",
+        "For factual policy (fees, transport, boarding, uniform prices, availability) use COMPANY KNOWLEDGE — if missing, say you will note it for management in the portal.",
+        "If the parent attached a file, register it with registerEducareAdmissionDocument when you know the applicationId and document type.",
     ].join("\n");
 
     const knowledgeBlock = knowledgeBundle.context
@@ -144,6 +148,7 @@ export async function runCompanySarahEducareTurn(params) {
         agentId: agent?.id || null,
         channel: CHANNEL,
         inboundMessage: text,
+        inboundAttachments: Array.isArray(attachments) ? attachments : [],
     };
 
     const chatHistory = history
@@ -167,7 +172,7 @@ export async function runCompanySarahEducareTurn(params) {
             aiResult.reply ||
             (parentStatus.mode === "verified_guardian"
                 ? "I'm here to help — tell me which child and what concern you'd like us to address."
-                : "Welcome! I can answer questions about Educare and help you start a registration application. What grade are you considering?"),
+                : "Welcome! I can answer questions and help you start an enrolment enquiry right here. What grade is your child going into?"),
         toolResults: aiResult.toolResults || [],
         parentMode: parentStatus.mode,
     };

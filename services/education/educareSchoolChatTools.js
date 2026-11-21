@@ -6,14 +6,39 @@ import {
     listGuardianLinksForParent,
     GUARDIAN_STATUS,
 } from "./schoolGuardianService.js";
-import { listAdmissionsForParent } from "./schoolAdmissionService.js";
+import {
+    createAdmissionDraft,
+    listAdmissionsForParent,
+    registerAdmissionDocument,
+    submitAdmissionApplication,
+    updateAdmissionDraft,
+} from "./schoolAdmissionService.js";
 import { logParentConcern } from "./schoolParentConcernService.js";
 
 export const EDUCARE_SARAH_APP_TOOL_NAMES = Object.freeze([
     "getParentEducareStatus",
-    "openEducareAdmissionForm",
+    "saveEducareAdmissionFromChat",
+    "submitEducareAdmissionFromChat",
+    "registerEducareAdmissionDocument",
     "logParentConcern",
 ]);
+
+function splitChildName(fullName = "") {
+    const parts = String(fullName || "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    if (!parts.length) return { legalFirstName: "", legalSurname: "" };
+    if (parts.length === 1) return { legalFirstName: parts[0], legalSurname: parts[0] };
+    return { legalFirstName: parts[0], legalSurname: parts.slice(1).join(" ") };
+}
+
+function approxDobFromAge(ageYears) {
+    const age = Number(ageYears);
+    if (!Number.isFinite(age) || age < 1 || age > 25) return null;
+    const year = new Date().getFullYear() - Math.floor(age);
+    return `${year}-07-01`;
+}
 
 export async function getParentEducareStatusSummary(companyId, parentUid) {
     const links = parentUid ? await listGuardianLinksForParent(companyId, parentUid).catch(() => []) : [];
@@ -56,33 +81,155 @@ const getParentEducareStatusTool = {
     },
 };
 
-const openEducareAdmissionFormTool = {
-    name: "openEducareAdmissionForm",
+const saveEducareAdmissionFromChatTool = {
+    name: "saveEducareAdmissionFromChat",
     description:
-        "Open the Educare admission registration form in the Sarah App for the parent to complete. Use for new enrolments when they are ready to apply.",
+        "Create or update a new enquiry / admission application in the school portal from the chat. Ask conversationally for child name, age or date of birth, gender, grade applying for, campus, and parent contact. Call repeatedly as you learn more.",
     parameters: {
         type: "object",
         properties: {
-            gradeHint: { type: "string", description: "Optional grade they mentioned (e.g. Grade 5 or RR)" },
-            campusId: { type: "string", enum: ["primary", "secondary"], description: "Campus hint if known" },
+            applicationId: { type: "string", description: "Existing draft id from a prior save in this chat" },
+            childFullName: { type: "string", description: "Learner full name" },
+            childAgeYears: { type: "number", description: "Age in years if DOB unknown yet" },
+            dateOfBirth: { type: "string", description: "YYYY-MM-DD when known" },
+            gender: { type: "string", description: "Child gender if parent shared it" },
+            gradeApplyingFor: { type: "string", description: "e.g. RR, 1, 8, Matric" },
+            campusId: { type: "string", enum: ["primary", "secondary", "preschool"], description: "Campus" },
+            academicYear: { type: "string", description: "Year applying for, e.g. 2026" },
+            parentFullName: { type: "string" },
+            parentMobile: { type: "string" },
+            parentEmail: { type: "string" },
+            parentRelationship: { type: "string" },
+            notes: { type: "string", description: "Extra context from chat" },
         },
     },
     async execute(ctx, args = {}) {
+        const parentUid = ctx.customerId;
+        if (!parentUid) {
+            return { ok: false, success: false, message: "Parent must be signed in to save an enquiry." };
+        }
+        const nameParts = splitChildName(args.childFullName);
+        const dob = String(args.dateOfBirth || "").trim() || approxDobFromAge(args.childAgeYears) || "";
+        const learnerPatch = {
+            ...(nameParts.legalFirstName ? { legalFirstName: nameParts.legalFirstName } : {}),
+            ...(nameParts.legalSurname ? { legalSurname: nameParts.legalSurname } : {}),
+            ...(dob ? { dateOfBirth: dob } : {}),
+            ...(args.gender ? { gender: args.gender } : {}),
+            ...(args.notes ? { previousSchool: String(args.notes).slice(0, 200) } : {}),
+        };
+        const guardianPatch = {
+            ...(args.parentFullName ? { fullName: args.parentFullName } : { fullName: ctx.customerName }),
+            ...(args.parentMobile || ctx.customerPhone ? { mobile: args.parentMobile || ctx.customerPhone } : {}),
+            ...(args.parentEmail ? { email: args.parentEmail } : {}),
+            ...(args.parentRelationship ? { relationship: args.parentRelationship } : {}),
+        };
+        let applicationId = String(args.applicationId || "").trim();
+        let summary;
+        try {
+            if (!applicationId) {
+                const created = await createAdmissionDraft(ctx.companyId, parentUid, {
+                    academicYear: args.academicYear || String(new Date().getFullYear() + 1),
+                    gradeApplyingFor: args.gradeApplyingFor || "",
+                    campusId: args.campusId || "",
+                    learner: learnerPatch,
+                    guardian: guardianPatch,
+                });
+                applicationId = created.applicationId;
+                summary = created;
+            } else {
+                summary = await updateAdmissionDraft(ctx.companyId, parentUid, applicationId, {
+                    academicYear: args.academicYear,
+                    gradeApplyingFor: args.gradeApplyingFor,
+                    campusId: args.campusId,
+                    learner: learnerPatch,
+                    guardian: guardianPatch,
+                });
+            }
+        } catch (err) {
+            return { ok: false, success: false, message: err.message || "Could not save enquiry." };
+        }
         return {
             ok: true,
             success: true,
-            message: "The admission form is opening in Sarah App — they can complete and submit enrolment there.",
-            uiHints: [
-                {
-                    action: "openEducareAdmissionForm",
-                    companyId: ctx.companyId,
-                    prefill: {
-                        gradeApplyingFor: args.gradeHint || null,
-                        campusId: args.campusId || null,
-                    },
-                },
-            ],
+            message: `Saved enquiry ${summary.reference || applicationId} on the school portal (draft).`,
+            data: { applicationId, reference: summary.reference, status: summary.status },
         };
+    },
+};
+
+const submitEducareAdmissionFromChatTool = {
+    name: "submitEducareAdmissionFromChat",
+    description:
+        "Submit the saved admission enquiry after the parent confirms details and agrees to the privacy notice in chat. Appears under New enquiries for school staff.",
+    parameters: {
+        type: "object",
+        properties: {
+            applicationId: { type: "string" },
+            parentConfirmedConsent: {
+                type: "boolean",
+                description: "True only after parent clearly agrees to submit and privacy processing",
+            },
+        },
+        required: ["applicationId", "parentConfirmedConsent"],
+    },
+    async execute(ctx, args = {}) {
+        if (args.parentConfirmedConsent !== true) {
+            return { ok: false, success: false, message: "Parent must confirm consent in chat before submit." };
+        }
+        try {
+            const submitted = await submitAdmissionApplication(ctx.companyId, ctx.customerId, args.applicationId, {
+                consent: true,
+            });
+            return {
+                ok: true,
+                success: true,
+                message: `Enquiry submitted as ${submitted.reference}. School staff will review in the portal.`,
+                data: submitted,
+            };
+        } catch (err) {
+            return {
+                ok: false,
+                success: false,
+                message: err.message || "Submit failed — save missing fields with saveEducareAdmissionFromChat first.",
+            };
+        }
+    },
+};
+
+const registerEducareAdmissionDocumentTool = {
+    name: "registerEducareAdmissionDocument",
+    description:
+        "Register a document or image the parent attached in chat against their admission enquiry (birth certificate, ID copy, etc.).",
+    parameters: {
+        type: "object",
+        properties: {
+            applicationId: { type: "string" },
+            documentType: {
+                type: "string",
+                description: "Checklist type e.g. birth_certificate, parent_id, report_card",
+            },
+            fileName: { type: "string" },
+            uploadId: { type: "string", description: "From chat attachment uploadId when available" },
+        },
+        required: ["applicationId", "documentType", "fileName"],
+    },
+    async execute(ctx, args = {}) {
+        try {
+            const storageRef = args.uploadId ? `chat-media:${args.uploadId}` : null;
+            const updated = await registerAdmissionDocument(ctx.companyId, ctx.customerId, args.applicationId, {
+                type: args.documentType,
+                fileName: args.fileName,
+                storageRef,
+            });
+            return {
+                ok: true,
+                success: true,
+                message: `Registered ${args.fileName} on ${updated.reference || args.applicationId}.`,
+                data: updated,
+            };
+        } catch (err) {
+            return { ok: false, success: false, message: err.message || "Could not register document." };
+        }
     },
 };
 
@@ -115,7 +262,9 @@ const logParentConcernTool = {
 
 export const EDUCARE_SCHOOL_CHAT_TOOLS = [
     getParentEducareStatusTool,
-    openEducareAdmissionFormTool,
+    saveEducareAdmissionFromChatTool,
+    submitEducareAdmissionFromChatTool,
+    registerEducareAdmissionDocumentTool,
     logParentConcernTool,
 ];
 
@@ -147,8 +296,8 @@ export function buildEducareCompanySarahGreeting(preferredName, companyName) {
     const name = preferredName || "there";
     return (
         `Hello ${name}! 👋 I'm Sarah from ${companyName}.\n\n` +
-        `I can help with **admissions & registration** for new families, or **parent support** if you already have a child at the school.\n\n` +
-        `Tell me what you need — or say **Register Now** to start an admission application.`
+        `I handle **new enrolment enquiries**, **questions about the school**, and **parent support** if your child is already with us — all here in chat.\n\n` +
+        `What would you like help with today?`
     );
 }
 

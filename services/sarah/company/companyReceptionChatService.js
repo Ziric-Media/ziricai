@@ -247,6 +247,7 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
                 consumerProfile,
                 text: customerText,
                 history,
+                attachments: enriched.attachments,
             });
             reply = dentalTurn.reply || "Thanks for your message.";
         } else if (useEducare) {
@@ -263,6 +264,7 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
                 consumerProfile,
                 text: customerText,
                 history,
+                attachments: enriched.attachments,
             });
             reply = educareTurn.reply || "Thanks for your message.";
             uiHints = extractEducareUiHints(educareTurn.toolResults || []);

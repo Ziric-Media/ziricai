@@ -14,6 +14,7 @@ import {
 import { SMILEMORE_DENTAL_TOOLS } from "../../dental/dentalBookingTools.js";
 import { toBusinessDateString, getTodayStartInBusinessTz } from "../../tools/availability.js";
 import { shouldRunAutomotiveSalesChat } from "./companyReceptionAutomotiveChat.js";
+import { SARAH_SOLE_CONTACT_RULES } from "./sarahSoleContactChannelRules.js";
 
 const CHANNEL = "sarah_app";
 
@@ -93,6 +94,7 @@ export async function runCompanySarahDentalTurn(params) {
         consumerProfile = {},
         text,
         history = [],
+        attachments = [],
     } = params;
 
     const displayName =
@@ -130,6 +132,7 @@ export async function runCompanySarahDentalTurn(params) {
 
     const channelRules = [
         "CHANNEL: Sarah App consumer chat (not WhatsApp).",
+        SARAH_SOLE_CONTACT_RULES,
         `TODAY (SAST) for this thread: ${todaySast}.`,
         phoneLine,
         `Customer name for this thread: ${displayName}.`,
@@ -146,7 +149,7 @@ export async function runCompanySarahDentalTurn(params) {
         "Product questions: use COMPANY KNOWLEDGE and published Discover products (braces, aligners, retainers, guards) — prices are indicative only.",
     ].join("\n");
 
-    const practiceBlock = smilemorePracticePrompt();
+    const practiceBlock = smilemorePracticePrompt({ channel: CHANNEL });
     const knowledgeBlock = knowledgeBundle.context
         ? `\n\nCOMPANY KNOWLEDGE (verified — do not contradict diary tools):\n${knowledgeBundle.context}`
         : "";
@@ -159,6 +162,7 @@ export async function runCompanySarahDentalTurn(params) {
         agentId: agent?.id || null,
         channel: CHANNEL,
         inboundMessage: text,
+        inboundAttachments: Array.isArray(attachments) ? attachments : [],
     };
 
     const chatHistory = history

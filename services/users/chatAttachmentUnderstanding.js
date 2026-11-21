@@ -54,6 +54,10 @@ export async function enrichMessageWithAttachments(text, attachments = []) {
                 captions.push(clean ? `[Voice note]: ${clean}` : "[Voice note: no speech detected]");
             } else if (mime.startsWith("video/")) {
                 captions.push(`[Video attached — ${att.name || "video"}]`);
+            } else {
+                const label = att.name || "document";
+                const ref = uploadId ? `uploadId=${uploadId}` : "";
+                captions.push(`[Document — ${label}${ref ? `; ${ref}` : ""}]`);
             }
         } catch (err) {
             captions.push(`[${att.name || "Attachment"}: could not interpret — ${err.message}]`);

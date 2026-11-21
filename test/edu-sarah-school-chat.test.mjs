@@ -19,11 +19,7 @@ const {
     extractEducareUiHints,
 } = await import("../services/education/educareSchoolChatTools.js");
 const { logParentConcern, listParentConcernsForSchool } = await import("../services/education/schoolParentConcernService.js");
-const {
-    createAdmissionDraft,
-    submitAdmissionApplication,
-    listAdmissionsForSchool,
-} = await import("../services/education/schoolAdmissionService.js");
+const { listAdmissionsForSchool } = await import("../services/education/schoolAdmissionService.js");
 
 await import("../services/storage/storageAdapter.js").then((m) => m.getStorageAdapter());
 
@@ -51,25 +47,32 @@ upsertBusinessDirectoryEntry(companyId, {
 
 assert.equal(await shouldRunEducareSchoolChat(companyId), true);
 
-const openTool = EDUCARE_SCHOOL_CHAT_TOOLS.find((t) => t.name === "openEducareAdmissionForm");
-const opened = await openTool.execute({ companyId, customerId: parentUid, channel: "test" }, { gradeHint: "5" });
-assert.equal(opened.ok, true);
-const hints = extractEducareUiHints([opened]);
-assert.equal(hints.length, 1);
-assert.equal(hints[0].action, "openEducareAdmissionForm");
-
-const draft = await createAdmissionDraft(companyId, parentUid, {
-    academicYear: String(new Date().getFullYear() + 1),
-    gradeApplyingFor: "5",
-    campusId: "primary",
-    learner: { legalFirstName: "Amy", legalSurname: "Test", dateOfBirth: "2015-06-01" },
-    guardian: { fullName: "Parent Test", mobile: "+27000000000", email: "parent@example.com" },
-});
-const submitted = await submitAdmissionApplication(companyId, parentUid, draft.applicationId, { consent: true });
-assert.equal(submitted.status, "documents_pending");
+const saveTool = EDUCARE_SCHOOL_CHAT_TOOLS.find((t) => t.name === "saveEducareAdmissionFromChat");
+const saved = await saveTool.execute(
+    { companyId, customerId: parentUid, customerName: "Parent Test", customerPhone: "+27000000000", channel: "test" },
+    {
+        childFullName: "Amy Test",
+        childAgeYears: 10,
+        gender: "girl",
+        gradeApplyingFor: "5",
+        campusId: "primary",
+        parentFullName: "Parent Test",
+        parentMobile: "+27000000000",
+        parentEmail: "parent@example.com",
+    }
+);
+assert.equal(saved.ok, true);
+assert.ok(saved.data?.applicationId);
+const submitTool = EDUCARE_SCHOOL_CHAT_TOOLS.find((t) => t.name === "submitEducareAdmissionFromChat");
+const submittedViaChat = await submitTool.execute(
+    { companyId, customerId: parentUid, channel: "test" },
+    { applicationId: saved.data.applicationId, parentConfirmedConsent: true }
+);
+assert.equal(submittedViaChat.ok, true);
+assert.equal(extractEducareUiHints([submittedViaChat]).length, 0);
 
 const schoolQueue = await listAdmissionsForSchool(companyId, { status: "documents_pending" });
-assert.ok(schoolQueue.applications.some((a) => a.applicationId === draft.applicationId));
+assert.ok(schoolQueue.applications.some((a) => a.applicationId === saved.data.applicationId));
 
 const concern = await logParentConcern(companyId, parentUid, {
     childName: "Amy Test",
