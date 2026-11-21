@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="Clear aligners">
+  <rect width="400" height="300" fill="#ecfeff"/>
+  <ellipse cx="200" cy="155" rx="120" ry="55" fill="none" stroke="#67e8f9" stroke-width="14" opacity=".9"/>
+  <ellipse cx="200" cy="170" rx="95" ry="38" fill="rgba(255,255,255,.65)" stroke="#22d3ee" stroke-width="6"/>
+  <text x="200" y="250" text-anchor="middle" font-family="system-ui,sans-serif" font-size="22" fill="#0e7490">Clear aligners</text>
+</svg>

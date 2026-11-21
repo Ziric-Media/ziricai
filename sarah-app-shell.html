@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#6d28d9">
+  <meta name="description" content="Sarah — your personal AI. Discover businesses and stay in control.">
+  <title>Sarah</title>
+  <link rel="icon" href="assets/favicon.png" type="image/png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/favicon.png">
+  <link rel="stylesheet" href="css/sarah-app.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "./node_modules/firebase/app/dist/esm/index.esm.js",
+      "firebase/auth": "./node_modules/firebase/auth/dist/esm/index.esm.js"
+    }
+  }
+  </script>
+</head>
+<body class="sarah-app">
+  <section id="authScreen" class="sarah-auth-screen">
+    <div class="sarah-auth-card">
+      <img src="assets/sarah-avatar.svg" alt="" width="56" height="56" />
+      <h1>Sarah</h1>
+      <p class="sarah-auth-lead">Your personal AI world — powered by ZiricAI</p>
+      <div class="sarah-auth-tabs">
+        <button type="button" class="is-active" data-auth-tab="signin">Sign in</button>
+        <button type="button" data-auth-tab="signup">Create account</button>
+      </div>
+      <form id="signInForm" class="sarah-auth-form">
+        <label>Email<input type="email" name="email" required autocomplete="email" /></label>
+        <label>Password<input type="password" name="password" required autocomplete="current-password" /></label>
+        <button type="submit" class="btn btn-primary">Sign in</button>
+      </form>
+      <form id="signUpForm" class="sarah-auth-form hidden">
+        <label>First name<input type="text" name="firstName" required autocomplete="given-name" /></label>
+        <label>Email<input type="email" name="email" required autocomplete="email" /></label>
+        <label>Password<input type="password" name="password" required minlength="6" autocomplete="new-password" /></label>
+        <label class="sarah-consent">
+          <input type="checkbox" name="popia" required />
+          <span>I agree to Sarah's privacy terms and POPIA-oriented data processing (U1 baseline).</span>
+        </label>
+        <button type="submit" class="btn btn-primary">Create Sarah account</button>
+      </form>
+      <p id="authStatus" class="sarah-auth-status" role="status"></p>
+    </div>
+  </section>
+
+  <div id="appShell" class="sarah-shell hidden">
+    <header class="sarah-shell-header">
+      <img src="assets/sarah-avatar.svg" alt="" width="32" height="32" />
+      <span id="shellGreeting">Sarah</span>
+      <button type="button" id="signOutBtn" class="btn btn-ghost btn-sm">Sign out</button>
+    </header>
+    <main id="viewHost" class="sarah-shell-main"></main>
+    <nav class="sarah-bottom-nav" aria-label="Primary">
+      <button type="button" data-route="chats" class="is-active"><i class="fa-solid fa-comments"></i> Chats</button>
+      <button type="button" data-route="my-sarah"><i class="fa-solid fa-sparkles"></i> My Sarah</button>
+      <button type="button" data-route="status"><i class="fa-solid fa-signal"></i> Status</button>
+      <button type="button" data-route="discover"><i class="fa-solid fa-compass"></i> Discover</button>
+      <button type="button" data-route="profile"><i class="fa-solid fa-user"></i> Profile</button>
+    </nav>
+  </div>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script type="module" src="js/users/main.js"></script>
+</body>
+</html>

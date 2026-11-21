@@ -22,7 +22,11 @@ function showAccessDenied(message) {
 }
 
 async function completeLoginSession(user, profile) {
-  setState({ user, profile });
+  setState({
+    user,
+    profile,
+    platformPermissions: profile?.platformPermissions || [],
+  });
   hideAuthScreens();
   updateUserMenu(profile, user.email);
   await onAuthReady?.(user, profile);
@@ -47,16 +51,23 @@ export function initAuthGuard({ onReady, onDenied }) {
 
     if (!profile) {
       showAccessDenied(
-        'No Super Admin Firestore profile found for your account. Open superadmin-register.html with the same email/password to link your profile, then sign in again.'
+        'No Mission Control access for this account. Use a Super Admin profile or a Sarah Network platform role granted in MC → Sarah Network → Access.'
       );
       return;
     }
 
+    const platformPermissions = profile.platformPermissions || [];
     if (!isSuperAdminRole(profile.role)) {
-      showAccessDenied(
-        'This account is not a Super Admin. Please use the Company Portal instead.'
-      );
-      return;
+      if (!platformPermissions.length) {
+        showAccessDenied(
+          'This account is not a Super Admin. Please use the Company Portal instead.'
+        );
+        return;
+      }
+      profile.isPlatformOperator = true;
+      document.body.classList.add('mc-platform-operator');
+    } else {
+      document.body.classList.remove('mc-platform-operator');
     }
 
     if (profile.status && String(profile.status).toLowerCase() !== 'active') {
@@ -119,13 +130,27 @@ export function bindLoginForm() {
       const { user } = result;
       const profile = result.profile || (await resolveAuthProfile(user, { allowDemo: false }));
 
-      if (!profile || !isSuperAdminRole(profile.role)) {
-        const msg = 'Super Admin access required for this console.';
+      let sessionProfile = profile || (await fetchServerSessionProfile(user));
+      if (!sessionProfile) {
+        const msg = 'No Mission Control access for this account.';
         busy.stop(msg);
         showToast(msg, 'error');
         showAccessDenied(msg);
         return;
       }
+      const perms = sessionProfile.platformPermissions || [];
+      if (!isSuperAdminRole(sessionProfile.role) && !perms.length) {
+        const msg = 'Super Admin or Sarah Network platform role required for this console.';
+        busy.stop(msg);
+        showToast(msg, 'error');
+        showAccessDenied(msg);
+        return;
+      }
+      if (!isSuperAdminRole(sessionProfile.role) && perms.length) {
+        sessionProfile.isPlatformOperator = true;
+        document.body.classList.add('mc-platform-operator');
+      }
+      profile = sessionProfile;
 
       busy.step('Opening dashboard...');
       await completeLoginSession(user, profile);

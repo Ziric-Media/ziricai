@@ -232,6 +232,33 @@ import { isMetaWebhookPath, normalizeWebhookPath } from "../services/integration
 import { initEventSystem } from "../services/events/index.js";
 import { applyApiVersionHeader } from "../services/api/routeRegistry.js";
 import { mountCustomerOpsRoutes } from "../services/api/customerOpsRoutes.js";
+import { mountConsumerRoutes } from "../services/api/consumerRoutes.js";
+import { mountProfilePhotoRoutes } from "../services/api/profilePhotoRoutes.js";
+import { mountRevenueRoutes } from "../services/api/revenueRoutes.js";
+import { mountPlatformRevenueRoutes } from "../services/api/platformRevenueRoutes.js";
+import { mountPlatformGovernanceRoutes } from "../services/api/platformGovernanceRoutes.js";
+import { mountSarahNetworkRoutes } from "../services/api/sarahNetworkRoutes.js";
+import { mountNetworkEntityRoutes } from "../services/api/networkEntityRoutes.js";
+import { mountNetworkListingRoutes } from "../services/api/networkListingRoutes.js";
+import { mountNetworkVerificationRoutes } from "../services/api/networkVerificationRoutes.js";
+import { mountRecommendationRoutes } from "../services/api/recommendationRoutes.js";
+import { mountNetworkSearchRoutes } from "../services/api/networkSearchRoutes.js";
+import { mountNetworkAgentRoutes } from "../services/api/networkAgentRoutes.js";
+import { mountNetworkConnectionRoutes } from "../services/api/networkConnectionRoutes.js";
+import { mountNetworkPlatformRoutes } from "../services/api/networkPlatformRoutes.js";
+import { mountNetworkTrustRoutes } from "../services/api/networkTrustRoutes.js";
+import { mountNetworkPresenceRoutes } from "../services/api/networkPresenceRoutes.js";
+import { mountEducationRoutes } from "../services/api/educationRoutes.js";
+import { mountUserConversationRoutes } from "../services/api/userConversationRoutes.js";
+import { mountChatPersonRoutes } from "../services/api/chatPersonRoutes.js";
+import { mountChatGroupRoutes } from "../services/api/chatGroupRoutes.js";
+import { mountChatIndexRoutes } from "../services/api/chatIndexRoutes.js";
+import { mountChatHandoverRoutes } from "../services/api/chatHandoverRoutes.js";
+import { mountChatWorkRoutes } from "../services/api/chatWorkRoutes.js";
+import { mountChatUxRoutes } from "../services/api/chatUxRoutes.js";
+import { mountDealerImageRoutes } from "../services/api/dealerImageRoutes.js";
+import { mountPersonalSarahRoutes } from "../services/api/personalSarahRoutes.js";
+import { mountPersonalKnowledgeRoutes } from "../services/api/personalKnowledgeRoutes.js";
 import { mountAutomotiveRoutes } from "../services/api/automotiveRoutes.js";
 import { mountFinanceAcceptanceRoutes } from "../services/api/financeAcceptanceRoutes.js";
 import { isFinanceAcceptanceRuntimeActive } from "../services/auth/financeAcceptanceMode.js";
@@ -334,6 +361,8 @@ app.use((req, res, next) => {
         'https://ziricai-production.up.railway.app',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
+        'https://sarah.ziricai.com',
+        'https://ziricai-sarah.netlify.app',
     ].filter(Boolean);
     const origin = req.get('origin');
     if (origin && (allowed.some((o) => origin.startsWith(o.replace(/\/$/, ''))) || process.env.NODE_ENV !== 'production')) {
@@ -346,10 +375,21 @@ app.use((req, res, next) => {
     next();
 });
 
-/** Capture raw Meta webhook bytes before JSON parsing (required for HMAC signature). */
+function isPaystackRevenueWebhookPath(path) {
+    return path === "/api/revenue/webhooks/paystack";
+}
+
+function isStripeRevenueWebhookPath(path) {
+    return path === "/api/revenue/webhooks/stripe";
+}
+
+/** Capture raw webhook bytes before JSON parsing (HMAC signature verification). */
 app.use((req, res, next) => {
     const path = normalizeWebhookPath(req);
-    if (!isMetaWebhookPath(path) || req.method !== "POST") {
+    const needsRaw =
+        req.method === "POST" &&
+        (isMetaWebhookPath(path) || isPaystackRevenueWebhookPath(path) || isStripeRevenueWebhookPath(path));
+    if (!needsRaw) {
         return next();
     }
 
@@ -394,6 +434,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(ROOT, 'marketing')));
 app.use('/app', express.static(path.join(ROOT, 'app')));
 app.use('/admin', express.static(path.join(ROOT, 'admin')));
+app.use('/users', express.static(path.join(ROOT, 'users')));
 app.use(express.static(ROOT));
 app.use(attachTenantContext());
 app.use(applyApiVersionHeader());
@@ -465,7 +506,14 @@ app.get("/api/auth/session", attachTenantContext(), async (req, res) => {
         }
         auditLog("session_loaded", { uid: auth.uid, email: auth.email });
         const sessionId = trackSession(auth.uid, { userAgent: req.get("user-agent") });
-        res.json(buildSessionResponse(auth, { sessionId }));
+        const { getPlatformRoles, permissionsForRoles } = await import("../services/auth/platformRbac.js");
+        const platformRoles = await getPlatformRoles(auth.uid);
+        const platformPermissions = permissionsForRoles(platformRoles);
+        res.json({
+            ...buildSessionResponse(auth, { sessionId }),
+            platformRoles,
+            platformPermissions,
+        });
     } catch (err) {
         console.error("[api/auth/session] error:", err.message);
         res.status(500).json({ error: err.message || "Failed to load session" });
@@ -2704,6 +2752,33 @@ if (isFinanceAcceptanceRuntimeActive()) {
     console.error("[startup] Finance acceptance loopback mode active (memory + mock auth)");
 }
 
+mountConsumerRoutes(app);
+mountProfilePhotoRoutes(app);
+mountRevenueRoutes(app);
+mountPlatformRevenueRoutes(app);
+mountPlatformGovernanceRoutes(app);
+mountSarahNetworkRoutes(app);
+mountNetworkEntityRoutes(app);
+mountNetworkListingRoutes(app);
+mountNetworkVerificationRoutes(app);
+mountRecommendationRoutes(app);
+mountNetworkSearchRoutes(app);
+mountNetworkAgentRoutes(app);
+mountNetworkConnectionRoutes(app);
+mountNetworkPlatformRoutes(app);
+mountNetworkTrustRoutes(app);
+mountNetworkPresenceRoutes(app);
+mountEducationRoutes(app);
+mountUserConversationRoutes(app);
+mountChatPersonRoutes(app);
+mountChatGroupRoutes(app);
+mountChatIndexRoutes(app);
+mountChatHandoverRoutes(app);
+mountChatWorkRoutes(app);
+mountChatUxRoutes(app);
+mountDealerImageRoutes(app);
+mountPersonalSarahRoutes(app);
+mountPersonalKnowledgeRoutes(app);
 mountCustomerOpsRoutes(app);
 mountAutomotiveRoutes(app);
 }
@@ -2735,6 +2810,11 @@ export async function runBackgroundInit() {
             const sm = await ensureSmilemoreDentalProductionTenant();
             if (sm.migrated) {
                 console.error("[startup] Smile More Dentists production dental preset ensured for", sm.companyId);
+            }
+            const { seedSmilemoreDentalSarahPilot } = await import("../services/storage/seedSmilemoreDentalPilot.js");
+            const seed = await seedSmilemoreDentalSarahPilot();
+            if (seed.knowledgeUpserted || seed.discoverUpdated || seed.agentCreated) {
+                console.error("[startup] Smile More Sarah pilot seed:", JSON.stringify(seed));
             }
         } catch (err) {
             console.error("[startup] Smile More dental production ensure skipped:", err.message);
@@ -2784,6 +2864,24 @@ export async function runBackgroundInit() {
         startWorkforceSarahWorker();
         await initQueue();
         console.error("[startup] Storage backend:", adapter.name);
+
+        const sarahNewsSchedulerMs = Number(process.env.SARAH_NEWS_SCHEDULER_INTERVAL_MS || 120_000);
+        if (
+            sarahNewsSchedulerMs > 0 &&
+            String(process.env.SARAH_NEWS_SCHEDULER_ENABLED || "true").toLowerCase() !== "false"
+        ) {
+            const { runSarahNewsSchedulerTick } = await import(
+                "../services/sarah/news/sarahNewsDeliveryService.js"
+            );
+            const runNews = () => {
+                runSarahNewsSchedulerTick().catch((err) => {
+                    console.warn("[sarahNews] scheduler tick:", err.message);
+                });
+            };
+            setTimeout(runNews, 45_000);
+            setInterval(runNews, sarahNewsSchedulerMs);
+            console.error("[startup] Sarah News scheduler every", sarahNewsSchedulerMs, "ms");
+        }
 
         const proactiveIntervalMs = Number(process.env.PROACTIVE_DETECTION_INTERVAL_MS || 0);
         if (

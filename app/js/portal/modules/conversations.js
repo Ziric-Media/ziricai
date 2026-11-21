@@ -7,6 +7,12 @@ import {
   sendConversationReply,
   setConversationTakeover,
   markConversationRead,
+  assignConversation,
+  acceptConversation,
+  transferConversation,
+  escalateConversation,
+  returnConversationToSarah,
+  fetchHandoverSummary,
 } from '../api.js';
 import { shouldUseDemoFallback } from '../../shared/dataMode.js';
 import { invalidateHub } from '../core/dataService.js';
@@ -15,11 +21,23 @@ import {
   computeInboxMetrics,
   filterInboxConversations,
   renderInboxLayout,
-  renderInboxPage,
   scrollThreadToBottom,
   setActiveFilterButton,
   conversationPhone,
+  bindConsumerAvatarFallbacks,
 } from './inbox-ui.js';
+import {
+  renderSalesShell,
+  renderSalesOverview,
+  renderSalesSarahShell,
+  bindSalesNav,
+  filterConversationsForSalesSection,
+  salesSectionMeta,
+} from '../salesWorkspace.js';
+import { mountSarahChat } from '../sarah/sarah-ui.js';
+import { mountWorkforceInstructionsPanel } from '../workforceInstructionsPanel.js';
+import { getSarahPageContext } from '../core/sarahPageContext.js';
+import { consumePendingSarahNav } from '../portalWorkforceNav.js';
 
 function isHumanControlled(conv = {}) {
   return Boolean(conv.humanTakeover) || (conv.mode || 'ai') === 'human';
@@ -28,6 +46,9 @@ function isHumanControlled(conv = {}) {
 function conversationKey(conv) {
   return conv?.id || conv?.phone || '';
 }
+
+/** @type {string} */
+let salesSection = 'overview';
 
 export async function renderConversations(container) {
   if (!can(state.profile?.role, 'canViewInbox')) {
@@ -38,9 +59,11 @@ export async function renderConversations(container) {
   const companyId = state.companyId;
   const canReply = state.permissions.canReply;
 
-  container.innerHTML = renderInboxPage({
-    metrics: {},
-    layoutHtml: '<div class="empty-panel">Loading inbox…</div>',
+  const pendingSection = consumePendingSarahNav('conversations');
+  salesSection = pendingSection || 'overview';
+  container.innerHTML = renderSalesShell({
+    section: salesSection,
+    bodyHtml: '<div class="empty-panel">Loading Sales Sarah…</div>',
     unreadCount: 0,
   });
 
@@ -53,12 +76,16 @@ export async function renderConversations(container) {
   });
 
   if (apiRes.error && !conversations.length && !useDemo) {
-    container.innerHTML = renderInboxPage({
-      metrics: {},
-      layoutHtml: `<div class="inbox-thread-error">${errorState(apiRes.error)}<div style="text-align:center;margin-top:12px;"><button class="btn btn-secondary btn-sm" type="button" id="inboxRetryBtn">Retry</button></div></div>`,
+    container.innerHTML = renderSalesShell({
+      section: salesSection,
+      bodyHtml: `<div class="inbox-thread-error">${errorState(apiRes.error)}<div style="text-align:center;margin-top:12px;"><button class="btn btn-secondary btn-sm" type="button" id="inboxRetryBtn">Retry</button></div></div>`,
       unreadCount: 0,
     });
     container.querySelector('#inboxRetryBtn')?.addEventListener('click', () => location.reload());
+    bindSalesNav(container, (id) => {
+      salesSection = id;
+      paint();
+    });
     return;
   }
 
@@ -76,9 +103,58 @@ export async function renderConversations(container) {
     return context?.aiEmployee?.name || null;
   }
 
+  function channelScopedConversations() {
+    return filterConversationsForSalesSection(conversations, salesSection);
+  }
+
+  async function mountSalesSarahChat() {
+    const root = container.querySelector('[data-sw-sarah-chat]');
+    if (!root || root.dataset.mounted === '1') return;
+    root.dataset.mounted = '1';
+    const instrHost = container.querySelector('[data-workforce-instructions-host]');
+    if (instrHost) {
+      await mountWorkforceInstructionsPanel(instrHost, { persistenceScope: 'salesSarah', adminView: false });
+    }
+    await mountSarahChat(root, {
+      mode: 'page',
+      persistenceScope: 'salesSarah',
+      welcomeMessage:
+        "Hi! I'm Sarah, your Sales assistant. I can help with leads, quotations, channel inbox behaviour, and instructions from Sarah Admin.",
+      suggestions: [
+        'Summarise open WhatsApp conversations',
+        'What workforce instructions are pending?',
+        'How do I hand a thread to a human?',
+        'Explain our quotation workflow',
+      ],
+      getPageContext: () => ({ ...getSarahPageContext(), module: 'sales', section: salesSection }),
+    });
+  }
+
   function paint() {
-    const filtered = filterInboxConversations(conversations, { filter, search });
-    const metrics = computeInboxMetrics(conversations);
+    if (salesSection === 'overview') {
+      container.innerHTML = renderSalesShell({
+        section: salesSection,
+        bodyHtml: renderSalesOverview(conversations),
+        unreadCount,
+      });
+      bindSalesNav(container, onSection);
+      return;
+    }
+
+    if (salesSection === 'sarah') {
+      container.innerHTML = renderSalesShell({
+        section: salesSection,
+        bodyHtml: renderSalesSarahShell(),
+        unreadCount,
+      });
+      bindSalesNav(container, onSection);
+      void mountSalesSarahChat();
+      return;
+    }
+
+    const scoped = channelScopedConversations();
+    const filtered = filterInboxConversations(scoped, { filter, search });
+    const meta = salesSectionMeta(salesSection);
     const layoutHtml = renderInboxLayout({
       conversations: filtered,
       selected,
@@ -91,12 +167,31 @@ export async function renderConversations(container) {
       aiEmployeeName: aiEmployeeNameFromContext(),
       threadError,
       threadLoading,
+      listTitle: `${meta.title} threads`,
+      layoutAccent: salesSection,
+      emptyMessage: `No ${meta.title} conversations yet. When this channel is connected, threads will appear here for Sarah Sales to handle.`,
     });
-    container.innerHTML = renderInboxPage({ metrics, layoutHtml, unreadCount });
+
+    container.innerHTML = renderSalesShell({
+      section: salesSection,
+      bodyHtml: layoutHtml,
+      unreadCount,
+    });
+    bindSalesNav(container, onSection);
     bindEvents(filtered);
+    bindConsumerAvatarFallbacks(container);
     if (!threadLoading && selected && !threadError) {
       scrollThreadToBottom(container);
     }
+  }
+
+  function onSection(id) {
+    salesSection = id || 'overview';
+    if (salesSection === 'overview' || salesSection === 'sarah') {
+      selected = null;
+      messages = [];
+    }
+    paint();
   }
 
   async function refreshConversations() {
@@ -179,7 +274,7 @@ export async function renderConversations(container) {
     container.querySelectorAll('.inbox-item').forEach((el) => {
       el.addEventListener('click', () => {
         const id = el.dataset.id;
-        const conv = conversations.find((c) => conversationKey(c) === id);
+        const conv = channelScopedConversations().find((c) => conversationKey(c) === id);
         loadThread(conv);
       });
     });
@@ -212,9 +307,11 @@ export async function renderConversations(container) {
     container.querySelector('#takeoverBtn')?.addEventListener('click', async () => {
       if (!selected) return;
       const human = isHumanControlled(selected);
-      const res = await setConversationTakeover(companyId, selected.id || selected.phone, {
-        enabled: !human,
-      });
+      const convId = selected.id || selected.phone;
+      const res =
+        human && selected.channel === 'sarah_app'
+          ? await returnConversationToSarah(companyId, convId, {})
+          : await setConversationTakeover(companyId, convId, { enabled: !human });
       if (res.error) {
         threadError = res.error;
         paint();
@@ -225,6 +322,64 @@ export async function renderConversations(container) {
       const key = conversationKey(selected);
       const updated = conversations.find((c) => conversationKey(c) === key) || selected;
       await loadThread({ ...updated, humanTakeover: !human, mode: human ? 'ai' : 'human' });
+    });
+
+    container.querySelector('#assignBtn')?.addEventListener('click', async () => {
+      if (!selected) return;
+      const employeeId = state.profile?.uid || 'staff';
+      const res = await assignConversation(companyId, selected.id || selected.phone, { employeeId });
+      threadError = res.error || null;
+      if (!res.error) await loadThread(selected);
+      else paint();
+    });
+
+    container.querySelector('#acceptBtn')?.addEventListener('click', async () => {
+      if (!selected) return;
+      const res = await acceptConversation(companyId, selected.id || selected.phone, {
+        employeeId: state.profile?.uid,
+      });
+      threadError = res.error || null;
+      if (!res.error) await loadThread(selected);
+      else paint();
+    });
+
+    container.querySelector('#transferBtn')?.addEventListener('click', async () => {
+      if (!selected) return;
+      const target = window.prompt('Transfer to employee id / name');
+      if (!target) return;
+      const res = await transferConversation(companyId, selected.id || selected.phone, {
+        targetEmployeeId: target,
+        humanAgent: target,
+      });
+      threadError = res.error || null;
+      if (!res.error) await loadThread(selected);
+      else paint();
+    });
+
+    container.querySelector('#escalateBtn')?.addEventListener('click', async () => {
+      if (!selected) return;
+      const res = await escalateConversation(companyId, selected.id || selected.phone, {
+        reason: 'Portal escalation',
+        level: 1,
+      });
+      threadError = res.error || null;
+      if (!res.error) await loadThread(selected);
+      else paint();
+    });
+
+    container.querySelector('#handoverSummaryBtn')?.addEventListener('click', async () => {
+      if (!selected) return;
+      const res = await fetchHandoverSummary(companyId, selected.id || selected.phone);
+      const panel = container.querySelector('#handoverSummaryPanel');
+      if (!panel) return;
+      if (res.error) {
+        panel.classList.remove('hidden');
+        panel.textContent = res.error;
+        return;
+      }
+      const summary = res.data?.summary || {};
+      panel.classList.remove('hidden');
+      panel.innerHTML = `<strong>Handover summary</strong><p>${summary.recentTranscript || summary.lastPreview || '—'}</p>`;
     });
 
     container.querySelector('#retryContextBtn')?.addEventListener('click', () => {

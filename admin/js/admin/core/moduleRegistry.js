@@ -17,6 +17,7 @@ export const MODULES = [
   'supportAttention',
   'agents',
   'marketplace',
+  'sarahNetwork',
   'knowledge',
   'settings',
 ];
@@ -37,6 +38,7 @@ export const MODULE_LABELS = {
   supportAttention: 'Attention Centre',
   agents: 'AI Employees',
   marketplace: 'AI Marketplace',
+  sarahNetwork: 'Sarah Network',
   knowledge: 'Knowledge Base',
   settings: 'Settings',
 };

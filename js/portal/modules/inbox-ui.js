@@ -1,7 +1,9 @@
 import { escapeHtml } from '../../admin/ui.js';
+import { renderInboxMessageBody } from '../shared/markdownMessage.js';
 
 const CHANNEL_LABELS = {
   whatsapp: 'WhatsApp',
+  sarah_app: 'Sarah App · Sarah Inbox',
   facebook: 'Facebook',
   instagram: 'Instagram',
   telegram: 'Telegram',
@@ -9,6 +11,12 @@ const CHANNEL_LABELS = {
   email: 'Email',
   sms: 'SMS',
 };
+
+/** @param {string} [channel] */
+export function inboxChannelLabel(channel) {
+  if (!channel) return 'Unknown';
+  return CHANNEL_LABELS[channel] || String(channel).replace(/_/g, ' ');
+}
 
 const FILTER_OPTIONS = [
   { id: 'all', label: 'All' },
@@ -76,11 +84,29 @@ export function formatMessageTime(createdAt) {
 }
 
 function channelLabel(channel) {
-  return CHANNEL_LABELS[channel] || CHANNEL_LABELS.whatsapp;
+  return inboxChannelLabel(channel);
 }
 
 function listSubtitle(conversation) {
   return conversation.preview || conversation.lastMessage || '';
+}
+
+function conversationPhotoUrl(conversation) {
+  if (!conversation) return '';
+  return String(
+    conversation.customerPhotoUrl || conversation.avatarUrl || conversation.photoURL || ''
+  ).trim();
+}
+
+export function renderConversationAvatar(conversation, { className = 'inbox-item-avatar', size = 'md' } = {}) {
+  const name = conversation?.customerName || conversation?.name || 'Visitor';
+  const photo = conversationPhotoUrl(conversation);
+  const initial = escapeHtml(name.charAt(0).toUpperCase());
+  const label = escapeHtml(name);
+  if (photo) {
+    return `<div class="${escapeHtml(className)} has-photo is-${size}" data-fallback-initial="${initial}" aria-hidden="true"><img src="${escapeHtml(photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-consumer-avatar-img /></div>`;
+  }
+  return `<div class="${escapeHtml(className)} is-${size}" aria-hidden="true" title="${label}">${initial}</div>`;
 }
 
 function resolveBubbleRole(message) {
@@ -124,7 +150,7 @@ export function renderInboxListItem(conversation, active) {
 
   return `
     <button class="inbox-item ${active ? 'active' : ''} ${conversation.unread ? 'unread' : ''}" type="button" data-id="${escapeHtml(conversation.id || conversation.phone)}">
-      <div class="inbox-item-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</div>
+      ${renderConversationAvatar(conversation)}
       <div class="inbox-item-body">
         <div class="inbox-item-top">
           <span class="name">${escapeHtml(name)}${unreadDot}</span>
@@ -146,13 +172,13 @@ export function renderMessageBubble(message, aiEmployeeName) {
   if (role === 'ai') label = aiEmployeeName || 'AI Assistant';
   else if (role === 'human') label = message.senderName || 'Staff';
 
-  const text = message.content || message.message || '';
+  const bodyHtml = renderInboxMessageBody(message);
   const timeLabel = formatMessageTime(message.createdAt);
 
   return `
     <div class="thread-bubble ${cls}" data-role="${escapeHtml(role)}" data-source="${escapeHtml(message.source || role)}">
       <div class="bubble-label">${escapeHtml(label)}</div>
-      <div class="bubble-text">${escapeHtml(text)}</div>
+      <div class="bubble-text bubble-text--rich">${bodyHtml}</div>
       ${timeLabel ? `<div class="bubble-time">${escapeHtml(timeLabel)}</div>` : ''}
     </div>
   `;
@@ -183,7 +209,9 @@ export function renderInboxThread(conversation, messages, { canReply, aiEmployee
   const modeLabel = human ? 'Human' : `AI · ${aiEmployeeName || 'Assistant'}`;
   const channelIcon = conversation.channel === 'whatsapp'
     ? '<i class="fa-brands fa-whatsapp" style="color:#25D366"></i>'
-    : '<i class="fa-solid fa-globe"></i>';
+    : conversation.channel === 'sarah_app'
+      ? '<i class="fa-solid fa-mobile-screen" style="color:#8b5cf6" aria-hidden="true"></i>'
+      : '<i class="fa-solid fa-globe"></i>';
 
   const msgHtml = threadError
     ? `<div class="inbox-thread-error">${escapeHtml(threadError)}</div>`
@@ -195,7 +223,7 @@ export function renderInboxThread(conversation, messages, { canReply, aiEmployee
     <div class="inbox-thread" id="inboxThread">
       <div class="inbox-col-header">Conversation</div>
       <div class="thread-header">
-        <div class="thread-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</div>
+        ${renderConversationAvatar(conversation, { className: 'thread-avatar', size: 'lg' })}
         <div class="thread-header-info">
           <div class="thread-name">${escapeHtml(name)}</div>
           <div class="thread-sub">${channelIcon} ${escapeHtml(channel)} · ${escapeHtml(modeLabel)}</div>
@@ -207,15 +235,27 @@ export function renderInboxThread(conversation, messages, { canReply, aiEmployee
         </div>
       </div>
       <div class="thread-messages" id="threadMessages">${msgHtml}</div>
+      ${
+        conversation.channel === 'sarah_app'
+          ? `<div class="thread-handover-ops" id="handoverOpsBar">
+        <button class="btn btn-secondary btn-sm" type="button" id="assignBtn" title="Assign employee">Assign</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="acceptBtn" title="Accept into queue">Accept</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="transferBtn" title="Transfer">Transfer</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="escalateBtn" title="Escalate">Escalate</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="handoverSummaryBtn" title="Sarah handover summary">Summary</button>
+      </div>`
+          : ''
+      }
       ${canReply ? `
         <div class="thread-compose portal-inbox-compose">
           <input type="text" id="replyInput" placeholder="Type a message..." autocomplete="off" />
-          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">${human ? 'Release to AI' : 'Take over'}</button>
+          <button class="btn btn-secondary btn-sm" type="button" id="takeoverBtn">${human ? 'Return to Sarah' : 'Take over'}</button>
           <button class="btn btn-primary btn-sm" type="button" id="sendReplyBtn">
             <i class="fa-solid fa-paper-plane"></i> Send
           </button>
         </div>
       ` : ''}
+      <div class="inbox-handover-summary hidden" id="handoverSummaryPanel"></div>
     </div>
   `;
 }
@@ -386,6 +426,20 @@ export function renderInboxPage({ metrics, layoutHtml, unreadCount }) {
       ${layoutHtml}
     </div>
   `;
+}
+
+export function bindConsumerAvatarFallbacks(container) {
+  container.querySelectorAll('[data-consumer-avatar-img]').forEach((img) => {
+    if (img.dataset.bound === '1') return;
+    img.dataset.bound = '1';
+    img.addEventListener('error', () => {
+      const wrap = img.closest('[data-fallback-initial]');
+      if (!wrap) return;
+      wrap.classList.remove('has-photo');
+      img.remove();
+      wrap.textContent = wrap.getAttribute('data-fallback-initial') || '?';
+    });
+  });
 }
 
 export function scrollThreadToBottom(container) {

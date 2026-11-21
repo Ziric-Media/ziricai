@@ -6,7 +6,22 @@
 export const ROOT = {
     COMPANIES: "companies",
     USERS: "users",
+    /** Sarah App consumer profile (one doc per uid). */
+    USER_PROFILES: "userProfiles",
+    USER_PREFERENCES: "userPreferences",
+    /** Sarah App — personal assistant data under personalSarah/{uid}/… */
+    PERSONAL_SARAH: "personalSarah",
+    /** My Knowledge sections under personalKnowledge/{uid}/sections/… */
+    PERSONAL_KNOWLEDGE: "personalKnowledge",
     PLATFORM: "platform",
+};
+
+export const PERSONAL_SARAH_COLLECTIONS = {
+    SESSIONS: "sessions",
+    TASKS: "tasks",
+    MEMORIES: "memories",
+    /** Daily RS02 chat usage counters (personalSarah/{uid}/usage/{dayKey}). */
+    USAGE: "usage",
 };
 
 /** Subcollections under companies/{companyId} */
@@ -21,6 +36,9 @@ export const TENANT_COLLECTIONS = {
     LEADS: "leads",
     CUSTOMERS: "customers",
     APPOINTMENTS: "appointments",
+    DENTAL_PATIENTS: "dentalPatients",
+    DENTAL_CLAIMS: "dentalClaims",
+    DENTAL_SALES: "dentalSales",
     TASKS: "tasks",
     /** Company Portal Finance v1 — tenant business ledger (not subscription billing). */
     FINANCE_TRANSACTIONS: "financeTransactions",
@@ -28,6 +46,8 @@ export const TENANT_COLLECTIONS = {
     FINANCE_CATEGORIES: "financeCategories",
     /** Server-only dedupe ledger for retry-safe financial writes (doc id = hash(scope,key)). */
     FINANCE_IDEMPOTENCY_KEYS: "financeIdempotencyKeys",
+    /** C1 — integration envelope publish dedupe (doc id = hash of idempotencyKey). */
+    INTEGRATION_IDEMPOTENCY_KEYS: "integrationIdempotencyKeys",
     /** SF-02 F3b — tenant chart of accounts + manual journal entries */
     FINANCE_GL_ACCOUNTS: "financeGlAccounts",
     FINANCE_JOURNAL_ENTRIES: "financeJournalEntries",
@@ -57,6 +77,16 @@ export const TENANT_COLLECTIONS = {
     SUPPORT_REMEDIATION_AUDITS: "supportRemediationAudits",
     /** Portal Sarah conversation sessions (tenant + user scoped). */
     SARAH_SESSIONS: "sarahSessions",
+    /** EDU — minimised learner rows (school tenant). */
+    SCHOOL_LEARNERS: "schoolLearners",
+    /** EDU — parent/guardian ↔ learner links with verification status. */
+    GUARDIAN_LINKS: "guardianLinks",
+    /** EDU — staff decisions on guardian applications (audit). */
+    GUARDIAN_AUDIT: "guardianAudit",
+    /** EDU — learner admission applications (Stage 3). */
+    ADMISSION_APPLICATIONS: "admissionApplications",
+    /** EDU — audit trail for admission application changes. */
+    ADMISSION_AUDIT: "admissionAudit",
     /** Sarah BOS — commercial cycle (quote → verified pay → mobilise) per tenant. */
     BOS_COMMERCIAL_CYCLES: "bosCommercialCycles",
     /** Sarah BOS — Admin/human → module Sarah workforce instructions. */
@@ -85,6 +115,200 @@ export const PLATFORM_MARKETPLACE = {
     REVIEWS: "reviews",
     RATINGS: "ratings",
 };
+
+/** Revenue Management System (R0+) — under platform/revenue/… */
+export const PLATFORM_REVENUE = {
+    ROOT: "revenue",
+    PRICING_CATALOG: "pricingCatalog",
+    REVENUE_LEDGER: "revenueLedger",
+    REVENUE_CONFIG: "revenueConfig",
+    LEGACY_ALIASES: "legacyPlanAliases",
+};
+
+export function platformRevenueLedgerPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_REVENUE.ROOT}/${PLATFORM_REVENUE.REVENUE_LEDGER}`;
+}
+
+export function platformRevenueConfigPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_REVENUE.ROOT}/${PLATFORM_REVENUE.REVENUE_CONFIG}`;
+}
+
+/** Sarah Network (U4+) — server writes only until rules ship */
+export const SARAH_NETWORK = {
+    ROOT: "sarahNetwork",
+    REQUESTS: "requests",
+    AUDIT: "audit",
+};
+
+export function sarahNetworkRequestPath(requestId) {
+    return `${SARAH_NETWORK.ROOT}/${SARAH_NETWORK.REQUESTS}/${requestId}`;
+}
+
+export function sarahNetworkAuditPath(eventId) {
+    return `${SARAH_NETWORK.ROOT}/${SARAH_NETWORK.AUDIT}/${eventId}`;
+}
+
+/** Sarah App consumer chat index (server writes only in C1). */
+export const USER_CONVERSATIONS = {
+    ROOT: "userConversations",
+    MESSAGES: "messages",
+    /** CH1 — conversation doc schemaVersion field value. */
+    SCHEMA_VERSION: 1,
+};
+
+/** CH1 — logical Chat conversation types (CHAT-01 §3.2). */
+export const CHAT_CONVERSATION_TYPES = {
+    PERSON_TO_PERSON: "person_to_person",
+    PERSON_TO_BUSINESS: "person_to_business",
+    PERSON_TO_ORGANISATION: "person_to_organisation",
+    PERSON_TO_SARAH: "person_to_sarah",
+    GROUP_PERSONAL: "group_personal",
+    GROUP_ORGANISATION: "group_organisation",
+    AI_TO_AI: "ai_to_ai",
+    HUMAN_ASSISTED: "human_assisted",
+};
+
+/** CH1 — handover state enum (CH6 implements transitions; stored from CH1). */
+export const CHAT_HANDOVER_STATES = {
+    AI_ACTIVE: "ai_active",
+    HUMAN_REQUESTED: "human_requested",
+    AWAITING_ASSIGNMENT: "awaiting_assignment",
+    HUMAN_ASSIGNED: "human_assigned",
+    HUMAN_ACTIVE: "human_active",
+    AI_RESUME_PENDING: "ai_resume_pending",
+    AI_ACTIVE_AGAIN: "ai_active_again",
+    RESOLVED: "resolved",
+    CLOSED: "closed",
+};
+
+/** Published discover snapshot (U6; constants only in C1). */
+export const BUSINESS_DIRECTORY = {
+    ROOT: "businessDirectory",
+    SECTIONS: "sections",
+};
+
+/** SNET-01a — opaque Sarah Network identity (server writes only). See SNET_01a_SN_ID_ADR.md. */
+export const NETWORK_ENTITIES = {
+    ROOT: "networkEntities",
+    /** Reverse index: doc id `{kind}__{refKey}` → { snId } (create-if-absent; idempotent mint). */
+    REFS_ROOT: "networkRefs",
+    SCHEMA_VERSION: 1,
+};
+
+export function networkEntityPath(snId) {
+    return `${NETWORK_ENTITIES.ROOT}/${snId}`;
+}
+
+export function networkRefPath(refDocId) {
+    return `${NETWORK_ENTITIES.REFS_ROOT}/${refDocId}`;
+}
+
+/**
+ * SNET-02+ — flat top-level network collections (server writes only; client default-deny).
+ * Doc ids are opaque ids owned by each module (grantId, requestId, snId, caseId …).
+ */
+export const NETWORK_COLLECTIONS = {
+    CONSENT_GRANTS: "networkConsentGrants",
+    REQUESTS: "networkRequests",
+    REQUEST_AUDIT: "networkRequestAudit",
+    RATE_EVENTS: "networkRateEvents",
+    VERIFICATION_CASES: "networkVerificationCases",
+    /** SNET-04 — evidence metadata (https URL / external reference) per verification case; no file storage. */
+    VERIFICATION_EVIDENCE: "networkVerificationEvidence",
+    AGENTS: "networkAgents",
+    CONNECTIONS: "networkConnections",
+    MODERATION_CASES: "networkModerationCases",
+    ADMIN_AUDIT: "networkAdminAudit",
+    /** Gate 5 — durable daily search counters (`day_YYYY-MM-DD`); no user identifiers. */
+    SEARCH_STATS: "networkSearchStats",
+    /** Gate 5 — subscriber notification event log (counts only; no fan-out, no recipient records). */
+    SUBSCRIBER_EVENTS: "networkSubscriberEvents",
+    /** Phase 2.0 — verification evidence file bytes: metadata doc per upload + base64 chunks (Firestore 1 MiB doc cap). */
+    EVIDENCE_BLOBS: "networkEvidenceBlobs",
+    EVIDENCE_BLOB_CHUNKS: "networkEvidenceBlobChunks",
+    /** CHAT-01 — consumer chat attachment bytes (metadata + chunks); token-gated download. */
+    CHAT_MEDIA_BLOBS: "networkChatMediaBlobs",
+    CHAT_MEDIA_BLOB_CHUNKS: "networkChatMediaBlobChunks",
+    /** CHAT-01 — upload tokens + attachment metadata (pending through ready). */
+    CHAT_MEDIA_UPLOADS: "networkChatMediaUploads",
+    /** Company Portal → Sarah Status posts (listed tenants). */
+    STATUS_POSTS: "networkStatusPosts",
+    /** Sarah App consumers — public Status timeline posts (image/video + reactions). */
+    CONSUMER_STATUS_POSTS: "networkConsumerStatusPosts",
+    CONSUMER_STATUS_POST_REACTIONS: "networkConsumerStatusPostReactions",
+    CONSUMER_STATUS_COMMENTS: "networkConsumerStatusComments",
+    STATUS_POST_REACTIONS: "networkStatusPostReactions",
+    /** Aggregated presence metrics per companyId (views, reactions, leads). */
+    PRESENCE_METRICS: "networkPresenceMetrics",
+    /** Public Discover listing images (logo/cover); token-gated GET. */
+    LISTING_MEDIA_UPLOADS: "networkListingMediaUploads",
+    /** Phase 2.0 — per-recipient in-app notifications for subscriber events (consumer polls; marks read). */
+    NOTIFICATIONS: "networkNotifications",
+    /** Phase 2.0 — Mission Control search administration (category / synonym overrides; single doc `config`). */
+    SEARCH_CONFIG: "networkSearchConfig",
+    /** Phase 2.0 — platform RBAC: `{ uid, roles[] }` for Verification Officer, Search Admin, … (server-only). */
+    PLATFORM_ROLES: "networkPlatformRoles",
+    /** Phase 2.1 — consumer FCM/web push tokens (`consent` required for delivery). */
+    PUSH_DEVICES: "networkPushDevices",
+    /** SNA-01E — per-consumer global notification prefs (push + quiet hours). */
+    CONSUMER_NOTIFICATION_PREFS: "networkConsumerNotificationPrefs",
+    /** RS02 — consumer Sarah subscription (sku + billing period). */
+    CONSUMER_SUBSCRIPTIONS: "networkConsumerSubscriptions",
+    CONSUMER_CHECKOUT_SESSIONS: "networkConsumerCheckoutSessions",
+    /** RS02 — processed payment webhook event ids (idempotency). */
+    CONSUMER_CHECKOUT_WEBHOOK_EVENTS: "networkConsumerCheckoutWebhookEvents",
+    /** RS02 — immutable consumer payment records. */
+    CONSUMER_PAYMENT_LEDGER: "networkConsumerPaymentLedger",
+};
+
+/**
+ * REC-02+ — Sarah Recommendations (RS09). Server-write only; tenant-scoped by companyId on documents.
+ */
+export const RECOMMENDATION_COLLECTIONS = {
+    OFFERINGS: "recOfferings",
+    OFFERING_VERIFICATION_CASES: "recOfferingVerificationCases",
+    CAMPAIGNS: "recCampaigns",
+    CAMPAIGN_USAGE_PERIODS: "recCampaignUsagePeriods",
+    PRESENTATION_EVENTS: "recPresentationEvents",
+    ATTRIBUTION_EVENTS: "recAttributionEvents",
+    RECOMMENDATION_REQUESTS: "recRecommendationRequests",
+};
+
+/** MC-PO — platform governance collections (server-only; Mission Control APIs). */
+export const PLATFORM_GOVERNANCE = {
+    /** Immutable-style event log (PII-minimized payloads). */
+    EVENTS: "platformEvents",
+    /** Daily aggregated counters keyed by UTC day + metric. */
+    EVENT_DAILY: "platformEventDaily",
+    CONSUMER_SAFETY_CASES: "platformConsumerSafetyCases",
+    /** ZiricAI-authored announcements (not org subscriber events). */
+    ANNOUNCEMENTS: "platformAnnouncements",
+    /** Daily Sarah App telemetry rollups. */
+    APP_TELEMETRY_DAILY: "platformSarahAppTelemetryDaily",
+    /** Durable Mission Control admin actions. */
+    ADMIN_AUDIT: "platformAdminAudit",
+};
+
+/** Optional future platform person link index. */
+export const PERSON_LINKS = {
+    ROOT: "personLinks",
+};
+
+export function userConversationPath(conversationId) {
+    return `${USER_CONVERSATIONS.ROOT}/${conversationId}`;
+}
+
+export function userConversationMessagesCollectionPath(conversationId) {
+    return `${userConversationPath(conversationId)}/${USER_CONVERSATIONS.MESSAGES}`;
+}
+
+export function userConversationMessagePath(conversationId, messageId) {
+    return `${userConversationMessagesCollectionPath(conversationId)}/${messageId}`;
+}
+
+export function businessDirectoryPath(companyId) {
+    return `${BUSINESS_DIRECTORY.ROOT}/${companyId}`;
+}
 
 /** Legacy root-level collections (Phase 1 migration — superadmin / server only) */
 export const LEGACY_COLLECTIONS = {
@@ -388,6 +612,24 @@ export const INDEX_DEFINITIONS = [
             { fieldPath: "knowledgeBaseId", order: "ASCENDING" },
             { fieldPath: "updatedAt", order: "DESCENDING" },
         ],
+    },
+    {
+        collectionGroup: "userConversations",
+        fields: [
+            { fieldPath: "userId", order: "ASCENDING" },
+            { fieldPath: "lastMessageAt", order: "DESCENDING" },
+        ],
+    },
+    {
+        collectionGroup: "userConversations",
+        fields: [
+            { fieldPath: "personId", order: "ASCENDING" },
+            { fieldPath: "companyId", order: "ASCENDING" },
+        ],
+    },
+    {
+        collectionGroup: "messages",
+        fields: [{ fieldPath: "createdAt", order: "ASCENDING" }],
     },
 ];
 

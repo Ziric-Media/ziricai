@@ -1,0 +1,15 @@
+{
+  "phase": "U2",
+  "completedAt": "2026-11-04",
+  "scope": "Personal Sarah MVP",
+  "api": [
+    "POST /api/personal-sarah/chat",
+    "GET /api/personal-sarah/sessions/active"
+  ],
+  "persona": "PERSONAL_ASSISTANT (surface personal_app)",
+  "storage": "personalSarah/{uid}/sessions, personalSarah/{uid}/tasks",
+  "tools": ["createPersonalReminder"],
+  "ui": "Sarah App → My Sarah chat module",
+  "tests": ["test/personal-sarah-u2.test.mjs"],
+  "notInScope": ["Sarah Network", "My Knowledge RAG", "tenant /api/sarah/chat"]
+}

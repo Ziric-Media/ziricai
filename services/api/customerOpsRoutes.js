@@ -358,6 +358,147 @@ export function mountCustomerOpsRoutes(app) {
         }
     });
 
+    app.post("/api/companies/:companyId/conversations/:conversationId/assign", requireAuthenticatedTenantMember(), async (req, res) => {
+        try {
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const employeeId = String(req.body?.employeeId || req.tenant?.uid || "staff").trim();
+            const humanAgent = String(req.body?.humanAgent || employeeId).trim();
+            const { assignSarahAppConversation } = await import("../tenants/sarahInboxHandoverService.js");
+            const meta = await assignSarahAppConversation(dataCompanyId, req.params.conversationId, {
+                employeeId,
+                humanAgent,
+            });
+            res.json({ success: true, assignmentState: meta.assignmentState, employeeId, meta });
+        } catch (err) {
+            res.status(500).json({ error: err.message || "Failed to assign conversation" });
+        }
+    });
+
+    app.post(
+        "/api/companies/:companyId/conversations/:conversationId/accept",
+        requireAuthenticatedTenantMember(),
+        async (req, res) => {
+            try {
+                const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+                const { acceptSarahAppConversation, buildSarahHandoverSummary } = await import(
+                    "../tenants/sarahInboxHandoverService.js"
+                );
+                const meta = await acceptSarahAppConversation(dataCompanyId, req.params.conversationId, {
+                    employeeId: req.body?.employeeId || req.tenant?.uid,
+                    humanAgent: req.body?.humanAgent || req.tenant?.displayName,
+                });
+                const detail = await getTenantConversation(dataCompanyId, req.params.conversationId);
+                const summary = buildSarahHandoverSummary(detail?.conversation || detail, detail?.messages || []);
+                res.json({ success: true, meta, handoverSummary: summary });
+            } catch (err) {
+                res.status(500).json({ error: err.message || "Failed to accept conversation" });
+            }
+        }
+    );
+
+    app.post(
+        "/api/companies/:companyId/conversations/:conversationId/transfer",
+        requireAuthenticatedTenantMember(),
+        async (req, res) => {
+            try {
+                const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+                const { transferSarahAppConversation } = await import("../tenants/sarahInboxHandoverService.js");
+                const meta = await transferSarahAppConversation(dataCompanyId, req.params.conversationId, req.body || {});
+                res.json({ success: true, meta });
+            } catch (err) {
+                res.status(500).json({ error: err.message || "Failed to transfer conversation" });
+            }
+        }
+    );
+
+    app.post(
+        "/api/companies/:companyId/conversations/:conversationId/escalate",
+        requireAuthenticatedTenantMember(),
+        async (req, res) => {
+            try {
+                const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+                const { escalateSarahAppConversation } = await import("../tenants/sarahInboxHandoverService.js");
+                const meta = await escalateSarahAppConversation(dataCompanyId, req.params.conversationId, req.body || {});
+                res.json({ success: true, meta });
+            } catch (err) {
+                res.status(500).json({ error: err.message || "Failed to escalate conversation" });
+            }
+        }
+    );
+
+    app.post(
+        "/api/companies/:companyId/conversations/:conversationId/return-to-sarah",
+        requireAuthenticatedTenantMember(),
+        async (req, res) => {
+            try {
+                const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+                const { returnSarahAppToAi } = await import("../tenants/sarahInboxHandoverService.js");
+                const meta = await returnSarahAppToAi(dataCompanyId, req.params.conversationId, {
+                    reason: req.body?.reason || "",
+                });
+                res.json({ success: true, meta });
+            } catch (err) {
+                res.status(500).json({ error: err.message || "Failed to return conversation to Sarah" });
+            }
+        }
+    );
+
+    app.get(
+        "/api/companies/:companyId/conversations/:conversationId/handover-summary",
+        requireAuthenticatedTenantMember(),
+        async (req, res) => {
+            try {
+                const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+                const detail = await getTenantConversation(dataCompanyId, req.params.conversationId);
+                const { buildSarahHandoverSummary, getHandoverMeta } = await import(
+                    "../tenants/sarahInboxHandoverService.js"
+                );
+                const summary = buildSarahHandoverSummary(detail?.conversation || detail, detail?.messages || []);
+                res.json({ summary, meta: getHandoverMeta(dataCompanyId, req.params.conversationId) });
+            } catch (err) {
+                res.status(500).json({ error: err.message || "Failed to load handover summary" });
+            }
+        }
+    );
+
+    app.get(
+        "/api/companies/:companyId/conversations/accept-queue",
+        requireAuthenticatedTenantMember(),
+        async (req, res) => {
+            try {
+                const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+                const { listAwaitingAcceptQueue } = await import("../tenants/sarahInboxHandoverService.js");
+                res.json({ items: listAwaitingAcceptQueue(dataCompanyId) });
+            } catch (err) {
+                res.status(500).json({ error: err.message || "Failed to load accept queue" });
+            }
+        }
+    );
+
+    app.post("/api/companies/:companyId/conversations/:conversationId/internal-note", requireAuthenticatedTenantMember(), async (req, res) => {
+        try {
+            const text = String(req.body?.text || "").trim();
+            if (!text) return res.status(400).json({ error: "text is required" });
+            const dataCompanyId = resolvePilotDataCompanyId(req.params.companyId);
+            const { saveOutboundMessage } = await import("../conversationService.js");
+            const { resolveTenantConversationRef } = await import("../conversation/tenantConversationRef.js");
+            const ref = resolveTenantConversationRef(req.params.conversationId, {
+                channel: req.body?.channel || "sarah_app",
+            });
+            await saveOutboundMessage(ref.phone, text, {
+                companyId: dataCompanyId,
+                channel: ref.channel,
+                source: "internal_note",
+                senderName: resolveStaffSenderName(req.tenant),
+                visibility: "tenant_only",
+                externalUserId: ref.channel === "sarah_app" ? ref.phone : undefined,
+            });
+            res.status(201).json({ success: true, conversationId: ref.canonicalId, visibility: "tenant_only" });
+        } catch (err) {
+            res.status(500).json({ error: err.message || "Failed to save internal note" });
+        }
+    });
+
     /* ── Appointments ── */
     app.get("/api/companies/:companyId/appointments", requireTenantScope(), async (req, res) => {
         try {

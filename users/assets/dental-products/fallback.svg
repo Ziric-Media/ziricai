@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="Dental product">
+  <rect width="400" height="300" fill="#f1f5f9"/>
+  <circle cx="200" cy="140" r="48" fill="#cbd5e1"/>
+  <text x="200" y="230" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" fill="#64748b">Dental product</text>
+</svg>

@@ -2,6 +2,13 @@ import { state, setState } from './state.js';
 import { MODULE_LABELS, MODULES } from './core/moduleRegistry.js';
 
 import { renderDashboard } from './modules/dashboard.js';
+import { renderMcPlatformUsers } from './modules/mc-platform-users.js';
+import { renderMcPlatformActivity } from './modules/mc-platform-activity.js';
+import { renderMcPlatformSafety } from './modules/mc-platform-safety.js';
+import { renderMcPlatformMonitor } from './modules/mc-platform-monitor.js';
+import { renderMcPlatformComms } from './modules/mc-platform-comms.js';
+import { renderMcOrgOversight } from './modules/mc-org-oversight.js';
+import { renderMcPlatformAudit } from './modules/mc-platform-audit.js';
 import { renderCompanies } from './modules/companies.js';
 import {
   renderGovernmentOrganisations,
@@ -18,10 +25,13 @@ import { renderSupportOperations } from './modules/support-operations.js';
 import { renderSupportAttention } from './modules/support-attention.js';
 import { renderAgents } from './modules/agents.js';
 import { renderMarketplace } from './modules/marketplace.js';
+import { renderSarahNetwork } from './modules/sarah-network.js';
+import { renderMcRecommendations } from './modules/mc-recommendations.js';
 import { renderKnowledge } from './modules/knowledge.js';
 import { renderSettings } from './modules/settings.js';
 
 import { errorState, loadingState } from './ui.js';
+import { perfMark, perfNavClick } from '../shared/perfNav.js';
 
 void MODULES;
 
@@ -29,6 +39,13 @@ const PAGE_TITLES = { ...MODULE_LABELS };
 
 const RENDERERS = {
   dashboard: renderDashboard,
+  mcPlatformUsers: renderMcPlatformUsers,
+  mcPlatformActivity: renderMcPlatformActivity,
+  mcPlatformSafety: renderMcPlatformSafety,
+  mcPlatformMonitor: renderMcPlatformMonitor,
+  mcPlatformComms: renderMcPlatformComms,
+  mcOrgOversight: renderMcOrgOversight,
+  mcPlatformAudit: renderMcPlatformAudit,
   companies: renderCompanies,
   government: renderGovernmentOrganisations,
   publicService: renderPublicServiceOrganisations,
@@ -43,11 +60,14 @@ const RENDERERS = {
   supportAttention: renderSupportAttention,
   agents: renderAgents,
   marketplace: renderMarketplace,
+  sarahNetwork: renderSarahNetwork,
+  mcRecommendations: renderMcRecommendations,
   knowledge: renderKnowledge,
   settings: renderSettings,
 };
 
 export function navigateTo(page, params = {}) {
+  perfMark('mc.navigateTo', { detail: page });
   if (params.phone) {
     setState({ selectedCustomerPhone: params.phone });
   }
@@ -72,7 +92,10 @@ export function navigateTo(page, params = {}) {
   const container = document.getElementById('pageContent');
   if (!container) return;
   container.innerHTML = loadingState('Loading...');
-  Promise.resolve(renderer(container)).catch((err) => {
+  perfMark('mc.loadingState painted', { detail: page });
+  Promise.resolve(renderer(container))
+    .then(() => perfMark('mc.module rendered', { detail: page }))
+    .catch((err) => {
     console.error(`Failed to render ${page}:`, err);
     container.innerHTML = errorState(err?.message || 'Failed to load this page.');
   });
@@ -83,7 +106,10 @@ export function initRouter() {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const page = link.dataset.page;
-      if (page) navigateTo(page);
+      if (page) {
+        perfNavClick(page);
+        navigateTo(page);
+      }
     });
   });
 }

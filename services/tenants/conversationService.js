@@ -21,9 +21,21 @@ import {
 import { getConversationTakeoverState } from "../conversation/takeoverSafety.js";
 import { mapMessageForInboxApi } from "../conversation/inboxMessageContract.js";
 import { buildSlimInboxContext } from "../conversation/inboxContext.js";
+import {
+    findConversationInList,
+    inferChannelFromConversationId,
+    resolveListedChannel,
+    resolveTenantConversationRef,
+} from "../conversation/tenantConversationRef.js";
+import { mirrorSarahAppHumanReplyToConsumer } from "../users/sarahAppConsumerMirrorService.js";
+import { openUserConversation, getUserConversationByCompany } from "../users/userConversationService.js";
+import { toIsoTimestamp } from "../core/timestampUtils.js";
+import { ownershipStateFromTakeover } from "../users/handoverStateService.js";
+import { resolveConsumerPhotoUrl } from "../users/consumerAvatarService.js";
 
 const CHANNEL_LABELS = {
     whatsapp: "WhatsApp",
+    sarah_app: "Sarah App · Sarah Inbox",
     facebook: "Facebook",
     instagram: "Instagram",
     telegram: "Telegram",
@@ -58,13 +70,19 @@ export {
 
 function formatRelativeTime(iso) {
     if (!iso) return "—";
-    const diff = Date.now() - new Date(iso).getTime();
+    const normalized = toIsoTimestamp(iso) || iso;
+    const ms = new Date(normalized).getTime();
+    if (!Number.isFinite(ms)) return "Recently";
+    const diff = Date.now() - ms;
+    if (diff < 0) return "Just now";
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return "Just now";
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
+    const days = Math.floor(hrs / 24);
+    if (!Number.isFinite(days)) return "Recently";
+    return `${days}d ago`;
 }
 
 function resolvePhoneFromConversationRef(conversationId) {
@@ -72,18 +90,29 @@ function resolvePhoneFromConversationRef(conversationId) {
 }
 
 function findListedConversation(convList, conversationId, phone) {
-    const canonicalId = resolveCanonicalConversationId(phone, "whatsapp");
-    return convList.find(
-        (c) =>
-            c.phone === phone ||
-            c.id === conversationId ||
-            c.id === canonicalId ||
-            c.id === phone
+    return findConversationInList(convList, conversationId) ||
+        convList.find(
+            (c) =>
+                c.phone === phone ||
+                c.id === conversationId ||
+                c.id === resolveCanonicalConversationId(phone, c.channel || "whatsapp") ||
+                c.id === phone
+        );
+}
+
+async function attachConsumerPhotos(rows) {
+    await Promise.all(
+        rows.map(async (row) => {
+            const url = await resolveConsumerPhotoUrl(row);
+            if (url) row.customerPhotoUrl = url;
+        })
     );
+    return rows;
 }
 
 function mapConversationRow(conv, companyId) {
-    const channel = conv.channel || "whatsapp";
+    const inferredChannel = inferChannelFromConversationId(conv.conversationId || conv.id);
+    const channel = conv.channel || inferredChannel || "whatsapp";
     const phone = conv.customerId || conv.phone || resolvePhoneFromConversationRef(conv.id);
     const id = conv.conversationId || conv.id || resolveCanonicalConversationId(phone, channel);
     return {
@@ -91,6 +120,8 @@ function mapConversationRow(conv, companyId) {
         phone,
         customerName: conv.customerName || conv.name || phone || "Unknown",
         name: conv.name || conv.customerName,
+        customerPhotoUrl: conv.customerPhotoUrl || conv.avatarUrl || conv.photoURL || null,
+        externalUserId: conv.externalUserId || null,
         lastMessage: conv.lastMessage || conv.preview || "",
         preview: conv.preview || conv.lastMessage || "",
         status: conv.status || "in_progress",
@@ -99,8 +130,8 @@ function mapConversationRow(conv, companyId) {
         channel,
         channelLabel: CHANNEL_LABELS[channel] || channel,
         channelColor: CHANNEL_COLORS[channel] || "grey",
-        time: conv.time ? formatRelativeTime(conv.time) : formatRelativeTime(conv.lastSeen || conv.updatedAt),
-        lastMessageAt: conv.time || conv.lastSeen || conv.updatedAt,
+        time: formatRelativeTime(conv.lastSeen || conv.updatedAt || conv.time),
+        lastMessageAt: toIsoTimestamp(conv.lastSeen || conv.updatedAt || conv.time) || null,
         unread: Boolean(conv.unread ?? conv.online),
         readAt: conv.readAt || null,
         leadScore: conv.leadScore ?? null,
@@ -127,34 +158,79 @@ export async function listTenantConversations(companyId, options = {}) {
     const limit = options.limit || 50;
     const legacy = await legacyListConversations({ companyId, limit });
     if (legacy.length) {
-        return legacy.map((c) => mapConversationRow(c, companyId));
+        const rows = legacy.map((c) => mapConversationRow(c, companyId));
+        return attachConsumerPhotos(rows);
     }
     const tenant = await conversationRepo.list(companyId, { max: limit });
     if (tenant.length) {
-        return tenant.map((c) => mapConversationRow(c, companyId));
+        const rows = tenant.map((c) => mapConversationRow(c, companyId));
+        return attachConsumerPhotos(rows);
     }
-    return legacy.map((c) => mapConversationRow(c, companyId));
+    const rows = legacy.map((c) => mapConversationRow(c, companyId));
+    return attachConsumerPhotos(rows);
 }
 
 export async function getTenantConversation(companyId, conversationId) {
-    const phone = resolvePhoneFromConversationRef(conversationId);
     const convList = await legacyListConversations({ companyId, limit: 100 });
-    const conv = findListedConversation(convList, conversationId, phone);
-    const channel = conv?.channel || "whatsapp";
-    const canonicalId = resolveCanonicalConversationId(phone, channel);
+    const listedChannel = resolveListedChannel(convList, conversationId);
+    const ref = resolveTenantConversationRef(conversationId, { listedChannel });
+    const { phone, channel, canonicalId, customerId } = ref;
 
-    const meta = (await getCanonicalConversationMeta(companyId, phone, channel)) || {};
-    const history = await legacyGetConversation(phone, 50, { companyId, channel });
+    const conv =
+        findConversationInList(convList, conversationId) ||
+        findListedConversation(convList, conversationId, phone);
+
+    let meta = (await conversationRepo.get(companyId, canonicalId)) || {};
+    if (!Object.keys(meta).length) {
+        meta = (await getCanonicalConversationMeta(companyId, phone, channel)) || {};
+    }
+
+    const history = await legacyGetConversation(phone, 100, {
+        companyId,
+        channel,
+        externalUserId: channel === "sarah_app" ? phone : undefined,
+    });
     const takeoverState = await getConversationTakeoverState(companyId, phone, channel);
 
     const messages = history.map((m) => mapMessageForInboxApi(m));
 
-    const mergedMeta = takeoverState.meta || meta;
+    const mergedMeta = { ...meta, ...(takeoverState.meta || {}) };
+    let customerName =
+        conv?.customerName || conv?.name || mergedMeta.customerName || mergedMeta.name || null;
+
+    if (channel === "sarah_app") {
+        const userConv = getUserConversationByCompany(phone, companyId);
+        const fromConsumer = userConv?.consumerDisplayName;
+        if (fromConsumer && fromConsumer !== "Sarah App user") {
+            customerName = fromConsumer;
+        } else if (mergedMeta.customerName && mergedMeta.customerName !== "Sarah App user") {
+            customerName = mergedMeta.customerName;
+        }
+    }
+
     const context = await buildSlimInboxContext(companyId, phone);
+
+    const photoUrl = await resolveConsumerPhotoUrl({
+        channel,
+        customerId,
+        phone,
+        id: canonicalId,
+    });
 
     return {
         conversation: mapConversationRow(
-            { ...conv, ...mergedMeta, id: canonicalId, phone, conversationId: canonicalId },
+            {
+                ...conv,
+                ...mergedMeta,
+                id: canonicalId,
+                phone,
+                customerId,
+                conversationId: canonicalId,
+                channel,
+                customerName: customerName || conv?.customerName,
+                name: customerName || conv?.name,
+                ...(photoUrl ? { customerPhotoUrl: photoUrl } : {}),
+            },
             companyId
         ),
         messages,
@@ -165,21 +241,30 @@ export async function getTenantConversation(companyId, conversationId) {
 }
 
 export async function sendConversationReply(companyId, conversationId, { text, channel, senderName }) {
-    const phone = resolvePhoneFromConversationRef(conversationId);
     const convList = await legacyListConversations({ companyId, limit: 100 });
-    const conv = findListedConversation(convList, conversationId, phone);
-    const outboundChannel = channel || conv?.channel || "whatsapp";
+    const listedChannel = resolveListedChannel(convList, conversationId);
+    const ref = resolveTenantConversationRef(conversationId, {
+        channel: channel || listedChannel,
+        listedChannel,
+    });
+    const { phone, channel: outboundChannel, canonicalId } = ref;
 
     await saveOutboundMessage(phone, text, {
         companyId,
         channel: outboundChannel,
         source: "human",
         senderName: senderName || null,
+        externalUserId: outboundChannel === "sarah_app" ? phone : undefined,
     });
-    try {
-        await integrationSend(outboundChannel, { companyId }, { to: phone, text });
-    } catch (err) {
-        console.warn("[conversationService] outbound send:", err.message);
+    if (outboundChannel === "sarah_app") {
+        await mirrorSarahAppHumanReplyToConsumer(companyId, canonicalId, text, { senderName });
+    }
+    if (outboundChannel !== "sarah_app") {
+        try {
+            await integrationSend(outboundChannel, { companyId }, { to: phone, text });
+        } catch (err) {
+            console.warn("[conversationService] outbound send:", err.message);
+        }
     }
 
     await publish(companyId, EventTypes.MESSAGE_SENT, {
@@ -191,18 +276,22 @@ export async function sendConversationReply(companyId, conversationId, { text, c
 
     return {
         success: true,
-        conversationId: resolveCanonicalConversationId(phone, outboundChannel),
+        conversationId: canonicalId,
         phone,
         channel: outboundChannel,
     };
 }
 
 export async function markConversationRead(companyId, conversationId) {
-    const phone = resolvePhoneFromConversationRef(conversationId);
-    const channel = "whatsapp";
-    const canonicalId = resolveCanonicalConversationId(phone, channel);
+    const convList = await legacyListConversations({ companyId, limit: 100 });
+    const listedChannel = resolveListedChannel(convList, conversationId);
+    const { phone, channel, canonicalId, customerId } = resolveTenantConversationRef(conversationId, {
+        listedChannel,
+    });
 
-    const existing = await conversationRepo.get(companyId, canonicalId);
+    const existing =
+        (await conversationRepo.get(companyId, canonicalId)) ||
+        (await conversationRepo.get(companyId, conversationId));
     if (!existing) {
         throw Object.assign(new Error("Conversation not found"), { status: 404, code: "NOT_FOUND" });
     }
@@ -212,7 +301,7 @@ export async function markConversationRead(companyId, conversationId) {
         unread: false,
         readAt,
         conversationId: canonicalId,
-        customerId: customerDocId(phone),
+        customerId,
         channel,
         updatedAt: readAt,
     });
@@ -226,44 +315,61 @@ export async function markConversationRead(companyId, conversationId) {
 }
 
 export async function setHumanTakeover(companyId, conversationId, { enabled = true, humanAgent = "Staff" } = {}) {
-    const phone = resolvePhoneFromConversationRef(conversationId);
-    const channel = "whatsapp";
-    const canonicalId = resolveCanonicalConversationId(phone, channel);
+    const convList = await legacyListConversations({ companyId, limit: 100 });
+    const listedChannel = resolveListedChannel(convList, conversationId);
+    const { phone, channel, canonicalId, customerId } = resolveTenantConversationRef(conversationId, {
+        listedChannel,
+    });
 
     await conversationRepo.upsert(companyId, canonicalId, {
         humanTakeover: enabled,
         mode: enabled ? "human" : "ai",
         assignedHumanAgent: enabled ? humanAgent : null,
-        customerId: customerDocId(phone),
+        customerId,
         conversationId: canonicalId,
         channel,
         updatedAt: new Date().toISOString(),
     });
 
-    const legacyId = normalizePhone(phone);
-    if (legacyId && legacyId !== canonicalId) {
-        const legacy = await conversationRepo.get(companyId, legacyId);
-        if (legacy && (legacy.humanTakeover || legacy.mode === "human")) {
-            await conversationRepo.upsert(companyId, legacyId, {
-                humanTakeover: false,
-                mode: "ai",
-                assignedHumanAgent: null,
-                migratedTo: canonicalId,
-                updatedAt: new Date().toISOString(),
-            });
+    if (channel === "sarah_app") {
+        const uid = resolveSarahAppUidFromRef(canonicalId);
+        if (uid) {
+            await openUserConversation(uid, companyId, {});
+            const conv = getUserConversationByCompany(uid, companyId);
+            if (conv) {
+                conv.ownershipState = ownershipStateFromTakeover(enabled, conv.ownershipState);
+                conv.assignedEmployeeId = enabled ? humanAgent : null;
+            }
         }
     }
 
-    await upsertCustomerFromWhatsApp(phone, {
-        companyId,
-        mode: enabled ? "human" : "ai",
-        assignedHumanAgent: enabled ? humanAgent : null,
-    });
+    if (channel === "whatsapp") {
+        const legacyId = normalizePhone(phone);
+        if (legacyId && legacyId !== canonicalId) {
+            const legacy = await conversationRepo.get(companyId, legacyId);
+            if (legacy && (legacy.humanTakeover || legacy.mode === "human")) {
+                await conversationRepo.upsert(companyId, legacyId, {
+                    humanTakeover: false,
+                    mode: "ai",
+                    assignedHumanAgent: null,
+                    migratedTo: canonicalId,
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+        }
+
+        await upsertCustomerFromWhatsApp(phone, {
+            companyId,
+            mode: enabled ? "human" : "ai",
+            assignedHumanAgent: enabled ? humanAgent : null,
+        });
+    }
 
     return {
         success: true,
         conversationId: canonicalId,
         phone,
+        channel,
         humanTakeover: enabled,
         mode: enabled ? "human" : "ai",
         humanAgent: enabled ? humanAgent : null,

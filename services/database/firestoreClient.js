@@ -20,7 +20,18 @@ import {
     serverTimestamp as clientServerTimestamp,
 } from "firebase/firestore";
 import { db } from "../../js/firebase.js";
-import { ROOT, tenantCollectionPath } from "./schema.js";
+import {
+    ROOT,
+    tenantCollectionPath,
+    USER_CONVERSATIONS,
+    userConversationPath,
+    userConversationMessagesCollectionPath,
+    userConversationMessagePath,
+    BUSINESS_DIRECTORY,
+    businessDirectoryPath,
+    networkEntityPath,
+    networkRefPath,
+} from "./schema.js";
 import {
     getAdminFirestore,
     hasAdminCredentials,
@@ -28,7 +39,12 @@ import {
     adminServerTimestamp,
 } from "./firestoreAdmin.js";
 
+export function useMemoryStorageBackend() {
+    return String(process.env.STORAGE_BACKEND || "").trim().toLowerCase() === "memory";
+}
+
 export function useAdminBackend() {
+    if (useMemoryStorageBackend()) return false;
     return isServerSide() && Boolean(getAdminFirestore());
 }
 
@@ -180,6 +196,108 @@ export function globalUserRef(uid) {
         return { __path: path, __admin: getAdminFirestore().doc(path), id: uid };
     }
     return doc(db, ROOT.USERS, uid);
+}
+
+export function userProfileRef(uid) {
+    const path = `${ROOT.USER_PROFILES}/${uid}`;
+    if (useAdminBackend()) {
+        return { __path: path, __admin: getAdminFirestore().doc(path), id: uid };
+    }
+    return doc(db, ROOT.USER_PROFILES, uid);
+}
+
+export function userPreferencesRef(uid) {
+    const path = `${ROOT.USER_PREFERENCES}/${uid}`;
+    if (useAdminBackend()) {
+        return { __path: path, __admin: getAdminFirestore().doc(path), id: uid };
+    }
+    return doc(db, ROOT.USER_PREFERENCES, uid);
+}
+
+export function userConversationsCollectionRef() {
+    const path = USER_CONVERSATIONS.ROOT;
+    if (useAdminBackend()) {
+        return { __path: path, __adminCol: getAdminFirestore().collection(path) };
+    }
+    return collection(db, USER_CONVERSATIONS.ROOT);
+}
+
+export function userConversationRef(conversationId) {
+    const path = userConversationPath(conversationId);
+    if (useAdminBackend()) {
+        return { __path: path, __admin: getAdminFirestore().doc(path), id: conversationId };
+    }
+    return doc(db, USER_CONVERSATIONS.ROOT, conversationId);
+}
+
+export function userConversationMessagesCollectionRef(conversationId) {
+    const path = userConversationMessagesCollectionPath(conversationId);
+    if (useAdminBackend()) {
+        return { __path: path, __adminCol: getAdminFirestore().collection(path) };
+    }
+    return collection(db, USER_CONVERSATIONS.ROOT, conversationId, USER_CONVERSATIONS.MESSAGES);
+}
+
+export function userConversationMessageRef(conversationId, messageId) {
+    const path = userConversationMessagePath(conversationId, messageId);
+    if (useAdminBackend()) {
+        return { __path: path, __admin: getAdminFirestore().doc(path), id: messageId };
+    }
+    return doc(db, USER_CONVERSATIONS.ROOT, conversationId, USER_CONVERSATIONS.MESSAGES, messageId);
+}
+
+/** SNET-01a — server-only (Admin SDK) top-level doc/collection refs. */
+function adminOnlyDocRef(path, id) {
+    return { __path: path, __admin: getAdminFirestore().doc(path), id };
+}
+
+export function networkEntityRef(snId) {
+    return adminOnlyDocRef(networkEntityPath(snId), snId);
+}
+
+export function networkRefDocRef(refDocId) {
+    return adminOnlyDocRef(networkRefPath(refDocId), refDocId);
+}
+
+/** SNET-02+ — generic server-only network collection refs (see NETWORK_COLLECTIONS). */
+export function networkDocRef(collectionName, id) {
+    return adminOnlyDocRef(`${collectionName}/${id}`, id);
+}
+
+export function networkCollectionRef(collectionName) {
+    return { __path: collectionName, __adminCol: getAdminFirestore().collection(collectionName) };
+}
+
+export function businessDirectoryDocRef(companyId) {
+    return adminOnlyDocRef(businessDirectoryPath(companyId), companyId);
+}
+
+export function businessDirectoryCollectionRef() {
+    return { __path: BUSINESS_DIRECTORY.ROOT, __adminCol: getAdminFirestore().collection(BUSINESS_DIRECTORY.ROOT) };
+}
+
+export function personalSarahDocRef(uid, subcollection, docId) {
+    const path = `${ROOT.PERSONAL_SARAH}/${uid}/${subcollection}/${docId}`;
+    if (useAdminBackend()) {
+        return { __path: path, __admin: getAdminFirestore().doc(path), id: docId };
+    }
+    return doc(db, ROOT.PERSONAL_SARAH, uid, subcollection, docId);
+}
+
+export function personalSarahCollectionRef(uid, subcollection) {
+    const path = `${ROOT.PERSONAL_SARAH}/${uid}/${subcollection}`;
+    if (useAdminBackend()) {
+        return { __path: path, __adminCol: getAdminFirestore().collection(path) };
+    }
+    return collection(db, ROOT.PERSONAL_SARAH, uid, subcollection);
+}
+
+export function personalKnowledgeSectionRef(uid, sectionKey) {
+    const path = `${ROOT.PERSONAL_KNOWLEDGE}/${uid}/sections/${sectionKey}`;
+    if (useAdminBackend()) {
+        return { __path: path, __admin: getAdminFirestore().doc(path), id: sectionKey };
+    }
+    return doc(db, ROOT.PERSONAL_KNOWLEDGE, uid, "sections", sectionKey);
 }
 
 export async function getDoc(ref) {

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ZiricIntegrationEventV1",
+  "type": "object",
+  "required": ["id", "type", "occurredAt", "source", "resource"],
+  "properties": {
+    "id": { "type": "string", "description": "Unique event id (evt-… or UUID)" },
+    "type": {
+      "type": "string",
+      "enum": [
+        "integration.conversation.opened",
+        "integration.message.user",
+        "integration.message.assistant",
+        "integration.tenant.mirrored",
+        "integration.identity.link.proposed"
+      ]
+    },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "companyId": { "type": ["string", "null"] },
+    "personId": { "type": ["string", "null"] },
+    "source": {
+      "type": "object",
+      "required": ["portal"],
+      "properties": {
+        "portal": { "enum": ["sarah_app", "company_portal", "platform"] },
+        "service": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["conversation", "message", "person", "customer"] },
+        "id": { "type": "string" }
+      }
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "description": "Stable key for dedupe, e.g. sarah_app:{companyId}:{messageId}"
+    },
+    "payload": { "type": "object" },
+    "metadata": { "type": "object" }
+  }
+}

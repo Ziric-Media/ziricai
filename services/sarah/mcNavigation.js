@@ -14,6 +14,7 @@ export const MC_NAV_TARGETS = {
     integrations: { label: "Integrations" },
     support: { label: "Support" },
     agents: { label: "AI Employees" },
+    sarahNetwork: { label: "Sarah Network" },
     knowledge: { label: "Knowledge Base" },
     settings: { label: "Settings" },
 };
@@ -33,6 +34,9 @@ const ALIASES = {
     employees: "agents",
     "knowledge base": "knowledge",
     whatsapp: "integrations",
+    "sarah network": "sarahNetwork",
+    network: "sarahNetwork",
+    "verification queue": "sarahNetwork",
 };
 
 export const MC_NAV_PAGE_IDS = Object.keys(MC_NAV_TARGETS);

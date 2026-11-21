@@ -1,0 +1,1 @@
+Dental finance on ZiricAI covers practice till receipts and ledger income — not medical-scheme adjudication. Medical-aid worksheets are internal records; they do not state what a scheme will pay. Use ZAR amounts and plain language for owners and reception.

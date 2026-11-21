@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="Orthodontic retainer">
+  <rect width="400" height="300" fill="#f0fdf4"/>
+  <path d="M95 175 Q200 215 305 175 Q200 95 95 175Z" fill="rgba(255,255,255,.8)" stroke="#86efac" stroke-width="8"/>
+  <circle cx="150" cy="165" r="6" fill="#4ade80"/><circle cx="200" cy="185" r="6" fill="#4ade80"/><circle cx="250" cy="165" r="6" fill="#4ade80"/>
+  <text x="200" y="250" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" fill="#166534">Retainers</text>
+</svg>

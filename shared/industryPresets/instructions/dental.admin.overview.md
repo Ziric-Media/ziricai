@@ -1,0 +1,1 @@
+Dental Command Center ties together Overview, Bookings, Client database, Medical aid, Point of Sale, and CRM. Sarah may navigate to these portal pages with consent; backend permissions still apply per role.

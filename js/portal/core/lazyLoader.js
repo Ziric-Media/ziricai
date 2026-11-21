@@ -28,6 +28,12 @@ const MODULE_IDS = [
   'support',
   'team',
   'activity',
+  'network',
+  'recommendations',
+  'statusPosts',
+  'discoverProfile',
+  'schoolGuardians',
+  'schoolAdmissions',
 ];
 
 function portalAssetVersion() {
@@ -57,6 +63,12 @@ const EXPORT_MAP = {
   support: 'renderSupport',
   team: 'renderTeam',
   activity: 'renderActivity',
+  network: 'renderNetwork',
+  recommendations: 'renderRecommendations',
+  statusPosts: 'renderStatusPosts',
+  discoverProfile: 'renderDiscoverProfile',
+  schoolGuardians: 'renderSchoolGuardians',
+  schoolAdmissions: 'renderSchoolAdmissions',
 };
 
 /**

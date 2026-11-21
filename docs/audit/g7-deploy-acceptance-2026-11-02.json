@@ -1,0 +1,41 @@
+{
+  "gate": "G7",
+  "title": "G7.1 RBAC + Mission Control Gateway — production deploy acceptance",
+  "deployedAt": "2026-11-02",
+  "verdict": "ACCEPTED",
+  "railway": {
+    "deploymentId": "8ece3a1a-0544-4b2f-a27e-9db9c7487aeb",
+    "serviceUrl": "https://ziricai-production.up.railway.app",
+    "method": "railway up --detach (local tree with G7.1/G7)"
+  },
+  "netlifyAdmin": {
+    "productionUrl": "https://admin.ziricai.com",
+    "deployId": "6ae7f4af7a5614b46ab23b18",
+    "navSource": "ziric-superadmin-console.html → prepare-sites.js admin"
+  },
+  "apiSmokeAuthenticated": {
+    "GET /api/platform/whatsapp-gateway/health": 200,
+    "GET /api/platform/whatsapp-gateway/usage-foundation": 200,
+    "GET /api/platform/whatsapp-numbers/:id (3699 pool row)": 200,
+    "g5Flags": {
+      "assignTransactions": "true",
+      "strictProjection": "true"
+    }
+  },
+  "unauthenticated": {
+    "GET /api/platform/whatsapp-gateway/usage-foundation": 401
+  },
+  "backbonePostDeploy": {
+    "suffix3699": "registryVsTenantsAligned: true, assignedCompanyId: central-motors-rtb"
+  },
+  "notChanged": [
+    "WHATSAPP_GATEWAY_LIVE_PROBE_AUTHORIZED",
+    "Client Zero migration",
+    "Meta/webhook/credentials",
+    "Firestore allocation mutations"
+  ],
+  "operatorNotes": [
+    "Set users/{uid}.platformGatewayAccess to viewer or operator for MC RBAC",
+    "Legacy superadmins without field retain operator behavior"
+  ]
+}

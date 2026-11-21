@@ -22,6 +22,36 @@ export const API_VERSION = "1";
 /** @type {RouteDefinition[]} */
 export const ROUTE_CATALOG = [
     // Health & platform
+    { method: "POST", path: "/api/users/bootstrap", domain: "consumer", tenantScoped: false, description: "Sarah App consumer profile bootstrap" },
+    { method: "GET", path: "/api/users/profile", domain: "consumer", tenantScoped: false, description: "Sarah App consumer profile + preferences" },
+    { method: "PATCH", path: "/api/users/profile", domain: "consumer", tenantScoped: false, description: "Update Sarah App consumer profile" },
+    { method: "POST", path: "/api/personal-sarah/chat", domain: "consumer", tenantScoped: false, description: "Personal Sarah assistant chat" },
+    { method: "GET", path: "/api/personal-sarah/sessions", domain: "consumer", tenantScoped: false, description: "List Personal Sarah sessions" },
+    { method: "POST", path: "/api/personal-sarah/sessions", domain: "consumer", tenantScoped: false, description: "Create Personal Sarah session" },
+    { method: "POST", path: "/api/personal-sarah/sessions/:id/work/submit", domain: "consumer", tenantScoped: false, description: "Submit Sarah Work task (consumes daily allowance)" },
+    { method: "POST", path: "/api/personal-sarah/sessions/:id/work/cancel", domain: "consumer", tenantScoped: false, description: "Cancel submitted work before completion (restores allowance)" },
+    { method: "GET", path: "/api/personal-sarah/sessions/:id", domain: "consumer", tenantScoped: false, description: "Load Personal Sarah session" },
+    { method: "GET", path: "/api/personal-sarah/home/cards", domain: "consumer", tenantScoped: false, description: "SHI-01 adaptive home cards (chat/work mode)" },
+    { method: "GET", path: "/api/personal-sarah/news/profile", domain: "consumer", tenantScoped: false, description: "Sarah News — consumer news preferences" },
+    { method: "PUT", path: "/api/personal-sarah/news/profile", domain: "consumer", tenantScoped: false, description: "Sarah News — save preferences" },
+    { method: "GET", path: "/api/personal-sarah/news/editions/latest", domain: "consumer", tenantScoped: false, description: "Sarah News — compile latest headline edition (RSS v1)" },
+    { method: "GET", path: "/api/personal-sarah/news/stories/:storyId", domain: "consumer", tenantScoped: false, description: "Sarah News — story room (facts, timeline, related, sources)" },
+    { method: "GET", path: "/api/personal-sarah/news/deliver/poll", domain: "consumer", tenantScoped: false, description: "Sarah News — poll briefing/breaking delivery (inbox + push)" },
+    { method: "GET", path: "/api/personal-sarah/sessions/active", domain: "consumer", tenantScoped: false, description: "Latest Personal Sarah session" },
+    { method: "GET", path: "/api/personal-sarah/sessions/:id/work/report", domain: "consumer", tenantScoped: false, description: "Sarah Work deliverable report after runner completes" },
+    { method: "GET", path: "/api/personal-sarah/sessions/:id/work/deliverables", domain: "consumer", tenantScoped: false, description: "Sarah Work deliverables + reference files index" },
+    { method: "GET", path: "/api/personal-sarah/sessions/:id/work/deliverables/:deliverableId", domain: "consumer", tenantScoped: false, description: "Download Sarah Work deliverable body (markdown)" },
+    { method: "GET", path: "/api/personal-sarah/work/home", domain: "consumer", tenantScoped: false, description: "Sarah Work home dashboard" },
+    { method: "GET", path: "/api/personal-sarah/work/capabilities", domain: "consumer", tenantScoped: false, description: "Sarah Work capability vocabulary" },
+    { method: "GET", path: "/api/personal-sarah/work/usage-rollup", domain: "consumer", tenantScoped: false, description: "Sarah Work usage rollup for billing period" },
+    { method: "GET", path: "/api/personal-sarah/sessions/:id/work/settings", domain: "consumer", tenantScoped: false, description: "Sarah Work assignment settings" },
+    { method: "PATCH", path: "/api/personal-sarah/sessions/:id/work/settings", domain: "consumer", tenantScoped: false, description: "Update Sarah Work assignment settings" },
+    { method: "GET", path: "/api/personal-sarah/sessions/:id/work/approvals", domain: "consumer", tenantScoped: false, description: "Sarah Work approval queue" },
+    { method: "POST", path: "/api/personal-sarah/sessions/:id/work/approvals/:approvalId/resolve", domain: "consumer", tenantScoped: false, description: "Approve or reject Sarah Work action" },
+    { method: "GET", path: "/api/network/v1/orgs/:companyId/subscriber-events/delivery-summary", domain: "network", tenantScoped: true, description: "Subscriber communications delivery monitor (counts only)" },
+    { method: "GET", path: "/api/personal-knowledge/sections", domain: "consumer", tenantScoped: false, description: "My Knowledge sections" },
+    { method: "PUT", path: "/api/personal-knowledge/sections/:sectionKey", domain: "consumer", tenantScoped: false, description: "Update My Knowledge section" },
+
     { method: "GET", path: "/api/health", domain: "platform", tenantScoped: false, description: "Public liveness probe (status + timestamp)" },
     { method: "GET", path: "/health", domain: "platform", tenantScoped: false, description: "Public liveness probe alias (status + timestamp)" },
     { method: "GET", path: "/api/platform/health", domain: "platform", tenantScoped: false, description: "Full operational diagnostics (platform auth)" },
@@ -30,6 +60,7 @@ export const ROUTE_CATALOG = [
 
     // Operations (superadmin)
     { method: "GET", path: "/api/operations/platform-dashboard", domain: "operations", tenantScoped: false, description: "MC platform dashboard read facade (?scope=platform|tenant&companyId= when tenant)" },
+    { method: "GET", path: "/api/operations/platform-command-overview", domain: "operations", tenantScoped: false, description: "MC-PO platform command overview (growth + RS02 + network slice)" },
     { method: "GET", path: "/api/operations/platform-executive-overview", domain: "operations", tenantScoped: false, description: "Mission Control executive KPI overview (read-only)" },
     { method: "GET", path: "/api/operations/platform-billing-console", domain: "operations", tenantScoped: false, description: "Mission Control platform billing table (read-only)" },
     { method: "GET", path: "/api/operations/platform-integrations", domain: "operations", tenantScoped: false, description: "Mission Control integrations matrix (read-only)" },
@@ -74,6 +105,7 @@ export const ROUTE_CATALOG = [
     { method: "DELETE", path: "/api/companies/:companyId/departments/:deptId", domain: "workspace", tenantScoped: true, description: "Delete department" },
     { method: "GET", path: "/api/companies/:companyId/team", domain: "workspace", tenantScoped: true, description: "Team roster" },
     { method: "POST", path: "/api/companies/:companyId/team/invite", domain: "workspace", tenantScoped: true, description: "Invite team member (stub)" },
+    { method: "POST", path: "/api/companies/:companyId/team/members", domain: "workspace", tenantScoped: true, description: "Create team member portal login" },
     { method: "PATCH", path: "/api/companies/:companyId/team/:uid", domain: "workspace", tenantScoped: true, description: "Update member role" },
 
     // Analytics
@@ -151,6 +183,152 @@ export const ROUTE_CATALOG = [
     { method: "GET", path: "/api/billing/plans", domain: "billing", tenantScoped: false, description: "Plan catalog" },
     { method: "GET", path: "/api/billing/plans/:planId", domain: "billing", tenantScoped: false, description: "Plan detail" },
     { method: "POST", path: "/api/billing/check-limit", domain: "billing", tenantScoped: false, description: "Plan limit check" },
+
+    // Revenue Management (R0)
+    { method: "GET", path: "/api/revenue/catalogue/public", domain: "revenue", tenantScoped: false, description: "Public SKU catalogue" },
+    { method: "GET", path: "/api/revenue/catalogue/skus/:skuId", domain: "revenue", tenantScoped: false, description: "SKU detail" },
+    { method: "GET", path: "/api/revenue/entitlements/me", domain: "revenue", tenantScoped: false, description: "Consumer entitlements" },
+    { method: "GET", path: "/api/revenue/subscription/me", domain: "revenue", tenantScoped: false, description: "Consumer subscription record" },
+    { method: "POST", path: "/api/revenue/subscription/checkout", domain: "revenue", tenantScoped: false, description: "Consumer plan checkout (when RS02 enabled)" },
+    { method: "GET", path: "/api/revenue/config/public", domain: "revenue", tenantScoped: false, description: "Commercial activation flags (read)" },
+    { method: "GET", path: "/api/platform/revenue/config", domain: "platform", tenantScoped: false, description: "MC revenue config" },
+    { method: "GET", path: "/api/platform/revenue/catalogue", domain: "platform", tenantScoped: false, description: "MC full catalogue" },
+    { method: "GET", path: "/api/platform/revenue/ledger", domain: "platform", tenantScoped: false, description: "MC revenue ledger" },
+    { method: "POST", path: "/api/platform/revenue/ledger/dry-run", domain: "platform", tenantScoped: false, description: "MC ledger dry-run" },
+
+    // Sarah Network (U4)
+    { method: "POST", path: "/api/sarah-network/grants", domain: "consumer", tenantScoped: false, description: "Create consent grant" },
+    { method: "GET", path: "/api/sarah-network/grants", domain: "consumer", tenantScoped: false, description: "List my consent grants (SNET-02)" },
+    { method: "GET", path: "/api/sarah-network/grants/:grantId", domain: "consumer", tenantScoped: false, description: "Get consent grant" },
+    { method: "POST", path: "/api/sarah-network/grants/:grantId/revoke", domain: "consumer", tenantScoped: false, description: "Revoke consent grant (SNET-02)" },
+    { method: "POST", path: "/api/sarah-network/enquiries", domain: "consumer", tenantScoped: false, description: "Personal→Company enquiry" },
+    { method: "GET", path: "/api/sarah-network/requests", domain: "consumer", tenantScoped: false, description: "List network requests" },
+    { method: "GET", path: "/api/sarah-network/requests/:requestId", domain: "consumer", tenantScoped: false, description: "Get network request" },
+
+    // SNET-01a — Network identity (tenant members / superadmin)
+    { method: "GET", path: "/api/network/v1/entities", domain: "network", tenantScoped: true, description: "Network entity by companyId (?companyId=)" },
+    { method: "GET", path: "/api/network/v1/entities/:snId", domain: "network", tenantScoped: true, description: "Network entity by SN-ID" },
+
+    // SNET-03 — Listing / publish (tenant members; writes owner/manager)
+    { method: "GET", path: "/api/network/v1/orgs/:companyId/listing", domain: "network", tenantScoped: true, description: "Listing draft + published state + missing fields" },
+    { method: "PUT", path: "/api/network/v1/orgs/:companyId/listing", domain: "network", tenantScoped: true, description: "Save listing draft (validated public/restricted fields)" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/listing/publish", domain: "network", tenantScoped: true, description: "Publish listing to Discover (eligibility + completeness gate)" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/listing/unpublish", domain: "network", tenantScoped: true, description: "Remove listing from Discover" },
+    { method: "GET", path: "/api/network/v1/entities/:snId/profile", domain: "consumer", tenantScoped: false, description: "Public entity profile (listed, non-suspended only)" },
+
+    // SNET-04 — Verification
+    { method: "GET", path: "/api/network/v1/orgs/:companyId/verification", domain: "network", tenantScoped: true, description: "Tenant verification status" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/verification", domain: "network", tenantScoped: true, description: "Submit for verification (optional evidence refs)" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/verification/evidence", domain: "network", tenantScoped: true, description: "Attach evidence references (https URL / external ref / uploaded file ref) to the open verification case" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/verification/evidence-uploads", domain: "network", tenantScoped: true, description: "Request a tenant-scoped signed upload token for a verification evidence file (metadata + sha256 only)" },
+    { method: "PUT", path: "/api/network/v1/orgs/:companyId/verification/evidence-uploads/:uploadId", domain: "network", tenantScoped: true, description: "Complete an evidence upload (raw body; records size + sha256; Phase 2.0: bytes are stored in the evidence blob store for officer download)" },
+    { method: "GET", path: "/api/platform/network/v1/verification", domain: "platform", tenantScoped: false, description: "Verification queue (platform)" },
+    { method: "GET", path: "/api/platform/network/v1/verification/:caseId", domain: "platform", tenantScoped: false, description: "Verification case (platform)" },
+    { method: "GET", path: "/api/platform/network/v1/verification/:caseId/evidence/:evidenceId/download", domain: "platform", tenantScoped: false, description: "Download a stored verification evidence file (verification_officer / super admin; audited; attachment, nosniff)" },
+    { method: "POST", path: "/api/platform/network/v1/verification/:caseId/decision", domain: "platform", tenantScoped: false, description: "Decide verification case: start_review, request_info, verify/approve, reject, restrict (audited)" },
+
+    // REC-05 — Sarah Recommendations query (consumer)
+    { method: "POST", path: "/api/recommendations/v1/query", domain: "consumer", tenantScoped: false, description: "REC query engine — organic + sponsored shortlist" },
+    { method: "POST", path: "/api/recommendations/v1/presentations", domain: "consumer", tenantScoped: false, description: "Record qualified sponsored presentation (idempotent)" },
+
+    // REC-02 — Sarah Recommendations offerings + verification
+    { method: "GET", path: "/api/companies/:companyId/recommendations/offerings", domain: "tenant", tenantScoped: true, description: "List recommendation offerings (RS09 catalogue)" },
+    { method: "POST", path: "/api/companies/:companyId/recommendations/offerings", domain: "tenant", tenantScoped: true, description: "Create recommendation offering draft" },
+    { method: "PATCH", path: "/api/companies/:companyId/recommendations/offerings/:offeringId", domain: "tenant", tenantScoped: true, description: "Update recommendation offering" },
+    { method: "GET", path: "/api/companies/:companyId/recommendations/offerings/:offeringId/verification", domain: "tenant", tenantScoped: true, description: "Offering verification status" },
+    { method: "POST", path: "/api/companies/:companyId/recommendations/offerings/:offeringId/submit-verification", domain: "tenant", tenantScoped: true, description: "Submit offering for platform verification" },
+    { method: "GET", path: "/api/operations/recommendations/verification-queue", domain: "platform", tenantScoped: false, description: "REC offering verification queue (MC)" },
+    { method: "GET", path: "/api/operations/recommendations/verification-queue/:caseId", domain: "platform", tenantScoped: false, description: "REC offering verification case detail" },
+    { method: "POST", path: "/api/operations/recommendations/verification-queue/:caseId/decision", domain: "platform", tenantScoped: false, description: "REC offering verification decision (audited)" },
+    { method: "GET", path: "/api/companies/:companyId/recommendations/packages", domain: "tenant", tenantScoped: true, description: "RS09 campaign packages (planning tariffs)" },
+    { method: "GET", path: "/api/companies/:companyId/recommendations/campaigns", domain: "tenant", tenantScoped: true, description: "List recommendation campaigns" },
+    { method: "POST", path: "/api/companies/:companyId/recommendations/campaigns", domain: "tenant", tenantScoped: true, description: "Create recommendation campaign draft" },
+    { method: "PATCH", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId", domain: "tenant", tenantScoped: true, description: "Update draft campaign" },
+    { method: "POST", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId/submit", domain: "tenant", tenantScoped: true, description: "Submit campaign for MC approval" },
+    { method: "GET", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId/checkout", domain: "tenant", tenantScoped: true, description: "REC-09 campaign checkout status" },
+    { method: "POST", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId/checkout", domain: "tenant", tenantScoped: true, description: "REC-09 start campaign checkout" },
+    { method: "POST", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId/checkout/confirm", domain: "tenant", tenantScoped: true, description: "REC-09 pilot payment confirm" },
+    { method: "POST", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId/activate", domain: "tenant", tenantScoped: true, description: "Activate approved campaign (payment or pilot)" },
+    { method: "GET", path: "/api/companies/:companyId/recommendations/campaigns/:campaignId/usage", domain: "tenant", tenantScoped: true, description: "Campaign allowance usage (current period)" },
+    { method: "GET", path: "/api/operations/recommendations/campaign-approval-queue", domain: "platform", tenantScoped: false, description: "REC campaign approval queue" },
+    { method: "GET", path: "/api/operations/recommendations/campaigns/:campaignId", domain: "platform", tenantScoped: false, description: "REC campaign detail (MC)" },
+    { method: "POST", path: "/api/operations/recommendations/campaigns/:campaignId/decision", domain: "platform", tenantScoped: false, description: "Approve/reject recommendation campaign" },
+
+    // MC-PO — Platform governance (Mission Control)
+    { method: "GET", path: "/api/platform/governance/consumers", domain: "platform", tenantScoped: false, description: "Consumer directory (metadata)" },
+    { method: "GET", path: "/api/platform/governance/consumers/:uid", domain: "platform", tenantScoped: false, description: "Consumer profile detail (no private content)" },
+    { method: "GET", path: "/api/platform/governance/activity/overview", domain: "platform", tenantScoped: false, description: "Platform event activity overview" },
+    { method: "GET", path: "/api/platform/governance/safety/cases", domain: "platform", tenantScoped: false, description: "Consumer safety cases" },
+    { method: "POST", path: "/api/platform/governance/safety/cases", domain: "platform", tenantScoped: false, description: "Open consumer safety case" },
+    { method: "POST", path: "/api/platform/governance/safety/cases/:caseId/decision", domain: "platform", tenantScoped: false, description: "Consumer safety decision" },
+    { method: "GET", path: "/api/platform/governance/rs02/console", domain: "platform", tenantScoped: false, description: "RS02 consumer revenue console" },
+    { method: "GET", path: "/api/platform/governance/orgs/overview", domain: "platform", tenantScoped: false, description: "Organisation oversight snapshot" },
+    { method: "GET", path: "/api/platform/governance/announcements", domain: "platform", tenantScoped: false, description: "ZiricAI platform announcements" },
+    { method: "POST", path: "/api/platform/governance/announcements", domain: "platform", tenantScoped: false, description: "Create platform announcement draft" },
+    { method: "PATCH", path: "/api/platform/governance/announcements/:id", domain: "platform", tenantScoped: false, description: "Update or publish announcement" },
+    { method: "GET", path: "/api/platform/governance/app-monitor/overview", domain: "platform", tenantScoped: false, description: "Sarah App monitor rollups" },
+    { method: "GET", path: "/api/platform/governance/audit", domain: "platform", tenantScoped: false, description: "Platform admin audit log" },
+    { method: "POST", path: "/api/platform/telemetry/sarah-app", domain: "consumer", tenantScoped: false, description: "Sarah App telemetry ingest" },
+
+    // SNET-09 — Mission Control (platform)
+    { method: "GET", path: "/api/platform/network/v1/stats", domain: "platform", tenantScoped: false, description: "Sarah Network overview numbers" },
+    { method: "GET", path: "/api/platform/network/v1/search-config", domain: "platform", tenantScoped: false, description: "MC Search: effective categories + synonyms and defaults (search_admin / super admin)" },
+    { method: "PUT", path: "/api/platform/network/v1/search-config", domain: "platform", tenantScoped: false, description: "MC Search: replace categories and/or synonyms (validated, audited)" },
+    { method: "POST", path: "/api/platform/network/v1/search-config/reset", domain: "platform", tenantScoped: false, description: "MC Search: reset taxonomy to built-in defaults (audited)" },
+    { method: "GET", path: "/api/platform/network/v1/roles", domain: "platform", tenantScoped: false, description: "Platform RBAC: list Sarah Network role grants (super admin only)" },
+    { method: "PUT", path: "/api/platform/network/v1/roles/:uid", domain: "platform", tenantScoped: false, description: "Platform RBAC: set the Sarah Network roles of a user (super admin only; audited)" },
+    { method: "GET", path: "/api/platform/network/v1/entities", domain: "platform", tenantScoped: false, description: "Network entities list (?status=&q=)" },
+    { method: "GET", path: "/api/platform/network/v1/entities/:snId", domain: "platform", tenantScoped: false, description: "Entity detail + audit trail" },
+    { method: "POST", path: "/api/platform/network/v1/entities/:snId/status", domain: "platform", tenantScoped: false, description: "Suspend / reinstate entity (reason required, audited)" },
+
+    // SNET-10 — Trust & safety
+    { method: "POST", path: "/api/network/v1/entities/:snId/report", domain: "consumer", tenantScoped: false, description: "Report a listed entity (rate-limited, deduped)" },
+    { method: "GET", path: "/api/network/v1/reports", domain: "consumer", tenantScoped: false, description: "My reports (status only)" },
+    { method: "GET", path: "/api/platform/network/v1/moderation", domain: "platform", tenantScoped: false, description: "Moderation queue (priority-ordered)" },
+    { method: "GET", path: "/api/platform/network/v1/moderation/:caseId", domain: "platform", tenantScoped: false, description: "Moderation case" },
+    { method: "POST", path: "/api/platform/network/v1/moderation/:caseId/decision", domain: "platform", tenantScoped: false, description: "start_review | dismiss | suspend_entity (audited)" },
+
+    // SNET-05 — Search
+    { method: "GET", path: "/api/network/v1/directory/search", domain: "consumer", tenantScoped: false, description: "Ranked directory search (q, category, verified, cursor, city, region, near, radiusKm, sort); anonymous read of listed entries, per-IP rate limited" },
+    { method: "GET", path: "/api/network/v1/directory/suggest", domain: "consumer", tenantScoped: false, description: "Search autocomplete; anonymous read of listed entries, per-IP rate limited" },
+    { method: "GET", path: "/api/network/v1/health", domain: "network", tenantScoped: false, description: "Network health (public, non-sensitive)" },
+
+    // SNET-06 — Agent registry
+    { method: "GET", path: "/api/network/v1/agents", domain: "consumer", tenantScoped: false, description: "Public agent directory (?capability=)" },
+    { method: "GET", path: "/api/network/v1/agents/:agentSnId", domain: "consumer", tenantScoped: false, description: "Public agent card" },
+    { method: "GET", path: "/api/network/v1/orgs/:companyId/agent", domain: "network", tenantScoped: true, description: "Company Sarah agent record (owner view)" },
+    { method: "PUT", path: "/api/network/v1/orgs/:companyId/agent", domain: "network", tenantScoped: true, description: "Update declared capabilities / pause" },
+
+    // SNET-07 — Relationships
+    { method: "GET", path: "/api/network/v1/connections", domain: "consumer", tenantScoped: false, description: "My relationships" },
+    { method: "GET", path: "/api/network/v1/connections/:snId", domain: "consumer", tenantScoped: false, description: "Relationship with one entity" },
+    { method: "POST", path: "/api/network/v1/connections", domain: "consumer", tenantScoped: false, description: "Follow / subscribe / connect / block (consent-linked)" },
+    // Gate 5 — subscriber notification stub (event log only)
+    { method: "GET", path: "/api/network/v1/orgs/:companyId/subscriber-events", domain: "network", tenantScoped: true, description: "Subscriber event log (audience counts only; Phase 2.0 fans out in-app notifications; no device push)" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/subscriber-events", domain: "network", tenantScoped: true, description: "Record or schedule subscriber announcement / notification / reminder (optional scheduledAt; urgent announcements audited; engagement on list)" },
+    // Gate 2 — My Organisations
+    { method: "GET", path: "/api/network/v1/my-organisations", domain: "consumer", tenantScoped: false, description: "My Organisations: my relationships joined to public directory cards" },
+    { method: "GET", path: "/api/network/v1/my-updates", domain: "consumer", tenantScoped: false, description: "Subscriber updates feed (pull): announcements / notifications / reminders from organisations the user is subscribed to, honouring channel preferences" },
+    { method: "GET", path: "/api/network/v1/my-notifications", domain: "consumer", tenantScoped: false, description: "My in-app notifications (Phase 2.0; poll) with unread count" },
+    { method: "POST", path: "/api/network/v1/my-notifications/read", domain: "consumer", tenantScoped: false, description: "Mark my notifications read (ids[] or all)" },
+    { method: "GET", path: "/api/network/v1/my-notification-preferences", domain: "consumer", tenantScoped: false, description: "Global notification prefs (push channels + quiet hours)" },
+    { method: "PUT", path: "/api/network/v1/my-notification-preferences", domain: "consumer", tenantScoped: false, description: "Update global notification prefs" },
+    { method: "POST", path: "/api/network/v1/my-push-devices", domain: "consumer", tenantScoped: false, description: "Register FCM/web push token (consent required for delivery)" },
+    { method: "PUT", path: "/api/network/v1/my-organisations/:snId/preferences", domain: "consumer", tenantScoped: false, description: "My Organisations channel preferences (notifications / announcements / reminders)" },
+    { method: "GET", path: "/api/network/v1/orgs/:companyId/connections", domain: "network", tenantScoped: true, description: "Business relationship list (pseudonymous)" },
+    { method: "POST", path: "/api/network/v1/orgs/:companyId/connections/:connectionId/:action", domain: "network", tenantScoped: true, description: "accept | decline | disconnect | block | unblock" },
+
+    // CH — Unified Chat index
+    { method: "GET", path: "/api/chat/conversations", domain: "consumer", tenantScoped: false, description: "Federated chat index (business, people, groups, network); hydrates from the durable store after restart" },
+    { method: "GET", path: "/api/network-conversations/:conversationId/messages", domain: "consumer", tenantScoped: false, description: "Network-linked (AI↔AI) thread messages" },
+    { method: "GET", path: "/api/chat/conversations/:companyId/handover", domain: "consumer", tenantScoped: false, description: "Handover ownership sync" },
+
+    // U5 — Company conversations
+    { method: "GET", path: "/api/discover/companies", domain: "consumer", tenantScoped: false, description: "Discover list: ranked search over the durable directory (q, category, limit, cursor, city, region, near, radiusKm, sort); anonymous read of listed entries only (per-IP rate limit); fixtures never merged" },
+    { method: "GET", path: "/api/user-conversations", domain: "consumer", tenantScoped: false, description: "User chat list" },
+    { method: "GET", path: "/api/user-conversations/:companyId/messages", domain: "consumer", tenantScoped: false, description: "Company chat history" },
+    { method: "GET", path: "/api/user-conversations/id/:conversationId/messages", domain: "consumer", tenantScoped: false, description: "Company chat history by conversation id" },
+    { method: "POST", path: "/api/user-conversations/:companyId/messages", domain: "consumer", tenantScoped: false, description: "Send company Sarah message" },
 
     // Onboarding
     { method: "GET", path: "/api/onboarding/industries", domain: "onboarding", tenantScoped: false, description: "Industry list" },

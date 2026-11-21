@@ -1,0 +1,102 @@
+{
+  "presetId": "dental-clinic",
+  "name": "Dental clinic",
+  "version": "1.0.0",
+  "schemaVersion": "1.0.0",
+  "description": "General and specialist dental practices — bookings diary, client file, medical-aid worksheets, and practice till.",
+  "industry": "dental",
+  "subIndustries": ["general_dentistry", "paediatric", "orthodontics", "multi_site"],
+  "jurisdictions": ["ZA", "global"],
+  "status": "approved",
+  "owner": "product-platform",
+  "lastReviewedAt": "2026-10-30",
+  "sarahMapping": {
+    "finance": {
+      "purpose": "Practice income, till receipts, and medical-aid worksheets within supported finance tools.",
+      "capabilities": [
+        "finance.transactions.read",
+        "finance.overview.read",
+        "dental.pos.read",
+        "dental.medicalAid.read"
+      ],
+      "instructionBlockIds": ["dental.finance.terminology"]
+    },
+    "operations": {
+      "purpose": "Bookings diary, availability checks, and operational tasks.",
+      "capabilities": ["tasks.list", "tasks.create", "dental.bookings.read", "dental.bookings.write"],
+      "instructionBlockIds": ["dental.ops.practiceWorkflows"]
+    },
+    "hr": {
+      "purpose": "Practice roster and HR workflows.",
+      "capabilities": ["hr.roster.read"],
+      "instructionBlockIds": []
+    },
+    "admin": {
+      "purpose": "Cross-module coordination, client file reads, and portal navigation.",
+      "capabilities": [
+        "admin.portalNavigation",
+        "knowledge.search",
+        "dental.patients.read",
+        "dental.bookings.read"
+      ],
+      "instructionBlockIds": ["dental.admin.overview"]
+    }
+  },
+  "modules": [
+    {
+      "moduleId": "dental-command-centre",
+      "displayName": "Dental Command Center",
+      "purpose": "Practice overview — bookings, clients, till, and medical aid in one surface.",
+      "requiredCapabilities": ["dental.bookings.read"],
+      "optionalCapabilities": [],
+      "defaultActivationState": "on",
+      "relevantSarahEmployees": ["admin", "operations"]
+    },
+    {
+      "moduleId": "dental-client-database",
+      "displayName": "Client database",
+      "purpose": "Patient/client records linked to diary, till, and CRM.",
+      "requiredCapabilities": ["dental.patients.read"],
+      "optionalCapabilities": [],
+      "defaultActivationState": "on",
+      "relevantSarahEmployees": ["admin", "operations"]
+    },
+    {
+      "moduleId": "dental-medical-aid",
+      "displayName": "Medical aid worksheets",
+      "purpose": "Internal worksheets — not scheme submission or payment guarantees.",
+      "requiredCapabilities": ["dental.medicalAid.read"],
+      "optionalCapabilities": [],
+      "defaultActivationState": "on",
+      "relevantSarahEmployees": ["finance", "admin"]
+    },
+    {
+      "moduleId": "dental-pos",
+      "displayName": "Point of Sale",
+      "purpose": "Practice till receipts posted to finance when configured.",
+      "requiredCapabilities": ["dental.pos.read"],
+      "optionalCapabilities": ["finance.transactions.read"],
+      "defaultActivationState": "on",
+      "relevantSarahEmployees": ["finance"]
+    }
+  ],
+  "roles": [],
+  "workflows": [],
+  "kpis": ["dental.bookings.byStatus", "dental.pos.revenue", "crm.byStage"],
+  "knowledge": [],
+  "compliance": [],
+  "onboarding": {
+    "checklist": [
+      "business_identity",
+      "dental_practice_hours",
+      "dental_locations_services",
+      "appointments_baseline",
+      "whatsapp_baseline"
+    ]
+  },
+  "integrations": ["integrations.whatsapp"],
+  "acceptance": {
+    "humanReviewRequired": true,
+    "notes": "Phase 1 — Smile More Dentists capabilities generalized for all dental-clinic preset tenants."
+  }
+}
