@@ -24,6 +24,7 @@ import {
 } from "./personalSarahWorldIntelPrefetch.js";
 import { buildOpenWebPrefetchBlock, shouldPrefetchOpenWeb } from "./personalSarahOpenWebPrefetch.js";
 import { buildLocalAffairsPrefetchBlock, shouldPrefetchLocalAffairs } from "./personalSarahLocalAffairsPrefetch.js";
+import { polishPersonalSarahReply } from "./personalSarahConversationVoice.js";
 
 bootstrapEnv();
 
@@ -222,6 +223,10 @@ export async function handlePersonalSarahChat(auth, input) {
 
     if (!reply) {
         reply = "I'm here — could you rephrase that?";
+    }
+
+    if (session.mode !== "work") {
+        reply = polishPersonalSarahReply(reply);
     }
 
     await appendPersonalSarahMessage(session, "user", displayMessage || message, {

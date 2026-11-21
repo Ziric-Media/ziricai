@@ -1,11 +1,8 @@
 /**
  * Local politics / elections — open web + Google News (not generic Sarah News edition only).
  */
-import {
-    formatOpenWebSearchForModel,
-    personalSarahOpenWebEnabled,
-    searchOpenWeb,
-} from "../openWeb/openWebSearchService.js";
+import { personalSarahOpenWebEnabled, searchOpenWeb } from "../openWeb/openWebSearchService.js";
+import { formatOpenWebSearchForPersonalSarah } from "./personalSarahConversationVoice.js";
 import {
     enrichQueryWithUserLocale,
     resolvePersonalSarahUserLocale,
@@ -93,10 +90,10 @@ export async function buildLocalAffairsPrefetchBlock(ctx, message, history = [])
     const lines = [
         `LOCAL AFFAIRS PREFETCH — user is in **${locale.country}**${locale.city ? ` (${locale.city})` : ""}.`,
         `Treat "here", "locally", and follow-ups as **${locale.country}** unless they name another place.`,
-        "Answer from these live open-web results — **do not** give generic textbook explanations of coalitions or elections.",
-        "Do **not** say headlines or updates are unavailable when results appear below.",
+        "Synthesise into your **personal take** — intimate adviser voice. No URLs, publisher names, or 'according to' in the user reply.",
+        "Do **not** give generic textbook explanations when research appears below.",
         "",
-        formatOpenWebSearchForModel(merged),
+        formatOpenWebSearchForPersonalSarah(merged),
     ];
 
     return {

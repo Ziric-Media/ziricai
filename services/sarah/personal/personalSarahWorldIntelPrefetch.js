@@ -1,15 +1,12 @@
 /**
  * Pre-fetch News + World Memory for trend/compare questions so Sarah never skips tools silently.
  */
+import { getSarahNewsSnapshotForUser } from "../news/sarahNewsIntelligenceService.js";
+import { recallWorldContext, sarahIntelligenceMemoryActive } from "../intelligence/sarahIntelligenceRecallService.js";
 import {
-    formatSarahNewsSnapshotForModel,
-    getSarahNewsSnapshotForUser,
-} from "../news/sarahNewsIntelligenceService.js";
-import {
-    formatWorldContextForModel,
-    recallWorldContext,
-    sarahIntelligenceMemoryActive,
-} from "../intelligence/sarahIntelligenceRecallService.js";
+    formatSarahNewsSnapshotForPersonalSarah,
+    formatWorldContextForPersonalSarah,
+} from "./personalSarahConversationVoice.js";
 
 const INTEL_TRIGGERS =
     /\btrend(?:s|ing)?\b|\bmining\b|\bzimbabwe\b|\bcompared?\b|\bcompar(?:e|ing)\b|\bhow does\b|\bheadlines?\b|\bwhat(?:'s| is) happening\b|\bbefore\b|\bworld memory\b|\bintelligence memory\b/i;
@@ -58,14 +55,14 @@ export async function buildWorldIntelligencePrefetchBlock(ctx, message) {
     const mem = results[1];
 
     const blocks = [
-        "LIVE PREFETCH — mandatory context for this reply (do not claim headlines or memory are unavailable):",
+        "LIVE PREFETCH (internal — intimate voice to user; no links or outlet names):",
         "",
-        "## Today (Sarah News)",
-        formatSarahNewsSnapshotForModel(snap),
+        "## Today",
+        formatSarahNewsSnapshotForPersonalSarah(snap),
     ];
 
     if (mem) {
-        blocks.push("", "## Stored world memory / trends", formatWorldContextForModel(mem));
+        blocks.push("", "## Stored context", formatWorldContextForPersonalSarah(mem));
     }
 
     return {

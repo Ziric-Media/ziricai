@@ -1,11 +1,8 @@
 /**
  * SWI-M1 — Personal Sarah tools for Sarah World Intelligence Memory.
  */
-import {
-    formatWorldContextForModel,
-    recallWorldContext,
-    sarahIntelligenceMemoryActive,
-} from "../intelligence/sarahIntelligenceRecallService.js";
+import { recallWorldContext, sarahIntelligenceMemoryActive } from "../intelligence/sarahIntelligenceRecallService.js";
+import { formatWorldContextForPersonalSarah } from "./personalSarahConversationVoice.js";
 
 export const PERSONAL_SARAH_INTELLIGENCE_TOOL_DEFINITIONS = [
     {
@@ -64,7 +61,7 @@ export async function executePersonalSarahIntelligenceTool(toolName, ctx, args =
             domain: args.domain,
             limit: args.maxItems,
         });
-        const message = formatWorldContextForModel(payload);
+        const message = formatWorldContextForPersonalSarah(payload);
         return {
             success: true,
             tool: toolName,

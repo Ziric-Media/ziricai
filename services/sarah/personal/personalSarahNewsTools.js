@@ -1,10 +1,8 @@
 /**
  * Personal Sarah — Sarah News intelligence (same RSS engine as Sarah News tab).
  */
-import {
-    formatSarahNewsSnapshotForModel,
-    getSarahNewsSnapshotForUser,
-} from "../news/sarahNewsIntelligenceService.js";
+import { getSarahNewsSnapshotForUser } from "../news/sarahNewsIntelligenceService.js";
+import { formatSarahNewsSnapshotForPersonalSarah } from "./personalSarahConversationVoice.js";
 import {
     addSarahNewsFollowTopic,
     getSarahNewsProfile,
@@ -119,7 +117,7 @@ export async function executePersonalSarahNewsTool(toolName, ctx, args = {}) {
                 code: snap.code,
             };
         }
-        const message = formatSarahNewsSnapshotForModel(snap);
+        const message = formatSarahNewsSnapshotForPersonalSarah(snap);
         return {
             success: true,
             tool: toolName,

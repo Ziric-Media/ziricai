@@ -1,13 +1,11 @@
 /**
  * Personal Sarah — live open web search and page read (beyond Sarah News RSS).
  */
+import { personalSarahOpenWebEnabled, readOpenWebPage, searchOpenWeb } from "../openWeb/openWebSearchService.js";
 import {
-    formatOpenWebPageForModel,
-    formatOpenWebSearchForModel,
-    personalSarahOpenWebEnabled,
-    readOpenWebPage,
-    searchOpenWeb,
-} from "../openWeb/openWebSearchService.js";
+    formatOpenWebPageForPersonalSarah,
+    formatOpenWebSearchForPersonalSarah,
+} from "./personalSarahConversationVoice.js";
 import { enrichQueryWithUserLocale, resolvePersonalSarahUserLocale } from "./personalSarahUserLocale.js";
 
 export const PERSONAL_SARAH_OPEN_WEB_TOOL_DEFINITIONS = [
@@ -68,7 +66,7 @@ export async function executePersonalSarahOpenWebTool(toolName, ctx, args = {}) 
                 localeHint: locale,
                 includeGoogleNews: true,
             });
-            const message = formatOpenWebSearchForModel(payload);
+            const message = formatOpenWebSearchForPersonalSarah(payload);
             return {
                 success: payload.ok,
                 tool: toolName,
@@ -86,7 +84,7 @@ export async function executePersonalSarahOpenWebTool(toolName, ctx, args = {}) 
         }
         try {
             const payload = await readOpenWebPage(url);
-            const message = formatOpenWebPageForModel(payload);
+            const message = formatOpenWebPageForPersonalSarah(payload);
             return {
                 success: payload.ok,
                 tool: toolName,

@@ -1,11 +1,8 @@
 /**
  * Prefetch open-web snippets for general knowledge questions (not news/trend compares).
  */
-import {
-    formatOpenWebSearchForModel,
-    personalSarahOpenWebEnabled,
-    searchOpenWeb,
-} from "../openWeb/openWebSearchService.js";
+import { personalSarahOpenWebEnabled, searchOpenWeb } from "../openWeb/openWebSearchService.js";
+import { formatOpenWebSearchForPersonalSarah } from "./personalSarahConversationVoice.js";
 import { shouldPrefetchWorldIntelligence } from "./personalSarahWorldIntelPrefetch.js";
 import { shouldPrefetchLocalAffairs } from "./personalSarahLocalAffairsPrefetch.js";
 
@@ -38,9 +35,9 @@ export async function buildOpenWebPrefetchBlock(message) {
     return {
         query,
         block: [
-            "OPEN WEB PREFETCH — use this for your reply; do not say you lack internet access:",
+            "OPEN WEB PREFETCH (internal — intimate adviser voice in reply; no links or outlet names):",
             "",
-            formatOpenWebSearchForModel(payload),
+            formatOpenWebSearchForPersonalSarah(payload),
         ].join("\n"),
         resultCount: payload.resultCount || 0,
     };
