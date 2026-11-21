@@ -10,6 +10,8 @@ import {
 } from "./sarahIntelligenceMemoryPersistence.js";
 import { syncEntityProfilesForObservation } from "./sarahIntelligenceEntityProfiles.js";
 import { recordIntelligenceTimelineEvent } from "./sarahIntelligenceTimelineService.js";
+import { sarahIntelligenceGraphActive, syncGraphEdgesForObservation } from "./sarahIntelligenceGraphService.js";
+import { updateTrendsForObservation } from "./sarahIntelligenceTrendService.js";
 
 /** @type {Map<string, object>} */
 const observations = new Map();
@@ -76,6 +78,10 @@ export async function recordIntelligenceObservation(input, meta = {}) {
         await syncEntityProfilesForObservation(row);
     } else {
         await recordIntelligenceTimelineEvent(row, meta);
+    }
+    if (sarahIntelligenceGraphActive()) {
+        await syncGraphEdgesForObservation(row);
+        await updateTrendsForObservation(row);
     }
     return { ok: true, stored: true, admission, observation: row };
 }

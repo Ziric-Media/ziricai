@@ -793,6 +793,8 @@ export const PLATFORM_SARAH_WORLD_MEMORY = {
     OBSERVATIONS: "observations",
     ENTITIES: "entities",
     TIMELINE: "timeline",
+    GRAPH: "graphEdges",
+    TRENDS: "trends",
 };
 
 export function platformSarahWorldMemoryObservationsCollectionPath() {
@@ -820,4 +822,22 @@ export function platformSarahWorldMemoryTimelineCollectionPath() {
 export function platformSarahWorldMemoryTimelinePath(timelineId) {
     const safe = String(timelineId || "unknown").replace(/[/\\]/g, "_");
     return `${platformSarahWorldMemoryTimelineCollectionPath()}/${safe}`;
+}
+
+export function platformSarahWorldMemoryGraphCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_SARAH_WORLD_MEMORY.ROOT_DOC}/${PLATFORM_SARAH_WORLD_MEMORY.GRAPH}`;
+}
+
+export function platformSarahWorldMemoryGraphEdgePath(edgeId) {
+    const safe = String(edgeId || "unknown").replace(/[/\\]/g, "_");
+    return `${platformSarahWorldMemoryGraphCollectionPath()}/${safe}`;
+}
+
+export function platformSarahWorldMemoryTrendsCollectionPath() {
+    return `${ROOT.PLATFORM}/${PLATFORM_SARAH_WORLD_MEMORY.ROOT_DOC}/${PLATFORM_SARAH_WORLD_MEMORY.TRENDS}`;
+}
+
+export function platformSarahWorldMemoryTrendPath(trendId) {
+    const safe = String(trendId || "unknown").replace(/[/\\]/g, "_");
+    return `${platformSarahWorldMemoryTrendsCollectionPath()}/${safe}`;
 }

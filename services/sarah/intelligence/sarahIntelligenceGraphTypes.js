@@ -1,5 +1,5 @@
 /**
- * SWI-M0 — graph edge types for future M2 implementation.
+ * SWI-M2 — graph node / edge type constants (see sarahIntelligenceGraphService.js).
  */
 
 export const GRAPH_NODE_TYPES = Object.freeze([

@@ -29,6 +29,23 @@
 - [x] `sarahIntelligenceRecallService.js` + `personalSarahIntelligenceTools.js` — `recallWorldContext` tool for Personal Sarah  
 - [x] Unit test `swi-memory-admission.test.mjs` (store versions + recall when flagged)  
 
+## M2 acceptance (this branch)
+
+- [x] `sarahIntelligenceCorroborationPolicy.js` — trend promotion thresholds (allow-list publishers vs distinct count)  
+- [x] `sarahIntelligenceGraphService.js` — region / industry → development edges on admit  
+- [x] `sarahIntelligenceTrendService.js` — topic trend objects with corroboration tier + strength  
+- [x] Firestore paths `graphEdges`, `trends` under platform `sarahWorldMemory`  
+- [x] `recallWorldContext` includes trends + graph slice when graph flag on  
+- [x] Unit test `swi-graph-trends.test.mjs`  
+
+### M2 environment (default off until sign-off)
+
+| Variable | Purpose |
+|----------|---------|
+| `SARAH_INTELLIGENCE_GRAPH_ENABLED` | `true` — build graph edges + trends on memory admit; enrich recall |
+| `SARAH_INTELLIGENCE_TREND_MIN_ALLOWLIST` | Default `2` — distinct allow-list publishers for corroborated tier |
+| `SARAH_INTELLIGENCE_TREND_MIN_PUBLISHERS` | Default `3` — distinct any publishers fallback |
+
 ### M0 environment (optional — default off in production)
 
 | Variable | Purpose |
@@ -41,4 +58,4 @@
 
 - **After M0:** No user-visible “memory answers” until M1 retrieval tool is product-approved.  
 - **After M1:** Pilot with Spencer on ZW mining + SA business queries only.  
-- **No graph in production** until M2 audit sign-off.
+- **M2 graph/trends:** Ship code on branch; enable `SARAH_INTELLIGENCE_GRAPH_ENABLED` on Railway only after Spencer sign-off.

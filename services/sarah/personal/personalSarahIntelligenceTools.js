@@ -74,6 +74,9 @@ export async function executePersonalSarahIntelligenceTool(toolName, ctx, args =
                 observations: payload.observations,
                 entities: payload.entities,
                 timeline: payload.timeline,
+                trends: payload.trends,
+                graphEdges: payload.graphEdges,
+                graphActive: payload.graphActive,
             },
         };
     } catch (err) {

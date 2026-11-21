@@ -4,6 +4,9 @@
 import { listIntelligenceObservations } from "./sarahIntelligenceMemoryStore.js";
 import { listIntelligenceTimeline } from "./sarahIntelligenceTimelineService.js";
 import { queryWorldMemoryEntityProfiles } from "./sarahIntelligenceMemoryPersistence.js";
+import { graphContextForEntityIds, sarahIntelligenceGraphActive } from "./sarahIntelligenceGraphService.js";
+import { listIntelligenceTrends } from "./sarahIntelligenceTrendService.js";
+import { deriveEntityRefsFromObservation } from "./sarahIntelligenceEntityProfiles.js";
 
 export function sarahIntelligenceMemoryActive() {
     return String(process.env.SARAH_INTELLIGENCE_MEMORY_ENABLED || "").toLowerCase() === "true";
@@ -20,6 +23,8 @@ export async function recallWorldContext(opts = {}) {
             observations: [],
             timeline: [],
             entities: [],
+            trends: [],
+            graphEdges: [],
             message: "Sarah World Intelligence Memory is not enabled on this server.",
         };
     }
@@ -39,15 +44,37 @@ export async function recallWorldContext(opts = {}) {
         queryWorldMemoryEntityProfiles({ query: opts.query, limit: 6 }),
     ]);
 
+    const graphOn = sarahIntelligenceGraphActive();
+    const [trends, graphEdges] = graphOn
+        ? await Promise.all([
+              listIntelligenceTrends({
+                  query: opts.query,
+                  region: opts.region,
+                  limit: 5,
+              }),
+              graphContextForEntityIds(
+                  (() => {
+                      const ids = entities.map((e) => e.entityId).filter(Boolean);
+                      if (ids.length || !observations.length) return ids;
+                      return deriveEntityRefsFromObservation(observations[0]).map((r) => r.entityId);
+                  })(),
+                  { limit: 10 }
+              ),
+          ])
+        : [[], []];
+
     return {
         ok: true,
         active: true,
+        graphActive: graphOn,
         query: opts.query || null,
         domain: opts.domain || null,
         region: opts.region || null,
         observations,
         timeline,
         entities,
+        trends,
+        graphEdges,
         count: observations.length,
     };
 }
@@ -93,6 +120,23 @@ export function formatWorldContextForModel(payload) {
         for (const t of payload.timeline.slice(0, 5)) {
             lines.push(`- ${t.at}: ${t.headline} (v${t.version})`);
         }
+        lines.push("");
+    }
+    if (payload.trends?.length) {
+        lines.push("Emergent trends (corroboration-gated):");
+        for (const tr of payload.trends.slice(0, 4)) {
+            lines.push(
+                `- ${tr.label}${tr.region ? ` (${tr.region})` : ""}: ${tr.corroborationTier} · strength ${tr.strength} · ${tr.publisherCount} publishers · "${String(tr.headlineSample || "").slice(0, 100)}"`
+            );
+        }
+        lines.push("");
+    }
+    if (payload.graphEdges?.length) {
+        lines.push("Graph links (region / industry → developments):");
+        for (const g of payload.graphEdges.slice(0, 6)) {
+            lines.push(`- ${g.fromNodeId} —${g.edgeType}→ ${g.toNodeId}${g.headline ? `: ${g.headline.slice(0, 80)}` : ""}`);
+        }
+        lines.push("");
     }
     lines.push(
         "",
