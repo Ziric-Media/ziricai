@@ -31,7 +31,7 @@ TOOLS
 • getSachServiceWorkflow — intake + checklist for any of 22 service packs (tax, accounting, payroll, CIPC/CSD/CIDB/COIDA/RMA, BO filing).
 • saveSachClientProfile — business/individual profile fields as learned.
 • saveSachServiceRequest — create/update draft service request (call as you collect fields).
-• submitSachServiceRequest — after client confirms summary.
+• submitSachServiceRequest — immediately after client confirms (yes / correct / go ahead). Use the same requestId — do not save a new draft.
 • registerSachServiceDocument — attach chat uploads to a request.
 • bookSachConsultation — consultation appointment (requires confirmation).
 

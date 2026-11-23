@@ -5,6 +5,7 @@ import { SACH_SARAH_SYSTEM_PROMPT } from "../storage/sachAccountingKnowledge.js"
 import {
     bookConsultationForClient,
     createServiceRequestDraft,
+    findLatestEditableDraft,
     getClientProfile,
     listServiceRequestsForClient,
     registerServiceDocument,
@@ -137,7 +138,7 @@ const saveSachClientProfileTool = {
 const saveSachServiceRequestTool = {
     name: "saveSachServiceRequest",
     description:
-        "Create or update a structured accounting service request. Collect conversationally: service type, categories, period, business name, summary. Call repeatedly as you learn more.",
+        "Create or update a draft service request while collecting fields. Always pass requestId from the previous save when updating. Do NOT call after the client confirms — use submitSachServiceRequest instead.",
     parameters: {
         type: "object",
         properties: {
@@ -173,10 +174,18 @@ const saveSachServiceRequestTool = {
             email: args.contactEmail,
             fullName: ctx.customerName,
         };
+        let requestId = args.requestId;
+        if (!requestId) {
+            const recent = await findLatestEditableDraft(ctx.companyId, ctx.customerId);
+            if (recent) {
+                const sameService = !args.serviceType || args.serviceType === recent.serviceType;
+                if (sameService) requestId = recent.requestId;
+            }
+        }
         let summary;
         try {
-            if (args.requestId) {
-                summary = await updateServiceRequestDraft(ctx.companyId, ctx.customerId, args.requestId, {
+            if (requestId) {
+                summary = await updateServiceRequestDraft(ctx.companyId, ctx.customerId, requestId, {
                     serviceType: args.serviceType,
                     categories: args.categories,
                     reportingPeriod: args.reportingPeriod,
@@ -226,7 +235,8 @@ const saveSachServiceRequestTool = {
 
 const submitSachServiceRequestTool = {
     name: "submitSachServiceRequest",
-    description: "Submit the saved service request after the client confirms the summary.",
+    description:
+        "Submit the draft to Sach staff after the client explicitly confirms the summary (yes / correct / go ahead). Required: requestId from the last saveSachServiceRequest result. Never call saveSachServiceRequest again on confirmation.",
     parameters: {
         type: "object",
         properties: { requestId: { type: "string" } },

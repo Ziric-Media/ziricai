@@ -16,6 +16,11 @@ import {
     extractSachUiHints,
 } from "../../consulting/sachAccountingChatTools.js";
 import { SARAH_SOLE_CONTACT_RULES } from "./sarahSoleContactChannelRules.js";
+import {
+    assistantAwaitedSubmissionConfirm,
+    isAffirmativeConfirmation,
+} from "../../consulting/sachAccountingClientConfirm.js";
+import { findLatestEditableDraft } from "../../consulting/sachAccountingServiceRequestService.js";
 
 const CHANNEL = "sarah_app";
 
@@ -62,6 +67,7 @@ const GOVERNANCE_RULES = [
     "Multiple distinct services in one conversation → separate saveSachServiceRequest drafts when appropriate.",
     "When the service is identified, call getSachServiceWorkflow first, then save intakeAnswers via saveSachServiceRequest.",
     "Present saveSachServiceRequest summary and obtain explicit confirmation before submitSachServiceRequest.",
+    "On yes/correct/go ahead: call submitSachServiceRequest with the same requestId — never save again or invent a new reference.",
     "For SARS letters: ask for secure upload and create a tax/SARS request — do not invent dispute outcomes.",
 ].join("\n");
 
@@ -150,6 +156,28 @@ export async function runCompanySarahSachAccountingTurn(params) {
             role: m.role === "assistant" ? "assistant" : "user",
             content: String(m.content || "").slice(0, 4000),
         }));
+
+    if (
+        signedIn &&
+        isAffirmativeConfirmation(text) &&
+        assistantAwaitedSubmissionConfirm(history)
+    ) {
+        const draft = await findLatestEditableDraft(companyId, uid).catch(() => null);
+        if (draft?.requestId && draft.status === "new") {
+            const submitted = await runSachTool("submitSachServiceRequest", toolCtx, {
+                requestId: draft.requestId,
+            });
+            if (submitted.ok) {
+                return {
+                    reply:
+                        `${submitted.message}\n\nOur team will follow up on **${submitted.data?.reference || draft.reference}**. ` +
+                        `Is there anything else I can help you with today?`,
+                    toolResults: [submitted],
+                    uiHints: extractSachUiHints([submitted]),
+                };
+            }
+        }
+    }
 
     const aiResult = await askAIWithTools(text, {
         history: chatHistory,

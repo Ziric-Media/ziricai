@@ -274,6 +274,21 @@ export async function registerServiceDocument(companyId, clientUid, requestId, i
     });
 }
 
+/** Most recent client-editable draft (status `new` etc.) for deduping chat saves. */
+export async function findLatestEditableDraft(companyId, clientUid, { maxAgeMs = 4 * 60 * 60 * 1000 } = {}) {
+    const list = await listServiceRequestsForClient(companyId, clientUid);
+    const cutoff = Date.now() - maxAgeMs;
+    const editable = list.filter((r) =>
+        ["new", "information_required", "client_action_required"].includes(r.status)
+    );
+    const recent = editable.filter((r) => {
+        const ts = Date.parse(r.updatedAt || r.createdAt || "");
+        return Number.isFinite(ts) && ts >= cutoff;
+    });
+    recent.sort((a, b) => Date.parse(b.updatedAt || b.createdAt) - Date.parse(a.updatedAt || a.createdAt));
+    return recent[0] || null;
+}
+
 export async function listServiceRequestsForClient(companyId, clientUid) {
     await requirePractice(companyId);
     const rows = (await requestRepo.list(companyId, { max: 500 })).filter((r) => r.clientUid === clientUid);
