@@ -79,6 +79,8 @@ test("validation: rejects non-editable fields (verified), bad URLs, unknown cate
     const branded = validateProfilePatch({ logoUrl: listingMedia, coverUrl: "https://cdn.example/cover.jpg" });
     assert.equal(branded.profile.logoUrl, listingMedia);
     assert.equal(branded.profile.coverUrl, "https://cdn.example/cover.jpg");
+    const site = validateProfilePatch({ contact: { website: "sachaccounting.co.za" } });
+    assert.equal(site.profile.contact.website, "https://sachaccounting.co.za");
     assert.throws(() => validateProfilePatch({ categories: ["nonsense"] }), { code: "PROFILE_INVALID" });
     assert.throws(() => validateProfilePatch({ contact: { email: "nope" } }), { code: "PROFILE_INVALID" });
     const { profile, restricted } = validateProfilePatch({ tags: ["Cars", "cars", " Service "], legalName: " X " });

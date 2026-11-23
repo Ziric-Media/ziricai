@@ -77,6 +77,19 @@ function url(value, field) {
     return v;
 }
 
+/** Business website — allow bare domains; store as https:// */
+function websiteUrl(value, field = "contact.website") {
+    let v = str(value, 500, field);
+    if (!v) return null;
+    if (/^https:\/\//i.test(v)) return v;
+    if (/^http:\/\//i.test(v)) return v.replace(/^http:\/\//i, "https://");
+    v = v.replace(/^\/\//, "");
+    if (!/^[a-z0-9.-]+\.[a-z]{2,}/i.test(v) && !v.includes(".")) {
+        throw bad(`${field} must be a valid website URL (https:// or domain name).`, "PROFILE_INVALID", { field });
+    }
+    return `https://${v}`;
+}
+
 const BLOCKED_IMAGE_HOTLINK = /(^|\.)facebook\.com$|(^|\.)fb\.com$|(^|\.)instagram\.com$|(^|\.)fbcdn\.net$/i;
 
 /** Social/page URLs cannot be embedded as Discover images (CORP blocks browsers). */
@@ -212,7 +225,7 @@ export function validateProfilePatch(input = {}) {
         profile.contact = {
             phone: str(c.phone, 40, "contact.phone"),
             email: str(c.email, 160, "contact.email"),
-            website: url(c.website, "contact.website"),
+            website: websiteUrl(c.website, "contact.website"),
         };
         if (profile.contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.contact.email)) {
             throw bad("contact.email is not a valid email.", "PROFILE_INVALID", { field: "contact.email" });

@@ -35,6 +35,7 @@ function fail(res, err, fallbackCode) {
         error: {
             code: err.code || fallbackCode,
             message: err.message || "Request failed",
+            ...(err.field ? { field: err.field } : {}),
             ...(err.missing ? { missing: err.missing } : {}),
             ...(err.fields ? { fields: err.fields } : {}),
         },

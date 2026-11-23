@@ -407,7 +407,7 @@ function formHtml(listing, { showPresenceExtras = false } = {}) {
     <div class="snet-grid snet-grid--3">
       ${field('nlPhone', 'Contact phone', c.phone, { disabled: ro })}
       ${field('nlEmail', 'Contact email', c.email, { disabled: ro, type: 'email' })}
-      ${field('nlWebsite', 'Website (https)', c.website, { disabled: ro, type: 'url' })}
+      ${field('nlWebsite', 'Website', c.website, { disabled: ro, placeholder: 'sachaccounting.co.za or https://…' })}
     </div>`;
 
   return `
@@ -563,18 +563,29 @@ function readGallery(container) {
       imageUrl: readImageUploadUrl(row.querySelector('[data-img-upload]')),
       caption: row.querySelector('[data-gal-caption]')?.value?.trim() || '',
     }))
-    .filter((g) => g.imageUrl);
+    .filter((g) => g.imageUrl && isAcceptedListingMediaUrl(g.imageUrl));
+}
+
+function normalizeWebsiteField(raw) {
+  const v = String(raw || '').trim();
+  if (!v) return '';
+  if (/^https:\/\//i.test(v)) return v;
+  if (/^http:\/\//i.test(v)) return v.replace(/^http:\/\//i, 'https://');
+  return `https://${v.replace(/^\/\//, '')}`;
 }
 
 function readProducts(container) {
   return [...container.querySelectorAll('#nlProductList .snet-repeat-row--product')]
-    .map((row) => ({
-      name: row.querySelector('[data-prd-name]')?.value?.trim() || '',
-      price: row.querySelector('[data-prd-price]')?.value?.trim() || '',
-      promotion: row.querySelector('[data-prd-promo]')?.value?.trim() || '',
-      imageUrl: readImageUploadUrl(row.querySelector('[data-img-upload]')),
-      description: row.querySelector('[data-prd-desc]')?.value?.trim() || '',
-    }))
+    .map((row) => {
+      const imageUrl = readImageUploadUrl(row.querySelector('[data-img-upload]'));
+      return {
+        name: row.querySelector('[data-prd-name]')?.value?.trim() || '',
+        price: row.querySelector('[data-prd-price]')?.value?.trim() || '',
+        promotion: row.querySelector('[data-prd-promo]')?.value?.trim() || '',
+        ...(imageUrl && isAcceptedListingMediaUrl(imageUrl) ? { imageUrl } : {}),
+        description: row.querySelector('[data-prd-desc]')?.value?.trim() || '',
+      };
+    })
     .filter((p) => p.name);
 }
 
@@ -619,7 +630,7 @@ function readProfile(container) {
     ...(logoUrl ? { logoUrl } : {}),
     ...(coverUrl ? { coverUrl } : {}),
     hours: parseHours(container.querySelector('#nlHours')?.value),
-    contact: { phone: v('nlPhone'), email: v('nlEmail'), website: v('nlWebsite') },
+    contact: { phone: v('nlPhone'), email: v('nlEmail'), website: normalizeWebsiteField(v('nlWebsite')) },
     legalName: v('nlLegalName'),
     registrationNumber: v('nlRegNo'),
     gallery: readGallery(container),
