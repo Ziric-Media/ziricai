@@ -167,8 +167,8 @@ export function validateProfilePatch(input = {}) {
     if (has("shortDescription")) profile.shortDescription = str(input.shortDescription, 600, "shortDescription");
     if (has("location")) profile.location = str(input.location, 160, "location");
     if (has("address")) profile.address = str(input.address, 240, "address");
-    if (has("logoUrl")) profile.logoUrl = url(input.logoUrl, "logoUrl");
-    if (has("coverUrl")) profile.coverUrl = url(input.coverUrl, "coverUrl");
+    if (has("logoUrl")) profile.logoUrl = discoverMediaUrl(input.logoUrl, "logoUrl");
+    if (has("coverUrl")) profile.coverUrl = discoverMediaUrl(input.coverUrl, "coverUrl");
     if (has("tags")) profile.tags = [...new Set(list(input.tags, 20, 30, "tags").map((t) => t.toLowerCase()))];
     if (has("languages")) profile.languages = list(input.languages, 10, 30, "languages");
     if (has("geo")) {
