@@ -58,7 +58,7 @@ export function imageUploadControlHtml(urlValue = '', opts = {}) {
       ${
         showUrl
           ? `<div class="snet-img-upload-row">
-        <input type="url"${idAttr} class="snet-img-upload-url" data-img-url value="${escapeHtml(url)}" placeholder="https://…" ${disabled ? 'disabled' : ''} />
+        <input type="text"${idAttr} class="snet-img-upload-url" data-img-url value="${escapeHtml(url)}" placeholder="https://… or upload a file" ${disabled ? 'disabled' : ''} inputmode="url" autocomplete="off" />
         ${
           disabled
             ? ''
@@ -158,7 +158,9 @@ export function bindImageUploads(root, companyId, opts = {}) {
       if (blobUrl) URL.revokeObjectURL(blobUrl);
       if (trigger) trigger.classList.remove('is-loading');
       if (res.error) {
-        if (status) status.textContent = res.error;
+        const msg = typeof res.error === "string" ? res.error : res.error?.message || "Upload failed.";
+        if (status) status.textContent = msg;
+        opts.onUploadError?.(msg, wrapper);
         syncImageUploadPreview(wrapper);
         return;
       }
@@ -184,6 +186,16 @@ export function bindImageUploads(root, companyId, opts = {}) {
 
     syncImageUploadPreview(wrapper);
   });
+}
+
+/** Logo/cover/gallery values accepted by listing profile validation. */
+export function isAcceptedListingMediaUrl(value) {
+  const v = String(value || "").trim();
+  if (!v) return false;
+  if (/^https:\/\//i.test(v)) return true;
+  if (/^\/api\/network\/v1\/listing-media\//i.test(v)) return true;
+  if (/^assets\//i.test(v)) return true;
+  return false;
 }
 
 /** Read image URL from an upload control (url input or hidden after solo upload). */

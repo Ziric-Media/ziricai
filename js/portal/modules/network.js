@@ -25,7 +25,12 @@ import {
   postSubscriberEvent,
   fetchSubscriberDeliverySummary,
 } from '../api.js';
-import { imageUploadControlHtml, bindImageUploads, readImageUploadUrl } from './portalImageUpload.js';
+import {
+  imageUploadControlHtml,
+  bindImageUploads,
+  readImageUploadUrl,
+  isAcceptedListingMediaUrl,
+} from './portalImageUpload.js';
 
 const FALLBACK_KINDS = ['registration_certificate', 'proof_of_address', 'ownership_proof', 'website', 'other'];
 
@@ -572,9 +577,17 @@ function readProducts(container) {
     .filter((p) => p.name);
 }
 
+function brandingMediaUrl(container, fieldId) {
+  const wrapper = container.querySelector(`#${fieldId}`)?.closest('[data-img-upload]');
+  const raw = readImageUploadUrl(wrapper) || container.querySelector(`#${fieldId}`)?.value?.trim() || '';
+  return isAcceptedListingMediaUrl(raw) ? raw : null;
+}
+
 function readProfile(container) {
   const v = (id) => container.querySelector(`#${id}`)?.value?.trim() || '';
   const picked = [...container.querySelectorAll('input[name="nlCategory"]:checked')].map((i) => i.value);
+  const logoUrl = brandingMediaUrl(container, 'nlLogo');
+  const coverUrl = brandingMediaUrl(container, 'nlCover');
   return {
     displayName: v('nlDisplayName'),
     industry: v('nlIndustry'),
@@ -586,8 +599,8 @@ function readProfile(container) {
     languages: splitCsv(v('nlLanguages')),
     serviceAreas: splitCsv(v('nlAreas')),
     geo: v('nlLat') || v('nlLng') ? { lat: v('nlLat'), lng: v('nlLng') } : null,
-    logoUrl: readImageUploadUrl(container.querySelector('#nlLogo')?.closest('[data-img-upload]')) || v('nlLogo'),
-    coverUrl: readImageUploadUrl(container.querySelector('#nlCover')?.closest('[data-img-upload]')) || v('nlCover'),
+    ...(logoUrl ? { logoUrl } : {}),
+    ...(coverUrl ? { coverUrl } : {}),
     hours: parseHours(container.querySelector('#nlHours')?.value),
     contact: { phone: v('nlPhone'), email: v('nlEmail'), website: v('nlWebsite') },
     legalName: v('nlLegalName'),
@@ -795,7 +808,10 @@ function bind(container, companyId, listing, opts = {}) {
     rerender();
   }));
 
-  const wireUploads = () => bindImageUploads(container, companyId);
+  const wireUploads = () =>
+    bindImageUploads(container, companyId, {
+      onUploadError: (msg) => showToast(msg, 'error'),
+    });
 
   container.querySelector('#nlGalleryAdd')?.addEventListener('click', () => {
     const host = container.querySelector('#nlGalleryList');

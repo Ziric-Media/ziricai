@@ -9,10 +9,12 @@
  *     GET  /api/network/v1/entities/:snId/profile             (public profile of a listed entity)
  * Envelope: { ok, data | error: { code, message } }.
  */
+import express from "express";
 import { resolveTenantContext, assertAuthenticatedTenantMemberAccess } from "../core/tenantContext.js";
 import { hasPermission } from "../auth/permissionsService.js";
 import { requireConsumerScope } from "../auth/consumerAuth.js";
 import { auditLog } from "../audit/auditLog.js";
+import { publicReadRateLimit } from "../auth/authRateLimiter.js";
 import { getCategories } from "../network/networkTaxonomy.js";
 import {
     getListing,
@@ -21,6 +23,11 @@ import {
     unpublishListing,
     getPublicProfileBySnId,
 } from "../network/networkProfileService.js";
+import {
+    createListingMediaUpload,
+    completeListingMediaUpload,
+    getListingMediaContent,
+} from "../network/networkListingMediaService.js";
 
 function fail(res, err, fallbackCode) {
     res.status(err.status || 500).json({
@@ -93,6 +100,48 @@ export function mountNetworkListingRoutes(app, deps = {}) {
         const result = await unpublishListing(companyId, ctx?.uid || null, listingDeps);
         auditLog("network_listing_unpublished", { companyId, uid: ctx?.uid || null, snId: result.snId });
         return result;
+    });
+
+    app.post("/api/network/v1/orgs/:companyId/listing/media-uploads", async (req, res) => {
+        try {
+            const companyId = String(req.params.companyId || "").trim();
+            await authorize(req, companyId, { write: true });
+            const upload = await createListingMediaUpload(companyId, req.body || {});
+            res.status(201).json({ ok: true, data: upload });
+        } catch (err) {
+            fail(res, err, "LISTING_MEDIA_UPLOAD_FAILED");
+        }
+    });
+
+    app.put(
+        "/api/network/v1/orgs/:companyId/listing/media-uploads/:uploadId",
+        express.raw({ type: "*/*", limit: "6mb" }),
+        async (req, res) => {
+            try {
+                const companyId = String(req.params.companyId || "").trim();
+                await authorize(req, companyId, { write: true });
+                const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
+                const token = String(req.query?.token || "");
+                const result = await completeListingMediaUpload(companyId, req.params.uploadId, token, bytes);
+                res.json({ ok: true, data: result });
+            } catch (err) {
+                fail(res, err, "LISTING_MEDIA_UPLOAD_FAILED");
+            }
+        }
+    );
+
+    const listingMediaReadGuard = deps.listingMediaGuard || publicReadRateLimit("listing-media");
+    app.get("/api/network/v1/listing-media/:uploadId/content", listingMediaReadGuard, async (req, res) => {
+        try {
+            const token = String(req.query?.token || "");
+            const { buffer, mimeType, fileName } = await getListingMediaContent(req.params.uploadId, token);
+            res.setHeader("Content-Type", mimeType || "application/octet-stream");
+            res.setHeader("Cache-Control", "public, max-age=86400");
+            if (fileName) res.setHeader("Content-Disposition", `inline; filename="${String(fileName).replace(/"/g, "")}"`);
+            res.status(200).send(buffer);
+        } catch (err) {
+            fail(res, err, "LISTING_MEDIA_NOT_FOUND");
+        }
     });
 
     app.get("/api/network/v1/entities/:snId/profile", consumerGuard, async (req, res) => {
