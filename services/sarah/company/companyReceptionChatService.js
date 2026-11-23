@@ -134,6 +134,39 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
         throw Object.assign(new Error("message or attachment is required"), { status: 400, code: "MESSAGE_REQUIRED" });
     }
 
+    try {
+        const { evaluateAndRecordConsumerSafety } = await import("../../platformGovernance/consumerSafetyDetectionService.js");
+        const safety = await evaluateAndRecordConsumerSafety({
+            uid,
+            companyId,
+            channel: "company_sarah",
+            message: enriched.text || text,
+        });
+        if (safety.blockReply) {
+            const { conversation: conv } = await ensureCompanyChatThread(uid, companyId, consumerProfile);
+            await appendUserConversationMessage(conv, {
+                role: "user",
+                content: enriched.text || text,
+                attachments: enriched.attachments,
+            });
+            await appendUserConversationMessage(conv, {
+                role: "assistant",
+                content: safety.blockReply,
+                source: "safety",
+            });
+            return {
+                conversationId: conv.id,
+                companyId,
+                companyName: conv.companyName,
+                reply: safety.blockReply,
+                messages: getUserConversationMessages(conv.id),
+                safety: { severity: safety.severity, category: safety.category },
+            };
+        }
+    } catch (err) {
+        console.warn("[companyReceptionChat] safety evaluation:", err?.message || err);
+    }
+
     const { conversation: conv } = await ensureCompanyChatThread(uid, companyId, consumerProfile);
     await appendUserConversationMessage(conv, {
         role: "user",

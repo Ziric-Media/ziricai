@@ -8868,3 +8868,192 @@ input[type="color"] {
         display: none;
     }
 }
+
+/* Phase 2.1 — scoped platform roles land on Sarah Network only */
+body.mc-platform-operator #sidebarNav a[data-page]:not([data-page="sarahNetwork"]) {
+    display: none;
+}
+
+/* MC-PO — platform governance forms + user detail metadata */
+.mc-po-panel-title {
+    margin: 0 0 14px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mc-po-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.mc-po-form .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.mc-po-form .form-group label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.mc-po-form .form-control {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--input-radius, var(--radius-sm));
+    font-size: 14px;
+    line-height: 1.4;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    min-height: unset;
+}
+
+.mc-po-form textarea.form-control {
+    min-height: 96px;
+    resize: vertical;
+}
+
+.mc-po-form .form-control:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.mc-po-form-grid {
+    display: grid;
+    gap: 12px 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 640px;
+}
+
+@media (max-width: 640px) {
+    .mc-po-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.mc-po-form-grid .mc-po-field--wide {
+    grid-column: 1 / -1;
+}
+
+.mc-po-form-actions {
+    margin-top: 14px;
+}
+
+.filter-bar .form-control {
+    display: block;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--input-radius, var(--radius-sm));
+    font-size: 14px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.mc-user-detail-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.mc-user-stat {
+    background: var(--bg-secondary, var(--bg-muted));
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    min-width: 0;
+}
+
+.mc-user-stat--wide {
+    grid-column: span 2;
+}
+
+@media (max-width: 520px) {
+    .mc-user-stat--wide {
+        grid-column: span 1;
+    }
+}
+
+.mc-user-stat .label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.mc-user-stat .value {
+    display: block;
+    margin-top: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text-primary);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.mc-user-stat .value.is-email {
+    font-size: 13px;
+    font-weight: 500;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.mc-safety-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--surface-elevated, #f0f2f5);
+    color: var(--text-secondary, #5c6570);
+}
+
+.mc-safety-pill--warn {
+    background: #fff4e5;
+    color: #9a6700;
+}
+
+.mc-safety-pill--bad {
+    background: #fde8e8;
+    color: #b42318;
+}
+
+.mc-user-section {
+    margin-top: 16px;
+}
+
+.mc-user-section h4 {
+    margin: 0 0 8px;
+    font-size: 14px;
+}
+
+.mc-user-list {
+    margin: 0 0 12px;
+    padding-left: 1.2rem;
+    font-size: 13px;
+}
+
+.mc-user-profile-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.mc-user-profile-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}

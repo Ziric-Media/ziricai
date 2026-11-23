@@ -287,6 +287,8 @@ export const PLATFORM_GOVERNANCE = {
     /** Daily aggregated counters keyed by UTC day + metric. */
     EVENT_DAILY: "platformEventDaily",
     CONSUMER_SAFETY_CASES: "platformConsumerSafetyCases",
+    /** Safety signals (metadata + redacted excerpt; not full chat logs). */
+    SAFETY_SIGNALS: "platformSafetySignals",
     /** ZiricAI-authored announcements (not org subscriber events). */
     ANNOUNCEMENTS: "platformAnnouncements",
     /** Daily Sarah App telemetry rollups. */

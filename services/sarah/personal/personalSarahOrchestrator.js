@@ -117,6 +117,25 @@ export async function handlePersonalSarahChat(auth, input) {
         return { reply: "Say something and I'll help.", sessionId: input.sessionId || null, actions: [] };
     }
 
+    try {
+        const { evaluateAndRecordConsumerSafety } = await import("../../platformGovernance/consumerSafetyDetectionService.js");
+        const safety = await evaluateAndRecordConsumerSafety({
+            uid: auth.uid,
+            channel: "personal_sarah",
+            message,
+        });
+        if (safety.blockReply) {
+            return {
+                reply: safety.blockReply,
+                sessionId: input.sessionId || null,
+                actions: [{ tool: "safetyGate", severity: safety.severity, caseId: safety.caseId }],
+                safety: { severity: safety.severity, category: safety.category },
+            };
+        }
+    } catch (err) {
+        console.warn("[personalSarah] safety evaluation:", err?.message || err);
+    }
+
     const ctx = await buildPersonalSarahContext(auth);
     const session = await getOrCreatePersonalSarahSession({
         sessionId: input.sessionId || null,
