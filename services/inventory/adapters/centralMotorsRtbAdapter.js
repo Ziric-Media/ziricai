@@ -86,7 +86,8 @@ export function extractWordPressPostId(html) {
 }
 
 export function parseTitleFields(title) {
-    const raw = String(title || "").trim();
+    let raw = String(title || "").trim();
+    raw = raw.replace(/^\(\d+\)\s*/, "");
     if (!raw) {
         return { year: null, make: null, model: null, trim: null, title: raw };
     }
@@ -121,8 +122,14 @@ export function parseTitleFields(title) {
     return { year, make, model, trim, title: raw };
 }
 
-export function extractGalleryImageUrls(html) {
+/**
+ * @param {string} html
+ * @param {string} [imageHost] e.g. centralmotorsrtb.co.za or babescarsales.co.za
+ */
+export function extractGalleryImageUrls(html, imageHost = "centralmotorsrtb.co.za") {
     if (!html) return [];
+    const host = String(imageHost || "centralmotorsrtb.co.za").replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const hostRe = host.replace(/\./g, "\\.");
 
     const urls = [];
     const galleryMatch = html.match(
@@ -131,13 +138,19 @@ export function extractGalleryImageUrls(html) {
     const scope = galleryMatch ? galleryMatch[0] : html;
 
     for (const match of scope.matchAll(
-        /href="(https:\/\/centralmotorsrtb\.co\.za\/wp-content\/uploads\/[^"]+\.(?:jpe?g|png|webp))"/gi
+        new RegExp(
+            `href="(https:\\/\\/${hostRe}\\/wp-content\\/uploads\\/[^"]+\\.(?:jpe?g|png|webp))"`,
+            "gi"
+        )
     )) {
         urls.push(match[1]);
     }
 
     for (const match of html.matchAll(
-        /(?:src|data-src)="(https:\/\/centralmotorsrtb\.co\.za\/wp-content\/uploads\/[^"]+\.(?:jpe?g|png|webp))"/gi
+        new RegExp(
+            `(?:src|data-src)="(https:\\/\\/${hostRe}\\/wp-content\\/uploads\\/[^"]+\\.(?:jpe?g|png|webp))"`,
+            "gi"
+        )
     )) {
         urls.push(match[1]);
     }
@@ -195,13 +208,13 @@ function extractListingPrice(html) {
     return parsePrice(meta?.[1]);
 }
 
-function extractLocation(html, title) {
+function extractLocation(html, title, defaultLocation = CENTRAL_MOTORS_DEFAULT_LOCATION) {
     const meta = html.match(/For Sale in ([A-Za-z\s]+)/i);
     if (meta?.[1]) return `${meta[1].trim()}, North West`;
     if (/rustenburg/i.test(title || "") || /rustenburg/i.test(html)) {
-        return CENTRAL_MOTORS_DEFAULT_LOCATION;
+        return defaultLocation;
     }
-    return CENTRAL_MOTORS_DEFAULT_LOCATION;
+    return defaultLocation;
 }
 
 /**
@@ -210,7 +223,14 @@ function extractLocation(html, title) {
  * @param {string} sourceUrl
  * @returns {object}
  */
-export function parseListingHtml(html, sourceUrl) {
+/**
+ * @param {string} html
+ * @param {string} sourceUrl
+ * @param {{ imageHost?: string, defaultLocation?: string }} [site]
+ */
+export function parseListingHtml(html, sourceUrl, site = {}) {
+    const imageHost = site.imageHost || "centralmotorsrtb.co.za";
+    const defaultLocation = site.defaultLocation || CENTRAL_MOTORS_DEFAULT_LOCATION;
     const postId = extractWordPressPostId(html);
     const title = extractListingTitle(html);
     const { year, make, model, trim } = parseTitleFields(title);
@@ -231,9 +251,9 @@ export function parseListingHtml(html, sourceUrl) {
     const serviceHistory = extractServiceHistory(description);
     const warranty = extractWarranty(description);
     const features = extractFeatures(description);
-    const images = extractGalleryImageUrls(html);
+    const images = extractGalleryImageUrls(html, imageHost);
     const price = extractListingPrice(html);
-    const location = extractLocation(html, title);
+    const location = extractLocation(html, title, defaultLocation);
 
     const missingFields = [];
     if (!vin) missingFields.push("vin");
@@ -280,11 +300,19 @@ export function parseListingHtml(html, sourceUrl) {
  * @param {string} companyId
  * @param {string} [syncedAt]
  */
-export function toUpsertVehicle(parsed, companyId, syncedAt = new Date().toISOString()) {
+export function toUpsertVehicle(
+    parsed,
+    companyId,
+    syncedAt = new Date().toISOString(),
+    options = {}
+) {
+    const source = options.source || CENTRAL_MOTORS_SOURCE;
+    const stockPrefix = options.stockPrefix || "CM-WP-";
+    const verifiedAt = options.verifiedAt || null;
     return {
         vehicleId: `veh-wp-${parsed.postId}`,
         companyId,
-        stockNumber: `CM-WP-${parsed.postId}`,
+        stockNumber: `${stockPrefix}${parsed.postId}`,
         year: parsed.year,
         make: parsed.make,
         model: parsed.model,
@@ -299,9 +327,10 @@ export function toUpsertVehicle(parsed, companyId, syncedAt = new Date().toISOSt
         title: parsed.title,
         metadata: {
             sourceUrl: parsed.sourceUrl,
-            source: CENTRAL_MOTORS_SOURCE,
+            source,
             externalId: parsed.postId,
             lastSyncedAt: syncedAt,
+            ...(verifiedAt ? { verifiedAt, verificationNote: options.verificationNote || "website-sitemap-sync" } : {}),
             bodyType: parsed.bodyType,
             driveType: parsed.driveType,
             exteriorColour: parsed.exteriorColour,
@@ -352,8 +381,13 @@ export async function fetchSitemapListingUrls(sitemapUrl = CENTRAL_MOTORS_SITEMA
 
 export async function fetchAndParseListing(url, options = {}) {
     const html = await fetchText(url, options);
-    const parsed = parseListingHtml(html, url);
-    return { parsed, vehicle: toUpsertVehicle(parsed, options.companyId || CENTRAL_MOTORS_RTB_COMPANY_ID) };
+    const site = options.site || {};
+    const parsed = parseListingHtml(html, url, site);
+    const upsertOpts = options.upsertOptions || {};
+    return {
+        parsed,
+        vehicle: toUpsertVehicle(parsed, options.companyId || CENTRAL_MOTORS_RTB_COMPANY_ID, undefined, upsertOpts),
+    };
 }
 
 export async function fetchAllListings({
@@ -362,6 +396,8 @@ export async function fetchAllListings({
     delayMs = 1200,
     limit = null,
     onProgress = null,
+    site = {},
+    upsertOptions = {},
 } = {}) {
     const urls = await fetchSitemapListingUrls(sitemapUrl);
     const selected = limit != null ? urls.slice(0, limit) : urls;
@@ -371,7 +407,11 @@ export async function fetchAllListings({
     for (let i = 0; i < selected.length; i += 1) {
         const url = selected[i];
         try {
-            const { parsed, vehicle } = await fetchAndParseListing(url, { companyId });
+            const { parsed, vehicle } = await fetchAndParseListing(url, {
+                companyId,
+                site,
+                upsertOptions,
+            });
             results.push({ parsed, vehicle, url });
             if (onProgress) onProgress({ index: i + 1, total: selected.length, url, ok: true });
         } catch (err) {

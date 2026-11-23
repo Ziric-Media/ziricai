@@ -14,6 +14,8 @@
         "twa:play-upload-prep": "powershell -ExecutionPolicy Bypass -File scripts/sarah-twa-prepare-play-upload.ps1",
         "provision:sach-consult": "node scripts/provision-sach-consult-tenant.mjs",
         "provision:babes-car-sales": "node scripts/provision-babes-car-sales-tenant.mjs",
+        "import:babes-inventory": "node scripts/import-babes-car-sales-inventory.mjs",
+        "bootstrap:babes-bcs03": "node scripts/bootstrap-babes-bcs03.mjs",
         "predev": "node scripts/prepare-sites.js",
         "dev": "node api/server.js",
         "dev:api": "node api/server.js",

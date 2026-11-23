@@ -21,13 +21,23 @@ Bootstrap only (preset + KB + Sarah), if tenant exists:
 BABES_SKIP_IF_EXISTS=1 railway run node scripts/provision-babes-car-sales-tenant.mjs
 ```
 
+## Inventory (BCS-03)
+
+```bash
+npm run import:babes-inventory
+# or full bootstrap (import + Discover + KB):
+npm run bootstrap:babes-bcs03
+```
+
+Postgres must be reachable (`DATABASE_URL`). From a workstation, use `railway connect postgres --tunnel-only` and override `DATABASE_URL` to `127.0.0.1` (see [BCS-03_IMPLEMENTATION_REPORT.md](../architecture/BCS-03_IMPLEMENTATION_REPORT.md)).
+
 ## Programme
 
 | Gate | Status |
 |------|--------|
 | BCS-00 | Audit — [BCS-00_BABES_TENANT_AUTOMOTIVE_AUDIT.md](../architecture/BCS-00_BABES_TENANT_AUTOMOTIVE_AUDIT.md) |
-| BCS-02 | Tenant + preset + Sarah foundation |
-| BCS-03 | Verified inventory + extended knowledge (not website bulk scrape) |
+| BCS-02 | Tenant + preset + Sarah foundation — **done** |
+| BCS-03 | Sitemap-synced inventory + Discover + inventory KB — **done** |
 | BCS-04 | Sales conversation UAT |
 | BCS-05 | Presentation readiness |
 
