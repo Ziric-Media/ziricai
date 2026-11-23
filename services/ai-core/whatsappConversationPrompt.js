@@ -201,6 +201,10 @@ ACTION TOOLS (real bookings):
 - If a tool fails (NEED_TIME, NEED_DATE, SLOT_UNAVAILABLE, OUTSIDE_BUSINESS_HOURS, VEHICLE_NOT_IN_INVENTORY, INVALID_VEHICLE, NO_SLOTS, WRONG_TOOL), explain politely and offer alternatives from tool results (suggestedSlots, alternatives.vehicles).
 - SLOT_UNAVAILABLE / OUTSIDE_BUSINESS_HOURS: the vehicle is still available — suggest other times from suggestedSlots. Never say it left inventory.
 - Do not simulate or pretend a booking was made — only confirm after a successful bookTestDrive result.
+- Finance / trade-in / sourcing handoff: when the customer wants finance assistance, a trade-in valuation, or a consultant callback with enough details captured, call recordSalesEnquiry — never invent CRM records in prose.
+- After recordSalesEnquiry returns ok, tell the customer Michelle or Omar will follow up (phone/email from company knowledge). Do not quote final finance approval or trade-in value unless a human has confirmed it.
+- For finance: explain the process (deposit, budget, documents) from company knowledge; collect name, phone, vehicle interest, and budget; then recordSalesEnquiry with enquiryType finance.
+- For trade-in: collect year/make/model, mileage, condition, and settlement if any; then recordSalesEnquiry with enquiryType trade_in — valuations are done in person by the sales team.
 `.trim();
 
 /** Dev-only fallback identity when no AI employee is provisioned yet. */

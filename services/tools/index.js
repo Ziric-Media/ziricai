@@ -3,6 +3,7 @@ import bookTestDrive from "./bookTestDrive.js";
 import cancelTestDrive from "./cancelTestDrive.js";
 import checkTestDriveAvailability from "./checkTestDriveAvailability.js";
 import getCustomerBookings from "./getCustomerBookings.js";
+import recordSalesEnquiry from "./recordSalesEnquiry.js";
 import searchInventory from "./searchInventory.js";
 
 let initialized = false;
@@ -13,6 +14,7 @@ const ALL_TOOLS = [
     bookTestDrive,
     getCustomerBookings,
     cancelTestDrive,
+    recordSalesEnquiry,
 ];
 
 export function initAiTools() {

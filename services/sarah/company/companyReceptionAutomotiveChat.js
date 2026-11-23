@@ -91,6 +91,8 @@ export async function runCompanySarahAutomotiveTurn(params) {
         "Do NOT promise automatic photo attachments — the customer receives photos only when they ask for pictures/photos or say yes after you offer them.",
         "Team/staff/dealer principal questions: answer from COMPANY KNOWLEDGE only — never searchInventory or vehicle photos on those turns.",
         "For team / staff / who-works-here questions, use COMPANY KNOWLEDGE below — do not invent names.",
+        "Finance, trade-in, or callback with enough customer details: call recordSalesEnquiry — confirm Michelle/Omar follow-up only after the tool returns ok.",
+        "Never promise approved finance rates or final trade-in values without human confirmation.",
     ].join("\n");
 
     const knowledgeBlock = knowledgeBundle.context

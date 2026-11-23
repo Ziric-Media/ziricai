@@ -64,6 +64,55 @@ Visit us at ${BABES_BUSINESS.address}. Phone ${BABES_BUSINESS.phone}.`,
 Phone ${BABES_BUSINESS.phone}, email ${BABES_BUSINESS.email}.
 Sarah (AI) handles discovery, stock search, test-drive booking, and initial finance/trade-in enquiries.`,
     },
+    {
+        id: "babes-kn-finance",
+        title: "Vehicle finance process",
+        type: "faq",
+        content: `Babes Car Sales assists customers with vehicle finance through accredited finance partners — Sarah does not approve finance.
+
+Process Sarah should explain:
+1. Customer chooses a vehicle from live inventory (searchInventory).
+2. Collect deposit (if any), purchase budget or monthly target, employment/business details at a high level.
+3. Michelle or Omar completes the formal application and presents options.
+4. Indicative monthly payments may be discussed only as estimates — final approval and rate are human-confirmed.
+
+Never promise approved finance. After capturing name, phone, vehicle interest, and budget details, record the enquiry for the sales team.`,
+    },
+    {
+        id: "babes-kn-trade-in",
+        title: "Trade-in process",
+        type: "faq",
+        content: `Babes Car Sales accepts trade-ins. Final valuation requires inspection by Michelle or Omar — Sarah must not quote a trade-in value.
+
+Collect for handoff:
+• Trade-in vehicle year, make, model, mileage
+• Overall condition (accident history, service history if known)
+• Amount still owing on finance if applicable
+• Vehicle the customer wants from Babes stock (if chosen)
+
+Offer to book a test drive on the replacement vehicle while trade-in is assessed. Use recordSalesEnquiry (trade_in) once details are captured.`,
+    },
+    {
+        id: "babes-kn-test-drive",
+        title: "Test drive at Babes",
+        type: "faq",
+        content: `Test drives at Babes Car Sales CC, ${BABES_BUSINESS.address}.
+• Book via checkTestDriveAvailability then bookTestDrive — confirm only after booking succeeds.
+• Hours: Mon–Fri 08:00–17:00, Sat 08:00–13:00 (closed Sunday).
+• Bring valid driver's licence. Sales consultants Michelle and Omar assist on site.
+• After booking, encourage finance/trade-in conversation if relevant — keep momentum toward purchase.`,
+    },
+    {
+        id: "babes-kn-uat-demo",
+        title: "Presentation demo flows",
+        type: "playbook",
+        content: `BCS presentation phrases (use tools, not invented stock):
+1. Discovery — "automatic SUV under R250,000" → searchInventory with maxPrice and body type.
+2. Specific stock — "Toyota Fortuner?" → searchInventory for Fortuner.
+3. Finance — explain finance process, collect budget/deposit, recordSalesEnquiry finance.
+4. Trade-in — collect trade vehicle details, recordSalesEnquiry trade_in.
+5. Test drive — pick vehicle from inventory, checkTestDriveAvailability, bookTestDrive.`,
+    },
 ];
 
 /**

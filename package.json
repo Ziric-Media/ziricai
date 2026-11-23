@@ -16,6 +16,8 @@
         "provision:babes-car-sales": "node scripts/provision-babes-car-sales-tenant.mjs",
         "import:babes-inventory": "node scripts/import-babes-car-sales-inventory.mjs",
         "bootstrap:babes-bcs03": "node scripts/bootstrap-babes-bcs03.mjs",
+        "bootstrap:babes-bcs04": "node scripts/bootstrap-babes-bcs04.mjs",
+        "verify:babes-bcs04": "node scripts/verify-babes-bcs04.mjs",
         "predev": "node scripts/prepare-sites.js",
         "dev": "node api/server.js",
         "dev:api": "node api/server.js",
