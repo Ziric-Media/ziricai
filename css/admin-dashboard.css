@@ -8959,9 +8959,15 @@ body.mc-platform-operator #sidebarNav a[data-page]:not([data-page="sarahNetwork"
 
 .mc-user-detail-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-    margin-top: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+
+@media (min-width: 480px) {
+    .mc-user-detail-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 .mc-user-stat {
@@ -8972,6 +8978,10 @@ body.mc-platform-operator #sidebarNav a[data-page]:not([data-page="sarahNetwork"
     min-width: 0;
 }
 
+.mc-user-stat--full {
+    grid-column: 1 / -1;
+}
+
 .mc-user-stat--wide {
     grid-column: span 2;
 }
@@ -8979,6 +8989,9 @@ body.mc-platform-operator #sidebarNav a[data-page]:not([data-page="sarahNetwork"
 @media (max-width: 520px) {
     .mc-user-stat--wide {
         grid-column: span 1;
+    }
+    .mc-user-detail-stats {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -9047,8 +9060,65 @@ body.mc-platform-operator #sidebarNav a[data-page]:not([data-page="sarahNetwork"
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 12px;
+    gap: 16px;
     align-items: flex-start;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-light, var(--border-color));
+}
+
+.mc-user-profile-titles {
+    flex: 1 1 200px;
+    min-width: 0;
+}
+
+.mc-user-profile-name {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.25;
+    display: block;
+    word-break: break-word;
+}
+
+.mc-user-profile-meta {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.mc-user-profile-uid {
+    margin: 4px 0 0;
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--text-muted);
+    line-height: 1.45;
+    word-break: break-all;
+}
+
+.mc-user-privacy-note {
+    margin: 14px 0 0;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+    background: var(--bg-secondary, var(--bg-muted));
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light, var(--border-color));
+}
+
+.mc-user-section-hint {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.mc-user-subheading {
+    margin: 12px 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
 .mc-user-profile-badges {
@@ -9056,4 +9126,92 @@ body.mc-platform-operator #sidebarNav a[data-page]:not([data-page="sarahNetwork"
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
+    flex-shrink: 0;
+}
+
+/* Sarah Users — profile flyout (stays in viewport; no scroll-to-bottom) */
+.mc-user-flyout {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 320;
+    pointer-events: none;
+}
+
+.mc-user-flyout.open {
+    display: block;
+    pointer-events: auto;
+}
+
+.mc-user-flyout-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    animation: mcUserFlyoutFade 0.2s ease;
+}
+
+@keyframes mcUserFlyoutFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.mc-user-flyout-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: min(440px, 100%);
+    height: 100%;
+    max-height: 100dvh;
+    background: var(--bg-card);
+    border-left: 1px solid var(--border-color);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
+    display: flex;
+    flex-direction: column;
+    animation: mcUserFlyoutSlide 0.24s ease;
+}
+
+@keyframes mcUserFlyoutSlide {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+.mc-user-flyout-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-light, var(--border-color));
+    flex-shrink: 0;
+}
+
+.mc-user-flyout-kicker {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.mc-user-flyout-close {
+    font-size: 22px;
+    line-height: 1;
+    padding: 4px 10px;
+    min-width: 36px;
+}
+
+.mc-user-flyout-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px 28px;
+    -webkit-overflow-scrolling: touch;
+}
+
+body.mc-user-flyout-open {
+    overflow: hidden;
+}
+
+.org-table tr.mc-user-row.is-active {
+    background: rgba(91, 33, 182, 0.06);
+    box-shadow: inset 3px 0 0 var(--accent, #5b21b6);
 }
