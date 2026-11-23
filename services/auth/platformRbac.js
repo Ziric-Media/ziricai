@@ -20,6 +20,17 @@ import { createNetworkCollection } from "../network/networkCollectionStore.js";
 import { hasPlatformApiKeyAccess } from "./platformAuth.js";
 
 export const PLATFORM_PERMISSIONS = Object.freeze({
+  CONSUMERS_READ: "platform.consumers.read",
+  CONSUMERS_ENFORCE: "platform.consumers.enforce",
+  ANALYTICS_READ: "platform.analytics.read",
+  SAFETY_READ: "platform.safety.read",
+  SAFETY_DECIDE: "platform.safety.decide",
+  REVENUE_READ: "platform.revenue.read",
+  ORGS_READ: "platform.orgs.read",
+  COMMS_READ: "platform.comms.read",
+  COMMS_PUBLISH: "platform.comms.publish",
+  MONITOR_READ: "platform.monitor.read",
+  AUDIT_READ: "platform.audit.read",
     VERIFICATION_READ: "network.verification.read",
     VERIFICATION_DECIDE: "network.verification.decide",
     VERIFICATION_RESTRICT: "network.verification.restrict",
@@ -51,6 +62,39 @@ export const PLATFORM_ROLES = Object.freeze({
     network_analyst: Object.freeze({
         label: "Network Analyst",
         permissions: Object.freeze([P.STATS_READ, P.ENTITIES_READ, P.SEARCH_READ]),
+    }),
+    user_support: Object.freeze({
+        label: "User Support",
+        permissions: Object.freeze([P.CONSUMERS_READ, P.ANALYTICS_READ, P.AUDIT_READ, P.MONITOR_READ]),
+    }),
+    finance_admin: Object.freeze({
+        label: "Finance Admin",
+        permissions: Object.freeze([P.REVENUE_READ, P.AUDIT_READ, P.ANALYTICS_READ]),
+    }),
+    communications_admin: Object.freeze({
+        label: "Communications Admin",
+        permissions: Object.freeze([P.COMMS_READ, P.COMMS_PUBLISH, P.AUDIT_READ]),
+    }),
+    trust_safety_consumer: Object.freeze({
+        label: "Consumer Trust & Safety",
+        permissions: Object.freeze([
+            P.SAFETY_READ,
+            P.SAFETY_DECIDE,
+            P.CONSUMERS_READ,
+            P.CONSUMERS_ENFORCE,
+            P.AUDIT_READ,
+        ]),
+    }),
+    platform_analyst: Object.freeze({
+        label: "Platform Analyst",
+        permissions: Object.freeze([
+            P.ANALYTICS_READ,
+            P.CONSUMERS_READ,
+            P.REVENUE_READ,
+            P.ORGS_READ,
+            P.MONITOR_READ,
+            P.STATS_READ,
+        ]),
     }),
 });
 
