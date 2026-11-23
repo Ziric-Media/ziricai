@@ -77,10 +77,29 @@ function url(value, field) {
     return v;
 }
 
+const BLOCKED_IMAGE_HOTLINK = /(^|\.)facebook\.com$|(^|\.)fb\.com$|(^|\.)instagram\.com$|(^|\.)fbcdn\.net$/i;
+
+/** Social/page URLs cannot be embedded as Discover images (CORP blocks browsers). */
+function assertDirectImageUrl(v, field) {
+    try {
+        const u = new URL(v, "https://ziricai.local");
+        if (BLOCKED_IMAGE_HOTLINK.test(u.hostname) || /photo\.php/i.test(u.pathname)) {
+            throw bad(
+                `${field} cannot use Facebook or Instagram page links — use Upload on this screen or a direct https image file URL (.jpg/.png/.webp).`,
+                "PROFILE_INVALID",
+                { field }
+            );
+        }
+    } catch (err) {
+        if (err.code === "PROFILE_INVALID") throw err;
+    }
+}
+
 /** Product/gallery images: https listing media or platform asset paths from dental presets. */
 function discoverMediaUrl(value, field) {
     let v = str(value, 500, field);
     if (!v) return null;
+    assertDirectImageUrl(v, field);
     try {
         const u = new URL(v, "https://ziricai.local");
         if (u.pathname.includes("/api/network/v1/listing-media/") && u.pathname.endsWith("/content")) {

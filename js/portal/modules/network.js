@@ -30,6 +30,7 @@ import {
   bindImageUploads,
   readImageUploadUrl,
   isAcceptedListingMediaUrl,
+  listingMediaValidationMessage,
 } from './portalImageUpload.js';
 
 const FALLBACK_KINDS = ['registration_certificate', 'proof_of_address', 'ownership_proof', 'website', 'other'];
@@ -96,7 +97,7 @@ function brandingMediaField(id, label, urlValue, { disabled = false, hint = '', 
   return `<div class="form-group snet-field snet-branding-field${wide ? ' snet-field--wide' : ''}">
     <label for="${id}">${escapeHtml(label)}</label>
     ${imageUploadControlHtml(urlValue, { disabled, id, variant })}
-    ${hint ? `<div class="form-hint">${escapeHtml(hint)}</div>` : `<div class="form-hint">JPEG, PNG, or WebP up to 5 MB. Paste a link or upload — you'll see a preview here.</div>`}
+    ${hint ? `<div class="form-hint">${escapeHtml(hint)}</div>` : `<div class="form-hint">JPEG, PNG, or WebP up to 5 MB. Use Upload (recommended). Facebook or Instagram page links do not work — save the image to your device first.</div>`}
   </div>`;
 }
 
@@ -583,6 +584,22 @@ function brandingMediaUrl(container, fieldId) {
   return isAcceptedListingMediaUrl(raw) ? raw : null;
 }
 
+function validateBrandingFields(container) {
+  for (const [id, label] of [
+    ['nlLogo', 'Logo'],
+    ['nlCover', 'Cover image'],
+  ]) {
+    const wrapper = container.querySelector(`#${id}`)?.closest('[data-img-upload]');
+    const raw = readImageUploadUrl(wrapper) || container.querySelector(`#${id}`)?.value?.trim() || '';
+    if (!raw) continue;
+    const msg = listingMediaValidationMessage(raw, label);
+    if (msg) return msg;
+  }
+  const uploading = container.querySelector('[data-img-upload-trigger].is-loading');
+  if (uploading) return 'Wait for the image upload to finish before saving.';
+  return null;
+}
+
 function readProfile(container) {
   const v = (id) => container.querySelector(`#${id}`)?.value?.trim() || '';
   const picked = [...container.querySelectorAll('input[name="nlCategory"]:checked')].map((i) => i.value);
@@ -686,6 +703,8 @@ function bind(container, companyId, listing, opts = {}) {
   const save = container.querySelector('#nlSave');
   if (save) {
     save.onclick = guard(save, async () => {
+      const brandingErr = validateBrandingFields(container);
+      if (brandingErr) return showToast(brandingErr, 'error');
       const res = await saveNetworkListingDraft(companyId, readProfile(container));
       if (res.error) return showToast(fieldError(res), 'error');
       showToast('Draft saved', 'success');
@@ -696,6 +715,8 @@ function bind(container, companyId, listing, opts = {}) {
   const publish = container.querySelector('#nlPublish');
   if (publish) {
     publish.onclick = guard(publish, async () => {
+      const brandingErr = validateBrandingFields(container);
+      if (brandingErr) return showToast(brandingErr, 'error');
       // Save first so what the user sees in the form is what gets published.
       const saved = await saveNetworkListingDraft(companyId, readProfile(container));
       if (saved.error) return showToast(fieldError(saved), 'error');

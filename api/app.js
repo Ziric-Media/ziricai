@@ -417,6 +417,13 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
     if (req.rawBody) return next();
+    const isListingMediaPut =
+        req.method === "PUT" &&
+        /\/api\/network\/v1\/orgs\/[^/]+\/listing\/media-uploads\/[^/]+$/i.test(String(req.path || req.url || ""));
+    const isVerificationEvidencePut =
+        req.method === "PUT" &&
+        /\/verification\/evidence-uploads\/[^/]+$/i.test(String(req.path || req.url || ""));
+    if (isListingMediaPut || isVerificationEvidencePut) return next();
     express.json()(req, res, next);
 });
 

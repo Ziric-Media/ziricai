@@ -68,6 +68,13 @@ test("saveListingDraft accepts nested profile wrapper from older portal clients"
 test("validation: rejects non-editable fields (verified), bad URLs, unknown categories, bad email", () => {
     assert.throws(() => validateProfilePatch({ verified: true }), { code: "PROFILE_FIELD_NOT_ALLOWED" });
     assert.throws(() => validateProfilePatch({ logoUrl: "http://insecure.example/a.png" }), { code: "PROFILE_INVALID" });
+    assert.throws(
+        () =>
+            validateProfilePatch({
+                logoUrl: "https://www.facebook.com/photo.php?fbid=123",
+            }),
+        { code: "PROFILE_INVALID" }
+    );
     const listingMedia = "/api/network/v1/listing-media/lmed_test/content?token=abc";
     const branded = validateProfilePatch({ logoUrl: listingMedia, coverUrl: "https://cdn.example/cover.jpg" });
     assert.equal(branded.profile.logoUrl, listingMedia);

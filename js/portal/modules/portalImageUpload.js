@@ -188,14 +188,41 @@ export function bindImageUploads(root, companyId, opts = {}) {
   });
 }
 
+/** Facebook/Instagram page links preview-block in browsers and are not valid listing images. */
+export function isBlockedImageHotlink(value) {
+  const v = String(value || "").trim();
+  if (!v) return false;
+  try {
+    const u = new URL(v, window.location.origin);
+    const host = u.hostname.toLowerCase();
+    if (/(^|\.)facebook\.com$|(^|\.)fb\.com$|(^|\.)instagram\.com$/.test(host)) return true;
+    if (host.includes('facebook.com') && /photo\.php/i.test(u.pathname)) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 /** Logo/cover/gallery values accepted by listing profile validation. */
 export function isAcceptedListingMediaUrl(value) {
   const v = String(value || "").trim();
-  if (!v) return false;
+  if (!v || isBlockedImageHotlink(v)) return false;
   if (/^https:\/\//i.test(v)) return true;
   if (/^\/api\/network\/v1\/listing-media\//i.test(v)) return true;
   if (/^assets\//i.test(v)) return true;
   return false;
+}
+
+export function listingMediaValidationMessage(value, label = 'Image') {
+  const v = String(value || '').trim();
+  if (!v) return null;
+  if (isBlockedImageHotlink(v)) {
+    return `${label}: Facebook or Instagram links cannot be used here. Click Upload and choose the file from your device.`;
+  }
+  if (!isAcceptedListingMediaUrl(v)) {
+    return `${label}: upload a file or paste a direct https image link (ends in .jpg, .png, or .webp).`;
+  }
+  return null;
 }
 
 /** Read image URL from an upload control (url input or hidden after solo upload). */
