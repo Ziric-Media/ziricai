@@ -249,6 +249,7 @@ import { mountNetworkPlatformRoutes } from "../services/api/networkPlatformRoute
 import { mountNetworkTrustRoutes } from "../services/api/networkTrustRoutes.js";
 import { mountNetworkPresenceRoutes } from "../services/api/networkPresenceRoutes.js";
 import { mountEducationRoutes } from "../services/api/educationRoutes.js";
+import { mountSachAccountingRoutes } from "../services/api/sachAccountingRoutes.js";
 import { mountUserConversationRoutes } from "../services/api/userConversationRoutes.js";
 import { mountChatPersonRoutes } from "../services/api/chatPersonRoutes.js";
 import { mountChatGroupRoutes } from "../services/api/chatGroupRoutes.js";
@@ -2769,6 +2770,7 @@ mountNetworkPlatformRoutes(app);
 mountNetworkTrustRoutes(app);
 mountNetworkPresenceRoutes(app);
 mountEducationRoutes(app);
+mountSachAccountingRoutes(app);
 mountUserConversationRoutes(app);
 mountChatPersonRoutes(app);
 mountChatGroupRoutes(app);

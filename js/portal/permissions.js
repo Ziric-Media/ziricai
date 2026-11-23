@@ -177,6 +177,8 @@ export const MODULE_PERMISSIONS = {
 
   schoolAdmissions: 'canManageNetwork',
 
+  sachServiceRequests: 'canManageNetwork',
+
 };
 
 

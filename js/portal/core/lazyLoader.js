@@ -34,6 +34,7 @@ const MODULE_IDS = [
   'discoverProfile',
   'schoolGuardians',
   'schoolAdmissions',
+  'sachServiceRequests',
 ];
 
 function portalAssetVersion() {
@@ -69,6 +70,7 @@ const EXPORT_MAP = {
   discoverProfile: 'renderDiscoverProfile',
   schoolGuardians: 'renderSchoolGuardians',
   schoolAdmissions: 'renderSchoolAdmissions',
+  sachServiceRequests: 'renderSachServiceRequests',
 };
 
 /**

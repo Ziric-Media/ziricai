@@ -87,6 +87,12 @@ export const TENANT_COLLECTIONS = {
     ADMISSION_APPLICATIONS: "admissionApplications",
     /** EDU — audit trail for admission application changes. */
     ADMISSION_AUDIT: "admissionAudit",
+    /** Sach Accounting — client relationship profiles (keyed by consumer uid). */
+    SACH_CLIENT_PROFILES: "sachClientProfiles",
+    /** Sach Accounting — structured service requests. */
+    SACH_SERVICE_REQUESTS: "sachServiceRequests",
+    /** Sach Accounting — service request audit. */
+    SACH_SERVICE_AUDIT: "sachServiceAudit",
     /** Sarah BOS — commercial cycle (quote → verified pay → mobilise) per tenant. */
     BOS_COMMERCIAL_CYCLES: "bosCommercialCycles",
     /** Sarah BOS — Admin/human → module Sarah workforce instructions. */

@@ -52,6 +52,13 @@ import {
     shouldRunEducareReceptionChat,
 } from "./companyReceptionEducareChat.js";
 import {
+    runCompanySarahSachAccountingTurn,
+    shouldRunSachAccountingReceptionChat,
+    buildSachCompanySarahGreeting,
+    extractSachUiHints,
+} from "./companyReceptionSachAccountingChat.js";
+import { shouldRunSachAccountingChat } from "../../consulting/sachAccountingIndustryPreset.js";
+import {
     buildEducareCompanySarahGreeting,
     extractEducareUiHints,
 } from "../../education/educareSchoolChatTools.js";
@@ -74,6 +81,8 @@ export async function ensureCompanyChatThread(uid, companyId, consumerProfile = 
         let greeting = buildCompanySarahGreeting(preferredName, conv.companyName);
         if (await shouldRunEducareSchoolChat(companyId)) {
             greeting = buildEducareCompanySarahGreeting(preferredName, conv.companyName);
+        } else if (await shouldRunSachAccountingChat(companyId)) {
+            greeting = buildSachCompanySarahGreeting(preferredName, conv.companyName);
         }
         await appendUserConversationMessage(conv, { role: "assistant", content: greeting, source: "greeting" });
         messages = getUserConversationMessages(conv.id);
@@ -210,12 +219,15 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
     let automotiveTurn = null;
     let dentalTurn = null;
     let educareTurn = null;
+    let sachTurn = null;
     let uiHints = [];
 
     try {
         const useAutomotive = await shouldRunAutomotiveSalesChat(companyId);
         const useDental = !useAutomotive && (await shouldRunDentalReceptionChat(companyId));
         const useEducare = !useAutomotive && !useDental && (await shouldRunEducareReceptionChat(companyId));
+        const useSachAccounting =
+            !useAutomotive && !useDental && !useEducare && (await shouldRunSachAccountingReceptionChat(companyId));
         if (useAutomotive) {
             automotiveTurn = await runCompanySarahAutomotiveTurn({
                 uid,
@@ -248,6 +260,7 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
                 text: customerText,
                 history,
                 attachments: enriched.attachments,
+                conversationId: conv.id,
             });
             reply = dentalTurn.reply || "Thanks for your message.";
         } else if (useEducare) {
@@ -262,12 +275,32 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
                 companyName: conv.companyName,
                 consumerDisplayName: liveName,
                 consumerProfile,
+                conversationId: conv.id,
                 text: customerText,
                 history,
                 attachments: enriched.attachments,
             });
             reply = educareTurn.reply || "Thanks for your message.";
             uiHints = extractEducareUiHints(educareTurn.toolResults || []);
+        } else if (useSachAccounting) {
+            const liveName =
+                consumerProfile.preferredName ||
+                consumerProfile.firstName ||
+                consumerProfile.displayName ||
+                conv.consumerDisplayName;
+            sachTurn = await runCompanySarahSachAccountingTurn({
+                uid,
+                companyId,
+                companyName: conv.companyName,
+                consumerDisplayName: liveName,
+                consumerProfile,
+                conversationId: conv.id,
+                text: customerText,
+                history,
+                attachments: enriched.attachments,
+            });
+            reply = sachTurn.reply || "Thanks for your message.";
+            uiHints = extractSachUiHints(sachTurn.toolResults || sachTurn.uiHints || []);
         } else {
             const liveName =
                 consumerProfile.preferredName ||
