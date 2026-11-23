@@ -56,6 +56,7 @@ For new clients: ask full name, business name (if any), contact number, and a sh
 export async function bootstrapSachConsultProfile(companyId = SACH_CONSULT_COMPANY_ID) {
     await updateCompany(companyId, {
         name: SACH_DISPLAY_NAME,
+        ownerName: "Saul Chitate",
         industry: "Professional Services",
         phone: "+27 14 592 1351",
         email: "hello@sachaccounting.co.za",

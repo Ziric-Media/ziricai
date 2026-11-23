@@ -23,6 +23,7 @@ import {
   fetchWorkspaceSnapshot,
 } from './core/dataService.js';
 import { DEMO_COMPANY_ID } from './demo-data.js';
+import { perfMark, perfAsync } from '../shared/perfNav.js';
 
 /** @type {((user: import('firebase/auth').User, profile: object) => void | Promise<void>) | null} */
 let onAuthReady = null;
@@ -55,6 +56,7 @@ function applyBranding(branding) {
 }
 
 async function loadTenantContext(profile) {
+  perfMark('portal.loadTenantContext:start');
   const companyId = profile.companyId;
   const isDemoTenant = profile.isDemo && companyId === DEMO_COMPANY_ID;
 
@@ -115,6 +117,7 @@ async function loadTenantContext(profile) {
 
   refreshNav();
 
+  perfMark('portal.loadTenantContext:end');
   prefetchHub(companyId).catch((err) => console.warn('[portal] hub prefetch:', err.message));
   import('./core/notificationPolling.js')
     .then((m) => {
@@ -136,11 +139,13 @@ async function completeLoginSession(user, profile) {
     profile,
     companyId: profile.companyId,
     permissions,
-    company: { id: profile.companyId, name: profile.fullName || profile.email || 'Your Company' },
+    company: { id: profile.companyId, name: 'Company' },
   });
-  updateShellUI(profile, { name: profile.fullName || profile.email || 'Your Company' }, {});
+  updateShellUI(profile, { name: 'Company' }, {});
   hideAuthScreens();
+  perfMark('portal.shell visible');
   await onAuthReady?.(user, profile);
+  perfMark('portal.onReady done');
   loadTenantContext(profile).catch((err) => {
     console.warn('[portal] tenant context load:', err?.message || err);
   });
@@ -217,6 +222,7 @@ export function initAuthGuard({ onReady, onDenied }) {
   onAuthReady = onReady ?? null;
 
   observeAuthState(async (user) => {
+    perfMark('portal.authState', { detail: user ? user.uid.slice(0, 8) : 'signed-out' });
     if (!user) {
       setState({ user: null, profile: null, companyId: null, company: null, permissions: {} });
       if (handleSignedOutVisitor()) return;
@@ -227,7 +233,7 @@ export function initAuthGuard({ onReady, onDenied }) {
 
     setState({ user });
 
-    const profile = await resolvePortalProfile(user);
+    const profile = await perfAsync('portal.resolvePortalProfile', () => resolvePortalProfile(user));
 
     if (!profile) {
       document.getElementById('accessDeniedMessage').textContent =
