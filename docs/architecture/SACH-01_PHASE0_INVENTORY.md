@@ -1,6 +1,6 @@
 # SACH-01 — Phase 0 implementation inventory
 
-**Tenant:** `sach-consult` (Sach Accounting Solutions / Sach Consult) — **extend only; no duplicate tenant.**
+**Tenant:** `sach-consult` (display **Sach Accounting**) — **extend only; no duplicate tenant.**
 
 **Spec reference:** Company Sarah Functional Specification (sections 1–24, proposed).
 

@@ -1,4 +1,4 @@
-# Sach Consult tenant
+# Sach Accounting tenant (`sach-consult`)
 
 | Field | Value |
 |-------|--------|

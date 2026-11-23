@@ -1,17 +1,20 @@
 /**
- * Sach Consult — tenant knowledge + company profile from public website (sachaccounting.co.za).
+ * Sach Accounting — tenant knowledge + company profile (sachaccounting.co.za).
  */
 import { updateCompany } from "../tenants/companyService.js";
 import { saveKnowledgeDocument } from "../tenants/knowledgeService.js";
 
 export const SACH_CONSULT_COMPANY_ID = "sach-consult";
 
+/** Portal, Discover, and Sarah display title (companyId remains `sach-consult`). */
+export const SACH_DISPLAY_NAME = "Sach Accounting";
+
 const KB = [
     {
         id: "sach-about",
-        title: "About Sach Consult",
+        title: "About Sach Accounting",
         type: "manual",
-        content: `Sach Consult (Sach Accounting Solutions) is a professional accounting and business consulting firm in Rustenburg, North West, South Africa.
+        content: `Sach Accounting (Sach Accounting Solutions on the web) is a professional accounting and business consulting firm in Rustenburg, North West, South Africa.
 
 Managing Director: Saul Chitate.
 
@@ -40,7 +43,7 @@ Sarah should capture the client's name, business name, and what they need, then 
         id: "sach-sarah-tone",
         title: "Company Sarah — reception guidelines",
         type: "policy",
-        content: `You are Company Sarah for Sach Consult — professional, warm, and concise.
+        content: `You are Company Sarah for Sach Accounting — professional, warm, and concise.
 
 Help with: service questions, booking a consultation, documents needed for tax or payroll, and general enquiries.
 
@@ -52,7 +55,7 @@ For new clients: ask full name, business name (if any), contact number, and a sh
 
 export async function bootstrapSachConsultProfile(companyId = SACH_CONSULT_COMPANY_ID) {
     await updateCompany(companyId, {
-        name: "Sach Consult",
+        name: SACH_DISPLAY_NAME,
         industry: "Professional Services",
         phone: "+27 14 592 1351",
         email: "hello@sachaccounting.co.za",

@@ -3,7 +3,7 @@
  * Source: sachaccounting.co.za (approved for routing; prices need Sach sign-off before firm quotes).
  */
 
-export const SACH_SARAH_SYSTEM_PROMPT = `You are Sarah, the digital client-service assistant for Sach Accounting Solutions (Sach Consult) in Rustenburg.
+export const SACH_SARAH_SYSTEM_PROMPT = `You are Sarah, the digital client-service assistant for Sach Accounting (Sach Accounting Solutions) in Rustenburg.
 
 You are NOT an independent accountant, auditor, tax practitioner, or authorised company representative. Professional decisions, filings, and regulated submissions require Sach's qualified staff.
 
@@ -44,7 +44,7 @@ export const SACH_KB_DOCUMENTS = [
         id: "sach-kb-001",
         title: "SACH-KB-001 — Firm overview",
         type: "manual",
-        content: `Sach Accounting Solutions (brand: Sach Consult) — professional accounting and business consulting in Rustenburg, North West.
+        content: `Sach Accounting (Sach Accounting Solutions) — professional accounting and business consulting in Rustenburg, North West.
 Managing Director: Saul Chitate.
 Cloud-based accounting capability (Sage, Xero — integration subject to firm authorisation).
 Sarah routes enquiries; staff deliver professional work.`,

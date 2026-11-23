@@ -1,7 +1,12 @@
 /**
  * Sach Accounting — idempotent tenant bootstrap (extends existing sach-consult).
  */
-import { bootstrapSachConsultProfile, SACH_CONSULT_COMPANY_ID } from "./sachConsultBootstrap.js";
+import {
+    bootstrapSachConsultProfile,
+    SACH_CONSULT_COMPANY_ID,
+    SACH_DISPLAY_NAME,
+} from "./sachConsultBootstrap.js";
+import { saveBusinessDirectoryEntry } from "../users/businessDirectoryService.js";
 import { SACH_KB_DOCUMENTS } from "../storage/sachAccountingKnowledge.js";
 import { saveKnowledgeDocument } from "../tenants/knowledgeService.js";
 import { ensureSachAccountingTenantSettings } from "./sachAccountingServiceRequestService.js";
@@ -21,5 +26,9 @@ export async function bootstrapSachAccountingPractice(companyId = SACH_CONSULT_C
         });
         kbIds.push(saved.id || doc.id);
     }
-    return { ...base, ...settings, accountingKnowledgeSeeded: kbIds };
+    await saveBusinessDirectoryEntry(companyId, {
+        discoverability: "public",
+        displayName: SACH_DISPLAY_NAME,
+    });
+    return { ...base, ...settings, accountingKnowledgeSeeded: kbIds, displayName: SACH_DISPLAY_NAME };
 }

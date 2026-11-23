@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Provision Sach Consult tenant + Discover + Company Sarah KB.
+ * Provision Sach Accounting tenant + Discover + Company Sarah KB.
  *
  * Env: Firebase Admin + STORAGE_BACKEND=firestore (see .env)
  *   SACH_OWNER_EMAIL (default hello@sachaccounting.co.za)
@@ -17,6 +17,7 @@ import { getCompany } from "../services/tenants/companyService.js";
 import {
     bootstrapSachConsultProfile,
     SACH_CONSULT_COMPANY_ID,
+    SACH_DISPLAY_NAME,
 } from "../services/consulting/sachConsultBootstrap.js";
 import { saveBusinessDirectoryEntry } from "../services/users/businessDirectoryService.js";
 import { ensureOrgEntitySafe } from "../services/network/networkIdentityService.js";
@@ -47,7 +48,7 @@ async function main() {
     } else {
         const result = await provisionOperatorTenant({
             companyId,
-            name: "Sach Consult",
+            name: SACH_DISPLAY_NAME,
             industry: "Professional Services",
             ownerEmail,
             owner: ownerName,
@@ -85,7 +86,7 @@ async function main() {
     const boot = await bootstrapSachConsultProfile(companyId);
     const directory = await saveBusinessDirectoryEntry(companyId, {
         discoverability: "public",
-        displayName: "Sach Consult",
+        displayName: SACH_DISPLAY_NAME,
         industry: "Accounting & consulting",
         location: "Rustenburg, North West",
         shortDescription:
