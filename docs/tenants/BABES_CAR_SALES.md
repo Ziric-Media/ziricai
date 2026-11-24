@@ -29,7 +29,21 @@ npm run import:babes-inventory
 npm run bootstrap:babes-bcs03
 ```
 
-Postgres must be reachable (`DATABASE_URL`). From a workstation, use `railway connect postgres --tunnel-only` and override `DATABASE_URL` to `127.0.0.1` (see [BCS-03_IMPLEMENTATION_REPORT.md](../architecture/BCS-03_IMPLEMENTATION_REPORT.md)).
+Postgres must be reachable (`DATABASE_URL`). Preferred production refresh:
+
+```bash
+railway ssh node scripts/import-babes-car-sales-inventory.mjs
+```
+
+From a workstation, use `railway connect postgres --tunnel-only` and override `DATABASE_URL` to `127.0.0.1` (see [BCS-03_IMPLEMENTATION_REPORT.md](../architecture/BCS-03_IMPLEMENTATION_REPORT.md)).
+
+Smoke (Postgres):
+
+```bash
+npm run verify:babes-inventory
+# production: after deploy includes scripts/verify-babes-inventory-smoke.mjs
+railway ssh node scripts/verify-babes-inventory-smoke.mjs
+```
 
 ## Sales conversation (BCS-04)
 

@@ -189,6 +189,14 @@ export async function recordPersonalSarahAction(session, action) {
     await writeToFirestore(session);
 }
 
+export async function persistPersonalSarahSession(session) {
+    if (!session?.userId || !session?.id) return session;
+    session.updatedAt = Date.now();
+    memorySessions.set(session.id, session);
+    await writeToFirestore(session);
+    return session;
+}
+
 function lastMessagePreview(session) {
     const msgs = session?.messages || [];
     for (let i = msgs.length - 1; i >= 0; i -= 1) {

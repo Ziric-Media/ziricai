@@ -72,8 +72,9 @@ export function completeChatMediaUpload(uploadId, personId, token, body) {
     }
     record.status = "ready";
     record.byteLength = size;
+    record.buffer = body;
     record.completedAt = new Date().toISOString();
-  record.storageKey = `chat-media/${personId}/${uploadId}`;
+    record.storageKey = `chat-media/${personId}/${uploadId}`;
     const attachment = {
         id: uploadId,
         mimeType: record.mimeType,
@@ -85,6 +86,38 @@ export function completeChatMediaUpload(uploadId, personId, token, body) {
     record.attachment = attachment;
     uploads.set(uploadId, record);
     return attachment;
+}
+
+export function parseChatMediaTokenFromUrl(url) {
+    const raw = String(url || "");
+    const match = raw.match(/[?&]token=([^&]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * CHAT-01 vision/voice — load completed upload bytes (same token as download URL).
+ * @param {string} uploadId
+ * @param {string} token
+ */
+export function getChatMediaContent(uploadId, token) {
+    const record = uploads.get(uploadId);
+    if (!record || record.purpose || record.status !== "ready") {
+        throw Object.assign(new Error("Attachment not found"), { status: 404, code: "ATTACHMENT_NOT_FOUND" });
+    }
+    if (record.token !== token) {
+        throw Object.assign(new Error("Forbidden"), { status: 403, code: "ATTACHMENT_FORBIDDEN" });
+    }
+    if (!record.buffer) {
+        throw Object.assign(new Error("Attachment buffer not available"), {
+            status: 404,
+            code: "ATTACHMENT_BUFFER_MISSING",
+        });
+    }
+    return {
+        buffer: record.buffer,
+        mimeType: record.mimeType,
+        fileName: record.fileName,
+    };
 }
 
 export function getChatMediaAttachment(uploadId, personId, token) {

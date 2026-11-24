@@ -11,8 +11,8 @@ export const MAX_VEHICLE_IMAGES_PER_TURN = 3;
 export const MAX_GALLERY_IMAGES_PER_VEHICLE = 3;
 
 const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\([^)]+\)/g;
-const CENTRAL_MOTORS_IMAGE_URL_PATTERN =
-    /https?:\/\/(?:www\.)?centralmotorsrtb\.co\.za[^\s)\]]+\.(?:jpe?g|png|webp)(?:\?[^\s)\]]*)?/gi;
+const DEALER_SITE_IMAGE_URL_PATTERN =
+    /https?:\/\/(?:www\.)?(?:centralmotorsrtb|babescarsales)\.co\.za[^\s)\]]+\.(?:jpe?g|png|webp)(?:\?[^\s)\]]*)?/gi;
 const BARE_IMAGE_URL_PATTERN = /https?:\/\/[^\s)\]]+\.(?:jpe?g|png|webp)(?:\?[^\s)\]]*)?/gi;
 const WEBP_PATTERN = /\.webp(?:\?|$)/i;
 const SUPPORTED_IMAGE_PATTERN = /\.(?:jpe?g|png)(?:\?|$)/i;
@@ -38,9 +38,9 @@ export function isSupportedWhatsAppImageUrl(url) {
 export function stripWhatsAppImageUrlsFromText(text) {
     let result = String(text || "");
     result = result.replace(MARKDOWN_IMAGE_PATTERN, "");
-    result = result.replace(CENTRAL_MOTORS_IMAGE_URL_PATTERN, "");
+    result = result.replace(DEALER_SITE_IMAGE_URL_PATTERN, "");
     result = result.replace(BARE_IMAGE_URL_PATTERN, (match) =>
-        /centralmotorsrtb\.co\.za/i.test(match) ? "" : match
+        /(?:centralmotorsrtb|babescarsales)\.co\.za/i.test(match) ? "" : match
     );
     result = result.replace(/[ \t]+\n/g, "\n");
     result = result.replace(/\n{3,}/g, "\n\n");

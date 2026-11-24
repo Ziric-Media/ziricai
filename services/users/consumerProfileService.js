@@ -18,6 +18,16 @@ const memoryConsumerPreferences = new Map();
 
 export const CONSUMER_ACCOUNT_KIND = "consumer";
 
+/**
+ * @param {object|null|undefined} profile
+ */
+export function consumerRegistrationComplete(profile) {
+    if (!profile) return false;
+    if (profile.onboardingCompletedAt) return true;
+    const required = ["firstName", "lastName", "city", "country"];
+    return required.every((key) => String(profile[key] || "").trim());
+}
+
 function normalizeKinds(profile) {
     const raw = profile?.accountKinds;
     if (Array.isArray(raw)) return raw.map(String);
@@ -156,6 +166,18 @@ const PROFILE_PATCH_KEYS = new Set([
  * @param {string} uid
  * @param {Record<string, unknown>} patch
  */
+/**
+ * MC safety enforcement — merge platformSafety on consumer profile.
+ * @param {string} uid
+ * @param {object} safetyPatch
+ */
+export async function patchConsumerPlatformSafety(uid, safetyPatch = {}) {
+    if (!uid) return null;
+    const current = (await getConsumerProfile(uid)) || { uid };
+    const platformSafety = { ...(current.platformSafety || {}), ...safetyPatch };
+    return updateConsumerProfile(uid, { platformSafety });
+}
+
 export async function updateConsumerProfile(uid, patch = {}) {
     const current = await getConsumerProfile(uid);
     if (!current) {
@@ -185,4 +207,37 @@ export function consumerCollectionPathsForDocs() {
         userProfiles: `${ROOT.USER_PROFILES}/{uid}`,
         userPreferences: `${ROOT.USER_PREFERENCES}/{uid}`,
     };
+}
+
+/**
+ * @param {object|null|undefined} profile
+ * @param {string} [field]
+ * @returns {number|null}
+ */
+export function profileTimestampMs(profile, field = "updatedAt") {
+    const raw = profile?.[field];
+    if (raw == null) return null;
+    if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+    if (typeof raw?.toDate === "function") return raw.toDate().getTime();
+    if (typeof raw?._seconds === "number") {
+        return raw._seconds * 1000 + (raw._nanoseconds || 0) / 1e6;
+    }
+    const ms = Date.parse(String(raw));
+    return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * MC platform read — scan userProfiles (capped).
+ * @param {{ limit?: number }} [opts]
+ */
+export async function listConsumerProfilesForPlatform({ limit: capArg = 500 } = {}) {
+    const cap = Math.min(Math.max(Number(capArg) || 500, 1), 5000);
+    if (getConfiguredStorageBackend() === "memory") {
+        return [...memoryConsumerProfiles.values()].slice(0, cap);
+    }
+    const { getAdminFirestore } = await import("../database/firestoreAdmin.js");
+    const db = getAdminFirestore();
+    if (!db) return [];
+    const snap = await db.collection(ROOT.USER_PROFILES).limit(cap).get();
+    return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
 }

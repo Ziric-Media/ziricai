@@ -1,0 +1,9 @@
+.*-wt/
+.*-prestage/
+.*-release/
+.*-audit/
+.*-impl/
+.netlify/
+test-results/
+mobile/
+.git/

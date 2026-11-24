@@ -10,6 +10,7 @@ import {
     CENTRAL_MOTORS_SOURCE,
     fetchAndParseListing,
 } from "../../inventory/adapters/centralMotorsRtbAdapter.js";
+import { BABES_CAR_SALES_SOURCE } from "../../inventory/adapters/babesCarSalesAdapter.js";
 import { resolveGalleryVehicleTargets } from "../../conversation/vehicleReference.js";
 import { extractSearchInventoryVehicles } from "../../conversation/vehicleOutboundPlan.js";
 import {
@@ -132,12 +133,15 @@ export function expandDealerImageCandidates(url) {
     return [...new Set(out)];
 }
 
+const LIVE_LISTING_IMAGE_SOURCES = new Set([CENTRAL_MOTORS_SOURCE, BABES_CAR_SALES_SOURCE]);
+
 /**
+ * Re-fetch gallery URLs from the dealer listing page when Postgres copies are stale or 404.
  * @param {object} vehicle
  */
-async function liveCentralMotorsImageUrls(vehicle) {
+async function liveWebsiteListingImageUrls(vehicle) {
     const meta = vehicle?.metadata || {};
-    if (meta.source !== CENTRAL_MOTORS_SOURCE) return [];
+    if (!LIVE_LISTING_IMAGE_SOURCES.has(meta.source)) return [];
     const sourceUrl = String(meta.sourceUrl || "").trim();
     if (!/\/listings\//i.test(sourceUrl)) return [];
     try {
@@ -180,7 +184,7 @@ export async function pickVerifiedSarahAppVehicleImageUrl(vehicle) {
     let ranked = getSarahAppVehicleImageUrls(vehicle);
     let picked = await verifyFirstWorkingDealerImage(ranked);
     if (picked) return picked;
-    const live = await liveCentralMotorsImageUrls(vehicle);
+    const live = await liveWebsiteListingImageUrls(vehicle);
     if (live.length) {
         ranked = [...live, ...ranked];
         picked = await verifyFirstWorkingDealerImage(ranked);
