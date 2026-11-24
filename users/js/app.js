@@ -1810,6 +1810,50 @@ function bindAppPrimaryTap(el, handler) {
   el.addEventListener('touchend', run, { passive: false });
 }
 
+/** Immediate visual feedback while navigation or network work is queued. */
+function markControlTapPending(el) {
+  if (!el) return;
+  el.classList.add('is-tap-pending');
+  const hadBusy = el.getAttribute('aria-busy') === 'true';
+  if (!hadBusy) el.setAttribute('aria-busy', 'true');
+  window.setTimeout(() => {
+    el.classList.remove('is-tap-pending');
+    if (!hadBusy) el.removeAttribute('aria-busy');
+  }, 420);
+}
+
+function primeCompanyThreadForOpen(company) {
+  const rt = getSarahRuntime();
+  const companyId = resolveLiveCompanySarahId(company.id);
+  const live = consumerChatLiveActive();
+  const existing = rt.threads[companyId];
+  if (existing?.kind === 'company' && existing.api && existing.messages?.length) {
+    rt.activeThreadId = companyId;
+    return;
+  }
+  rt.threads[companyId] = {
+    kind: 'company',
+    name: company.name,
+    companyId,
+    snId: company.snId || existing?.snId || null,
+    verified: Boolean(company.verified),
+    avatar: companyAvatarUrl(company),
+    api: live,
+    fetching: live,
+    messages: existing?.messages?.length
+      ? existing.messages
+      : live
+        ? []
+        : [
+            {
+              role: 'assistant',
+              markdown: `**Hi ${MOCK_USER.name}** — I'm Sarah from **${company.name}**. How can I help you today?`,
+            },
+          ],
+  };
+  rt.activeThreadId = companyId;
+}
+
 function bindStatusInteractionDelegates() {
   /* no-op — feed engage is wired per card via wireFeedEngageButtons */
 }
@@ -3684,6 +3728,22 @@ function isExplicitNonPersonalThreadSelection(rt) {
   return false;
 }
 
+/** Avoid treating person-to-person inbox rows as Company Sarah loads. */
+function activeThreadNeedsCompanyApiLoad(rt) {
+  const id = String(rt.activeThreadId || '').trim();
+  if (!id) return false;
+  const thread = rt.threads[id];
+  if (thread?.kind === 'personal') return false;
+  if (thread?.kind && thread.kind !== 'company') return false;
+  if (thread?.kind === 'company') return true;
+  if (id === 'smilemore-demo') return true;
+  const chat = getAllChats().find((c) => c.id === id);
+  if (chat && !chat.company) return false;
+  if (chat?.company) return true;
+  if (discoverFind(resolveLiveCompanySarahId(id))) return true;
+  return false;
+}
+
 function guessCompanyAvatarKey(companyId, label = '') {
   const hay = `${companyId} ${label}`.toLowerCase();
   if (hay.includes('smile')) return 'smilemore';
@@ -3752,37 +3812,60 @@ async function loadCompanyThreadFromApiIfNeeded() {
   if (!companyId) return false;
 
   const existing = rt.threads[companyId] || rt.threads[id];
-  if (existing?.api && existing.kind === 'company' && existing.messages?.length) return true;
-
-  const chat = getAllChats().find((c) => c.id === id || c.id === companyId);
-  const discoverCo = discoverFind(companyId);
-
-  const res = await window.SarahLive.fetchCompanyMessages(companyId);
-  if (res.error) {
-    showProtoToast(res.error);
-    return false;
+  if (existing?.api && existing.kind === 'company' && existing.messages?.length) {
+    if (existing.fetching) existing.fetching = false;
+    return true;
   }
-  const payload = res.data || {};
-  const messages = mapApiMessagesToThread(payload.messages);
-  const name =
-    payload.conversation?.companyName || chat?.name || discoverCo?.name || companyId;
-  rt.threads[companyId] = {
-    kind: 'company',
-    name,
-    companyId,
-    snId: payload.conversation?.snId || chat?.snId || discoverCo?.snId || null,
-    verified: true,
-    api: true,
-    messages,
-  };
-  rt.activeThreadId = companyId;
-  return true;
+
+  if (companyThreadFetchInflight.has(companyId)) {
+    return companyThreadFetchInflight.get(companyId);
+  }
+
+  const job = (async () => {
+    const chat = getAllChats().find((c) => c.id === id || c.id === companyId);
+    const discoverCo = discoverFind(companyId);
+    const threadRef = rt.threads[companyId] || rt.threads[id];
+    if (threadRef) threadRef.fetching = true;
+    if (parseLocationHash().route === 'chat-thread') renderThread();
+
+    const res = await window.SarahLive.fetchCompanyMessages(companyId);
+    if (res.error) {
+      if (threadRef) threadRef.fetching = false;
+      if (parseLocationHash().route === 'chat-thread') renderThread();
+      showProtoToast(res.error);
+      return false;
+    }
+    const payload = res.data || {};
+    const messages = mapApiMessagesToThread(payload.messages);
+    const name =
+      payload.conversation?.companyName || chat?.name || discoverCo?.name || companyId;
+    rt.threads[companyId] = {
+      kind: 'company',
+      name,
+      companyId,
+      snId: payload.conversation?.snId || chat?.snId || discoverCo?.snId || null,
+      verified: true,
+      api: true,
+      fetching: false,
+      messages,
+    };
+    rt.activeThreadId = companyId;
+    return true;
+  })();
+
+  companyThreadFetchInflight.set(companyId, job);
+  try {
+    return await job;
+  } finally {
+    companyThreadFetchInflight.delete(companyId);
+  }
 }
 
 let chatsListLoadGen = 0;
 let chatsListLastFetchAt = 0;
 const CHATS_LIST_FETCH_MIN_MS = 45_000;
 const CHATS_LIST_SESSION_KEY = 'sarah.chats.list.cache.v1';
+const companyThreadFetchInflight = new Map();
 /** @type {object[]|null} */
 let chatsListMemoryCache = null;
 let chatsTabSearchDebounceTimer = null;
@@ -3845,14 +3928,23 @@ async function loadNonCompanyThreadFromApi(convId, kind) {
 }
 
 async function openChatFromList(chatId, rowEl) {
+  markControlTapPending(rowEl);
   const rt = getSarahRuntime();
   const kind = rowEl?.dataset?.kind || '';
   const convId = rowEl?.dataset?.convId || chatId;
   const isCompany = rowEl?.dataset?.company !== '0';
-  rt.activeThreadId = isCompany ? chatId || 'smilemore-demo' : convId;
+  const targetId = isCompany ? chatId || 'smilemore-demo' : convId;
+  rt.activeThreadId = targetId;
   if (consumerChatLiveActive()) {
-    if (isCompany) await loadCompanyThreadFromApiIfNeeded();
-    else await loadNonCompanyThreadFromApi(convId, kind);
+    if (isCompany) {
+      const co =
+        discoverFind(resolveLiveCompanySarahId(targetId)) ||
+        ({ id: targetId, name: rowEl?.querySelector('.chat-title')?.textContent?.trim() || targetId, verified: true });
+      primeCompanyThreadForOpen(co);
+      setRoute('chat-thread');
+      return;
+    }
+    await loadNonCompanyThreadFromApi(convId, kind);
   }
   setRoute('chat-thread');
 }
@@ -4588,20 +4680,21 @@ function persistPersonalSarahSessionId(threadId) {
 /**
  * Open a personal thread. Use skipServerLoad when local messages are already correct (e.g. first send from Home).
  */
-async function openPersonalSarahThread(threadId, { skipServerLoad = false } = {}) {
+function openPersonalSarahThread(threadId, { skipServerLoad = false } = {}) {
   if (personalSarahUsesMockThreads()) ensurePersonalThreadsSeeded();
   const rt = getSarahRuntime();
   if (!rt.threads[threadId] && personalSarahLiveActive()) {
     upsertPersonalThreadFromSession({ id: threadId, title: 'My Sarah', messages: [] }, { partial: true });
   }
   if (!rt.threads[threadId]) return;
-  if (personalSarahLiveActive() && !skipServerLoad) {
-    const ok = await loadPersonalThreadFromServer(threadId);
-    if (!ok) return;
-  }
   rt.activeThreadId = threadId;
   persistPersonalSarahSessionId(threadId);
   setRoute('chat-thread');
+  if (personalSarahLiveActive() && !skipServerLoad) {
+    void loadPersonalThreadFromServer(threadId).then((ok) => {
+      if (ok && parseLocationHash().route === 'chat-thread') renderThread();
+    });
+  }
 }
 
 async function startNewPersonalChat(options = {}) {
@@ -5988,9 +6081,10 @@ function getActiveThreadContext() {
   };
 }
 
-async function openCompanySarahChat(companyId) {
+function openCompanySarahChat(companyId, triggerEl) {
   const id = String(companyId || '').trim();
   if (!id) return;
+  markControlTapPending(triggerEl);
   const company = discoverFind(id) || {
     id,
     name: id,
@@ -5998,11 +6092,9 @@ async function openCompanySarahChat(companyId) {
   };
   // Public Discover can be browsed signed out; chatting with Company Sarah needs an account.
   if (company.live && !requireLiveSignIn('chat with this business')) return;
-  const rt = getSarahRuntime();
-  const threadId = company.id;
-  rt.activeThreadId = threadId;
+  primeCompanyThreadForOpen(company);
   upsertRuntimeChat({
-    id: threadId,
+    id: company.id,
     name: company.name,
     preview: `Hi ${MOCK_USER.name}, I'm Sarah from ${company.name}…`,
     time: 'Now',
@@ -6010,23 +6102,6 @@ async function openCompanySarahChat(companyId) {
     avatar: companyAvatarUrl(company),
     company: true,
   });
-  if (consumerChatLiveActive()) {
-    await loadCompanyThreadFromApiIfNeeded();
-  } else {
-    rt.threads[threadId] = {
-      kind: 'company',
-      name: company.name,
-      avatar: companyAvatarUrl(company),
-      verified: company.verified,
-      companyId: company.id,
-      messages: [
-        {
-          role: 'assistant',
-          markdown: `**Hi ${MOCK_USER.name}** — I'm Sarah from **${company.name}**. How can I help you today?`,
-        },
-      ],
-    };
-  }
   setRoute('chat-thread');
 }
 
@@ -6179,7 +6254,7 @@ function bindChatsListInteractions(host) {
     });
   });
   host.querySelectorAll('[data-start-company-chat]').forEach((row) => {
-    const start = () => void openCompanySarahChat(row.dataset.startCompanyChat || '');
+    const start = () => openCompanySarahChat(row.dataset.startCompanyChat || '', row);
     row.addEventListener('click', start);
     row.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -12190,7 +12265,11 @@ function renderThread() {
 
   const log = document.getElementById('threadLog');
   if (!log) return;
-  log.innerHTML = ctx.messages.map((m) => renderThreadMessageMarkup(m, isPersonal, ctx)).join('');
+  let messages = ctx.messages || [];
+  if (!messages.length && thread?.fetching && !isPersonal) {
+    messages = [{ thinking: true }];
+  }
+  log.innerHTML = messages.map((m) => renderThreadMessageMarkup(m, isPersonal, ctx)).join('');
   log.querySelectorAll('[data-retry-send]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const retryText = btn.getAttribute('data-retry-send') || '';
@@ -12234,58 +12313,71 @@ function activateView() {
   const preAuth = route === 'welcome' || route === 'auth' || route === 'register-details';
   showNav(!preAuth && route !== 'chat-thread');
 
-  if (route === 'register-details') renderRegisterDetails();
+  const paintRoute = () => {
+    if (route === 'register-details') renderRegisterDetails();
 
-  if (route === 'chats') renderChatsList();
-  if (route === 'home') {
-    syncUserAvatars();
-    renderMySarahPage();
-    applyMySarahPanel(msPanel);
-    updatePersonalSarahLiveUi();
-    if (personalSarahLiveActive()) syncPersonalSarahSessionsFromServer({ silent: true });
-  }
-  if (route === 'chat-thread') {
-    const { personalThreadId } = parseLocationHash();
-    const rt = getSarahRuntime();
-    if (personalThreadId) {
-      rt.activeThreadId = personalThreadId;
-      if (personalSarahLiveActive()) {
-        loadPersonalThreadFromServer(personalThreadId).then((ok) => {
+    if (route === 'chats') renderChatsList();
+    if (route === 'home') {
+      syncUserAvatars();
+      renderMySarahPage();
+      applyMySarahPanel(msPanel);
+      updatePersonalSarahLiveUi();
+      if (personalSarahLiveActive()) syncPersonalSarahSessionsFromServer({ silent: true });
+    }
+    if (route === 'chat-thread') {
+      const { personalThreadId } = parseLocationHash();
+      const rt = getSarahRuntime();
+      if (personalThreadId) {
+        rt.activeThreadId = personalThreadId;
+        if (personalSarahLiveActive()) {
+          renderThread();
+          loadPersonalThreadFromServer(personalThreadId).then((ok) => {
+            if (ok) renderThread();
+          });
+        } else {
+          renderThread();
+        }
+      } else if (activeThreadNeedsCompanyApiLoad(rt)) {
+        renderThread();
+        loadCompanyThreadFromApiIfNeeded().finally(() => renderThread());
+      } else if (
+        personalSarahLiveActive() &&
+        rt.activeThreadId &&
+        rt.threads[rt.activeThreadId]?.kind === 'personal' &&
+        rt.threads[rt.activeThreadId]?.api
+      ) {
+        renderThread();
+        loadPersonalThreadFromServer(rt.activeThreadId).then(() => renderThread());
+      } else if (personalSarahLiveActive() && window.SarahLive?.getSessionId?.()) {
+        const sid = window.SarahLive.getSessionId();
+        rt.activeThreadId = sid;
+        renderThread();
+        loadPersonalThreadFromServer(sid).then((ok) => {
           if (ok) renderThread();
+          else renderThread();
         });
       } else {
         renderThread();
       }
-    } else if (isExplicitNonPersonalThreadSelection(rt)) {
-      loadCompanyThreadFromApiIfNeeded().finally(() => renderThread());
-    } else if (
-      personalSarahLiveActive() &&
-      rt.activeThreadId &&
-      rt.threads[rt.activeThreadId]?.kind === 'personal' &&
-      rt.threads[rt.activeThreadId]?.api
-    ) {
-      loadPersonalThreadFromServer(rt.activeThreadId).then(() => renderThread());
-    } else if (personalSarahLiveActive() && window.SarahLive?.getSessionId?.()) {
-      const sid = window.SarahLive.getSessionId();
-      rt.activeThreadId = sid;
-      loadPersonalThreadFromServer(sid).then((ok) => {
-        if (ok) renderThread();
-        else renderThread();
-      });
-    } else {
-      renderThread();
     }
-  }
 
-  if (route === 'news' && window.SarahNews?.renderNewsPanel) window.SarahNews.renderNewsPanel();
-  if (route === 'discover') renderDiscover();
-  if (route === 'discover-company') {
-    const { companyId } = parseLocationHash();
-    renderCompanyDetail(companyId);
-  }
-  if (route === 'profile') {
-    const { profilePanel, profileKind } = parseLocationHash();
-    renderProfile(profilePanel || 'public', profileKind || activeProfileKind);
+    if (route === 'news' && window.SarahNews?.renderNewsPanel) window.SarahNews.renderNewsPanel();
+    if (route === 'discover') renderDiscover();
+    if (route === 'discover-company') {
+      const { companyId } = parseLocationHash();
+      renderCompanyDetail(companyId);
+    }
+    if (route === 'profile') {
+      const { profilePanel, profileKind } = parseLocationHash();
+      renderProfile(profilePanel || 'public', profileKind || activeProfileKind);
+    }
+  };
+
+  const paintNow = route === 'chat-thread' || route === 'welcome' || route === 'auth' || route === 'register-details';
+  if (paintNow) {
+    paintRoute();
+  } else {
+    requestAnimationFrame(paintRoute);
   }
 }
 
@@ -13836,9 +13928,12 @@ function renderCompanyDetail(companyId) {
     void handleFollowToggle(btn, id);
   });
 
-  root.querySelector('[data-chat-company]')?.addEventListener('click', (e) => {
-    openCompanySarahChat(e.currentTarget.getAttribute('data-chat-company'));
-  });
+  const chatSarahBtn = root.querySelector('[data-chat-company]');
+  if (chatSarahBtn) {
+    bindAppPrimaryTap(chatSarahBtn, () => {
+      openCompanySarahChat(chatSarahBtn.getAttribute('data-chat-company'), chatSarahBtn);
+    });
+  }
 
   root.querySelectorAll('[data-gallery-open]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -14132,7 +14227,8 @@ function init() {
   });
 
   document.querySelectorAll('.bottom-nav [data-route]').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    bindAppPrimaryTap(btn, () => {
+      markControlTapPending(btn);
       const target = btn.dataset.route || 'welcome';
       if (target === 'home') {
         let panel = 'home';

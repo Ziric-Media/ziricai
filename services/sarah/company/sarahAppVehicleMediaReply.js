@@ -28,7 +28,7 @@ const HALLUCINATED_CAPTION =
     /\b(?:SUV|Sedan|Truck|Hatch|Bakkie)\s+Models?\b|\b(?:SUV|Sedan|Truck|Hatch|Bakkie)\s+Model\s*\d+\b/i;
 
 const TRUSTED_IMAGE_HOST =
-    /centralmotorsrtb\.co\.za|firebasestorage\.googleapis\.com|\.firebasestorage\.app|(?:sarah\.)?ziricai\.com\/api\/network\/v1\/listing-media/i;
+    /(?:centralmotorsrtb|babescarsales)\.co\.za|firebasestorage\.googleapis\.com|\.firebasestorage\.app|(?:sarah\.)?ziricai\.com\/api\/network\/v1\/listing-media/i;
 
 /** @param {string|null|undefined} url */
 export function isSarahAppDisplayableImageUrl(url) {
@@ -43,7 +43,10 @@ export function isSarahAppDisplayableImageUrl(url) {
     }
     if (!/^https?:\/\//i.test(raw)) return false;
     if (TRUSTED_IMAGE_HOST.test(raw)) return true;
-    return /\.(?:jpe?g|png|webp|gif)(?:\?|$)/i.test(raw) && /centralmotorsrtb\.co\.za/i.test(raw);
+    return (
+        /\.(?:jpe?g|png|webp|gif)(?:\?|$)/i.test(raw) &&
+        /(?:centralmotorsrtb|babescarsales)\.co\.za/i.test(raw)
+    );
 }
 
 /**
@@ -364,13 +367,33 @@ export function parseNumberedVehicleLinesFromReply(reply) {
     return mentions;
 }
 
+/** Markdown bullets such as `- **2014 FORD RANGER…**` when Sarah lists multiple vehicles. */
+export function parseBulletVehicleLinesFromReply(reply) {
+    const mentions = [];
+    const re = /^\s*[-*•]\s*\*{0,2}([^*\n]+?)(?:\*{0,2})?\s*$/gm;
+    let m;
+    while ((m = re.exec(String(reply || ""))) !== null) {
+        const title = m[1].replace(/\*\*/g, "").trim();
+        if (!/\b(19|20)\d{2}\b/.test(title) || title.length < 8) continue;
+        mentions.push({ index: mentions.length + 1, title });
+    }
+    return mentions;
+}
+
+/** Numbered lines first; otherwise bullet lists of year/make/model titles. */
+export function parseVehicleLinesFromReply(reply) {
+    const numbered = parseNumberedVehicleLinesFromReply(reply);
+    if (numbered.length) return numbered;
+    return parseBulletVehicleLinesFromReply(reply);
+}
+
 /**
  * Keep image order aligned with numbered list in Sarah's reply.
  * @param {string} reply
  * @param {object[]} vehicles
  */
 export function matchVehiclesToReplyOrder(reply, vehicles = []) {
-    const mentions = parseNumberedVehicleLinesFromReply(reply);
+    const mentions = parseVehicleLinesFromReply(reply);
     if (!mentions.length || !vehicles?.length) return vehicles;
 
     const used = new Set();
@@ -408,6 +431,8 @@ const MODEL_HINTS = [
     "ranger",
     "fortuner",
     "rav4",
+    "x-trail",
+    "x3",
     "hilux",
     "corolla",
     "amaze",
@@ -415,6 +440,7 @@ const MODEL_HINTS = [
     "changan",
     "haval",
     "bmw",
+    "nissan",
 ];
 
 /**
@@ -445,6 +471,12 @@ export function customerAsksVehiclePhoto(customerText, history = []) {
     if (/\b(see|show)\s+(me\s+)?(its?|the)\s+(pic|pics|photo|photos|image|images)\b/i.test(text)) return true;
     if (/\blets\s+see\s+(its?|the)\s+pic\b/i.test(text)) return true;
     if (/\bshow me\s+(its?|the)\s+image\b/i.test(text)) return true;
+    if (
+        /^\s*(do you have\s+)?(any\s+)?(pics?|photos?|images?|pictures)\b/i.test(text) &&
+        (STOCK_MEDIA_INTENT.test(text) || Boolean(resolveDiscussedVehicleFromHistory(history)))
+    ) {
+        return true;
+    }
     if (
         /\b(pics?|photos?|images?|pictures)\b/i.test(text) &&
         (STOCK_MEDIA_INTENT.test(text) || Boolean(resolveDiscussedVehicleFromHistory(history)))
@@ -982,7 +1014,7 @@ export async function enrichCompanySarahReplyWithVehicleMedia(
         mediaPlan.skipBroadSearch = true;
     }
     const promisedBody = resolvePromisedBodyType(customerText, content, history);
-    const listMentions = parseNumberedVehicleLinesFromReply(content);
+    const listMentions = parseVehicleLinesFromReply(content);
     const mediaLimit = listMentions.length || mediaPlan.limit;
 
     if (discussedTitle && !listMentions.length) {

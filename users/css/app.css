@@ -1407,6 +1407,13 @@ body.is-feed-comment-open {
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 8px 20px rgba(91, 33, 182, 0.35);
+  transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
+}
+
+.company-chat-sarah:active,
+.company-chat-sarah.is-tap-pending {
+  transform: scale(0.98);
+  opacity: 0.92;
 }
 
 .company-actions {
@@ -6576,6 +6583,14 @@ body.is-feed-comment-open {
   font-size: var(--type-nav-size);
   font-weight: var(--type-nav-weight);
   color: var(--color-text-muted);
+  transition: transform 0.12s ease, opacity 0.12s ease;
+  touch-action: manipulation;
+}
+
+.bottom-nav button:active,
+.bottom-nav button.is-tap-pending {
+  transform: scale(0.96);
+  opacity: 0.82;
 }
 
 .bottom-nav button.is-active,
