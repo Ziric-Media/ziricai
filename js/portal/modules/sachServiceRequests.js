@@ -83,8 +83,12 @@ function formatShortDate(value) {
     if (typeof value.toDate === 'function') {
       return value.toDate().toISOString().slice(0, 10);
     }
-    if (Number.isFinite(value.seconds)) {
-      return new Date(value.seconds * 1000).toISOString().slice(0, 10);
+    const sec = value.seconds ?? value._seconds;
+    if (Number.isFinite(sec)) {
+      return new Date(sec * 1000).toISOString().slice(0, 10);
+    }
+    if (typeof value.toISOString === 'function') {
+      return value.toISOString().slice(0, 10);
     }
   }
   try {
@@ -124,19 +128,21 @@ export async function renderSachServiceRequests(container) {
   let selectedId = '';
 
   container.innerHTML = `
-    <div class="bos-sach-requests">
-      <header class="sach-requests-hero">
-        <div class="sach-requests-hero__text">
-          <p class="sach-requests-eyebrow">Sach Accounting · Client intake</p>
-          <h2 class="sach-requests-title">Client service requests</h2>
-          <p class="sach-requests-lead">Structured intake from Company Sarah — VAT, payroll, CIPC, bookkeeping, and related workflows.</p>
-          <p class="sach-requests-meta" id="sachPackSummary"></p>
+    <div class="sach-page">
+      <header class="sach-hero">
+        <div class="sach-hero__glow" aria-hidden="true"></div>
+        <div class="sach-hero__text">
+          <p class="sach-eyebrow">Sach Accounting · Client intake</p>
+          <h2 class="sach-title">Client service requests</h2>
+          <p class="sach-lead">Structured intake from Company Sarah — VAT, payroll, CIPC, bookkeeping, and related workflows.</p>
+          <p class="sach-meta" id="sachPackSummary"></p>
+          <div class="sach-stats" id="sachStatsRow" hidden></div>
         </div>
-        <div class="sach-requests-hero__accent" aria-hidden="true">
+        <div class="sach-hero__mark" aria-hidden="true">
           <i class="fa-solid fa-clipboard-list"></i>
         </div>
       </header>
-      <div class="sach-requests-toolbar bos-card">
+      <div class="sach-toolbar">
         <div class="sach-filter-bar" id="sachFilterBar" role="tablist" aria-label="Service request filters">
           ${FILTER_STATUSES.map(
             (s) =>
@@ -144,17 +150,17 @@ export async function renderSachServiceRequests(container) {
           ).join('')}
         </div>
       </div>
-      <div class="sach-requests-layout">
-        <div class="bos-card sach-panel sach-panel-queue" id="sachQueue">
-          <div class="sach-panel-head">
+      <div class="sach-layout">
+        <div class="sach-panel" id="sachQueue">
+          <div class="sach-panel__head">
             <h3>Queue</h3>
-            <span class="sach-panel-hint" id="sachQueueCount"></span>
+            <span class="sach-panel__hint" id="sachQueueCount"></span>
           </div>
-          <div class="sach-panel-body"><p class="text-muted">Loading requests…</p></div>
+          <div class="sach-panel__body"><p class="text-muted">Loading requests…</p></div>
         </div>
-        <div class="bos-card sach-panel sach-panel-detail" id="sachDetail">
-          <div class="sach-panel-body">
-            <p class="text-muted sach-detail-placeholder">Select a request to review intake, checklist, and status.</p>
+        <div class="sach-panel" id="sachDetail">
+          <div class="sach-panel__body">
+            <p class="sach-detail-placeholder">Select a request to review intake, checklist, and status.</p>
           </div>
         </div>
       </div>
@@ -162,9 +168,28 @@ export async function renderSachServiceRequests(container) {
   `;
 
   const queuePanel = container.querySelector('#sachQueue');
-  const queueBody = queuePanel?.querySelector('.sach-panel-body');
+  const queueBody = queuePanel?.querySelector('.sach-panel__body');
   const queueCount = container.querySelector('#sachQueueCount');
-  const detailEl = container.querySelector('#sachDetail .sach-panel-body');
+  const detailEl = container.querySelector('#sachDetail .sach-panel__body');
+  const statsRow = container.querySelector('#sachStatsRow');
+
+  function renderStats(rows = []) {
+    if (!statsRow) return;
+    const total = rows.length;
+    const review = rows.filter((r) => r.status === 'ready_for_review').length;
+    const active = rows.filter((r) =>
+      ['new', 'in_progress', 'assigned', 'awaiting_assignment', 'client_action_required'].includes(r.status)
+    ).length;
+    if (!total) {
+      statsRow.hidden = true;
+      return;
+    }
+    statsRow.hidden = false;
+    statsRow.innerHTML = `
+      <div class="sach-stat"><span class="sach-stat__label">In view</span><div class="sach-stat__value">${total}</div></div>
+      <div class="sach-stat"><span class="sach-stat__label">Ready for review</span><div class="sach-stat__value">${review}</div></div>
+      <div class="sach-stat"><span class="sach-stat__label">Active</span><div class="sach-stat__value">${active}</div></div>`;
+  }
 
   async function renderQueue() {
     if (!queueBody) return;
@@ -172,12 +197,13 @@ export async function renderSachServiceRequests(container) {
     try {
       const data = await fetchQueue(filterStatus);
       const rows = Array.isArray(data.requests) ? data.requests : [];
+      renderStats(rows);
       if (queueCount) {
         queueCount.textContent = rows.length ? `${rows.length} request${rows.length === 1 ? '' : 's'}` : 'Empty';
       }
       if (!rows.length) {
         queueBody.innerHTML = `
-          <div class="sach-empty-state">
+          <div class="sach-empty">
             <i class="fa-solid fa-inbox" aria-hidden="true"></i>
             <p>No service requests match this filter.</p>
             <p class="text-muted">New enquiries appear here when clients chat with Company Sarah on the Sarah App.</p>
@@ -185,29 +211,24 @@ export async function renderSachServiceRequests(container) {
         return;
       }
       queueBody.innerHTML = `
-        <div class="sach-queue-table-wrap">
-          <table class="sach-queue-table">
-            <thead>
-              <tr><th>Reference</th><th>Service</th><th>Status</th><th>Updated</th></tr>
-            </thead>
-            <tbody>
-              ${rows
-                .map(
-                  (r) => `
-                <tr class="sach-queue-row${r.requestId === selectedId ? ' is-selected' : ''}" data-id="${escHtml(r.requestId)}">
-                  <td><span class="sach-ref">${escHtml(r.reference)}</span></td>
-                  <td>${escHtml(serviceTypeLabel(r.serviceType))}</td>
-                  <td><span class="sach-status-pill ${statusCssClass(r.status)}">${escHtml(statusLabel(r.status))}</span></td>
-                  <td class="sach-date">${escHtml(formatShortDate(r.updatedAt))}</td>
-                </tr>`
-                )
-                .join('')}
-            </tbody>
-          </table>
+        <div class="sach-queue-list" role="list">
+          ${rows
+            .map(
+              (r) => `
+            <button type="button" class="sach-queue-card${r.requestId === selectedId ? ' is-selected' : ''}" data-id="${escHtml(r.requestId)}" role="listitem">
+              <div class="sach-queue-card__top">
+                <span class="sach-ref">${escHtml(r.reference)}</span>
+                <span class="sach-status-pill ${statusCssClass(r.status)}">${escHtml(statusLabel(r.status))}</span>
+              </div>
+              <p class="sach-queue-card__service">${escHtml(serviceTypeLabel(r.serviceType))}</p>
+              <span class="sach-queue-card__date">Updated ${escHtml(formatShortDate(r.updatedAt))}</span>
+            </button>`
+            )
+            .join('')}
         </div>`;
-      queueBody.querySelectorAll('.sach-queue-row').forEach((row) => {
-        row.addEventListener('click', () => {
-          selectedId = row.getAttribute('data-id');
+      queueBody.querySelectorAll('.sach-queue-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          selectedId = card.getAttribute('data-id');
           renderQueue();
           renderDetail();
         });
@@ -221,7 +242,7 @@ export async function renderSachServiceRequests(container) {
     if (!detailEl) return;
     if (!selectedId) {
       detailEl.innerHTML =
-        '<p class="text-muted sach-detail-placeholder">Select a request to review intake, checklist, and status.</p>';
+        '<p class="sach-detail-placeholder">Select a request to review intake, checklist, and status.</p>';
       return;
     }
     detailEl.innerHTML = '<p class="text-muted">Loading detail…</p>';

@@ -103,7 +103,7 @@ function resolveAssetVersion() {
   // Include CSS fingerprints so Netlify/browser caches bust when styles change without a new git SHA.
   try {
     const hasher = crypto.createHash('sha256');
-    for (const name of ['admin-dashboard.css', 'company-portal.css']) {
+    for (const name of ['admin-dashboard.css', 'company-portal.css', 'sach-service-requests.css']) {
       const cssPath = path.join(ROOT, 'css', name);
       if (fs.existsSync(cssPath)) hasher.update(fs.readFileSync(cssPath));
     }
@@ -444,6 +444,10 @@ function patchHtml(html, { site, importmapMode = useCdnFirebase ? 'cdn' : 'node'
       `href="css/company-portal.css?v=${assetVersion}"`
     );
     out = out.replace(
+      /href="css\/sach-service-requests\.css"/,
+      `href="css/sach-service-requests.css?v=${assetVersion}"`
+    );
+    out = out.replace(
       /src="js\/portal\/main\.js"/,
       `src="js/portal/main.js?v=${assetVersion}"`
     );
@@ -705,8 +709,11 @@ function prepareApp() {
     copyFile(path.join(ROOT, 'js', f), path.join(dir, 'js', f));
   }
 
-  for (const css of ['admin-dashboard.css', 'company-portal.css']) {
-    copyFile(path.join(ROOT, 'css', css), path.join(dir, 'css', css));
+  for (const css of ['admin-dashboard.css', 'company-portal.css', 'sach-service-requests.css']) {
+    const src = path.join(ROOT, 'css', css);
+    if (fs.existsSync(src)) {
+      copyFile(src, path.join(dir, 'css', css));
+    }
   }
   copyPlatformBrandAssets(dir, ['favicon-portal.svg']);
 
