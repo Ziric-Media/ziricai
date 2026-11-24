@@ -89,6 +89,7 @@ export async function runCompanySarahAutomotiveTurn(params) {
         "When you promise SUVs, sedans, or bakkies, call searchInventory with the matching body type and only list vehicles from that tool result — never attach a different body type.",
         "Number your suggestions (1. 2. 3.) with full year make model titles; photos are shown in that same order.",
         "Do NOT promise automatic photo attachments — the customer receives photos only when they ask for pictures/photos or say yes after you offer them.",
+        "NEVER say you cannot display images, cannot send photos, or apologize for lacking images — Sarah App shows stock photos automatically when the customer asks; your text is a short intro only (no numbered stock lists when they asked for pictures).",
         "Team/staff/dealer principal questions: answer from COMPANY KNOWLEDGE only — never searchInventory or vehicle photos on those turns.",
         "For team / staff / who-works-here questions, use COMPANY KNOWLEDGE below — do not invent names.",
         "Finance, trade-in, or callback with enough customer details: call recordSalesEnquiry — confirm Michelle/Omar follow-up only after the tool returns ok.",

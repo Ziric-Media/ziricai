@@ -195,6 +195,16 @@ test("resolveMediaSearchContext inherits SUV from prior turn", () => {
     assert.match(ctx, /suv/i);
 });
 
+test("resolveMediaSearchContext uses last discussed vehicle title", () => {
+    const ctx = resolveMediaSearchContext("Show me the image", [
+        {
+            role: "assistant",
+            content: "**(1273) 2014 FORD RANGER 3.2 TDCI 4X4 A/T E-CAB FOR SALE IN RUSTENBURG**",
+        },
+    ]);
+    assert.match(ctx, /RANGER/i);
+});
+
 test("scrubInvalidMarkdownImages removes SUV Model placeholders", () => {
     const raw = "Intro\n\n![SUV Model 1](https://example.com/a.jpg)\n![2019 Fortuner](https://www.centralmotorsrtb.co.za/a.jpg)";
     const out = scrubInvalidMarkdownImages(raw);

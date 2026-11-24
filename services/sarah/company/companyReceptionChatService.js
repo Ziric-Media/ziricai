@@ -382,6 +382,23 @@ export async function sendCompanySarahMessage(uid, companyId, message, consumerP
             });
             reply = media.content;
             mediaAttachments = media.attachments || [];
+            if (!mediaAttachments.length) {
+                const fallback = await buildDirectShowroomMediaReply(
+                    companyId,
+                    resolveMediaSearchContext(customerText, history),
+                    [...toolVehicles, ...prefetchedVehicles],
+                    {
+                        recommendedVehicles,
+                        history,
+                        toolVehicles,
+                        toolResults: automotiveTurn?.toolResults,
+                    }
+                );
+                if (directReplyHasMedia(fallback)) {
+                    reply = fallback.content;
+                    mediaAttachments = fallback.attachments || [];
+                }
+            }
         } else {
             reply = scrubInvalidMarkdownImages(reply).text;
         }

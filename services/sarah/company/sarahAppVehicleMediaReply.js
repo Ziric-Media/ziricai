@@ -216,6 +216,10 @@ export async function buildSarahAppMediaAttachmentsVerified(vehicles, limit = 9)
  */
 export async function buildSarahAppMediaAttachmentsForReply(vehicles, limit = 4) {
     const capped = dedupeVehicles(vehicles).slice(0, limit);
+  /** Trusted dealer URLs are proxied in Sarah App — skip slow per-image upstream verification by default. */
+    const fast = buildSarahAppMediaAttachments(capped, limit);
+    if (fast.length) return fast;
+
     const items = [];
     for (const vehicle of capped) {
         const picked = await pickVerifiedSarahAppVehicleImageUrl(vehicle);
@@ -236,6 +240,7 @@ export async function buildSarahAppMediaAttachmentsForReply(vehicles, limit = 4)
             name: normalizeVehicleDisplayTitle(formatVehicleTitle(vehicle) || "Vehicle"),
             mimeType: /\.png/i.test(primaryUrl) ? "image/png" : "image/jpeg",
         });
+        if (items.length >= limit) break;
     }
     return items;
 }
@@ -272,6 +277,8 @@ export function wantsSarahAppVehicleGallery(message, history = []) {
 export function resolveMediaSearchContext(customerText, history = []) {
     const text = String(customerText || "").trim();
     if (detectInventoryBodyTypeFilter(text) || text.length > 24) return text;
+    const discussed = resolveDiscussedVehicleFromHistory(history);
+    if (discussed) return discussed;
     const prior = (history || [])
         .filter((h) => h.role === "user")
         .slice(-6)
@@ -474,6 +481,12 @@ export function customerAsksVehiclePhoto(customerText, history = []) {
     if (
         /^\s*(do you have\s+)?(any\s+)?(pics?|photos?|images?|pictures)\b/i.test(text) &&
         (STOCK_MEDIA_INTENT.test(text) || Boolean(resolveDiscussedVehicleFromHistory(history)))
+    ) {
+        return true;
+    }
+    if (
+        /\b(show|see|send)\s+(me\s+)?(the\s+)?(pic|pics|photo|photos|image|images)\b/i.test(text) &&
+        Boolean(resolveDiscussedVehicleFromHistory(history))
     ) {
         return true;
     }

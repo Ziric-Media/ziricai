@@ -196,7 +196,18 @@ export function normalizeAttachments(attachments) {
             const url = a.url ? String(a.url).slice(0, 2048) : null;
             const name = a.name ? String(a.name).slice(0, 200) : null;
             if (!url && !name) return null;
-            return { mimeType, url, name, size: Number(a.size) || null };
+            const kind = a.kind ? String(a.kind).slice(0, 32) : null;
+            const alternateUrls = Array.isArray(a.alternateUrls)
+                ? a.alternateUrls.map((u) => String(u || "").slice(0, 2048)).filter(Boolean).slice(0, 5)
+                : undefined;
+            return {
+                mimeType,
+                url,
+                name,
+                size: Number(a.size) || null,
+                ...(kind ? { kind } : {}),
+                ...(alternateUrls?.length ? { alternateUrls } : {}),
+            };
         })
         .filter(Boolean)
         .slice(0, 8);
