@@ -48,6 +48,25 @@ function toLocalDateString(dateObj) {
  * @param {string} [channel]
  * @returns {Promise<SchedulingContext>}
  */
+/** Strip scheduling meta to prompt-safe fields (Sarah App + WhatsApp). */
+export function sanitizeSchedulingContext(raw = {}) {
+    if (!raw || typeof raw !== "object") return {};
+    const keys = [
+        "pendingDate",
+        "pendingTime",
+        "lastMentionedDate",
+        "lastMentionedTime",
+        "lastOfferedDate",
+        "lastOfferedSlots",
+        "resolvedDateLabel",
+    ];
+    const out = {};
+    for (const k of keys) {
+        if (raw[k] !== undefined && raw[k] !== null) out[k] = raw[k];
+    }
+    return out;
+}
+
 export async function getSchedulingContext(companyId, phone, channel = "whatsapp") {
     if (!companyId || !phone) return {};
     const conv = await getTenantConversation(companyId, phone, channel);

@@ -75,3 +75,13 @@ export function isCentralMotorsPilotMode() {
     if (flag === "false" || flag === "0" || flag === "no") return false;
     return process.env.DEFAULT_COMPANY_ID === CENTRAL_MOTORS_RTB_COMPANY_ID;
 }
+
+/**
+ * Postgres inventory + vehicle media are keyed by tenant companyId, except demo-central-motors
+ * (showcase portal) which reads central-motors-rtb stock when the CM pilot flag is on.
+ * @param {string} companyId — Sarah App / Discover company id (e.g. babes-car-sales-cc)
+ */
+export function resolveSarahAppInventoryCompanyId(companyId) {
+    if (!companyId) return companyId;
+    return resolvePilotDataCompanyId(companyId);
+}
