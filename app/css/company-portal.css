@@ -298,6 +298,14 @@
 .portal-body .bos-nav-items a[data-page="sachServiceRequests"] .icon i {
     color: #fff;
 }
+.portal-body .sidebar-nav a.active[data-page="sachServiceRequests"] .icon {
+    background: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(225, 29, 72, 0.45);
+}
+.portal-body .sidebar-nav a.active[data-page="sachServiceRequests"] .icon i {
+    color: #fff;
+}
 
 .portal-body .sidebar-nav a.active .icon {
     background: rgba(255, 255, 255, 0.22);
