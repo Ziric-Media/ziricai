@@ -160,6 +160,26 @@ function publicLocation(entry) {
     return { geo: loc.geo, geoSource: loc.geoSource, region: loc.region };
 }
 
+/** Portal-published profile fields exposed on Discover (no draft / restricted). */
+function publicDiscoverProfileFields(entry) {
+    const contact =
+        entry?.contact && typeof entry.contact === "object"
+            ? {
+                  phone: entry.contact.phone || null,
+                  email: entry.contact.email || null,
+                  website: entry.contact.website || null,
+              }
+            : null;
+    return {
+        address: entry?.address || null,
+        hours: Array.isArray(entry?.hours) ? entry.hours : [],
+        contact,
+        gallery: Array.isArray(entry?.gallery) ? entry.gallery : [],
+        products: Array.isArray(entry?.products) ? entry.products : [],
+        languages: Array.isArray(entry?.languages) ? entry.languages : [],
+    };
+}
+
 /** Public card shape for Discover (never includes restricted/private fields). */
 export function toDiscoverCard(entry, entity) {
     return {
@@ -178,8 +198,26 @@ export function toDiscoverCard(entry, entity) {
         coverUrl: entry.coverUrl || null,
         serviceAreas: Array.isArray(entry.serviceAreas) ? entry.serviceAreas : [],
         ...publicLocation(entry),
+        ...publicDiscoverProfileFields(entry),
         hasCompanySarah: true,
     };
+}
+
+/**
+ * Single listed company for Discover detail (fresh portal listing; same shape as list cards).
+ * @param {string} companyId
+ */
+export async function getDiscoverCompanyPublicCard(companyId) {
+    await hydrateBusinessDirectory();
+    const entry = await assertCompanyDiscoverableAsync(companyId);
+    const entity = await resolveEntity(entry);
+    if (entity?.status === "suspended") {
+        throw Object.assign(new Error("This business is not available on Sarah Discover yet."), {
+            status: 404,
+            code: "COMPANY_NOT_DISCOVERABLE",
+        });
+    }
+    return toDiscoverCard(entry, entity);
 }
 
 /**

@@ -32,6 +32,14 @@
     { id: 'fashion', label: 'Fashion & lifestyle' },
   ];
 
+  const NEWS_LOADER_STEPS = [
+    'Reading publisher feeds',
+    'Compiling your briefing',
+    'Personalising for you',
+  ];
+  let newsLoaderTimer = null;
+  let newsLoaderStep = 0;
+
   const BRIEFINGS = [
     { id: 'morning', label: 'Morning briefing' },
     { id: 'lunch', label: 'Lunchtime briefing' },
@@ -473,6 +481,7 @@
   }
 
   function renderDigest(host, profile, edition) {
+    stopNewsLoaderAnim();
     activeEdition = edition;
     activeProfile = profile;
     host.classList.remove('snews-host--article');
@@ -636,19 +645,54 @@
     /* legacy overlay unused — in-app article reader (SN-02) */
   }
 
-  function renderLoading(host, message) {
-    const msg = message || 'Loading your briefing';
-    host.innerHTML = `
+  function stopNewsLoaderAnim() {
+    if (newsLoaderTimer) {
+      clearInterval(newsLoaderTimer);
+      newsLoaderTimer = null;
+    }
+  }
+
+  function paintNewsLoaderSteps(host, activeIndex) {
+    const steps = host?.querySelectorAll?.('.snews-load-step');
+    if (!steps?.length) return;
+    steps.forEach((el, i) => {
+      el.classList.toggle('is-active', i === activeIndex);
+      el.classList.toggle('is-done', i < activeIndex);
+    });
+  }
+
+  function startNewsLoaderAnim(host) {
+    stopNewsLoaderAnim();
+    newsLoaderStep = 0;
+    paintNewsLoaderSteps(host, 0);
+    newsLoaderTimer = setInterval(() => {
+      newsLoaderStep = (newsLoaderStep + 1) % NEWS_LOADER_STEPS.length;
+      paintNewsLoaderSteps(host, newsLoaderStep);
+    }, 1600);
+  }
+
+  function newsLoaderHtml(title) {
+  const steps = NEWS_LOADER_STEPS.map(
+    (label, i) =>
+      `<li class="snews-load-step ${i === 0 ? 'is-active' : ''}"><span class="snews-load-step-dot" aria-hidden="true"></span>${escapeHtml(label)}</li>`
+  ).join('');
+    return `
       <div class="snews-loading" role="status" aria-live="polite">
         <div class="snews-loading-visual" aria-hidden="true">
           <div class="snews-loading-ring"></div>
           <div class="snews-loading-ring snews-loading-ring--pulse"></div>
           <img class="snews-loading-avatar sarah-brand-img" src="assets/sarah-avatar.svg" alt="" width="40" height="40" />
         </div>
-        <div class="snews-loading-shimmer" aria-hidden="true"></div>
-        <p class="snews-loading-title">${escapeHtml(msg)}</p>
-        <p class="snews-loading-sub">Sarah is reading your publisher feeds</p>
+        <p class="snews-loading-title">${escapeHtml(title || 'Preparing Sarah News…')}</p>
+        <ol class="snews-load-steps" aria-label="Loading stages">${steps}</ol>
       </div>`;
+  }
+
+  function renderLoading(host, message) {
+    stopNewsLoaderAnim();
+    const title = message || 'Preparing Sarah News…';
+    host.innerHTML = newsLoaderHtml(title);
+    startNewsLoaderAnim(host);
   }
 
   async function loadDigest(host, profile, opts = {}) {

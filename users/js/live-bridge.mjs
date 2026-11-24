@@ -1066,6 +1066,12 @@ export async function fetchDiscoverCompanies({ q = '', category = '', limit = 50
   return apiRequest(`/api/discover/companies${qs ? `?${qs}` : ''}`);
 }
 
+export async function fetchDiscoverCompany(companyId) {
+  const id = String(companyId || '').trim();
+  if (!id) return { error: 'Missing business id' };
+  return apiRequest(`/api/discover/companies/${encodeURIComponent(id)}`);
+}
+
 /* ---------- SNET-11 — relationships (follow / subscribe) keyed by SN-ID ---------- */
 
 const SUBSCRIBE_SCOPE = 'sarah_network_subscription';
@@ -1469,6 +1475,7 @@ function mountPublicApi() {
     resolveApiBase,
     fetchChatConversations,
     fetchDiscoverCompanies,
+    fetchDiscoverCompany,
     fetchStatusFeed,
     reactToStatusFeedPost,
     recordDiscoverProfileView,

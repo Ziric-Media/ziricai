@@ -3924,7 +3924,9 @@ const companyThreadFetchInflight = new Map();
 /** @type {object[]|null} */
 let chatsListMemoryCache = null;
 let chatsTabSearchDebounceTimer = null;
-let activeChatsPanel = 'business';
+let activeChatsPanel = 'sarah';
+/** @type {{ businessChats: object[], sarahChatRows: object[], orgSection?: string }|null} */
+let chatsListPanelCache = null;
 
 function loadChatsListSessionCache() {
   if (chatsListMemoryCache?.length) return chatsListMemoryCache;
@@ -5899,10 +5901,14 @@ function finalizePrototypeWorkTask(threadId) {
 const GALLERY_SIZE = 6;
 
 function getCompanyGallery(company) {
-  let items = company.gallery && company.gallery.length ? [...company.gallery] : [];
-  if (!items.length && company.image) items.push(company.image);
-  if (!items.length && company.avatar && company.avatar !== company.image) items.push(company.avatar);
+  const raw = company.gallery && company.gallery.length ? company.gallery : [];
+  let items = raw
+    .map((g) => (typeof g === 'string' ? g : g?.imageUrl || g?.src || ''))
+    .map((u) => String(u || '').trim())
+    .filter(Boolean);
+  if (!items.length && company.image) items = [company.image];
   if (!items.length) return [];
+  if (company.live) return items.slice(0, GALLERY_SIZE);
   while (items.length < GALLERY_SIZE) {
     items.push(items[items.length % items.length]);
   }
@@ -5911,18 +5917,7 @@ function getCompanyGallery(company) {
 
 function getCompanyProducts(company) {
   if (company.products && company.products.length) return sortDiscoverProducts(company.products);
-  if (company.live) {
-    return [
-      {
-        id: `${company.id}-services`,
-        name: 'Services & offers',
-        price: '',
-        image: company.avatar || company.image,
-        imageFallback: company.imageFallback || businessListingAvatarFallback(),
-        description: 'Ask Company Sarah for quotes, appointments, and availability.',
-      },
-    ];
-  }
+  if (company.live) return [];
   return [
     {
       id: `${company.id}-sample`,
@@ -6336,6 +6331,22 @@ function buildChatsPanelHtml(panel, businessChats, sarahChatRows, orgSection = '
   return `${businessSection}${orgSection}`;
 }
 
+function paintChatsPanelFromCache() {
+  const host = document.getElementById('chatsList');
+  const q = (document.getElementById('chatsTabSearchInput')?.value || '').trim();
+  if (!host || !chatsListPanelCache || q) return false;
+  syncChatsPanelChrome(false);
+  host.innerHTML = buildChatsPanelHtml(
+    activeChatsPanel,
+    chatsListPanelCache.businessChats,
+    chatsListPanelCache.sarahChatRows,
+    chatsListPanelCache.orgSection || ''
+  );
+  host.dataset.chatsPanel = activeChatsPanel;
+  bindChatsListInteractions(host);
+  return true;
+}
+
 function bindChatsPanelTabsOnce() {
   const wrap = document.getElementById('chatsSegmentWrap');
   if (!wrap || wrap.dataset.bound === '1') return;
@@ -6350,7 +6361,8 @@ function bindChatsPanelTabsOnce() {
         b.classList.toggle('is-active', on);
         b.setAttribute('aria-selected', on ? 'true' : 'false');
       });
-      void renderChatsList();
+      if (paintChatsPanelFromCache()) return;
+      void renderChatsList({ force: true });
     });
   });
 }
@@ -6448,17 +6460,19 @@ function bindChatsListInteractions(host) {
   });
 }
 
-async function renderChatsList() {
+async function renderChatsList(opts = {}) {
   const host = document.getElementById('chatsList');
   if (!host) return;
   const qRaw = (document.getElementById('chatsTabSearchInput')?.value || '').trim();
   const q = qRaw.toLowerCase();
   const now = Date.now();
   if (
+    !opts.force &&
     !q &&
     chatsListLastFetchAt &&
     now - chatsListLastFetchAt < CHATS_LIST_FETCH_MIN_MS &&
-    host.querySelector('.chat-row, .chats-list-empty, .chats-list-hint')
+    host.querySelector('.chat-row, .chats-list-empty, .chats-list-hint') &&
+    host.dataset.chatsPanel === activeChatsPanel
   ) {
     return;
   }
@@ -6471,7 +6485,9 @@ async function renderChatsList() {
       const businessCached = cached.filter(isBusinessChatRow);
       const sarahCached = mergeSarahChatRows(cached, listPersonalThreads());
       syncChatsPanelChrome(false);
+      chatsListPanelCache = { businessChats: businessCached, sarahChatRows: sarahCached, orgSection: '' };
       host.innerHTML = buildChatsPanelHtml(activeChatsPanel, businessCached, sarahCached);
+      host.dataset.chatsPanel = activeChatsPanel;
       bindChatsListInteractions(host);
     } else if (!host.querySelector('.chat-row')) {
       host.innerHTML = '<p class="chats-list-hint">Loading your conversations…</p>';
@@ -6534,7 +6550,9 @@ async function renderChatsList() {
   syncChatsPanelChrome(q);
 
   if (!q) {
+    chatsListPanelCache = { businessChats, sarahChatRows, orgSection };
     host.innerHTML = buildChatsPanelHtml(activeChatsPanel, businessChats, sarahChatRows, orgSection);
+    host.dataset.chatsPanel = activeChatsPanel;
   } else if (!chats.length && !orgSection && q.length >= 2 && !chatsTabOrgSearch.loading) {
     host.innerHTML =
       '<p class="chats-list-empty">No chats or businesses match that search. Try another name or open Discover.</p>';
@@ -13620,6 +13638,24 @@ function discoverFind(id) {
   return (MOCK_DISCOVER_COMPANIES || []).find((c) => c.id === key);
 }
 
+function mergeLiveDiscoverCompany(card) {
+  if (!card?.companyId) return null;
+  const mapped = mapLiveDiscoverCard(card);
+  liveDiscover.byId.set(mapped.id, mapped);
+  const idx = liveDiscover.companies.findIndex((c) => c.id === mapped.id);
+  if (idx >= 0) liveDiscover.companies[idx] = mapped;
+  else liveDiscover.companies.push(mapped);
+  return mapped;
+}
+
+async function fetchLiveDiscoverCompanyDetail(companyId) {
+  const id = String(companyId || '').trim();
+  if (!id || !discoverLiveActive() || !window.SarahLive?.fetchDiscoverCompany) return null;
+  const res = await window.SarahLive.fetchDiscoverCompany(id);
+  if (res.error || !res.data?.company) return null;
+  return mergeLiveDiscoverCompany(res.data.company);
+}
+
 function discoverCategoriesSource() {
   if (!discoverLiveActive()) return MOCK_DISCOVER_CATEGORIES;
   return [{ id: 'all', label: 'All' }, ...liveDiscover.facets.map((f) => ({ id: f.id, label: f.label }))];
@@ -13944,10 +13980,18 @@ function renderDiscover() {
   });
 }
 
-function renderCompanyDetail(companyId) {
+async function renderCompanyDetail(companyId) {
   const root = document.getElementById('companyDetailRoot');
   if (!root) return;
-  const company = discoverFind(companyId);
+  let company = discoverFind(companyId);
+  if (discoverLiveActive() && companyId) {
+    if (!company) {
+      root.innerHTML = '<div class="company-detail-body"><p>Loading business…</p></div>';
+    }
+    await fetchLiveDiscoverCompanyDetail(companyId);
+    if (!liveDiscover.loaded) await refreshLiveDiscover();
+    company = discoverFind(companyId);
+  }
   if (!company && discoverLiveActive() && !liveDiscover.loaded) {
     root.innerHTML = '<div class="company-detail-body"><p>Loading business…</p></div>';
     ensureLiveDiscoverFresh();

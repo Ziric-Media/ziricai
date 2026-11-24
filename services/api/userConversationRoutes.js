@@ -8,7 +8,7 @@ import {
     sendCompanySarahMessage,
     getCompanyConversationForUser,
 } from "../sarah/company/companyReceptionChatService.js";
-import { searchDiscoverCompanies } from "../users/businessDirectoryService.js";
+import { getDiscoverCompanyPublicCard, searchDiscoverCompanies } from "../users/businessDirectoryService.js";
 import { attachSnId, attachSnIds } from "../network/networkIntegration.js";
 
 const chatRateLimit = authRateLimit("auth");
@@ -24,6 +24,19 @@ export function mountUserConversationRoutes(app, deps = {}) {
     const guard = deps.consumerGuard || requireConsumerScope();
     /** Public Discover: anonymous read of listed, non-suspended entries only (per-IP rate limit). */
     const publicDiscoverGuard = deps.discoverGuard || publicReadRateLimit();
+    app.get("/api/discover/companies/:companyId", publicDiscoverGuard, async (req, res) => {
+        try {
+            const companyId = String(req.params.companyId || "").slice(0, 120);
+            const company = await getDiscoverCompanyPublicCard(companyId);
+            res.json({ company });
+        } catch (err) {
+            res.status(err.status || 500).json({
+                error: err.message || "Discover unavailable",
+                ...(err.code ? { code: err.code } : {}),
+            });
+        }
+    });
+
     app.get("/api/discover/companies", publicDiscoverGuard, async (req, res) => {
         try {
             const result = await searchDiscoverCompanies({

@@ -325,6 +325,7 @@ export const ROUTE_CATALOG = [
 
     // U5 — Company conversations
     { method: "GET", path: "/api/discover/companies", domain: "consumer", tenantScoped: false, description: "Discover list: ranked search over the durable directory (q, category, limit, cursor, city, region, near, radiusKm, sort); anonymous read of listed entries only (per-IP rate limit); fixtures never merged" },
+    { method: "GET", path: "/api/discover/companies/:companyId", domain: "consumer", tenantScoped: false, description: "Discover detail: portal-published listing (gallery, products, hours, contact) for one listed company" },
     { method: "GET", path: "/api/user-conversations", domain: "consumer", tenantScoped: false, description: "User chat list" },
     { method: "GET", path: "/api/user-conversations/:companyId/messages", domain: "consumer", tenantScoped: false, description: "Company chat history" },
     { method: "GET", path: "/api/user-conversations/id/:conversationId/messages", domain: "consumer", tenantScoped: false, description: "Company chat history by conversation id" },
