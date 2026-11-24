@@ -26,6 +26,14 @@ Advisory: business planning, cash flow, compliance assessments, consultations.
 SERVICE PLANS (explain; confirm current pricing with staff before binding quotes)
 Standard, Premium, and Personal plans — see knowledge document SACH-KB-PLANS.
 
+TEAM (who helps clients — use SACH-KB-TEAM; name a person when asked who will assist)
+• Saul Chitate — Managing Director — escalations, leadership, complex matters.
+• Tshegofatso Molefe — Administration Manager — admin coordination and client routing.
+• Bonang Sejwe, Kekelertso Mosiamang, Lebo Makhapha — administration (reception, documents, CIPC intake support).
+• Refilwe Chilaule, Tshepang Motjale — assistant accountants (bookkeeping, accounts under partner supervision).
+• Nhlakanipho Sihlophe, Tshiamo Monageng — accounting interns (support under supervision).
+• Tax-heavy matters → tax team lead by qualified staff; payroll → payroll team; CIPC → corporate admin team (Tshegofatso or admin officers).
+
 TOOLS
 • getSachClientContext — client status and open requests (signed-in users).
 • getSachServiceWorkflow — intake + checklist for any of 22 service packs (tax, accounting, payroll, CIPC/CSD/CIDB/COIDA/RMA, BO filing).
@@ -82,5 +90,36 @@ Use service-specific checklists when creating requests; firm may customise.`,
         content: `Sarah may prepare intake, checklists, and appointment requests.
 Sarah must NOT: submit VAT/tax/CIPC filings; approve payroll; issue compliance certificates; give binding professional advice from incomplete data.
 Escalate complaints and urgent SARS letters to human staff.`,
+    },
+    {
+        id: "sach-kb-team",
+        title: "SACH-KB-TEAM — Sach staff (who does what)",
+        type: "manual",
+        content: `Sach Accounting Solutions team — Rustenburg office: 169 Joubert Street · +27 14 592 1351 · hello@sachaccounting.co.za · www.sachaccounting.co.za
+
+When a client asks who will help them, name the most relevant person below and say our team will confirm assignment on the service request.
+
+LEADERSHIP
+• Saul Chitate — Managing Director — saul@sachaccounting.co.za · +27 71 844 5359 — firm leadership, escalations, complex advisory, complaints.
+
+ADMINISTRATION & CLIENT COORDINATION
+• Tshegofatso Molefe — Administration Manager — tshego@sachaccounting.co.za · +27 76 085 4898 — admin team lead, routing requests, office coordination.
+• Bonang Sejwe — Administration Officer — bonang@sachaccounting.co.za · +27 61 540 7874 — administration, documents, client onboarding support.
+• Kekelertso Mosiamang — Office Administrator — keke@sachaccounting.co.za · +27 78 043 6167 — office admin, scheduling, document collection.
+• Lebo Makhapha — Administration Clerk — lebo@sachaccounting.co.za · +27 61 540 7874 — admin support, filing, data capture.
+
+ACCOUNTING (under qualified partner review)
+• Refilwe Chilaule — Assistant Accountant — refilwe@sachaccounting.co.za · +27 61 540 7874 — bookkeeping, management accounts, reconciliations.
+• Tshepang Motjale — Assistant Accountant — tshepang@sachaccounting.co.za · +27 61 540 7874 — bookkeeping, VAT prep support, payroll support.
+• Nhlakanipho Sihlophe — Accounting Intern — nhlakanipho@sachaccounting.co.za · +27 61 540 7874 — supervised accounting support.
+• Tshiamo Monageng — Accounting Intern — tshiamo@sachaccounting.co.za · +27 61 540 7874 — supervised accounting support.
+
+ROUTING HINTS FOR SARAH
+• Company registration / CIPC / annual returns → Tshegofatso Molefe or Bonang Sejwe (administration).
+• Bookkeeping / monthly accounts → Refilwe Chilaule or Tshepang Motjale.
+• VAT / tax / SARS letters → qualified tax practitioners on the Sach team (Sarah does not name a specific tax partner unless listed in KB — route to “our tax team” and Tshegofatso for assignment).
+• Payroll → payroll administrator (via Tshegofatso for routing).
+• Consultations with leadership → Saul Chitate.
+• After submitSachServiceRequest: say the request is with Sach staff and name the best contact above for follow-up.`,
     },
 ];

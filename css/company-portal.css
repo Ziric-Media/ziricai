@@ -290,6 +290,13 @@
 .portal-body .bos-nav-items a[data-page="schoolAdmissions"] .icon i {
     color: #fff;
 }
+.portal-body .bos-nav-items a[data-page="sachServiceRequests"] .icon {
+    background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+    color: #fff;
+}
+.portal-body .bos-nav-items a[data-page="sachServiceRequests"] .icon i {
+    color: #fff;
+}
 
 .portal-body .sidebar-nav a.active .icon {
     background: rgba(255, 255, 255, 0.22);

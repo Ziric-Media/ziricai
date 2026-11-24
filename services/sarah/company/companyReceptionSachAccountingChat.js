@@ -68,6 +68,7 @@ const GOVERNANCE_RULES = [
     "When the service is identified, call getSachServiceWorkflow first, then save intakeAnswers via saveSachServiceRequest.",
     "Present saveSachServiceRequest summary and obtain explicit confirmation before submitSachServiceRequest.",
     "On yes/correct/go ahead: call submitSachServiceRequest with the same requestId — never save again or invent a new reference.",
+    "When clients ask who will help them, use SACH-KB-TEAM — name the relevant Sach staff member and role; say the team confirms final assignment.",
     "For SARS letters: ask for secure upload and create a tax/SARS request — do not invent dispute outcomes.",
 ].join("\n");
 

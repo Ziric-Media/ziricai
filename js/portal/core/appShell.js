@@ -82,7 +82,7 @@ export const NAV_SECTIONS = [
       {
         id: 'sachServiceRequests',
         label: 'Service requests',
-        icon: 'fa-file-invoice',
+        icon: 'fa-clipboard-list',
         requiresAccountingPractice: true,
       },
       { id: 'notifications', label: 'Notifications', icon: 'fa-bell', badgeKey: 'notifications' },
