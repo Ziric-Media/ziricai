@@ -642,8 +642,10 @@
       <div class="snews-loading" role="status" aria-live="polite">
         <div class="snews-loading-visual" aria-hidden="true">
           <div class="snews-loading-ring"></div>
-          <div class="snews-loading-dots"><span></span><span></span><span></span></div>
+          <div class="snews-loading-ring snews-loading-ring--pulse"></div>
+          <img class="snews-loading-avatar sarah-brand-img" src="assets/sarah-avatar.svg" alt="" width="40" height="40" />
         </div>
+        <div class="snews-loading-shimmer" aria-hidden="true"></div>
         <p class="snews-loading-title">${escapeHtml(msg)}</p>
         <p class="snews-loading-sub">Sarah is reading your publisher feeds</p>
       </div>`;

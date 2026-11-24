@@ -48,14 +48,28 @@ function prototypeAsset(path) {
   return prototypeAssetBase ? prototypeAssetBase + rel : rel;
 }
 
+function businessListingAvatarFallback() {
+  return MOCK_PROFILE?.avatarFallback || 'assets/discover/green-haven-fallback.svg';
+}
+
 function resolveItemAvatar(item) {
-  if (!item) return MOCK_USER.avatar;
+  if (!item) return businessListingAvatarFallback();
   if (item.sarahPersonal || item.isSarahPersonal) return SARAH_AVATAR_SRC;
+  if (String(item.conversationKind || '').toLowerCase() === 'personal_sarah') return SARAH_AVATAR_SRC;
   if (item.avatar) return item.avatar;
   const map = COMPANY_AVATARS || {};
   if (item.avatarKey && map[item.avatarKey]) return map[item.avatarKey];
-  if (String(item.conversationKind || '').toLowerCase() === 'personal_sarah') return SARAH_AVATAR_SRC;
-  return MOCK_USER.avatar;
+  const companyId = item.companyId || (item.company ? item.id : null) || item.id;
+  if (companyId && (item.company || item.companyId || isBusinessChatRow(item))) {
+    const co = discoverFind(companyId);
+    if (co?.avatar) return co.avatar;
+    if (co?.image) return co.image;
+  }
+  if (item.logoUrl) {
+    const resolved = resolveListingMediaUrl(item.logoUrl);
+    if (resolved) return resolved;
+  }
+  return businessListingAvatarFallback();
 }
 
 const FEED_ENGAGEMENT_STORAGE_KEY = 'sarah.feed.engagement.v2';
@@ -1760,6 +1774,8 @@ function bindProtoSearchAndNotif() {
   document.getElementById('protoSearchInput')?.addEventListener('input', (e) => {
     renderProtoSearchResults(e.target.value.trim().toLowerCase());
   });
+
+  bindChatsPanelTabsOnce();
 
   const chatsTabSearchEl = document.getElementById('chatsTabSearchInput');
   chatsTabSearchEl?.addEventListener('input', () => {
@@ -3793,7 +3809,12 @@ function mapFederatedConversationToChatRow(c) {
   const convId = c.id || '';
   const id = isBusiness ? companyId || convId : convId || companyId;
   const rawLogo = c.logoUrl || c.avatarUrl || null;
-  const avatar = isPersonalSarah ? SARAH_AVATAR_SRC : rawLogo ? resolveListingMediaUrl(rawLogo) : null;
+  let avatar = isPersonalSarah ? SARAH_AVATAR_SRC : rawLogo ? resolveListingMediaUrl(rawLogo) : null;
+  if (!avatar && isBusiness && companyId) {
+    const co = discoverFind(companyId);
+    if (co?.avatar) avatar = co.avatar;
+    else if (co?.image) avatar = co.image;
+  }
   return {
     id,
     convId,
@@ -3903,6 +3924,7 @@ const companyThreadFetchInflight = new Map();
 /** @type {object[]|null} */
 let chatsListMemoryCache = null;
 let chatsTabSearchDebounceTimer = null;
+let activeChatsPanel = 'business';
 
 function loadChatsListSessionCache() {
   if (chatsListMemoryCache?.length) return chatsListMemoryCache;
@@ -5877,20 +5899,30 @@ function finalizePrototypeWorkTask(threadId) {
 const GALLERY_SIZE = 6;
 
 function getCompanyGallery(company) {
-  if (company.live && !(company.gallery && company.gallery.length)) return [];
   let items = company.gallery && company.gallery.length ? [...company.gallery] : [];
-  if (!items.length && company.image) items = [company.image];
-  if (items.length) {
-    while (items.length < GALLERY_SIZE) {
-      items.push(items[items.length % items.length]);
-    }
+  if (!items.length && company.image) items.push(company.image);
+  if (!items.length && company.avatar && company.avatar !== company.image) items.push(company.avatar);
+  if (!items.length) return [];
+  while (items.length < GALLERY_SIZE) {
+    items.push(items[items.length % items.length]);
   }
   return items.slice(0, GALLERY_SIZE);
 }
 
 function getCompanyProducts(company) {
   if (company.products && company.products.length) return sortDiscoverProducts(company.products);
-  if (company.live) return [];
+  if (company.live) {
+    return [
+      {
+        id: `${company.id}-services`,
+        name: 'Services & offers',
+        price: '',
+        image: company.avatar || company.image,
+        imageFallback: company.imageFallback || businessListingAvatarFallback(),
+        description: 'Ask Company Sarah for quotes, appointments, and availability.',
+      },
+    ];
+  }
   return [
     {
       id: `${company.id}-sample`,
@@ -6020,7 +6052,14 @@ function upsertRuntimeChat(entry) {
 }
 
 function companyAvatarUrl(company) {
-  return resolveItemAvatar(company) || company.image || '';
+  if (!company) return businessListingAvatarFallback();
+  if (company.avatar) return company.avatar;
+  if (company.logoUrl) {
+    const resolved = resolveListingMediaUrl(company.logoUrl);
+    if (resolved) return resolved;
+  }
+  if (company.image) return company.image;
+  return businessListingAvatarFallback();
 }
 
 function isCompanyFollowed(companyId) {
@@ -6285,14 +6324,48 @@ function mapPersonalThreadToChatRow(t) {
   };
 }
 
-function buildDualChatsListHtml(businessChats, sarahChatRows, orgSection = '') {
+function buildChatsPanelHtml(panel, businessChats, sarahChatRows, orgSection = '') {
+  if (panel === 'sarah') {
+    return sarahChatRows.length
+      ? sarahChatRows.map((c) => renderChatRowHtml(c)).join('')
+      : '<p class="chats-list-empty chats-list-empty--section">No Sarah chats yet. Open My Sarah to start talking with Personal Sarah.</p>';
+  }
   const businessSection = businessChats.length
     ? businessChats.map((c) => renderChatRowHtml(c)).join('')
     : '<p class="chats-list-empty chats-list-empty--section">No business conversations yet. Search for a business to message Company Sarah.</p>';
-  const sarahSection = sarahChatRows.length
-    ? sarahChatRows.map((c) => renderChatRowHtml(c)).join('')
-    : '<p class="chats-list-empty chats-list-empty--section">No Sarah chats yet. Open My Sarah to start talking with Personal Sarah.</p>';
-  return `<p class="chats-list-section">Business chats</p>${businessSection}<p class="chats-list-section">Sarah chats</p>${sarahSection}${orgSection}`;
+  return `${businessSection}${orgSection}`;
+}
+
+function bindChatsPanelTabsOnce() {
+  const wrap = document.getElementById('chatsSegmentWrap');
+  if (!wrap || wrap.dataset.bound === '1') return;
+  wrap.dataset.bound = '1';
+  wrap.querySelectorAll('[data-chats-panel]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = btn.getAttribute('data-chats-panel') === 'sarah' ? 'sarah' : 'business';
+      if (next === activeChatsPanel) return;
+      activeChatsPanel = next;
+      wrap.querySelectorAll('[data-chats-panel]').forEach((b) => {
+        const on = b.getAttribute('data-chats-panel') === activeChatsPanel;
+        b.classList.toggle('is-active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      void renderChatsList();
+    });
+  });
+}
+
+function syncChatsPanelChrome(searching) {
+  const wrap = document.getElementById('chatsSegmentWrap');
+  if (wrap) wrap.classList.toggle('hidden', Boolean(searching));
+  if (!searching) {
+    const wrapEl = document.getElementById('chatsSegmentWrap');
+    wrapEl?.querySelectorAll('[data-chats-panel]').forEach((b) => {
+      const on = b.getAttribute('data-chats-panel') === activeChatsPanel;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
 }
 
 function mergeSarahChatRows(federated, personalThreads) {
@@ -6317,11 +6390,20 @@ function mergeSarahChatRows(federated, personalThreads) {
   return Array.from(byId.values()).sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
 }
 
+function chatRowAvatarFallback(c) {
+  if (c?.sarahPersonal || c?.conversationKind === 'personal_sarah') return SARAH_AVATAR_SRC;
+  if (c?.company) {
+    const co = discoverFind(c.companyId || c.id);
+    if (co?.imageFallback) return co.imageFallback;
+  }
+  return (c?.avatarKey && COMPANY_AVATARS?.[c.avatarKey]) || businessListingAvatarFallback();
+}
+
 function renderChatRowHtml(c) {
   const personalSarah = c.sarahPersonal || c.conversationKind === 'personal_sarah';
   return `
     <div class="chat-row" data-open-thread="${escapeHtml(c.id)}" data-company="${c.company ? '1' : '0'}" data-personal-sarah="${personalSarah ? '1' : '0'}" data-company-id="${escapeHtml(c.company ? c.id : '')}" data-conv-id="${escapeHtml(c.convId || c.id || '')}" data-kind="${escapeHtml(c.conversationKind || '')}" role="button" tabindex="0">
-      <img class="avatar avatar-sm chat-row-avatar" src="${escapeHtml(prototypeAsset(resolveItemAvatar(c)))}" alt="" width="44" height="44" ${profileImgOnError((c.avatarKey && COMPANY_AVATARS?.[c.avatarKey]) || MOCK_PROFILE.avatarFallback)} />
+      <img class="avatar avatar-sm chat-row-avatar" src="${escapeHtml(prototypeAsset(resolveItemAvatar(c)))}" alt="" width="44" height="44" ${profileImgOnError(chatRowAvatarFallback(c))} />
       <div class="meta">
         <div class="name">${escapeHtml(c.name)}${c.company ? ` ${verifiedBadge}` : ''}</div>
         <div class="preview">${escapeHtml(c.preview)}</div>
@@ -6388,7 +6470,8 @@ async function renderChatsList() {
     if (cached.length && !host.querySelector('.chat-row')) {
       const businessCached = cached.filter(isBusinessChatRow);
       const sarahCached = mergeSarahChatRows(cached, listPersonalThreads());
-      host.innerHTML = buildDualChatsListHtml(businessCached, sarahCached);
+      syncChatsPanelChrome(false);
+      host.innerHTML = buildChatsPanelHtml(activeChatsPanel, businessCached, sarahCached);
       bindChatsListInteractions(host);
     } else if (!host.querySelector('.chat-row')) {
       host.innerHTML = '<p class="chats-list-hint">Loading your conversations…</p>';
@@ -6448,8 +6531,10 @@ async function renderChatsList() {
       : '<p class="chats-list-empty">No existing chats match that search.</p>'
   : '';
 
+  syncChatsPanelChrome(q);
+
   if (!q) {
-    host.innerHTML = buildDualChatsListHtml(businessChats, sarahChatRows, orgSection);
+    host.innerHTML = buildChatsPanelHtml(activeChatsPanel, businessChats, sarahChatRows, orgSection);
   } else if (!chats.length && !orgSection && q.length >= 2 && !chatsTabOrgSearch.loading) {
     host.innerHTML =
       '<p class="chats-list-empty">No chats or businesses match that search. Try another name or open Discover.</p>';
@@ -13475,9 +13560,9 @@ async function handleLiveUnsubscribe(companyId) {
 
 /** Map a /api/discover/companies card into the shape the Discover/detail renderers expect. */
 function mapLiveDiscoverCard(card) {
-  const fallbackImg = SARAH_AVATAR_SRC || 'assets/sarah-avatar.svg';
-  const cover = resolveListingMediaUrl(card.coverUrl || card.logoUrl) || fallbackImg;
-  const logo = resolveListingMediaUrl(card.logoUrl) || fallbackImg;
+  const listingFallback = businessListingAvatarFallback();
+  const cover = resolveListingMediaUrl(card.coverUrl || card.logoUrl) || listingFallback;
+  const logo = resolveListingMediaUrl(card.logoUrl) || listingFallback;
   return {
     id: card.companyId,
     companyId: card.companyId,
@@ -13492,7 +13577,7 @@ function mapLiveDiscoverCard(card) {
     locationLabel: card.location || '',
     verified: Boolean(card.verified),
     image: cover,
-    imageFallback: fallbackImg,
+    imageFallback: listingFallback,
     avatar: logo,
     gallery: (card.gallery || [])
       .map((g) => resolveListingMediaUrl(typeof g === 'string' ? g : g.imageUrl))

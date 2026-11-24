@@ -55,27 +55,27 @@
   <meta name="apple-mobile-web-app-title" content="Sarah" />
   <title>Sarah</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" href="assets/favicon.png?v=beaae3f5267d-0e3c58de" type="image/png" />
+  <link rel="icon" href="assets/favicon.png?v=ec468588d34a-0e3c58de" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=5" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/design-system.css?v=beaae3f5267d-0e3c58de" />
-  <link rel="stylesheet" href="css/icons.css?v=beaae3f5267d-0e3c58de" />
-  <link rel="stylesheet" href="css/app.css?v=beaae3f5267d-0e3c58de" />
-  <script src="js/boot-inline.js?v=beaae3f5267d-0e3c58de"></script>
-<script src="js/site-config.js?v=beaae3f5267d-0e3c58de"></script>
+  <link rel="stylesheet" href="css/design-system.css?v=ec468588d34a-0e3c58de" />
+  <link rel="stylesheet" href="css/icons.css?v=ec468588d34a-0e3c58de" />
+  <link rel="stylesheet" href="css/app.css?v=ec468588d34a-0e3c58de" />
+  <script src="js/boot-inline.js?v=ec468588d34a-0e3c58de"></script>
+<script src="js/site-config.js?v=ec468588d34a-0e3c58de"></script>
 </head>
 <body>
   <div id="appBootSplash" class="app-boot-splash" role="status" aria-live="polite" aria-busy="true" aria-label="Loading Sarah">
-    <img class="app-boot-splash__logo sarah-brand-img" src="assets/sarah-avatar.svg?v=beaae3f5267d-0e3c58de" alt="Sarah" width="104" height="104" decoding="async" />
+    <img class="app-boot-splash__logo sarah-brand-img" src="assets/sarah-avatar.svg?v=ec468588d34a-0e3c58de" alt="Sarah" width="104" height="104" decoding="async" />
     <p class="app-boot-splash__brand">Powered by ZiricAI</p>
   </div>
   <div class="app-frame">
     <!-- Welcome -->
     <section class="view is-active" data-view="welcome">
       <div class="welcome-hero">
-        <div class="logo-ring"><img class="sarah-brand-img" src="assets/sarah-avatar.svg?v=beaae3f5267d-0e3c58de" alt="Sarah" width="72" height="72" /></div>
+        <div class="logo-ring"><img class="sarah-brand-img" src="assets/sarah-avatar.svg?v=ec468588d34a-0e3c58de" alt="Sarah" width="72" height="72" /></div>
         <h1>Sarah</h1>
         <p>Your personal AI world — discover businesses, stay in control.</p>
         <div class="welcome-features">
@@ -177,8 +177,10 @@
         <div class="snews-loading" role="status" aria-live="polite">
           <div class="snews-loading-visual" aria-hidden="true">
             <div class="snews-loading-ring"></div>
-            <div class="snews-loading-dots"><span></span><span></span><span></span></div>
+            <div class="snews-loading-ring snews-loading-ring--pulse"></div>
+            <img class="snews-loading-avatar sarah-brand-img" src="assets/sarah-avatar.svg?v=ec468588d34a-0e3c58de" alt="" width="40" height="40" />
           </div>
+          <div class="snews-loading-shimmer" aria-hidden="true"></div>
           <p class="snews-loading-title">Preparing Sarah News…</p>
           <p class="snews-loading-sub">Sarah is reading your publisher feeds</p>
         </div>
@@ -303,7 +305,7 @@
               <span class="ms-ring ms-ring--outer" aria-hidden="true"></span>
               <span class="ms-ring ms-ring--mid" aria-hidden="true"></span>
               <span class="ms-ring ms-ring--inner" aria-hidden="true"></span>
-              <img class="ms-avatar-main sarah-brand-img" src="assets/sarah-avatar.svg?v=beaae3f5267d-0e3c58de" alt="Personal Sarah" width="120" height="120" />
+              <img class="ms-avatar-main sarah-brand-img" src="assets/sarah-avatar.svg?v=ec468588d34a-0e3c58de" alt="Personal Sarah" width="120" height="120" />
             </div>
             <p class="ms-greeting-bubble"></p>
             <div class="ms-quick-grid" id="msQuickGrid"></div>
@@ -361,7 +363,7 @@
               <span class="ms-reminder-label">Don't forget</span>
               <p class="ms-reminder-text" id="msReminderText"></p>
             </div>
-            <img class="ms-reminder-art sarah-brand-img" src="assets/sarah-avatar.svg?v=beaae3f5267d-0e3c58de" alt="" width="56" height="56" />
+            <img class="ms-reminder-art sarah-brand-img" src="assets/sarah-avatar.svg?v=ec468588d34a-0e3c58de" alt="" width="56" height="56" />
           </section>
 
           <section class="sw-home-dashboard hidden" id="msWorkDashboard" aria-label="Sarah Work dashboard" hidden>
@@ -685,6 +687,12 @@
           <div class="search-bar search-bar--icon">
             <span class="search-bar-icon" aria-hidden="true"><svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg></span>
             <input type="search" id="chatsTabSearchInput" placeholder="Search chats and businesses…" autocomplete="off" aria-label="Search chats and businesses on Sarah Network" />
+          </div>
+        </div>
+        <div class="chats-segment-wrap" id="chatsSegmentWrap">
+          <div class="chats-segment ms-segment" role="tablist" aria-label="Business or Sarah chats">
+            <button type="button" class="ms-segment-btn is-active" role="tab" data-chats-panel="business" aria-selected="true">Business chats</button>
+            <button type="button" class="ms-segment-btn" role="tab" data-chats-panel="sarah" aria-selected="false">Sarah chats</button>
           </div>
         </div>
         <div id="chatsList"></div>
@@ -1015,7 +1023,7 @@
           <span class="nav-sarah-app-ring nav-sarah-app-ring--outer"></span>
           <span class="nav-sarah-app-ring nav-sarah-app-ring--mid"></span>
           <span class="nav-sarah-app-ring nav-sarah-app-ring--inner"></span>
-          <img class="nav-sarah-app-icon sarah-brand-img" src="assets/sarah-avatar.svg?v=beaae3f5267d-0e3c58de" alt="" width="26" height="26" decoding="async" />
+          <img class="nav-sarah-app-icon sarah-brand-img" src="assets/sarah-avatar.svg?v=ec468588d34a-0e3c58de" alt="" width="26" height="26" decoding="async" />
         </span>
       </span>
       My Sarah
@@ -1048,15 +1056,15 @@
       }
     }
     </script>
-  <script src="js/ziricai-config.js?v=beaae3f5267d-0e3c58de"></script>
-  <script type="module" src="js/live-bridge.mjs?v=beaae3f5267d-0e3c58de"></script>
+  <script src="js/ziricai-config.js?v=ec468588d34a-0e3c58de"></script>
+  <script type="module" src="js/live-bridge.mjs?v=ec468588d34a-0e3c58de"></script>
   <!-- Classic scripts (mock UI works on file://; live Sarah needs http + API) -->
-  <script src="js/icons.js?v=beaae3f5267d-0e3c58de"></script>
-  <script src="js/mock-data.js?v=beaae3f5267d-0e3c58de"></script>
-  <script src="js/thread-rich-text.js?v=beaae3f5267d-0e3c58de"></script>
-  <script src="js/sarah-behavior-options.js?v=beaae3f5267d-0e3c58de"></script>
-  <script src="js/sarah-news.js?v=beaae3f5267d-0e3c58de"></script>
-  <script src="js/app.js?v=beaae3f5267d-0e3c58de"></script>
+  <script src="js/icons.js?v=ec468588d34a-0e3c58de"></script>
+  <script src="js/mock-data.js?v=ec468588d34a-0e3c58de"></script>
+  <script src="js/thread-rich-text.js?v=ec468588d34a-0e3c58de"></script>
+  <script src="js/sarah-behavior-options.js?v=ec468588d34a-0e3c58de"></script>
+  <script src="js/sarah-news.js?v=ec468588d34a-0e3c58de"></script>
+  <script src="js/app.js?v=ec468588d34a-0e3c58de"></script>
   <script defer>
     (function () {
       if (!('serviceWorker' in navigator)) return;

@@ -176,8 +176,10 @@
         <div class="snews-loading" role="status" aria-live="polite">
           <div class="snews-loading-visual" aria-hidden="true">
             <div class="snews-loading-ring"></div>
-            <div class="snews-loading-dots"><span></span><span></span><span></span></div>
+            <div class="snews-loading-ring snews-loading-ring--pulse"></div>
+            <img class="snews-loading-avatar sarah-brand-img" src="assets/sarah-avatar.svg" alt="" width="40" height="40" />
           </div>
+          <div class="snews-loading-shimmer" aria-hidden="true"></div>
           <p class="snews-loading-title">Preparing Sarah News…</p>
           <p class="snews-loading-sub">Sarah is reading your publisher feeds</p>
         </div>
@@ -684,6 +686,12 @@
           <div class="search-bar search-bar--icon">
             <span class="search-bar-icon" aria-hidden="true"><svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg></span>
             <input type="search" id="chatsTabSearchInput" placeholder="Search chats and businesses…" autocomplete="off" aria-label="Search chats and businesses on Sarah Network" />
+          </div>
+        </div>
+        <div class="chats-segment-wrap" id="chatsSegmentWrap">
+          <div class="chats-segment ms-segment" role="tablist" aria-label="Business or Sarah chats">
+            <button type="button" class="ms-segment-btn is-active" role="tab" data-chats-panel="business" aria-selected="true">Business chats</button>
+            <button type="button" class="ms-segment-btn" role="tab" data-chats-panel="sarah" aria-selected="false">Sarah chats</button>
           </div>
         </div>
         <div id="chatsList"></div>
