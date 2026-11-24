@@ -50,9 +50,11 @@ function prototypeAsset(path) {
 
 function resolveItemAvatar(item) {
   if (!item) return MOCK_USER.avatar;
+  if (item.sarahPersonal || item.isSarahPersonal) return SARAH_AVATAR_SRC;
   if (item.avatar) return item.avatar;
   const map = COMPANY_AVATARS || {};
   if (item.avatarKey && map[item.avatarKey]) return map[item.avatarKey];
+  if (String(item.conversationKind || '').toLowerCase() === 'personal_sarah') return SARAH_AVATAR_SRC;
   return MOCK_USER.avatar;
 }
 
@@ -1199,10 +1201,13 @@ function mapLiveNotifToRow(n) {
   const org = n.organisation?.displayName || 'Organisation';
   const kind = classifyLiveNotif(n);
   const id = n.notificationId;
+  const logoUrl =
+    n.organisation?.logoUrl || n.organisation?.avatarUrl || n.organisation?.imageUrl || null;
   return {
     id,
     kind,
     org,
+    logoUrl,
     title: n.title || 'Update',
     body: n.body || '',
     createdAt: Date.parse(n.createdAt) || Date.now(),
@@ -1275,6 +1280,29 @@ function inboxOrgInitial(org) {
   return t ? t.charAt(0).toUpperCase() : '?';
 }
 
+function inboxUsesSarahAvatar(n) {
+  const kind = String(n?.kind || '');
+  if (kind === 'work' || kind === 'reminder' || kind === 'usage') return true;
+  const org = String(n?.org || '').toLowerCase();
+  if (/personal sarah|^sarah\b|sarah work|sarah reminders|sarah news/i.test(org)) return true;
+  return false;
+}
+
+function inboxRowAvatarHtml(n) {
+  if (inboxUsesSarahAvatar(n)) {
+    return `<img class="sna-row-avatar sna-row-avatar--img sarah-brand-img" src="${escapeHtml(
+      prototypeAsset(SARAH_AVATAR_SRC)
+    )}" alt="" width="40" height="40" decoding="async" />`;
+  }
+  const logo = n.logoUrl || n.thumb;
+  if (logo) {
+    return `<img class="sna-row-avatar sna-row-avatar--img" src="${escapeHtml(
+      prototypeAsset(resolveListingMediaUrl(logo))
+    )}" alt="" width="40" height="40" ${profileImgOnError(MOCK_PROFILE.avatarFallback)} />`;
+  }
+  return `<span class="sna-row-avatar" aria-hidden="true">${escapeHtml(inboxOrgInitial(n.org))}</span>`;
+}
+
 function renderMyNotificationsPanel() {
   const host = document.getElementById('snaNotifList');
   if (!host) return;
@@ -1302,7 +1330,7 @@ function renderMyNotificationsPanel() {
       const badge = rowKindBadge(n);
       return `${groupHtml}
     <button type="button" class="sna-row ${n.unread ? 'is-unread' : ''}" data-sna-id="${escapeHtml(n.id)}" data-sna-kind="${escapeHtml(n.kind)}">
-      <span class="sna-row-avatar" aria-hidden="true">${escapeHtml(inboxOrgInitial(n.org))}</span>
+      ${inboxRowAvatarHtml(n)}
       <span class="sna-row-body">
         <span class="sna-row-org">${escapeHtml(n.org || '')}</span>
         <span class="sna-row-title">${escapeHtml(n.title || '')}</span>
@@ -3757,24 +3785,30 @@ function mapFederatedConversationToChatRow(c) {
     .trim()
     .replace(/\s+/g, '_');
   const isBusiness = kind === 'person_to_business';
+  const label = c.displayLabel || c.companyName || c.title || '';
+  const isPersonalSarah =
+    !isBusiness &&
+    (kind.includes('personal') || /personal\s+sarah|^my\s+sarah/i.test(String(label || '')));
   const companyId = c.companyId || '';
   const convId = c.id || '';
   const id = isBusiness ? companyId || convId : convId || companyId;
   const rawLogo = c.logoUrl || c.avatarUrl || null;
-  const avatar = rawLogo ? resolveListingMediaUrl(rawLogo) : null;
+  const avatar = isPersonalSarah ? SARAH_AVATAR_SRC : rawLogo ? resolveListingMediaUrl(rawLogo) : null;
   return {
     id,
     convId,
-    conversationKind: kind,
-    name: c.displayLabel || c.companyName || c.title || id || 'Chat',
+    conversationKind: isPersonalSarah ? 'personal_sarah' : kind,
+    name: label || id || 'Chat',
     preview: c.preview || c.lastMessagePreview || 'Tap to open',
     time: formatPersonalThreadTime(c.lastMessageAt) || '',
     online: false,
     avatarKey: avatar ? null : isBusiness ? guessCompanyAvatarKey(companyId, c.displayLabel) : null,
     avatar,
+    sarahPersonal: isPersonalSarah,
     company: isBusiness,
     snId: c.snId || null,
     api: true,
+    lastMessageAt: c.lastMessageAt ? Date.parse(c.lastMessageAt) || 0 : 0,
   };
 }
 
@@ -3933,6 +3967,10 @@ async function openChatFromList(chatId, rowEl) {
   const kind = rowEl?.dataset?.kind || '';
   const convId = rowEl?.dataset?.convId || chatId;
   const isCompany = rowEl?.dataset?.company !== '0';
+  if (!isCompany && (kind === 'personal_sarah' || rowEl?.dataset?.personalSarah === '1')) {
+    openPersonalSarahThread(convId || chatId);
+    return;
+  }
   const targetId = isCompany ? chatId || 'smilemore-demo' : convId;
   rt.activeThreadId = targetId;
   if (consumerChatLiveActive()) {
@@ -6217,9 +6255,72 @@ async function refreshChatsTabOrgSearch(rawQuery) {
   chatsTabOrgSearch.companies = filterDiscoverListings(MOCK_DISCOVER_COMPANIES || [], 'all', q);
 }
 
+function isBusinessChatRow(c) {
+  if (c?.company) return true;
+  const kind = String(c?.conversationKind || '').toLowerCase().replace(/\s+/g, '_');
+  return kind === 'person_to_business';
+}
+
+function isSarahSideChatRow(c) {
+  if (c?.sarahPersonal || c?.isSarahPersonal) return true;
+  const kind = String(c?.conversationKind || '').toLowerCase().replace(/\s+/g, '_');
+  if (kind === 'personal_sarah') return true;
+  return !isBusinessChatRow(c);
+}
+
+function mapPersonalThreadToChatRow(t) {
+  return {
+    id: t.id,
+    convId: t.id,
+    name: t.title || 'Personal Sarah',
+    preview: t.preview || 'Tap to open',
+    time: t.time || '',
+    online: false,
+    avatar: SARAH_AVATAR_SRC,
+    sarahPersonal: true,
+    company: false,
+    conversationKind: 'personal_sarah',
+    api: true,
+    lastMessageAt: t.lastMessageAt || 0,
+  };
+}
+
+function buildDualChatsListHtml(businessChats, sarahChatRows, orgSection = '') {
+  const businessSection = businessChats.length
+    ? businessChats.map((c) => renderChatRowHtml(c)).join('')
+    : '<p class="chats-list-empty chats-list-empty--section">No business conversations yet. Search for a business to message Company Sarah.</p>';
+  const sarahSection = sarahChatRows.length
+    ? sarahChatRows.map((c) => renderChatRowHtml(c)).join('')
+    : '<p class="chats-list-empty chats-list-empty--section">No Sarah chats yet. Open My Sarah to start talking with Personal Sarah.</p>';
+  return `<p class="chats-list-section">Business chats</p>${businessSection}<p class="chats-list-section">Sarah chats</p>${sarahSection}${orgSection}`;
+}
+
+function mergeSarahChatRows(federated, personalThreads) {
+  const byId = new Map();
+  federated.filter(isSarahSideChatRow).forEach((c) => byId.set(String(c.convId || c.id), c));
+  personalThreads.forEach((t) => {
+    const row = mapPersonalThreadToChatRow(t);
+    const key = String(row.id);
+    const existing = byId.get(key);
+    if (!existing) byId.set(key, row);
+    else {
+      byId.set(key, {
+        ...existing,
+        ...row,
+        name: row.name || existing.name,
+        preview: row.preview || existing.preview,
+        time: row.time || existing.time,
+        lastMessageAt: Math.max(row.lastMessageAt || 0, existing.lastMessageAt || 0),
+      });
+    }
+  });
+  return Array.from(byId.values()).sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+}
+
 function renderChatRowHtml(c) {
+  const personalSarah = c.sarahPersonal || c.conversationKind === 'personal_sarah';
   return `
-    <div class="chat-row" data-open-thread="${escapeHtml(c.id)}" data-company="${c.company ? '1' : '0'}" data-company-id="${escapeHtml(c.company ? c.id : '')}" data-conv-id="${escapeHtml(c.convId || '')}" data-kind="${escapeHtml(c.conversationKind || '')}" role="button" tabindex="0">
+    <div class="chat-row" data-open-thread="${escapeHtml(c.id)}" data-company="${c.company ? '1' : '0'}" data-personal-sarah="${personalSarah ? '1' : '0'}" data-company-id="${escapeHtml(c.company ? c.id : '')}" data-conv-id="${escapeHtml(c.convId || c.id || '')}" data-kind="${escapeHtml(c.conversationKind || '')}" role="button" tabindex="0">
       <img class="avatar avatar-sm chat-row-avatar" src="${escapeHtml(prototypeAsset(resolveItemAvatar(c)))}" alt="" width="44" height="44" ${profileImgOnError((c.avatarKey && COMPANY_AVATARS?.[c.avatarKey]) || MOCK_PROFILE.avatarFallback)} />
       <div class="meta">
         <div class="name">${escapeHtml(c.name)}${c.company ? ` ${verifiedBadge}` : ''}</div>
@@ -6285,7 +6386,9 @@ async function renderChatsList() {
   if (!q && consumerChatLiveActive()) {
     const cached = loadChatsListSessionCache();
     if (cached.length && !host.querySelector('.chat-row')) {
-      host.innerHTML = cached.map((c) => renderChatRowHtml(c)).join('');
+      const businessCached = cached.filter(isBusinessChatRow);
+      const sarahCached = mergeSarahChatRows(cached, listPersonalThreads());
+      host.innerHTML = buildDualChatsListHtml(businessCached, sarahCached);
       bindChatsListInteractions(host);
     } else if (!host.querySelector('.chat-row')) {
       host.innerHTML = '<p class="chats-list-hint">Loading your conversations…</p>';
@@ -6313,6 +6416,17 @@ async function renderChatsList() {
     });
   }
 
+  let sarahChatRows = [];
+  let businessChats = chats;
+  if (!q) {
+    if (personalSarahLiveActive()) {
+      await syncPersonalSarahSessionsFromServer({ silent: true });
+      if (gen !== chatsListLoadGen) return;
+    }
+    sarahChatRows = mergeSarahChatRows(chats, listPersonalThreads());
+    businessChats = chats.filter(isBusinessChatRow);
+  }
+
   let orgSection = '';
   if (q.length >= 2) {
     await refreshChatsTabOrgSearch(qRaw);
@@ -6328,13 +6442,14 @@ async function renderChatsList() {
     }
   }
 
-  const chatSection =
-    chats.length || !q
+  const chatSection = q
+    ? chats.length
       ? chats.map((c) => renderChatRowHtml(c)).join('')
-      : '<p class="chats-list-empty">No existing chats match that search.</p>';
+      : '<p class="chats-list-empty">No existing chats match that search.</p>'
+  : '';
 
-  if (!q && !chats.length) {
-    host.innerHTML = '<p class="chats-list-empty">Your conversations will appear here. Search for a business to start chatting with Company Sarah.</p>';
+  if (!q) {
+    host.innerHTML = buildDualChatsListHtml(businessChats, sarahChatRows, orgSection);
   } else if (!chats.length && !orgSection && q.length >= 2 && !chatsTabOrgSearch.loading) {
     host.innerHTML =
       '<p class="chats-list-empty">No chats or businesses match that search. Try another name or open Discover.</p>';

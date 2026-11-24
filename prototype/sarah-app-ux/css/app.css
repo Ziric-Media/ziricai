@@ -5971,6 +5971,12 @@ body.is-feed-comment-open {
   background: var(--color-bg, #f1f5f9);
 }
 
+.chats-list-empty--section {
+  padding-top: 8px;
+  padding-bottom: 12px;
+  color: var(--color-text-muted);
+}
+
 .chats-list-hint,
 .chats-list-empty {
   margin: 0;
@@ -8353,6 +8359,12 @@ body.is-feed-comment-open .proto-toast {
   font-size: 14px;
   background: #e0e7ff;
   color: #3730a3;
+}
+.sna-row-avatar--img {
+  display: block;
+  object-fit: cover;
+  background: #f8fafc;
+  padding: 0;
 }
 .sna-row-body { flex: 1; min-width: 0; }
 .sna-row-org {

@@ -173,7 +173,14 @@
         <span class="discover-top-spacer" aria-hidden="true"></span>
       </header>
       <div class="screen-body snews-body" id="snewsHost">
-        <p class="text-muted">Loading Sarah News…</p>
+        <div class="snews-loading" role="status" aria-live="polite">
+          <div class="snews-loading-visual" aria-hidden="true">
+            <div class="snews-loading-ring"></div>
+            <div class="snews-loading-dots"><span></span><span></span><span></span></div>
+          </div>
+          <p class="snews-loading-title">Preparing Sarah News…</p>
+          <p class="snews-loading-sub">Sarah is reading your publisher feeds</p>
+        </div>
       </div>
     </section>
 
