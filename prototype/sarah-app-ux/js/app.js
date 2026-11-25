@@ -5916,7 +5916,9 @@ function getCompanyGallery(company) {
 }
 
 function getCompanyProducts(company) {
-  if (company.products && company.products.length) return sortDiscoverProducts(company.products);
+  if (company.products && company.products.length) {
+    return company.live ? company.products : sortDiscoverProducts(company.products);
+  }
   if (company.live) return [];
   return [
     {
@@ -6406,16 +6408,50 @@ function chatRowAvatarFallback(c) {
   if (c?.sarahPersonal || c?.conversationKind === 'personal_sarah') return SARAH_AVATAR_SRC;
   if (c?.company) {
     const co = discoverFind(c.companyId || c.id);
+    if (co?.avatar) return co.avatar;
+    if (co?.image) return co.image;
     if (co?.imageFallback) return co.imageFallback;
   }
   return (c?.avatarKey && COMPANY_AVATARS?.[c.avatarKey]) || businessListingAvatarFallback();
 }
 
+function resolveChatRowAvatarSrc(item) {
+  const row = enrichBusinessChatRowAvatar(item);
+  const raw = row?.avatar || resolveItemAvatar(row);
+  if (!raw) return prototypeAsset(businessListingAvatarFallback());
+  if (/^https?:\/\//i.test(raw) || /^data:|^blob:/i.test(raw)) return raw;
+  const resolved = resolveListingMediaUrl(raw) || raw;
+  return prototypeAsset(resolved);
+}
+
+function enrichBusinessChatRowAvatar(row) {
+  if (!row || (!row.company && !isBusinessChatRow(row))) return row;
+  const companyId = String(row.companyId || row.id || '').trim();
+  let avatar = row.avatar || row.logoUrl || null;
+  const co = companyId ? discoverFind(companyId) : null;
+  if (co?.avatar) avatar = co.avatar;
+  else if (co?.image && !avatar) avatar = co.image;
+  if (avatar && !/^https?:\/\//i.test(avatar)) {
+    avatar = resolveListingMediaUrl(avatar) || avatar;
+  }
+  return { ...row, companyId: companyId || row.companyId, avatar, company: true };
+}
+
+function chatRowAvatarImgAttrs(c) {
+  const primary = escapeHtml(resolveChatRowAvatarSrc(c));
+  const fb1 = escapeHtml(prototypeAsset(chatRowAvatarFallback(c)));
+  const fb2 = escapeHtml(prototypeAsset(businessListingAvatarFallback()));
+  return `src="${primary}" alt="" width="52" height="52" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.fb==='2')return;if(this.dataset.fb==='1'){this.dataset.fb='2';this.src='${fb2}';return}this.dataset.fb='1';this.src='${fb1}'"`;
+}
+
 function renderChatRowHtml(c) {
   const personalSarah = c.sarahPersonal || c.conversationKind === 'personal_sarah';
+  const avatarAttrs = personalSarah
+    ? `src="${escapeHtml(prototypeAsset(SARAH_AVATAR_SRC))}" alt="" width="52" height="52" ${profileImgOnError(SARAH_AVATAR_SRC)}`
+    : chatRowAvatarImgAttrs(c);
   return `
     <div class="chat-row" data-open-thread="${escapeHtml(c.id)}" data-company="${c.company ? '1' : '0'}" data-personal-sarah="${personalSarah ? '1' : '0'}" data-company-id="${escapeHtml(c.company ? c.id : '')}" data-conv-id="${escapeHtml(c.convId || c.id || '')}" data-kind="${escapeHtml(c.conversationKind || '')}" role="button" tabindex="0">
-      <img class="avatar avatar-sm chat-row-avatar" src="${escapeHtml(prototypeAsset(resolveItemAvatar(c)))}" alt="" width="44" height="44" ${profileImgOnError(chatRowAvatarFallback(c))} />
+      <img class="avatar chat-row-avatar" ${avatarAttrs} />
       <div class="meta">
         <div class="name">${escapeHtml(c.name)}${c.company ? ` ${verifiedBadge}` : ''}</div>
         <div class="preview">${escapeHtml(c.preview)}</div>
@@ -6428,7 +6464,7 @@ function renderChatsTabOrgRowHtml(company) {
   const preview = company.address || company.categoryLabel || 'Sarah Network business';
   return `
     <div class="chat-row chat-row--org" data-start-company-chat="${escapeHtml(company.id)}" role="button" tabindex="0">
-      <img class="avatar avatar-sm chat-row-avatar" src="${escapeHtml(prototypeAsset(companyAvatarUrl(company)))}" alt="" width="44" height="44" ${profileImgOnError(company.imageFallback || MOCK_PROFILE.avatarFallback)} />
+      <img class="avatar chat-row-avatar" ${chatRowAvatarImgAttrs({ company: true, companyId: company.id, id: company.id, avatar: companyAvatarUrl(company) })} />
       <div class="meta">
         <div class="name">${escapeHtml(company.name)}${company.verified ? ` ${verifiedBadge}` : ''}</div>
         <div class="preview">${escapeHtml(preview)}</div>
@@ -6482,7 +6518,8 @@ async function renderChatsList(opts = {}) {
   if (!q && consumerChatLiveActive()) {
     const cached = loadChatsListSessionCache();
     if (cached.length && !host.querySelector('.chat-row')) {
-      const businessCached = cached.filter(isBusinessChatRow);
+      if (discoverLiveActive()) await ensureLiveDiscoverFresh();
+      const businessCached = cached.filter(isBusinessChatRow).map(enrichBusinessChatRowAvatar);
       const sarahCached = mergeSarahChatRows(cached, listPersonalThreads());
       syncChatsPanelChrome(false);
       chatsListPanelCache = { businessChats: businessCached, sarahChatRows: sarahCached, orgSection: '' };
@@ -6518,12 +6555,13 @@ async function renderChatsList(opts = {}) {
   let sarahChatRows = [];
   let businessChats = chats;
   if (!q) {
+    if (discoverLiveActive()) await ensureLiveDiscoverFresh();
     if (personalSarahLiveActive()) {
       await syncPersonalSarahSessionsFromServer({ silent: true });
       if (gen !== chatsListLoadGen) return;
     }
     sarahChatRows = mergeSarahChatRows(chats, listPersonalThreads());
-    businessChats = chats.filter(isBusinessChatRow);
+    businessChats = chats.filter(isBusinessChatRow).map(enrichBusinessChatRowAvatar);
   }
 
   let orgSection = '';
@@ -12514,8 +12552,11 @@ function renderThread() {
   syncWorkWorkspaceUi(ctx);
 }
 
+let lastActivatedRoute = '';
+
 function activateView() {
   const { route, msPanel } = parseLocationHash();
+  const reopeningChatsFromThread = route === 'chats' && lastActivatedRoute === 'chat-thread';
 
   document.querySelectorAll('.view').forEach((v) => {
     v.classList.toggle('is-active', v.dataset.view === route);
@@ -12534,7 +12575,7 @@ function activateView() {
   const paintRoute = () => {
     if (route === 'register-details') renderRegisterDetails();
 
-    if (route === 'chats') renderChatsList();
+    if (route === 'chats') void renderChatsList({ force: reopeningChatsFromThread });
     if (route === 'home') {
       syncUserAvatars();
       renderMySarahPage();
@@ -12597,6 +12638,7 @@ function activateView() {
   } else {
     requestAnimationFrame(paintRoute);
   }
+  lastActivatedRoute = route;
 }
 
 function formatProfileCount(n) {
@@ -13600,12 +13642,12 @@ function mapLiveDiscoverCard(card) {
     gallery: (card.gallery || [])
       .map((g) => resolveListingMediaUrl(typeof g === 'string' ? g : g.imageUrl))
       .filter(Boolean),
-    products: sortDiscoverProducts(card.products || []).map((p) => ({
+    products: (card.products || []).map((p) => ({
       id: p.id || p.name,
       name: p.name,
       price: p.price || '',
-      image: resolveDiscoverProductImage(p.imageUrl, card.coverUrl || card.logoUrl),
-      imageFallback: prototypeAsset('assets/dental-products/fallback.svg'),
+      image: resolveDiscoverProductImage(p.imageUrl, card.logoUrl || card.coverUrl),
+      imageFallback: 'assets/dental-products/fallback.svg',
       description: p.description || '',
       promotion: p.promotion || '',
     })),
@@ -14050,6 +14092,7 @@ async function renderCompanyDetail(companyId) {
       return `
       <article class="product-card">
         <div class="product-card-media">
+          ${p.promotion ? `<span class="product-card-promo">${escapeHtml(p.promotion)}</span>` : ''}
           <img ${discoverImgAttrs(p.image || p.imageUrl, { imageFallback: p.imageFallback || 'assets/dental-products/fallback.svg' })} />
         </div>
         <div class="product-card-body">
@@ -14124,7 +14167,7 @@ async function renderCompanyDetail(companyId) {
         products.length
           ? `<section class="company-block company-section company-products-block">
         <h2>Products</h2>
-        <p class="company-section-lead">Available to order — like items or buy through Sarah (mock checkout).</p>
+        <p class="company-section-lead">${company.live ? 'Services and offers published from this business on Sarah Network. Ask Company Sarah to order or book.' : 'Available to order — like items or buy through Sarah (mock checkout).'}</p>
         <div class="product-grid">${productsHtml}</div>
       </section>`
           : ''
