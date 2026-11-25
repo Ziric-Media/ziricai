@@ -4160,15 +4160,22 @@ async function syncConsumerProfileToPersonalKnowledge(profile, extras = {}) {
 async function routeAfterConsumerAuth(profile) {
   const p = profile || window.SarahLive?.getConsumerProfile?.();
   applyConsumerProfileToUi(p);
-  if (personalSarahLiveActive() && window.SarahLive?.isSignedIn?.()) {
-    await syncPersonalSarahSessionsFromServer({ force: true });
-    if (!consumerRegistrationComplete(p)) {
-      setRoute('register-details');
-      return;
+  if (!consumerRegistrationComplete(p)) {
+    if (personalSarahLiveActive() && window.SarahLive?.isSignedIn?.()) {
+      await syncPersonalSarahSessionsFromServer({ force: true });
     }
-    await syncConsumerProfileToPersonalKnowledge(p);
+    setRoute('register-details');
+    return;
   }
   setRoute('home');
+  void renderSarahHomeIntelligence();
+  if (personalSarahLiveActive() && window.SarahLive?.isSignedIn?.()) {
+    void (async () => {
+      await syncPersonalSarahSessionsFromServer({ force: true });
+      await syncConsumerProfileToPersonalKnowledge(p);
+      void renderSarahHomeIntelligence();
+    })();
+  }
 }
 
 function populateRegisterDetailsForm(profile) {
@@ -11813,6 +11820,42 @@ function dismissSarahHomeCard(cardId) {
   void renderSarahHomeIntelligence();
 }
 
+const SARAH_HOME_CARDS_CACHE_KEY = 'sarah.home.cardsCache.v1';
+
+function readSarahHomeCardsCache(mode) {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(SARAH_HOME_CARDS_CACHE_KEY) || '{}');
+    return raw[mode === 'work' ? 'work' : 'chat'] || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSarahHomeCardsCache(mode, payload) {
+  try {
+    const key = mode === 'work' ? 'work' : 'chat';
+    const raw = JSON.parse(sessionStorage.getItem(SARAH_HOME_CARDS_CACHE_KEY) || '{}');
+    raw[key] = {
+      cards: payload.cards || [],
+      moreCards: payload.moreCards || [],
+      greeting: payload.greeting || null,
+      cachedAt: Date.now(),
+    };
+    sessionStorage.setItem(SARAH_HOME_CARDS_CACHE_KEY, JSON.stringify(raw));
+  } catch {
+    /* ignore */
+  }
+}
+
+function paintSarahHomeQuickGrid(quickHost, cards, { showDismiss = true } = {}) {
+  if (!quickHost) return;
+  quickHost.innerHTML = (cards || [])
+    .slice(0, HOME_CARD_GRID_SIZE)
+    .map((q) => renderHomeCardMarkup(q, { showDismiss }))
+    .join('');
+  bindHomeCardClicks(quickHost);
+}
+
 function renderHomeCardMarkup(q, { showDismiss = false } = {}) {
   const statements = Array.isArray(q.lines)
     ? q.lines
@@ -11864,9 +11907,6 @@ async function renderSarahHomeIntelligence() {
   const greetingEl = document.querySelector('.ms-greeting-bubble');
   if (!quickHost) return;
 
-  let cards = MOCK_MY_SARAH_QUICK;
-  let moreCards = [];
-  let greeting = null;
   const mode = msHomeCardMode();
   const live = personalSarahLiveActive() && window.SarahLive?.fetchSarahHomeCards;
 
@@ -11874,32 +11914,43 @@ async function renderSarahHomeIntelligence() {
   const prefs = readLocalSarahHomePrefs();
   if (staticBox) staticBox.checked = Boolean(prefs.staticHome);
 
-  if (live) {
-    const res = await window.SarahLive.fetchSarahHomeCards(mode);
-    if (!res.error) {
-      moreCards = res.moreCards || [];
-      greeting = res.greeting;
-      cards = selectHomeCardsForGrid(res.cards || [], moreCards, prefs, mode);
-    }
-  } else {
-    cards = selectHomeCardsForGrid(MOCK_MY_SARAH_QUICK, MOCK_MY_SARAH_QUICK_EXTRA, prefs, mode);
-  }
+  const cached = live ? readSarahHomeCardsCache(mode) : null;
+  let moreCards = cached?.moreCards || [];
+  let cards = selectHomeCardsForGrid(
+    cached?.cards?.length ? cached.cards : MOCK_MY_SARAH_QUICK,
+    cached?.cards?.length ? moreCards : MOCK_MY_SARAH_QUICK_EXTRA,
+    prefs,
+    mode
+  );
 
   const liveProfile = window.SarahLive?.getConsumerProfile?.();
   const greetName = consumerDisplayFirstName(liveProfile) || MOCK_USER.name;
 
-  if (greetingEl) greetingEl.textContent = sarahHomeGreetingText(greetName);
+  if (greetingEl) {
+    greetingEl.textContent = sarahHomeGreetingText(greetName);
+  }
 
-  quickHost.innerHTML = cards
-    .slice(0, HOME_CARD_GRID_SIZE)
-    .map((q) => renderHomeCardMarkup(q, { showDismiss: true }))
-    .join('');
-  bindHomeCardClicks(quickHost);
+  paintSarahHomeQuickGrid(quickHost, cards, { showDismiss: Boolean(live) });
 
   if (moreHost) {
     moreHost.classList.add('hidden');
     moreHost.innerHTML = '';
   }
+
+  if (!live) {
+    return;
+  }
+
+  const res = await window.SarahLive.fetchSarahHomeCards(mode);
+  if (res.error) return;
+
+  writeSarahHomeCardsCache(mode, res);
+  moreCards = res.moreCards || [];
+  cards = selectHomeCardsForGrid(res.cards || [], moreCards, prefs, mode);
+  if (greetingEl) {
+    greetingEl.textContent = res.greeting || sarahHomeGreetingText(greetName);
+  }
+  paintSarahHomeQuickGrid(quickHost, cards, { showDismiss: true });
 }
 
 if (!window.__sarahHomeStaticBound) {
