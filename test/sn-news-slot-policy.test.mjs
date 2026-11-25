@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import {
     applyCrossSlotDedupe,
+    applyProfileCoverageMix,
     followTopicScore,
     rankStoriesForSlot,
     storiesAreRelated,
@@ -49,5 +50,20 @@ const ranked = rankStoriesForSlot(
     { slot: "morning" }
 );
 assert.equal(ranked[0].storyId, "2");
+
+const bloated = [
+    { storyId: "za1", region: "za", headline: "SA one" },
+    { storyId: "za2", region: "za", headline: "SA two" },
+    { storyId: "za3", region: "za", headline: "SA three" },
+    { storyId: "zw1", region: "zw", headline: "ZW one" },
+    { storyId: "ent1", interest: "entertainment", headline: "Showbiz" },
+];
+const mixed = applyProfileCoverageMix(bloated, {
+    regions: ["za", "zw"],
+    interests: ["entertainment"],
+});
+assert.ok(mixed.some((s) => s.storyId === "zw1"));
+assert.ok(mixed.some((s) => s.storyId === "ent1"));
+assert.ok(mixed.filter((s) => s.region === "za").length >= 2);
 
 console.log("sn-news-slot-policy.test.mjs: ok");

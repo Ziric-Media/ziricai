@@ -121,6 +121,53 @@ export function rankStoriesForSlot(stories, followTopics, opts = {}) {
  * @param {{ headline?: string }} a
  * @param {{ headline?: string }} b
  */
+/**
+ * Ensure selected regions/interests appear in the headline list (not drowned by default za/world ranking).
+ * @param {object[]} rankedStories — already sorted by relevance
+ * @param {{ regions?: string[], interests?: string[] }} profile
+ * @param {{ headlineCap?: number, minPerRegion?: number, minPerInterest?: number }} [opts]
+ */
+export function applyProfileCoverageMix(rankedStories, profile, opts = {}) {
+    const regions = (profile.regions || []).filter(Boolean);
+    const interests = (profile.interests || []).filter(Boolean);
+    const headlineCap = opts.headlineCap ?? 28;
+    const minPerRegion = opts.minPerRegion ?? 2;
+    const minPerInterest = opts.minPerInterest ?? 2;
+
+    const picked = [];
+    const pickedIds = new Set();
+    const pool = [...(rankedStories || [])];
+
+    function reserve(where, limit) {
+        let n = 0;
+        for (const s of pool) {
+            if (n >= limit) break;
+            if (pickedIds.has(s.storyId)) continue;
+            if (!where(s)) continue;
+            picked.push(s);
+            pickedIds.add(s.storyId);
+            n += 1;
+        }
+    }
+
+    for (const region of regions) {
+        if (region === "world") continue;
+        reserve((s) => s.region === region, minPerRegion);
+    }
+    for (const interest of interests) {
+        reserve((s) => s.interest === interest, minPerInterest);
+    }
+
+    for (const s of pool) {
+        if (picked.length >= headlineCap) break;
+        if (pickedIds.has(s.storyId)) continue;
+        picked.push(s);
+        pickedIds.add(s.storyId);
+    }
+
+    return picked;
+}
+
 export function storiesAreRelated(a, b) {
     if (!a?.headline || !b?.headline || a === b) return false;
     const ta = new Set(tokenize(a.headline));

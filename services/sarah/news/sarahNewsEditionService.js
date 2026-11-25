@@ -33,6 +33,7 @@ import {
 } from "./sarahNewsEditionStore.js";
 import {
     applyCrossSlotDedupe,
+    applyProfileCoverageMix,
     backfillEditionStories,
     rankStoriesForSlot,
 } from "./sarahNewsSlotPolicy.js";
@@ -62,6 +63,33 @@ function matchesInterestFilter(interest, item) {
     if (interest !== "mining") return true;
     const hay = `${item.title} ${item.description}`;
     return MINING_KEYWORDS.test(hay);
+}
+
+/**
+ * @param {object} item
+ * @param {{ nativeRegion?: string, tags?: string[] }} meta
+ * @param {string[]} regionTags
+ * @param {string[]} regionOrder — user profile region priority
+ */
+function pickRegionForItem(item, meta, regionTags, regionOrder) {
+    const matches = regionTags.filter((r) => matchesRegionFilter(r, item, meta));
+    if (!matches.length) return null;
+    if (meta.nativeRegion && matches.includes(meta.nativeRegion)) return meta.nativeRegion;
+    for (const r of regionOrder) {
+        if (matches.includes(r)) return r;
+    }
+    return matches[0];
+}
+
+/**
+ * @param {object} item
+ * @param {string[]} interestTags
+ */
+function pickInterestForItem(item, interestTags) {
+    for (const interest of interestTags) {
+        if (matchesInterestFilter(interest, item)) return interest;
+    }
+    return null;
 }
 
 /**
@@ -98,8 +126,14 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
     function addFeeds(list, tag) {
         for (const feed of list || []) {
             const prev = feedMap.get(feed.url);
-            if (prev) prev.tags.push(tag);
-            else feedMap.set(feed.url, { ...feed, tags: [tag] });
+            if (prev) {
+                prev.tags.push(tag);
+                if (feed.nativeRegion && !prev.nativeRegion) {
+                    prev.nativeRegion = feed.nativeRegion;
+                }
+            } else {
+                feedMap.set(feed.url, { ...feed, tags: [tag] });
+            }
         }
     }
     for (const region of merged.regions) {
@@ -118,8 +152,21 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                 const items = await fetchRssFeedCached(url);
                 for (const item of items) {
                     if (item.link && seenLinks.has(item.link)) continue;
-                    const regionTag = meta.tags.find((t) => t.startsWith("region:"))?.slice(7);
-                    if (regionTag && !matchesRegionFilter(regionTag, item, meta)) continue;
+                    const regionTags = meta.tags
+                        .filter((t) => t.startsWith("region:"))
+                        .map((t) => t.slice(7));
+                    const interestTags = meta.tags
+                        .filter((t) => t.startsWith("interest:"))
+                        .map((t) => t.slice(9));
+
+                    const regionTag = regionTags.length
+                        ? pickRegionForItem(item, meta, regionTags, merged.regions)
+                        : null;
+                    const interestTag = interestTags.length
+                        ? pickInterestForItem(item, interestTags)
+                        : null;
+
+                    if (!regionTag && !interestTag) continue;
 
                     const detail = decodeEntities(item.description || "");
                     const headline = decodeEntities(item.title || "");
@@ -133,8 +180,6 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
                     }
 
                     const id = storyId(item.link || item.title);
-                    const interestTag = meta.tags.find((t) => t.startsWith("interest:"))?.slice(9);
-                    if (interestTag && !matchesInterestFilter(interestTag, item)) continue;
 
                     const summary = newsCardTeaser(detail, 200);
                     const draft = {
@@ -180,9 +225,19 @@ export async function compileSarahNewsEdition(profile = {}, opts = {}) {
         slot,
         previousCompiledAt: previousEdition?.compiledAt,
     });
+    ranked = applyProfileCoverageMix(ranked, merged, {
+        headlineCap: 28,
+        minPerRegion: 2,
+        minPerInterest: 2,
+    });
 
     const dedupe = applyCrossSlotDedupe(ranked, previousEdition);
     ranked = backfillEditionStories(dedupe.stories, stories, 10);
+    ranked = applyProfileCoverageMix(ranked, merged, {
+        headlineCap: 28,
+        minPerRegion: 2,
+        minPerInterest: 2,
+    });
 
     const IMAGE_ENRICH_LIMIT = 28;
     const MAX_OG_FETCHES = 14;

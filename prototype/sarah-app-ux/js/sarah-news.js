@@ -678,13 +678,15 @@
   ).join('');
     return `
       <div class="snews-loading" role="status" aria-live="polite">
-        <div class="snews-loading-visual" aria-hidden="true">
-          <div class="snews-loading-ring"></div>
-          <div class="snews-loading-ring snews-loading-ring--pulse"></div>
-          <img class="snews-loading-avatar sarah-brand-img" src="assets/sarah-avatar.svg" alt="" width="40" height="40" />
+        <div class="snews-loading-card">
+          <div class="snews-loading-visual" aria-hidden="true">
+            <div class="snews-loading-ring"></div>
+            <div class="snews-loading-ring snews-loading-ring--pulse"></div>
+            <img class="snews-loading-avatar sarah-brand-img" src="assets/sarah-avatar.svg" alt="" width="40" height="40" />
+          </div>
+          <p class="snews-loading-title">${escapeHtml(title || 'Preparing Sarah News…')}</p>
+          <ol class="snews-load-steps" aria-label="Loading stages">${steps}</ol>
         </div>
-        <p class="snews-loading-title">${escapeHtml(title || 'Preparing Sarah News…')}</p>
-        <ol class="snews-load-steps" aria-label="Loading stages">${steps}</ol>
       </div>`;
   }
 
