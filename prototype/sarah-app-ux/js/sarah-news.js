@@ -549,6 +549,15 @@
     const map = storiesById || activeEdition?.storiesById || {};
     let story = { ...map[storyId], ...enrichStoryLocally(map[storyId]) };
     if (!story?.headline) return;
+
+    if (global.SarahLive?.fetchSarahNewsStory) {
+      const slot = activeEdition?.slot || '';
+      const remote = await global.SarahLive.fetchSarahNewsStory(storyId, slot);
+      if (remote?.story) {
+        story = { ...story, ...remote.story, ...enrichStoryLocally(remote.story) };
+      }
+    }
+
     const host = document.getElementById('snewsHost');
     if (!host || !activeEdition) return;
     const scroller = host.closest('.snews-body') || host.parentElement || host;

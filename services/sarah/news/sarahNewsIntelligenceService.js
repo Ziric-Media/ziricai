@@ -4,6 +4,7 @@
 import { DEFAULT_SARAH_NEWS_PROFILE, getSarahNewsProfile } from "./sarahNewsProfileService.js";
 import { compileSarahNewsEdition } from "./sarahNewsEditionService.js";
 import { buildSarahNewsStoryRoom } from "./sarahNewsStoryService.js";
+import { composeSarahArticleBodyFull } from "./sarahNewsArticleComposer.js";
 
 function filterHeadlinesByQuery(headlines, rawQuery) {
     const q = String(rawQuery || "").trim().toLowerCase();
@@ -131,9 +132,10 @@ export async function getSarahNewsStoryForUser(uid, storyId, opts = {}) {
         return { success: false, error: "Story not found in current edition.", code: "STORY_NOT_FOUND" };
     }
     const room = buildSarahNewsStoryRoom(base, edition);
+    const articleBodyFull = composeSarahArticleBodyFull(base) || base.articleBody;
     return {
         success: true,
-        story: { ...base, ...room },
+        story: { ...base, ...room, articleBody: articleBodyFull || base.articleBody },
         edition: { slot: edition.slot, compiledAt: edition.compiledAt, editionDay: edition.editionDay },
     };
 }

@@ -7,6 +7,8 @@ import { decodeEntities } from "./sarahNewsRss.js";
 export const MIN_STORY_DETAIL_CHARS = 80;
 const MAX_DETAIL_FOR_BODY = 1400;
 const MAX_BODY_SENTENCES = 4;
+const MAX_DETAIL_FOR_READER = 24_000;
+const MAX_READER_BODY_SENTENCES = 80;
 
 function splitSentences(text) {
     const clean = String(text || "").replace(/\s+/g, " ").trim();
@@ -61,6 +63,45 @@ export function composeSarahArticleBody(story) {
     const paragraphs = [`Here's what I'm seeing: ${lead}`];
     if (rest && rest.length >= 40) {
         paragraphs.push(`What else is known so far: ${rest}`);
+    }
+    if (regionNote) paragraphs.push(regionNote);
+    paragraphs.push(
+        "This briefing is Sarah's summary of verified reporting. It is not legal or financial advice; use your judgment before you act on any of it."
+    );
+
+    return paragraphs.join("\n\n");
+}
+
+/**
+ * Full in-app article (story room) — uses the complete feed detail, not the home briefing cap.
+ * @param {{ headline?: string, summary?: string, description?: string, region?: string|null }} story
+ */
+export function composeSarahArticleBodyFull(story) {
+    if (!storyHasPublishableDetail(story)) return null;
+
+    const headline = decodeEntities(story.headline || "Today's story");
+    let summary = decodeEntities(story.summary ?? story.description ?? "");
+    if (summary.length > MAX_DETAIL_FOR_READER) {
+        summary = `${summary.slice(0, MAX_DETAIL_FOR_READER).replace(/\s+\S*$/, "").trim()}…`;
+    }
+    const sentences = splitSentences(summary).slice(0, MAX_READER_BODY_SENTENCES);
+    if (!sentences.length) return composeSarahArticleBody(story);
+
+    const regionNote =
+        story.region === "za"
+            ? "For South African readers, I'll keep the local angle in mind as this develops."
+            : story.region === "zw"
+              ? "This one matters for Zimbabwe and the wider region — I'll watch for follow-up reporting."
+              : "";
+
+    const paragraphs = [];
+    if (sentences[0]) paragraphs.push(`Here's what I'm seeing: ${sentences[0]}`);
+    const body = sentences.slice(1);
+    if (body.length) {
+        const chunkSize = 4;
+        for (let i = 0; i < body.length; i += chunkSize) {
+            paragraphs.push(body.slice(i, i + chunkSize).join(" "));
+        }
     }
     if (regionNote) paragraphs.push(regionNote);
     paragraphs.push(

@@ -25,6 +25,8 @@ import {
     resolveIndustryPresetForTenant,
     buildIndustryPresetWorkspaceHint,
 } from "../platform/industryPresetContext.js";
+import { isDentalPracticeCompany } from "../dental/dentalIndustryPreset.js";
+import { smilemoreWorkforceHint } from "../dental/smilemorePractice.js";
 
 /**
  * Tenant company record for preset resolution — workspace first, then portal pack inner company.
@@ -129,10 +131,13 @@ export async function buildSarahContext(req, overrides = {}) {
         active: false,
         reason: "resolve_failed",
     }));
+    const dentalPractice = isDentalPracticeCompany(companyId, resolvedCompany);
 
     return {
         companyId,
         companyName: resolvedCompany?.name || companyId,
+        tenantCompanyRecord: resolvedCompany,
+        dentalPractice,
         companyIndustry:
             resolvedCompany?.industry ||
             workspace?.company?.industry ||
@@ -285,6 +290,11 @@ export function buildWorkspaceContextHint(ctx) {
 
     const presetHint = buildIndustryPresetWorkspaceHint(ctx);
     if (presetHint) parts.push(presetHint);
+
+    if (ctx.dentalPractice) {
+        const dentalHint = smilemoreWorkforceHint(moduleKey);
+        if (dentalHint) parts.push(dentalHint);
+    }
 
     return parts.join(". ");
 }

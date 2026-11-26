@@ -2493,16 +2493,11 @@ function renderThreadMessageMarkup(message, isPersonal, ctx = null) {
   if (message.retryable && message.retryText) {
     retry = `<button type="button" class="thread-retry-btn" data-retry-send="${escapeHtml(message.retryText)}">Retry</button>`;
   }
-  const creditNote =
-    isPersonal && Number.isFinite(Number(message.creditsUsed))
-      ? `<p class="thread-credit-footnote" title="Credits metered for this Sarah reply">−${escapeHtml(formatSarahCredits(message.creditsUsed))} credits</p>`
-      : '';
   const recPanel = isPersonal && message.recommendationsUi ? renderRecommendationsUiMarkup(message.recommendationsUi) : '';
   return `<article class="thread-turn thread-turn--assistant">
     <div class="thread-msg thread-msg--assistant">
       <div class="thread-prose thread-prose--rich ${proseKind}">${body}</div>
       ${recPanel}
-      ${creditNote}
       ${retry}
     </div>
   </article>`;
@@ -11856,14 +11851,26 @@ function paintSarahHomeQuickGrid(quickHost, cards, { showDismiss = true } = {}) 
   bindHomeCardClicks(quickHost);
 }
 
+function normalizeHomeCardDisplayLines(lines) {
+  const raw = Array.isArray(lines) ? lines : [];
+  const trimmed = raw
+    .map((line) => {
+      const t = String(line || '').replace(/\s+/g, ' ').trim();
+      if (!t) return '';
+      if (t.length <= 54) return t;
+      const slice = t.slice(0, 54);
+      const cutAt = slice.lastIndexOf(' ');
+      return `${cutAt > 26 ? slice.slice(0, cutAt) : slice}…`;
+    })
+    .filter(Boolean)
+    .slice(0, 2);
+  return trimmed.length ? trimmed : ['Tap to open'];
+}
+
 function renderHomeCardMarkup(q, { showDismiss = false } = {}) {
-  const statements = Array.isArray(q.lines)
-    ? q.lines
-    : Array.isArray(q.statements)
-      ? q.statements
-      : q.subtitle
-        ? [q.subtitle]
-        : [];
+  const statements = normalizeHomeCardDisplayLines(
+    Array.isArray(q.lines) ? q.lines : Array.isArray(q.statements) ? q.statements : q.subtitle ? [q.subtitle] : []
+  );
   const statementLines = statements.map((line) => `<li class="ms-quick-sub">${escapeHtml(line)}</li>`).join('');
   const reason = q.reason ? `<p class="ms-quick-reason">${escapeHtml(q.reason)}</p>` : '';
   const prompt = q.prompt || '';

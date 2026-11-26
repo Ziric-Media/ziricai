@@ -16,6 +16,8 @@ import { listVehiclesByCompany } from "../../inventory/inventoryService.js";
 import { resolveSarahAppInventoryCompanyId } from "../../storage/centralMotorsPilot.js";
 import { retrieveAgentKnowledgeContext } from "../../ai-core/aiCoreBridge.js";
 import { EDUCARE_COMPANY_ID } from "../../education/educareDefaults.js";
+import { BABES_CAR_SALES_COMPANY_ID } from "../../automotive/babesCarSalesBootstrap.js";
+import { AUTOMOTIVE_PRESET_ID } from "../../automotive/automotiveIndustryPreset.js";
 
 const CHANNEL = "sarah_app";
 
@@ -29,10 +31,20 @@ function isEducationSchoolTenant(record) {
 
 export async function shouldRunAutomotiveSalesChat(companyId) {
     if (companyId === EDUCARE_COMPANY_ID) return false;
+    if (companyId === BABES_CAR_SALES_COMPANY_ID) return true;
     const company = await getPortalCompanyAsync(companyId).catch(() => null);
     const record = company?.company || company;
     if (isEducationSchoolTenant(record)) return false;
     if (isAutomotivePresetConfigured(record)) return true;
+    const industry = String(record?.industry || record?.category || "").toLowerCase();
+    if (
+        industry.includes("automotive") ||
+        industry.includes("motor") ||
+        industry.includes("dealership") ||
+        record?.industryPresetId === AUTOMOTIVE_PRESET_ID
+    ) {
+        return true;
+    }
     const inventoryCompanyId = resolveSarahAppInventoryCompanyId(companyId);
     const inv = await listVehiclesByCompany(inventoryCompanyId).catch(() => []);
     return inv.length > 0;

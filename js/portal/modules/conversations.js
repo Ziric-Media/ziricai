@@ -113,7 +113,11 @@ export async function renderConversations(container) {
     root.dataset.mounted = '1';
     const instrHost = container.querySelector('[data-workforce-instructions-host]');
     if (instrHost) {
-      await mountWorkforceInstructionsPanel(instrHost, { persistenceScope: 'salesSarah', adminView: false });
+      try {
+        await mountWorkforceInstructionsPanel(instrHost, { persistenceScope: 'salesSarah', adminView: false });
+      } catch (err) {
+        console.warn('[Sales Sarah] workforce instructions panel:', err);
+      }
     }
     await mountSarahChat(root, {
       mode: 'page',

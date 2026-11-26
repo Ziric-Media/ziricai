@@ -14,6 +14,7 @@ import {
     formatRankedRecommendationsForPrompt,
 } from "../conversation/salesContext.js";
 import { evaluateSeatingFit, getVehicleSeatingCapacity, resolveMinSeatsFilter } from "../inventory/seatingCapacity.js";
+import { resolveSarahAppInventoryCompanyId } from "../storage/centralMotorsPilot.js";
 
 export default {
     name: "searchInventory",
@@ -70,10 +71,11 @@ export default {
     },
 
     async execute(ctx, args = {}) {
-        const { companyId, customerPhone, channel, salesContext } = ctx;
-        if (!companyId) {
+        const { companyId: rawCompanyId, customerPhone, channel, salesContext } = ctx;
+        if (!rawCompanyId) {
             return { ok: false, error: "companyId is required", code: "MISSING_COMPANY" };
         }
+        const companyId = resolveSarahAppInventoryCompanyId(rawCompanyId);
 
         const brandHints = detectBrandHintsFromQuery(args.query || "");
         const bodyHints = detectBodyTypeFromQuery(args.query || "");

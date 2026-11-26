@@ -13,6 +13,26 @@ import { slotForNow } from "../news/sarahNewsEditionService.js";
 import { getConsumerNotificationPrefs } from "../../network/consumerNotificationPrefsService.js";
 
 const MAX_CARDS = 4;
+const HOME_CARD_LINE_MAX = 52;
+const HOME_CARD_MAX_LINES = 2;
+
+function truncateHomeCardLine(text, maxLen = HOME_CARD_LINE_MAX) {
+    const t = String(text || "").replace(/\s+/g, " ").trim();
+    if (!t) return "";
+    if (t.length <= maxLen) return t;
+    const slice = t.slice(0, maxLen);
+    const lastSpace = slice.lastIndexOf(" ");
+    const cut = lastSpace > 24 ? slice.slice(0, lastSpace) : slice;
+    return `${cut}…`;
+}
+
+function normalizeHomeCardLines(lines) {
+    const arr = (Array.isArray(lines) ? lines : [])
+        .map((l) => truncateHomeCardLine(l))
+        .filter(Boolean)
+        .slice(0, HOME_CARD_MAX_LINES);
+    return arr.length ? arr : ["Tap to open"];
+}
 
 function timeOfDay(date = new Date()) {
     const h = date.getHours();
@@ -143,7 +163,11 @@ function buildCandidates(ctx) {
     /** @type {object[]} */
     const out = [];
     const push = (card) => {
-        if (card) out.push(card);
+        if (!card) return;
+        out.push({
+            ...card,
+            lines: normalizeHomeCardLines(card.lines || card.statements),
+        });
     };
 
     if (ctx.isNewUser && ctx.mode === "chat") {

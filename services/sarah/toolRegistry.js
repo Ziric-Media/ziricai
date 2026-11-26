@@ -13,6 +13,10 @@ import {
     isToolAllowedInFinanceSarah,
 } from "./financeSarahToolPolicy.js";
 import { PORTAL_SARAH_SURFACES } from "./portalSarahSurfaces.js";
+import {
+    ensurePortalDentalSarahToolsRegistered,
+    getPortalDentalSarahToolsForContext,
+} from "./portalDentalSarahTools.js";
 
 /** @type {Map<string, import('./tools/types.js').SarahToolDefinition>} */
 const registry = new Map();
@@ -51,6 +55,7 @@ export function listAllTools() {
  * @param {{ role?: string, isSuperAdmin?: boolean, canUseTool?: (t: object) => boolean, persona?: string, surface?: string }} ctx
  */
 export function getToolsForContext(ctx) {
+    ensurePortalDentalSarahToolsRegistered();
     const persona = resolvePersona(ctx);
     const toolPolicy =
         ctx.toolPolicy ||
@@ -60,7 +65,7 @@ export function getToolsForContext(ctx) {
               ? SARAH_TOOL_POLICY.TENANT_AND_PLATFORM
               : SARAH_TOOL_POLICY.TENANT);
 
-    return listAllTools().filter((tool) => {
+    const base = listAllTools().filter((tool) => {
         if (toolPolicy === SARAH_TOOL_POLICY.PUBLIC) {
             if (!PUBLIC_SARAH_TOOL_NAMES.has(tool.name)) return false;
         }
@@ -74,6 +79,16 @@ export function getToolsForContext(ctx) {
         if (ctx.canUseTool && !ctx.canUseTool(tool)) return false;
         return true;
     });
+    const dental = getPortalDentalSarahToolsForContext(ctx);
+    if (!dental.length) return base;
+    const names = new Set(base.map((t) => t.name));
+    for (const tool of dental) {
+        if (!names.has(tool.name)) {
+            base.push(tool);
+            names.add(tool.name);
+        }
+    }
+    return base;
 }
 
 /**
