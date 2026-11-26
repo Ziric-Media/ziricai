@@ -2026,6 +2026,7 @@ body.is-feed-comment-open {
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-chat-zone {
   flex: 1;
   min-height: 0;
+  max-width: 100%;
   /* Small / short phones: allow scroll so cards stay readable; design tokens preserved */
   overflow-x: hidden;
   overflow-y: auto;
@@ -2074,26 +2075,42 @@ body.is-feed-comment-open {
 }
 
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-grid {
-  flex: 1 1 0;
-  min-height: min(200px, 32vh);
-  overflow: visible;
+  flex: 0 0 auto;
+  overflow: hidden;
   align-self: stretch;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  /* 4 quick cards — 2×2 grid */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
+  /* Square 2×2 tile block — height tracks width so every cell stays square */
+  aspect-ratio: 1;
   gap: 8px;
   margin-bottom: 0;
   margin-top: 6px;
 }
 
+.my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-card-wrap {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-card {
+  flex: 1 1 auto;
   min-height: 0;
   height: 100%;
+  width: 100%;
+  max-width: 100%;
   align-self: stretch;
-  padding: 12px;
-  gap: 6px;
+  padding: 10px 10px 12px;
+  gap: 4px;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -2103,42 +2120,75 @@ body.is-feed-comment-open {
   overflow: hidden;
 }
 
+.my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-icon {
+  flex-shrink: 0;
+}
+
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-title {
+  flex-shrink: 0;
   font-size: 13px;
   line-height: 1.25;
+  min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-reason {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-statements {
   list-style: none;
   margin: 0;
   padding: 0;
-  padding-inline-start: 1em;
+  padding-inline-start: 0.85em;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   align-self: stretch;
   width: 100%;
+  min-width: 0;
+  min-height: 0;
   box-sizing: border-box;
   overflow: hidden;
-  max-height: 3.9em;
 }
 
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-sub {
-  display: list-item;
-  list-style-type: disc;
-  list-style-position: outside;
+  position: relative;
+  padding-inline-start: 0.75em;
   font-size: 10px;
-  line-height: 1.3;
+  line-height: 1.35;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
+  list-style: none;
 }
 
-.my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-sub::marker {
+.my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-sub::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  top: 0;
   color: var(--color-text-muted);
   font-size: 0.85em;
+  line-height: 1.35;
 }
 
 /* Narrow phones — keep grid but tighten rhythm so nothing collides with compose + nav */
@@ -2180,13 +2230,12 @@ body.is-feed-comment-open {
 
   .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-grid {
     gap: 6px;
-    min-height: min(176px, 28vh);
   }
 
   .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-card {
     padding: 10px;
     gap: 4px;
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-title {
@@ -2219,8 +2268,7 @@ body.is-feed-comment-open {
   }
 
   .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-grid {
-    min-height: 0;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
   }
 }
 
@@ -3128,7 +3176,8 @@ body.is-feed-comment-open {
 }
 
 .thread-credit-footnote {
-  margin: 6px 0 0;
+  display: none;
+  margin: 0;
   font-size: 11px;
   font-weight: 600;
   color: #5b21b6;
@@ -5610,9 +5659,18 @@ body.is-feed-comment-open {
 
 .ms-quick-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
   margin-bottom: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.ms-quick-card-wrap {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ms-quick-card {
@@ -5627,6 +5685,10 @@ body.is-feed-comment-open {
   flex-direction: column;
   gap: 6px;
   min-height: 108px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .ms-quick-icon {
@@ -5638,6 +5700,9 @@ body.is-feed-comment-open {
   font-weight: 700;
   color: var(--color-text);
   line-height: 1.25;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .ms-quick-reason {
@@ -5646,10 +5711,10 @@ body.is-feed-comment-open {
   font-weight: 500;
   color: var(--color-text-muted, #6b7280);
   line-height: 1.3;
-}
-
-.ms-quick-card-wrap {
-  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ms-quick-dismiss {
@@ -6113,7 +6178,7 @@ body.is-feed-comment-open {
 }
 
 .thread-turn--assistant {
-  padding: 10px 0 12px;
+  padding: 8px 0 6px;
   border-bottom: 1px solid rgba(226, 232, 240, 0.65);
 }
 
