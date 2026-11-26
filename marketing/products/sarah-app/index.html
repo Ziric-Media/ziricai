@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sarah App · ZiricAI</title>
+    <meta name="description" content="Sarah App — the AI super app for individuals. Personal Sarah, chat, work, My Knowledge, Discover, and organisations you follow.">
+    <link rel="icon" href="../../assets/favicon.png?v=9374e1babf14-cfc61e85" type="image/png">
+    <link rel="apple-touch-icon" href="../../assets/favicon.png?v=9374e1babf14-cfc61e85">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="../../css/onboarding.css">
+    <link rel="stylesheet" href="../../css/ziricai-landing.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js",
+        "firebase/storage": "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js"
+      }
+    }
+    </script>
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"","assetVersion":"9374e1babf14-cfc61e85","sites":{"marketing":"https://marketing.ziricai.com","publicWeb":"https://ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","sarah":"https://sarah.ziricai.com","api":"https://ziricai-production.up.railway.app"},"landingSarahCompanyId":"ziricai","firebase":{"apiKey":"AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"482382497730","appId":"1:482382497730:web:6bc2f8668a1598fa13f85b","measurementId":"G-92ZVT0731S","databaseId":"default"}};</script>
+</head>
+<body>
+<div id="landingView" class="landing-view marketing-subpage">
+<header class="landing-header site-header-v2 site-header-mega">
+    <div class="container header-inner">
+        <a href="/" class="logo" aria-label="ZiricAI Home"><img src="../../assets/ZIRICAI LOGO.png?v=9374e1babf14-cfc61e85" alt="ZiricAI" class="logo-img"></a>
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+        <div class="header-nav-panel" id="headerNavPanel">
+            <nav class="nav-links nav-links-mega" id="navLinks">
+                <a href="/" class="nav-link nav-home "><i class="fa-solid fa-house" aria-hidden="true"></i><span>Home</span></a>
+                <div class="nav-dropdown is-open nav-section-active" data-nav-dropdown>
+                <a href="/products/sarah-app/" class="nav-dropdown-toggle nav-active nav-link" aria-haspopup="true" aria-expanded="true">
+                    <span>Products</span> <i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <div class="nav-dropdown-group" role="presentation"><span class="nav-dropdown-group-label">Ecosystem</span></div>
+                    <a href="/products/sarah-app/" class="nav-dropdown-item nav-active" role="menuitem">Sarah App</a>
+                    <a href="/products/business-platform/" class="nav-dropdown-item " role="menuitem">Business Platform</a>
+                    <a href="/products/sarah-network/" class="nav-dropdown-item " role="menuitem">Sarah Network</a>
+                    <a href="/products/mission-control/" class="nav-dropdown-item " role="menuitem">Mission Control</a>
+                    <div class="nav-dropdown-group" role="presentation"><span class="nav-dropdown-group-label">Business platform stack</span></div>
+                    <a href="/platform/" class="nav-dropdown-item " role="menuitem">AI Business OS overview</a>
+                    <a href="/products/knowledge/" class="nav-dropdown-item " role="menuitem">Knowledge Base</a>
+                    <a href="/products/crm/" class="nav-dropdown-item " role="menuitem">CRM</a>
+                    <a href="/products/automation/" class="nav-dropdown-item " role="menuitem">Automation</a>
+                    <a href="/products/analytics/" class="nav-dropdown-item " role="menuitem">Analytics</a>
+                    <a href="/platform/whatsapp/" class="nav-dropdown-item " role="menuitem">Integrations & channels</a>
+                </div>
+            </div>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/ai-employees/marketplace/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>AI Employees</span> <i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/ai-employees/marketplace/" class="nav-dropdown-item " role="menuitem">Browse AI Employees</a>
+                    <a href="/ai-employees/how-it-works/" class="nav-dropdown-item " role="menuitem">How It Works</a>
+                    <a href="/ai-employees/administration/" class="nav-dropdown-item " role="menuitem">Administration</a>
+                    <a href="/ai-employees/sales/" class="nav-dropdown-item " role="menuitem">Sales</a>
+                    <a href="/ai-employees/customer-support/" class="nav-dropdown-item " role="menuitem">Customer Support</a>
+                    <a href="/ai-employees/human-resources/" class="nav-dropdown-item " role="menuitem">Human Resources</a>
+                    <a href="/ai-employees/finance/" class="nav-dropdown-item " role="menuitem">Finance</a>
+                    <a href="/ai-employees/legal/" class="nav-dropdown-item " role="menuitem">Legal</a>
+                    <a href="/ai-employees/healthcare/" class="nav-dropdown-item " role="menuitem">Healthcare</a>
+                    <a href="/ai-employees/education/" class="nav-dropdown-item " role="menuitem">Education</a>
+                </div>
+            </div>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/solutions/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>Solutions</span> <i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/solutions/customer-service/" class="nav-dropdown-item " role="menuitem">Customer Service</a>
+                    <a href="/solutions/sales/" class="nav-dropdown-item " role="menuitem">Sales</a>
+                    <a href="/solutions/operations/" class="nav-dropdown-item " role="menuitem">Operations</a>
+                    <a href="/solutions/enterprise/" class="nav-dropdown-item " role="menuitem">Enterprise</a>
+                    <a href="/solutions/small-business/" class="nav-dropdown-item " role="menuitem">Small Business</a>
+                    <a href="/solutions/growing-business/" class="nav-dropdown-item " role="menuitem">Growing Business</a>
+                </div>
+            </div>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/industries/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>Industries</span> <i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/industries/automotive/" class="nav-dropdown-item " role="menuitem">Automotive</a>
+                    <a href="/industries/mining/" class="nav-dropdown-item " role="menuitem">Mining</a>
+                    <a href="/industries/healthcare/" class="nav-dropdown-item " role="menuitem">Healthcare</a>
+                    <a href="/industries/education/" class="nav-dropdown-item " role="menuitem">Education</a>
+                    <a href="/industries/legal/" class="nav-dropdown-item " role="menuitem">Legal</a>
+                    <a href="/industries/retail/" class="nav-dropdown-item " role="menuitem">Retail</a>
+                    <a href="/industries/hospitality/" class="nav-dropdown-item " role="menuitem">Hospitality</a>
+                    <a href="/industries/all/" class="nav-dropdown-item " role="menuitem">View All Industries</a>
+                </div>
+            </div>
+                <a href="/pricing/" class="nav-link ">Pricing</a>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/resources/guides/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>Resources</span> <i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/resources/guides/" class="nav-dropdown-item " role="menuitem">Guides</a>
+                    <a href="/resources/faq/" class="nav-dropdown-item " role="menuitem">FAQ</a>
+                    <a href="/resources/documentation/" class="nav-dropdown-item " role="menuitem">Documentation</a>
+                    <a href="/company/security/" class="nav-dropdown-item " role="menuitem">Security</a>
+                </div>
+            </div>
+                <div class="nav-dropdown" data-nav-dropdown>
+                <a href="/company/about/" class="nav-dropdown-toggle nav-link" aria-haspopup="true" aria-expanded="false">
+                    <span>Company</span> <i class="fa-solid fa-chevron-down nav-chevron" aria-hidden="true"></i>
+                </a>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="/company/about/" class="nav-dropdown-item " role="menuitem">About ZiricAI</a>
+                    <a href="/company/security/" class="nav-dropdown-item " role="menuitem">Security & Trust</a>
+                    <a href="/company/contact/" class="nav-dropdown-item " role="menuitem">Contact</a>
+                </div>
+            </div>
+            </nav>
+            <div class="nav-ctas">
+                <a href="/login.html" class="btn btn-sm btn-outline nav-cta-login">Login</a>
+                <button type="button" class="btn btn-sm" onclick="launchWizard()">Start Free</button>
+            </div>
+        </div>
+    </header>
+<main class="marketing-page-main">
+<section class="section marketing-page-hero marketing-page-block-hero">
+    <div class="container">
+        <span class="section-eyebrow">For individuals</span>
+        <h1>Sarah App — AI for everyday life</h1>
+        <p class="intro-lead">Your personal AI assistant on mobile and web. Plan your day, get answers grounded in what you choose to share, discover organisations, and stay connected — with privacy controls you own.</p>
+        <div class="hero-actions marketing-hero-actions"><div class="hero-actions marketing-hero-actions"><a href="#" data-site-link="sarah" class="btn btn-glow">Open Sarah App</a> <a href="/pricing/" class="btn btn-ghost">See pricing</a></div></div>
+    </div>
+</section>
+<section class="section section-alt marketing-page-block-intro">
+    <div class="container marketing-page-intro-inner">
+        <h2>Built for people, not just businesses</h2>
+        <p>Sarah App is the consumer product in the ZiricAI ecosystem. Personal Sarah helps with planning, questions, and tasks; Sarah Work delegates longer assignments; My Knowledge is your permissioned memory; Discover and My Organisations connect you to real businesses on the Sarah Network.</p>
+    </div>
+</section>
+<section class="section marketing-page-block-detail section-alt">
+    <div class="container">
+<ul class="marketing-feature-list"><li><span class="mkt-avail mkt-avail-live">Available now</span> <strong>Personal Sarah</strong> — Chat, home intelligence, and personal sessions on sarah.ziricai.com.</li><li><span class="mkt-avail mkt-avail-live">Available now</span> <strong>Sarah Work</strong> — Delegate structured tasks with progress and reports.</li><li><span class="mkt-avail mkt-avail-live">Available now</span> <strong>My Knowledge</strong> — Choose what Sarah may read and remember about you.</li><li><span class="mkt-avail mkt-avail-live">Available now</span> <strong>Discover & organisations</strong> — Follow businesses and see updates in your feed.</li><li><span class="mkt-avail mkt-avail-live">Available now</span> <strong>Status & social feed</strong> — Stay in touch with people and organisations you care about.</li><li><span class="mkt-avail mkt-avail-dev">In development</span> <strong>Sarah Pay & wallet</strong> — Payments and wallet features are in active development — not marketed as fully live until release.</li><li><span class="mkt-avail mkt-avail-later">Coming later</span> <strong>Sarah Mobility</strong> — Ride and mobility integrations are on the strategic roadmap.</li></ul>
+<p class="marketing-page-back"><a href="/"><i class="fa-solid fa-arrow-left"></i> Back to home</a></p>
+    </div>
+</section>
+</main>
+<footer class="site-footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <a href="/" class="logo"><img src="../../assets/ZIRICAI LOGO.png?v=9374e1babf14-cfc61e85" alt="ZiricAI" class="logo-img"></a>
+                <p>One AI ecosystem for people and organisations — Personal Sarah, Company Sarah, AI Employees, and governed platform operations.</p>
+            </div>
+            <div class="footer-col">
+                <h5>Products</h5>
+                <a href="/products/sarah-app/">Sarah App</a>
+                <a href="/products/business-platform/">Business Platform</a>
+                <a href="/products/sarah-network/">Sarah Network</a>
+                <a href="/products/mission-control/">Mission Control</a>
+            </div>
+            <div class="footer-col">
+                <h5>Product</h5>
+                <a href="/#ai-employees">AI Employees</a>
+                <a href="/#automation">Automation</a>
+                <a href="/#knowledge">Knowledge</a>
+                <a href="/pricing/">Pricing</a>
+            </div>
+            <div class="footer-col">
+                <h5>Solutions</h5>
+                <a href="/solutions/automotive/">Automotive</a>
+                <a href="/#industries">Industries</a>
+                <a href="mailto:hello@ziric.ai">Contact</a>
+            </div>
+            <div class="footer-col">
+                <h5>Platform</h5>
+                <a href="#" data-site-link="app">Company Portal</a>
+                <a href="#" data-site-link="admin">Mission Control</a>
+                <a href="/login.html">Sign in</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>&copy; 2026 ZiricAI — built by Ziric Media</span>
+            <div class="footer-bottom-links">
+                <a href="/sarah-privacy.html">Sarah Privacy Policy</a>
+                <a href="/login.html">Sign in</a>
+            </div>
+        </div>
+    </div>
+</footer>
+</div>
+
+<div id="wizardView" class="wizard-view hidden onboarding-body">
+    <div class="onboarding-bg"></div>
+    <header class="onboarding-header">
+        <a href="/" class="onboarding-brand" id="wizardBackHome">
+            <img src="../../assets/ZIRICAI LOGO.png?v=9374e1babf14-cfc61e85" alt="ZiricAI" class="logo-img">
+        </a>
+        <div class="onboarding-header-meta">
+            <span class="trial-pill"><i class="fa-solid fa-gift"></i> 14-day free trial</span>
+            <a href="/login.html" class="link-muted">Sign in</a>
+        </div>
+    </header>
+    <main class="onboarding-main">
+        <aside class="onboarding-progress-panel">
+            <h2>Launch in minutes</h2>
+            <p class="progress-sub">Set up your AI workforce — no credit card required.</p>
+            <ol class="step-list" id="stepList"></ol>
+            <div class="progress-bar-wrap">
+                <div class="progress-bar"><div class="progress-fill" id="overallProgress"></div></div>
+                <span id="progressLabel">Step 1 of 7</span>
+            </div>
+        </aside>
+        <section class="onboarding-card" id="wizardCard">
+            <div id="stepContent"></div>
+            <div class="wizard-actions" id="wizardActions"></div>
+            <p class="wizard-status" id="wizardStatus"></p>
+        </section>
+    </main>
+    <footer class="onboarding-footer">
+        <span>&copy; ZiricAI &middot; POPIA-ready &middot; <a href="#" data-site-link="admin">Mission Control</a></span>
+    </footer>
+</div>
+
+<div class="sarah-widget" id="sarahWidget">
+    <div class="sarah-panel" id="sarahPanel" aria-hidden="true">
+        <div class="sarah-panel-header">
+            <div class="sarah-panel-avatar"><img src="../../assets/sarah-avatar.svg?v=9374e1babf14-cfc61e85" alt="" width="40" height="40"></div>
+            <div>
+                <strong>Sarah</strong>
+                <span>ZiricAI assistant · Online</span>
+            </div>
+            <button class="sarah-panel-close" id="sarahPanelClose" aria-label="Close chat">&times;</button>
+        </div>
+        <div class="sarah-panel-messages" id="sarahMessages">
+            <div class="sarah-msg ai">Hi 👋 I'm Sarah. Ask me about platforms, AI Employees, pricing, or how to get started.</div>
+        </div>
+        <div class="sarah-panel-suggestions" id="sarahSuggestions">
+            <button type="button" data-q="How much does ZiricAI cost?">Pricing</button>
+            <button type="button" data-q="Does Sarah work on WhatsApp?">WhatsApp</button>
+            <button type="button" data-q="What is an AI Employee?">AI Employees</button>
+        </div>
+        <form class="sarah-panel-input" id="sarahForm">
+            <input type="text" id="sarahInput" placeholder="Ask Sarah anything…" autocomplete="off" maxlength="500">
+            <button type="submit" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
+        </form>
+    </div>
+    <button class="sarah-bubble" id="sarahBubble" aria-label="Chat with Sarah">
+        <span class="sarah-bubble-avatar"><img src="../../assets/sarah-avatar.svg?v=9374e1babf14-cfc61e85" alt="" width="44" height="44"></span>
+        <span class="sarah-bubble-text">Chat with Sarah</span>
+        <span class="sarah-bubble-icon"><i class="fa-solid fa-comment-dots"></i></span>
+    </button>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="../../js/ziricai-landing.js"></script>
+
+<script>
+    function launchWizard() {
+        const landing = document.getElementById('landingView');
+        const wizard = document.getElementById('wizardView');
+        if (!landing || !wizard) {
+            window.location.href = '/#start';
+            return;
+        }
+        landing.classList.add('hidden');
+        wizard.classList.remove('hidden');
+        document.body.classList.add('wizard-active');
+        history.replaceState(null, '', '#start');
+        window.scrollTo(0, 0);
+        window.dispatchEvent(new CustomEvent('ziric:wizard-open'));
+        window.initOnboarding?.();
+    }
+    window.launchWizard = launchWizard;
+    document.getElementById('wizardBackHome')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.location.href = '/';
+    });
+    function syncWizardFromHash() {
+        if (location.hash === '#start' || location.hash === '#wizard') {
+            launchWizard();
+            return;
+        }
+        document.body.classList.remove('wizard-active');
+        document.getElementById('landingView')?.classList.remove('hidden');
+        document.getElementById('wizardView')?.classList.add('hidden');
+    }
+    syncWizardFromHash();
+    window.addEventListener('hashchange', syncWizardFromHash);
+    document.getElementById('faqAskSarahBtn')?.addEventListener('click', () => document.getElementById('sarahBubble')?.click());
+</script>
+<script src="../../js/marketing-site-nav.js"></script>
+<script type="module" src="../../js/onboarding/main.js"></script>
+<script type="module">
+import { getSiteUrls } from '../../js/shared/siteUrls.js';
+document.querySelectorAll('[data-site-link]').forEach((el) => {
+  const key = el.getAttribute('data-site-link');
+  const urls = getSiteUrls();
+  if (key === 'login') {
+    const base = (urls.marketing || '').replace(/\/$/, '');
+    el.href = base ? `${base}/login.html` : '/login.html';
+    return;
+  }
+  if (urls[key]) el.href = urls[key];
+});
+</script>
+</body>
+</html>
