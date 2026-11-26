@@ -698,7 +698,7 @@ export async function fetchSarahNewsStory(storyId, slot = '') {
   const q = slot ? `?slot=${encodeURIComponent(slot)}` : '';
   const res = await apiRequest(`/api/personal-sarah/news/stories/${id}${q}`, {
     silent: true,
-    timeoutMs: 120000,
+    timeoutMs: 25000,
   });
   if (res.error) return { error: res.error, code: res.code, status: res.status };
   const body = res.data || {};

@@ -3,7 +3,7 @@
  */
 import { createHash } from "node:crypto";
 
-const DEFAULT_TTL_MS = 120 * 1000;
+const DEFAULT_TTL_MS = 15 * 60 * 1000;
 /** @type {Map<string, { edition: object, expires: number }>} */
 const editionCache = new Map();
 

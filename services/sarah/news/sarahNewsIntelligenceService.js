@@ -2,9 +2,23 @@
  * SHI/SN — shared news intelligence for Sarah News UI and Personal Sarah tools.
  */
 import { DEFAULT_SARAH_NEWS_PROFILE, getSarahNewsProfile } from "./sarahNewsProfileService.js";
-import { compileSarahNewsEdition } from "./sarahNewsEditionService.js";
+import { compileSarahNewsEdition, slotForNow } from "./sarahNewsEditionService.js";
 import { buildSarahNewsStoryRoom } from "./sarahNewsStoryService.js";
 import { composeSarahArticleBodyFull } from "./sarahNewsArticleComposer.js";
+import { editionCacheKey, getCachedSarahNewsEdition } from "./sarahNewsEditionCache.js";
+import { localDayKey } from "./sarahNewsEditionStore.js";
+
+function storyPayloadFromEdition(edition, storyId) {
+    const base = edition?.storiesById?.[storyId];
+    if (!base) return null;
+    const room = buildSarahNewsStoryRoom(base, edition);
+    const articleBodyFull = composeSarahArticleBodyFull(base) || base.articleBody;
+    return {
+        ...base,
+        ...room,
+        articleBody: articleBodyFull || base.articleBody,
+    };
+}
 
 function filterHeadlinesByQuery(headlines, rawQuery) {
     const q = String(rawQuery || "").trim().toLowerCase();
@@ -121,21 +135,38 @@ export async function getSarahNewsStoryForUser(uid, storyId, opts = {}) {
             code: "NEWS_PROFILE_MISSING",
         };
     }
+    const slot = opts.slot || slotForNow();
+    const dayKey = localDayKey();
+    const cacheKey = editionCacheKey(uid, slot, dayKey, profile);
+    const cachedEdition = getCachedSarahNewsEdition(cacheKey);
+    if (cachedEdition) {
+        const cachedStory = storyPayloadFromEdition(cachedEdition, storyId);
+        if (cachedStory) {
+            return {
+                success: true,
+                story: cachedStory,
+                edition: {
+                    slot: cachedEdition.slot,
+                    compiledAt: cachedEdition.compiledAt,
+                    editionDay: cachedEdition.editionDay,
+                },
+            };
+        }
+    }
+
     const edition = await compileSarahNewsEdition(profile, {
-        slot: opts.slot,
+        slot,
         uid,
         persistEdition: false,
         useCache: true,
     });
-    const base = edition.storiesById?.[storyId];
-    if (!base) {
+    const story = storyPayloadFromEdition(edition, storyId);
+    if (!story) {
         return { success: false, error: "Story not found in current edition.", code: "STORY_NOT_FOUND" };
     }
-    const room = buildSarahNewsStoryRoom(base, edition);
-    const articleBodyFull = composeSarahArticleBodyFull(base) || base.articleBody;
     return {
         success: true,
-        story: { ...base, ...room, articleBody: articleBodyFull || base.articleBody },
+        story,
         edition: { slot: edition.slot, compiledAt: edition.compiledAt, editionDay: edition.editionDay },
     };
 }

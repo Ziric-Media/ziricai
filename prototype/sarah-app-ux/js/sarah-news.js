@@ -402,8 +402,30 @@
     ].join('\n\n');
   }
 
+  /** Instant reader copy from digest fields (no network). */
+  function localArticleBodyFull(story) {
+    const existing = String(story.articleBody || '').trim();
+    if (existing.length >= 280) return existing;
+    const summary = String(story.summary || story.description || '').trim();
+    if (summary.length < 80) return localArticleBody(story);
+    const sentences = summary
+      .replace(/\s+/g, ' ')
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!sentences.length) return localArticleBody(story);
+    const paras = [`Here's what I'm seeing: ${sentences[0]}`];
+    for (let i = 1; i < sentences.length; i += 3) {
+      paras.push(sentences.slice(i, i + 3).join(' '));
+    }
+    paras.push(
+      'This briefing is Sarah\'s summary of verified reporting. It is not legal or financial advice; use your judgment before you act on any of it.'
+    );
+    return paras.join('\n\n');
+  }
+
   function articleParagraphs(story) {
-    const raw = story.articleBody || localArticleBody(story);
+    const raw = story.articleBody || localArticleBodyFull(story) || localArticleBody(story);
     return String(raw)
       .split(/\n\n+/)
       .map((p) => p.trim())
@@ -545,26 +567,7 @@
     });
   }
 
-  async function openStory(storyId, storiesById) {
-    const map = storiesById || activeEdition?.storiesById || {};
-    let story = { ...map[storyId], ...enrichStoryLocally(map[storyId]) };
-    if (!story?.headline) return;
-
-    if (global.SarahLive?.fetchSarahNewsStory) {
-      const slot = activeEdition?.slot || '';
-      const remote = await global.SarahLive.fetchSarahNewsStory(storyId, slot);
-      if (remote?.story) {
-        story = { ...story, ...remote.story, ...enrichStoryLocally(remote.story) };
-      }
-    }
-
-    const host = document.getElementById('snewsHost');
-    if (!host || !activeEdition) return;
-    const scroller = host.closest('.snews-body') || host.parentElement || host;
-    digestScrollTop = scroller.scrollTop || 0;
-    host.classList.add('snews-host--article');
-    scroller.scrollTop = 0;
-
+  function paintStoryArticle(host, story, map) {
     const hero = story.imageUrl
       ? `<div class="snews-article-hero"><img class="snews-story-banner-img" src="${escapeHtml(story.imageUrl)}" data-fallback="${escapeHtml(story.imageFallback || story.imageUrl || '')}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="640" height="360"/></div>`
       : '<div class="snews-article-hero snews-article-hero--placeholder" aria-hidden="true"></div>';
@@ -583,8 +586,8 @@
           <span class="snews-story-meta">${escapeHtml(story.publisher || 'News')}</span>
           <h1 class="snews-article-title">${escapeHtml(story.headline)}</h1>
           <p class="snews-article-byline">Written for you by Sarah</p>
-          <div class="snews-article-body">${paras}</div>
-          ${renderStoryIntelSections(story)}
+          <div class="snews-article-body" data-snews-article-body>${paras}</div>
+          <div class="snews-article-intel" data-snews-article-intel>${renderStoryIntelSections(story)}</div>
           <footer class="snews-article-foot">${escapeHtml(foot)}</footer>
           <section class="snews-opinion-card" aria-labelledby="snewsOpinionHeading">
             <h3 id="snewsOpinionHeading">Sarah's take</h3>
@@ -597,6 +600,39 @@
 
     bindStoryBannerImages(host);
     bindStoryCards(host, activeEdition?.storiesById || map);
+  }
+
+  async function openStory(storyId, storiesById) {
+    const map = storiesById || activeEdition?.storiesById || {};
+    let story = { ...map[storyId], ...enrichStoryLocally(map[storyId]) };
+    if (!story?.headline) return;
+
+    const host = document.getElementById('snewsHost');
+    if (!host || !activeEdition) return;
+    const scroller = host.closest('.snews-body') || host.parentElement || host;
+    digestScrollTop = scroller.scrollTop || 0;
+    host.classList.add('snews-host--article');
+    scroller.scrollTop = 0;
+
+    paintStoryArticle(host, story, map);
+
+  if (global.SarahLive?.fetchSarahNewsStory) {
+      const slot = activeEdition?.slot || '';
+      void global.SarahLive.fetchSarahNewsStory(storyId, slot).then((remote) => {
+        if (!remote?.story || !host.isConnected) return;
+        const merged = { ...story, ...remote.story, ...enrichStoryLocally(remote.story) };
+        story = merged;
+        const bodyEl = host.querySelector('[data-snews-article-body]');
+        const intelEl = host.querySelector('[data-snews-article-intel]');
+        if (bodyEl) {
+          bodyEl.innerHTML = articleParagraphs(merged)
+            .map((p) => `<p>${escapeHtml(p)}</p>`)
+            .join('');
+        }
+        if (intelEl) intelEl.innerHTML = renderStoryIntelSections(merged);
+        bindStoryCards(host, activeEdition?.storiesById || map);
+      });
+    }
 
     host.querySelector('#snewsArticleBack')?.addEventListener('click', () => {
       renderDigest(host, activeProfile, activeEdition);
