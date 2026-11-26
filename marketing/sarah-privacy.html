@@ -5,15 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy · Sarah App</title>
     <meta name="description" content="How the Sarah consumer app collects, uses, and protects your personal information — Personal Sarah, My Knowledge, News, Discover, and Sarah Network.">
-    <link rel="icon" type="image/svg+xml" href="assets/favicon-portal.svg">
+    <link rel="icon" href="assets/favicon.png?v=32da3b95c98a-0e3c58de" type="image/png">
+    <link rel="apple-touch-icon" href="assets/favicon.png?v=32da3b95c98a-0e3c58de">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/ziricai-landing.css">
+<script>window.__ZIRICAI_CONFIG__={"apiBase":"","assetVersion":"32da3b95c98a-0e3c58de","sites":{"marketing":"https://marketing.ziricai.com","publicWeb":"https://ziricai.com","app":"https://app.ziricai.com","admin":"https://admin.ziricai.com","sarah":"https://sarah.ziricai.com","api":"https://ziricai-production.up.railway.app"},"landingSarahCompanyId":"ziricai","firebase":{"apiKey":"AIzaSyDABe2SMR6x81KI7h_N44biSwLVxzx9yH8","authDomain":"ziricai.firebaseapp.com","projectId":"ziricai","storageBucket":"ziricai.firebasestorage.app","messagingSenderId":"482382497730","appId":"1:482382497730:web:6bc2f8668a1598fa13f85b","measurementId":"G-92ZVT0731S","databaseId":"default"}};</script>
 </head>
 <body class="legal-page">
 
 <header class="legal-header">
     <div class="container legal-header-inner">
-        <a href="/" class="logo"><img src="assets/ZIRICAI LOGO.png" alt="ZiricAI" class="logo-img"></a>
+        <a href="/" class="logo"><img src="assets/ZIRICAI LOGO.png?v=32da3b95c98a-0e3c58de" alt="ZiricAI" class="logo-img"></a>
         <a href="/products/sarah-app/" class="btn btn-sm btn-outline legal-back">← Sarah App</a>
     </div>
 </header>
@@ -22,7 +24,7 @@
     <div class="container legal-content">
         <p class="legal-eyebrow">Legal · Sarah App</p>
         <h1>Sarah App — Privacy Policy</h1>
-        <p class="legal-meta">Last updated: 26 November 2026</p>
+        <p class="legal-meta">Last updated: 27 November 2026</p>
         <p class="legal-lead"><strong>Sarah</strong> is the ZiricAI consumer super app for individuals — Personal Sarah chat, Work, My Knowledge, News, Discover, company chats, and Sarah Network. This policy applies when you use Sarah at <a href="https://sarah.ziricai.com">sarah.ziricai.com</a> or the official <strong>Sarah</strong> app distributed through Google Play (Trusted Web Activity). It does <strong>not</strong> replace the privacy terms of the ZiricAI <strong>Company Portal</strong> or business WhatsApp integrations; those are covered separately at <a href="/privacy.html">ZiricAI Business Platform Privacy Policy</a>.</p>
 
         <section>
@@ -96,16 +98,25 @@
 
             <h3>3.7 Notifications and device data</h3>
             <ul>
-                <li>Push notification tokens (for example Firebase Cloud Messaging) when you enable notifications</li>
-                <li>Device type, operating system, app version, and coarse technical logs for crashes and performance</li>
-                <li>Approximate location <strong>only when you use a location-based Discover feature</strong> (for example “near me”); we do not continuously track GPS in the background unless a feature you activate clearly states otherwise</li>
+                <li><strong>Push notifications</strong> — if Firebase Cloud Messaging is enabled for Sarah, you grant notification permission on a supported device, and the required technical configuration is in place, we may register a messaging token and related technical identifiers with Google to deliver notifications. Availability may vary by platform and release. In-app notifications may still be delivered without device push.</li>
+                <li><strong>Device and app context</strong> — when you use Sarah, our systems and service providers may receive technical information needed to operate the service (for example device type, operating system, app or browser version, and request timestamps). We use this for security, support, and reliability rather than for advertising profiles.</li>
+                <li><strong>Location</strong> — we do not continuously track your GPS in the background. If a specific Sarah feature requests location (for example a location-based Discover search), we use it only for that feature and according to any in-app notice shown at the time.</li>
             </ul>
 
-            <h3>3.8 Usage and service metering</h3>
+            <h3>3.8 Usage and service metering (ZiricAI servers)</h3>
+            <p>When you use Sarah, <strong>MyPlayc</strong> and the ZiricAI API record <strong>first-party operational data</strong> on our systems. This is separate from third-party advertising analytics and is used to run your account, enforce plans, and keep the service secure.</p>
             <ul>
-                <li>Feature usage, API usage, and credit or quota counters tied to your plan</li>
-                <li>Security and audit logs (sign-in events, suspicious activity flags)</li>
+                <li>Feature and API activity linked to your account (for example chats started, tools invoked, News or Discover actions)</li>
+                <li>Credit, quota, and subscription metering tied to your plan</li>
+                <li>Security and audit records (for example sign-in activity, abuse prevention, and support investigations)</li>
             </ul>
+            <p>This operational data may be stored with your Firebase user identifier and consumer profile on ZiricAI infrastructure (for example on Railway-hosted services). It is not the same as Google Analytics event collection described in section 3.9.</p>
+
+            <h3>3.9 Product analytics, Firebase configuration, and Google services</h3>
+            <p>Our Firebase web project configuration for Sarah includes a <strong>Google Analytics measurement identifier</strong> (<code>measurementId</code>). The <strong>current Sarah App consumer client</strong> (including <a href="https://sarah.ziricai.com">sarah.ziricai.com</a> and the Google Play Trusted Web Activity) <strong>does not load the Firebase Analytics SDK</strong> and <strong>does not send custom Google Analytics 4 (GA4) events</strong> from that client. We may enable client-side analytics in a future version; if we do, we will update this policy and provide any notice or consent required by law.</p>
+            <p><strong>This describes the Sarah consumer client only.</strong> Other ZiricAI surfaces (for example the Company Portal, marketing website, or Mission Control) may use different tools or analytics; those are covered by their own notices where applicable.</p>
+            <p><strong>Firebase Authentication</strong> and <strong>Firebase Cloud Messaging</strong> (when enabled as described in section 3.7) communicate with Google’s infrastructure to provide sign-in and notification delivery. That may include information such as your Firebase user identifier, authentication metadata, and device or messaging tokens. This is distinct from custom GA4 event analytics in the Sarah consumer client.</p>
+            <p>We do not claim that Sarah shares <em>no</em> information with Google — only that the consumer client, as currently built, does not initialise Firebase Analytics for custom GA4 event collection. Other Google or Firebase services may still process data as part of Auth, messaging, or infrastructure.</p>
         </section>
 
         <section>
@@ -118,7 +129,8 @@
                 <li>Deliver News, Discover, chats, and Network features</li>
                 <li>Send service, security, and (where permitted) promotional notifications</li>
                 <li>Enforce terms, prevent abuse, and comply with law</li>
-                <li>Improve reliability and develop features using aggregated or de-identified statistics where possible</li>
+                <li>Operate first-party usage and metering on ZiricAI servers as described in section 3.8</li>
+                <li>Improve reliability and develop features using aggregated or de-identified statistics from our own systems where possible</li>
             </ul>
             <p>We do <strong>not</strong> sell your personal information. We do not use your private Personal Sarah chats to train public third-party AI models in a way that identifies you, except as described under service providers below and as required to operate the service you request.</p>
         </section>
@@ -149,7 +161,7 @@
             <h2>7. Third-party providers</h2>
             <p>Sarah relies on established providers, including:</p>
             <ul>
-                <li><strong>Google Firebase</strong> (Authentication, Firestore, Cloud Messaging, Storage, and related Google Cloud services) — account and app infrastructure</li>
+                <li><strong>Google Firebase and Google Cloud</strong> — <strong>Firebase Authentication</strong> for Sarah sign-in; <strong>Firebase Cloud Messaging</strong> when enabled for push as described in section 3.7. Firebase project configuration includes a Google Analytics <code>measurementId</code>, but the <strong>current Sarah consumer client does not initialise Firebase Analytics</strong> for custom GA4 events (see section 3.9). Google may still process data for Auth, messaging, and related infrastructure. Other Firebase or Google Cloud components may apply to the wider ZiricAI platform.</li>
                 <li><strong>OpenAI</strong> and similar AI vendors — model inference for chat and tools, subject to API terms and our configuration</li>
                 <li><strong>Hosting and CDN</strong> (for example Railway, Netlify, or equivalent) — API and web delivery</li>
                 <li><strong>Payment processors</strong> (for example Paystack or Stripe, when enabled) — subscription checkout; we receive confirmation and metadata, not your full card number</li>
