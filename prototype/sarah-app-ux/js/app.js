@@ -15075,6 +15075,7 @@ function init() {
       }
       syncNotificationBadge();
       if (isMyNotificationsOpen()) renderMyNotificationsPanel();
+      void refreshSarahTasksPanelIfOpen();
     };
     void pollServerReminders();
     setInterval(pollServerReminders, 15000);

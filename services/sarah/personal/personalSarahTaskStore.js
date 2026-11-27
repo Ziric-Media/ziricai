@@ -15,6 +15,8 @@ import {
     useAdminBackend,
 } from "../../database/firestoreClient.js";
 import { assertConsumerSarahTaskAllowance } from "./personalSarahTaskAllowance.js";
+import { isActiveReminderTask } from "./personalSarahReminderSlots.js";
+import { syncPersonalSarahReminderSubscriber } from "./personalSarahReminderSubscriberIndex.js";
 
 const memoryTasks = new Map();
 
@@ -101,15 +103,16 @@ export async function createPersonalSarahTask(uid, body = {}, opts = {}) {
 
     if (getConfiguredStorageBackend() === "memory" || !useAdminBackend()) {
         memoryTasks.set(taskKey(uid, taskId), task);
-        return task;
+    } else {
+        await setDoc(personalSarahDocRef(uid, PERSONAL_SARAH_COLLECTIONS.TASKS, taskId), {
+            ...task,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
     }
-
-    await setDoc(personalSarahDocRef(uid, PERSONAL_SARAH_COLLECTIONS.TASKS, taskId), {
-        ...task,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-    });
-
+    if (isActiveReminderTask(task)) {
+        await syncPersonalSarahReminderSubscriber(uid).catch(() => {});
+    }
     return task;
 }
 
@@ -232,6 +235,9 @@ export async function updatePersonalSarahTask(uid, taskId, patch = {}) {
 
     if (getConfiguredStorageBackend() === "memory" || !useAdminBackend()) {
         memoryTasks.set(taskKey(uid, taskId), next);
+        if (isActiveReminderTask(next)) {
+            await syncPersonalSarahReminderSubscriber(uid).catch(() => {});
+        }
         return next;
     }
 
@@ -240,6 +246,9 @@ export async function updatePersonalSarahTask(uid, taskId, patch = {}) {
         { ...next, updatedAt: serverTimestamp() },
         { merge: true }
     );
+    if (isActiveReminderTask(next)) {
+        await syncPersonalSarahReminderSubscriber(uid).catch(() => {});
+    }
     return next;
 }
 

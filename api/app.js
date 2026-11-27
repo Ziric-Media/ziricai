@@ -2892,6 +2892,24 @@ export async function runBackgroundInit() {
             console.error("[startup] Sarah News scheduler every", sarahNewsSchedulerMs, "ms");
         }
 
+        const personalReminderSchedulerMs = Number(process.env.PERSONAL_SARAH_REMINDER_SCHEDULER_INTERVAL_MS || 60_000);
+        if (
+            personalReminderSchedulerMs > 0 &&
+            String(process.env.PERSONAL_SARAH_REMINDER_SCHEDULER_ENABLED || "true").toLowerCase() !== "false"
+        ) {
+            const { runPersonalSarahReminderSchedulerTick } = await import(
+                "../services/sarah/personal/personalSarahReminderScheduler.js"
+            );
+            const runReminders = () => {
+                runPersonalSarahReminderSchedulerTick().catch((err) => {
+                    console.warn("[personalSarahReminders] scheduler tick:", err?.message || err);
+                });
+            };
+            setTimeout(runReminders, 30_000);
+            setInterval(runReminders, personalReminderSchedulerMs);
+            console.error("[startup] Personal Sarah reminder scheduler every", personalReminderSchedulerMs, "ms");
+        }
+
         const worldMonitorMs = Number(process.env.SARAH_WORLD_MONITOR_INTERVAL_MS || 0);
         if (
             worldMonitorMs > 0 &&

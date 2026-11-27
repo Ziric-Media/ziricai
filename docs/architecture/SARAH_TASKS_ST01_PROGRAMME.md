@@ -20,7 +20,7 @@
 | ST-01D | Templates | Before You Leave profiles, trip/interview prep plans |
 | ST-01E | Gate | UX review + formal approval → unlock ST-02 |
 | ST-02 | Engine | **v1 shipped** — Firestore tasks API, allowance, client sync (`/api/personal-sarah/tasks`) |
-| ST-03 | Reminders | **v2 in progress** — per-slot delivery + reschedule inbox; FCM-when-closed hardening ongoing |
+| ST-03 | Reminders | **v3 on prod** — per-slot delivery, server scheduler (~60s), FCM push; test matrix below |
 | ST-04 | Intelligence | Generated checklists, timelines, suggestions |
 | ST-05 | Execution | Research, drafts, bookings with approval |
 | ST-06 | Personalisation | Routines, templates, learning |
@@ -55,3 +55,15 @@
 - [x] Dashboard Next Actions + Preparation tab  
 - [x] Visual identity unchanged (purple / white)  
 - [x] Spencer proceed → ST-03 engineering (UAT may run in parallel)
+
+## Spencer UAT — test then fix
+
+1. **Paid account** — Create interview prep → `task-*` id → refresh → checklist PATCH persists.  
+2. **Meeting** — Two reminder offsets + travel → each slot should notify (inbox; push if device registered).  
+3. **App open** — 15s poll: chime + Tasks list refresh when due.  
+4. **App backgrounded** — Within ~60s of due time, OS push (requires notification consent + push device).  
+5. **Snooze** on task detail → new time fires once.  
+6. **Cancel** → task disappears from lists.  
+7. **Free tier** — create blocked with clear allowance message.
+
+Paste: task id, expected vs actual, screenshot of My Notifications if push fails.
