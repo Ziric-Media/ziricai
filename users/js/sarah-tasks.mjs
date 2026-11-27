@@ -247,6 +247,11 @@ function formatWhen(iso) {
   });
 }
 
+function taskProgress(t) {
+  if (Number.isFinite(t?.progress)) return Math.min(100, Number(t.progress));
+  return Math.min(100, checklistProgress(t?.checklist) || 0);
+}
+
 function buildStats(tasks) {
   const open = tasks.filter((t) => t.status === 'open' || t.status === 'active').length;
   const waiting = tasks.filter((t) => t.status === 'waiting').length;
@@ -267,7 +272,7 @@ function renderTaskCards(tasks) {
           <span class="st-task-card-status st-task-card-status--${esc(t.status)}">${esc(t.status === 'completed' ? 'Done' : 'Open')}</span>
         </div>
         <p class="st-task-card-when">${t.dueAt ? esc(formatWhen(t.dueAt)) : 'No due date'}</p>
-        <div class="st-task-card-bar"><span style="width:${Math.min(100, t.progress ?? checklistProgress(t.checklist) || 0)}%"></span></div>
+        <div class="st-task-card-bar"><span style="width:${taskProgress(t)}%"></span></div>
       </button></li>`
     )
     .join('');
@@ -529,7 +534,7 @@ function renderDetail(reminders) {
   if (!task) {
     return `<header class="st-subhead"><button type="button" class="st-back" data-st-back>← Back</button><p>Task not found.</p></header>`;
   }
-  const pct = task.progress ?? checklistProgress(task.checklist);
+  const pct = taskProgress(task);
   const checklist =
     Array.isArray(task.checklist) && task.checklist.length
       ? `<ul class="st-detail-checklist">${task.checklist
