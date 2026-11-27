@@ -298,14 +298,27 @@
   border-radius: 16px;
   background: #fff;
   text-align: left;
-  cursor: pointer;
   font: inherit;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
-.st-cat-card:active {
-  border-color: #c4b5fd;
-  background: #faf5ff;
+.st-cat-select {
+  margin-top: 8px;
+  align-self: stretch;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6d28d9, #7c5cff);
+  box-shadow: 0 4px 12px rgba(109, 40, 217, 0.22);
+}
+
+.st-cat-select:active {
+  transform: scale(0.99);
 }
 
 .st-cat-icon {

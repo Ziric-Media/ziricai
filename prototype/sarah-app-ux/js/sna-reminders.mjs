@@ -8,6 +8,7 @@ const SNOOZE_MS = 5 * 60 * 1000;
 
 let activeRing = null;
 let tickTimer = null;
+let alarmToneTimer = null;
 
 function loadAll() {
   try {
@@ -56,8 +57,52 @@ export function playAttentionAlarm({ repeat = 3 } = {}) {
   if (navigator.vibrate) navigator.vibrate([280, 120, 280, 120, 400]);
 }
 
+/** Soft arpeggio chime for Sarah task/reminder alarms (app open). */
+export function playSarahReminderChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const master = ctx.createGain();
+    master.gain.value = 0.2;
+    master.connect(ctx.destination);
+    const sequence = [
+      { f: 523.25, t: 0, d: 0.42 },
+      { f: 659.25, t: 0.1, d: 0.42 },
+      { f: 783.99, t: 0.2, d: 0.5 },
+      { f: 1046.5, t: 0.34, d: 0.62 },
+    ];
+    const start = ctx.currentTime;
+    for (const note of sequence) {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = note.f;
+      const t0 = start + note.t;
+      env.gain.setValueAtTime(0.0001, t0);
+      env.gain.exponentialRampToValueAtTime(0.85, t0 + 0.05);
+      env.gain.exponentialRampToValueAtTime(0.0001, t0 + note.d);
+      osc.connect(env);
+      env.connect(master);
+      osc.start(t0);
+      osc.stop(t0 + note.d + 0.08);
+    }
+    setTimeout(() => ctx.close(), 1400);
+  } catch {
+    /* ignore */
+  }
+  if (navigator.vibrate) navigator.vibrate([100, 70, 100, 70, 180]);
+}
+
+function stopAlarmToneLoop() {
+  if (alarmToneTimer) {
+    clearInterval(alarmToneTimer);
+    alarmToneTimer = null;
+  }
+}
+
 function playAlarmTone() {
-  playAttentionAlarm({ repeat: 3 });
+  playSarahReminderChime();
+  stopAlarmToneLoop();
+  alarmToneTimer = setInterval(() => playSarahReminderChime(), 4200);
 }
 
 function formatClock(ts) {
@@ -82,6 +127,7 @@ function showAlarm(reminder) {
 }
 
 function hideAlarm() {
+  stopAlarmToneLoop();
   const shell = document.getElementById('sarahReminderAlarm');
   shell?.classList.add('hidden');
   shell?.setAttribute('aria-hidden', 'true');

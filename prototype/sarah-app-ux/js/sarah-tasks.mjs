@@ -291,11 +291,12 @@ function renderCategories() {
       <p class="st-lead">Sarah opens the right form for what you selected.</p>
     </header>
     <div class="st-cat-grid">${CATEGORIES.map(
-      (c) => `<button type="button" class="st-cat-card" data-st-category="${c.id}">
+      (c) => `<article class="st-cat-card">
         ${iconSvg(c.icon)}
         <span class="st-cat-title">${esc(c.title)}</span>
         <span class="st-cat-desc">${esc(c.desc)}</span>
-      </button>`
+        <button type="button" class="st-cat-select" data-st-category="${c.id}">Select</button>
+      </article>`
     ).join('')}</div>`;
 }
 
@@ -324,6 +325,7 @@ function renderMeetingForm() {
         <label class="st-radio"><input type="radio" name="lead" value="60" /> 1 hour</label>
         <label class="st-radio"><input type="radio" name="lead" value="1440" /> 1 day</label>
       </fieldset>
+      <label class="st-field"><span>Notes</span><textarea name="notes" rows="3" placeholder="Agenda, parking, who to meet, dial-in details…"></textarea></label>
       <aside class="st-preview" id="stFormPreview" aria-live="polite"></aside>
       <button type="submit" class="st-submit-btn">Create task</button>
     </form>`;
@@ -378,16 +380,18 @@ function renderPreparationPick() {
       <p class="st-lead">What are you preparing for?</p>
     </header>
     <div class="st-prep-pick">
-      <button type="button" class="st-cat-card st-prep-opt" data-st-prep="interview">
+      <article class="st-cat-card">
         ${iconSvg('checklist')}
         <span class="st-cat-title">Job interview</span>
         <span class="st-cat-desc">Checklist and prep plan</span>
-      </button>
-      <button type="button" class="st-cat-card st-prep-opt" data-st-prep="departure">
+        <button type="button" class="st-cat-select" data-st-prep="interview">Select</button>
+      </article>
+      <article class="st-cat-card">
         ${iconSvg('home')}
         <span class="st-cat-title">Before you leave</span>
         <span class="st-cat-desc">Don’t forget keys, wallet, documents</span>
-      </button>
+        <button type="button" class="st-cat-select" data-st-prep="departure">Select</button>
+      </article>
     </div>`;
 }
 
@@ -646,11 +650,12 @@ function updateMeetingPreview(form) {
   const loc = fd.get('location') || 'your meeting';
   const lead = Number(fd.get('lead')) || 15;
   const take = fd.getAll('take').filter(Boolean);
+  const userNotes = String(fd.get('notes') || '').trim();
   const el = form.querySelector('#stFormPreview');
   if (!el) return;
   el.innerHTML = `<h4>Preview</h4><p>Your meeting at <strong>${esc(String(loc))}</strong> is in ${lead} minutes.</p>${
     take.length ? `<p>Remember: ${take.map((t) => esc(t)).join(', ')}</p>` : ''
-  }<p class="st-preview-note">${esc(title)}</p>`;
+  }${userNotes ? `<p>${esc(userNotes)}</p>` : ''}<p class="st-preview-note">${esc(title)}</p>`;
 }
 
 async function submitMeeting(form) {
@@ -666,7 +671,14 @@ async function submitMeeting(form) {
   const dueMs = Date.parse(dueIso) - leadMin * 60_000;
   const reminderAt = new Date(Math.max(Date.now() + 30_000, dueMs)).toISOString();
   const take = fd.getAll('take').filter(Boolean);
-  const notes = [location && `Where: ${location}`, take.length && `Bring: ${take.join(', ')}`].filter(Boolean).join('. ');
+  const userNotes = String(fd.get('notes') || '').trim();
+  const notes = [
+    location && `Where: ${location}`,
+    take.length && `Bring: ${take.join(', ')}`,
+    userNotes && `Notes: ${userNotes}`,
+  ]
+    .filter(Boolean)
+    .join('. ');
 
   if (hooks.createReminder) {
     const res = await hooks.createReminder({
