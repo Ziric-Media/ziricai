@@ -19,7 +19,7 @@
 | ST-01C | Detail | Open task → detail, checklist, status actions |
 | ST-01D | Templates | Before You Leave profiles, trip/interview prep plans |
 | ST-01E | Gate | UX review + formal approval → unlock ST-02 |
-| ST-02 | Engine | Durable `personalSarah/{uid}/tasks`, lifecycle, quotas |
+| ST-02 | Engine | **In progress** — Firestore tasks API, allowance, client sync (`/api/personal-sarah/tasks`) |
 | ST-03 | Reminders | Server scheduling, push, snooze, history |
 | ST-04 | Intelligence | Generated checklists, timelines, suggestions |
 | ST-05 | Execution | Research, drafts, bookings with approval |

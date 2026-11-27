@@ -24,6 +24,10 @@ import { deliverGeofenceReminders } from "../sarah/personal/personalSarahGeofenc
 import {
     createPersonalReminderFromApi,
     listPersonalReminders,
+    createPersonalSarahTask,
+    listPersonalSarahTasks,
+    getPersonalSarahTask,
+    updatePersonalSarahTask,
 } from "../sarah/personal/personalSarahTaskStore.js";
 import { persistPersonalSarahSession } from "../sarah/personal/personalSarahSessionStore.js";
 import { getSarahNewsProfile, setSarahNewsProfile } from "../sarah/news/sarahNewsProfileService.js";
@@ -659,6 +663,80 @@ export async function handleListPersonalSarahReminders(req, res) {
     }
 }
 
+export async function handleCreatePersonalSarahTask(req, res) {
+    try {
+        const uid = req.consumerAuth.uid;
+        const profile = req.consumerAuth.profile || {};
+        const timeZone = profile.timeZone || profile.timezone || "Africa/Johannesburg";
+        const body = { ...(req.body || {}), timeZone };
+        if (body.taskKind === "reminder" && body.dueAt) {
+            let dueAt = body.dueAt;
+            try {
+                const { resolveReminderDueAt } = await import("../sarah/personal/personalSarahTools.js");
+                dueAt = resolveReminderDueAt(body.dueAt, {
+                    userMessage: body.notes || body.dueAt,
+                    title: body.title,
+                    timeZone,
+                });
+            } catch {
+                /* keep raw */
+            }
+            body.dueAt = dueAt;
+            body.status = body.status || "scheduled";
+        }
+        const task = await createPersonalSarahTask(uid, body);
+        if (task.taskKind === "reminder" && task.dueAt) {
+            try {
+                const { createSarahReminderScheduledNotification } = await import("../network/notificationService.js");
+                await createSarahReminderScheduledNotification(uid, {
+                    reminderId: task.id,
+                    title: task.title,
+                    body: task.notes || task.title,
+                    dueAt: task.dueAt,
+                });
+            } catch (err) {
+                console.warn("[api/personal-sarah/tasks]", err?.message || err);
+            }
+        }
+        res.status(201).json({ task });
+    } catch (err) {
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message || "Could not create task", code: err.code || "TASK_CREATE_ERROR" });
+    }
+}
+
+export async function handleListPersonalSarahTasks(req, res) {
+    try {
+        const tasks = await listPersonalSarahTasks(req.consumerAuth.uid, {
+            limit: req.query.limit,
+            status: req.query.status,
+        });
+        res.json({ tasks });
+    } catch (err) {
+        res.status(500).json({ error: err.message || "Could not list tasks", code: "TASK_LIST_ERROR" });
+    }
+}
+
+export async function handleGetPersonalSarahTask(req, res) {
+    try {
+        const task = await getPersonalSarahTask(req.consumerAuth.uid, req.params?.id);
+        if (!task) return res.status(404).json({ error: "Task not found", code: "TASK_NOT_FOUND" });
+        res.json({ task });
+    } catch (err) {
+        res.status(500).json({ error: err.message || "Could not load task", code: "TASK_GET_ERROR" });
+    }
+}
+
+export async function handlePatchPersonalSarahTask(req, res) {
+    try {
+        const task = await updatePersonalSarahTask(req.consumerAuth.uid, req.params?.id, req.body || {});
+        res.json({ task });
+    } catch (err) {
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message || "Could not update task", code: err.code || "TASK_UPDATE_ERROR" });
+    }
+}
+
 export async function handleDuePersonalSarahReminders(req, res) {
     try {
         const result = await deliverDuePersonalReminders(req.consumerAuth.uid);
@@ -793,6 +871,11 @@ export function mountPersonalSarahRoutes(app) {
 
     app.post("/api/personal-sarah/reminders", requireConsumerScope(), handleCreatePersonalSarahReminder);
     app.get("/api/personal-sarah/reminders", requireConsumerScope(), handleListPersonalSarahReminders);
+
+    app.post("/api/personal-sarah/tasks", requireConsumerScope(), handleCreatePersonalSarahTask);
+    app.get("/api/personal-sarah/tasks", requireConsumerScope(), handleListPersonalSarahTasks);
+    app.get("/api/personal-sarah/tasks/:id", requireConsumerScope(), handleGetPersonalSarahTask);
+    app.patch("/api/personal-sarah/tasks/:id", requireConsumerScope(), handlePatchPersonalSarahTask);
     app.get("/api/personal-sarah/reminders/due", requireConsumerScope(), handleDuePersonalSarahReminders);
 
     app.post("/api/personal-sarah/reminders/geo-check", requireConsumerScope(), handleGeofencePersonalSarahReminders);

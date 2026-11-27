@@ -111,19 +111,41 @@ function iconSvg(name) {
   return `<svg class="icon-svg icon-svg--md st-cat-icon" viewBox="0 0 24 24" aria-hidden="true">${map[name] || map.spark}</svg>`;
 }
 
+function mapServerTask(t) {
+  const raw = String(t?.status || '').toLowerCase();
+  let status = 'open';
+  if (raw === 'fired' || raw === 'completed') status = 'completed';
+  else if (raw === 'cancelled' || raw === 'dismissed') status = 'completed';
+  else if (raw === 'waiting') status = 'waiting';
+  else if (raw === 'scheduled') status = 'open';
+  else if (raw) status = raw;
+  return {
+    id: t.id,
+    title: t.title,
+    dueAt: t.dueAt,
+    status,
+    kind: t.taskKind || t.type,
+    categoryId: t.categoryId || (t.taskKind === 'reminder' ? 'reminders' : null),
+    taskType: t.taskType,
+    taskKind: t.taskKind,
+    checklist: t.checklist,
+    progress: t.progress,
+    notes: t.notes,
+    reminderSchedule: t.reminderSchedule,
+    meta: t.meta,
+    source: 'server',
+  };
+}
+
 function mapLiveReminders(rows) {
-  return (rows || []).map((r) => ({
-    id: r.id,
-    title: r.title,
-    dueAt: r.dueAt,
-    status: r.status === 'fired' ? 'completed' : 'open',
-    kind: 'reminder',
-    categoryId: 'reminders',
-    progress: r.status === 'fired' ? 100 : 0,
-  }));
+  return (rows || []).map((r) => mapServerTask({ ...r, taskKind: r.taskKind || 'reminder' }));
 }
 
 async function pullLiveReminders() {
+  if (hooks.fetchTasks) {
+    const res = await hooks.fetchTasks({ limit: 80 });
+    if (!res?.error) return (res.tasks || []).map(mapServerTask);
+  }
   if (!hooks.fetchReminders) return [];
   const res = await hooks.fetchReminders({ limit: 40 });
   if (res?.error) return cachedReminders;
@@ -148,6 +170,12 @@ async function ensureReminders({ force = false } = {}) {
 
 function allTasks(reminders) {
   const proto = loadProtoTasks().filter((t) => !t.hiddenInList);
+  if (hooks.fetchTasks && reminders.length) {
+    const serverIds = new Set(reminders.map((t) => t.id));
+    const shadowOnly = proto.filter((t) => t.meta?.reminderId && serverIds.has(t.meta.reminderId));
+    const localOnly = proto.filter((t) => !serverIds.has(t.id) && !t.meta?.reminderId);
+    return [...reminders, ...shadowOnly, ...localOnly];
+  }
   return [...proto, ...reminders];
 }
 
@@ -319,7 +347,7 @@ function renderHub(reminders) {
       )
       .join('')}</nav>
     <section class="st-list-wrap">${tab === 'templates' ? renderTemplates() : `<ul class="st-task-list">${renderTaskCards(list)}</ul>`}</section>
-    <p class="st-footnote">Tasks sync to Sarah’s cloud engine in ST-02 — reliable push when the app is closed arrives with ST-03.</p>
+    <p class="st-footnote">Tasks save to your Sarah account when signed in. Reliable push when the app is closed arrives with ST-03.</p>
   `;
 }
 
@@ -519,8 +547,8 @@ function findTaskById(id, reminders = cachedReminders) {
   return live || null;
 }
 
-function isProtoTaskId(id) {
-  return loadProtoTasks().some((t) => t.id === id && !t.meta?.reminderId);
+function isMutableTaskId(id) {
+  return String(id).startsWith('task-') || loadProtoTasks().some((t) => t.id === id && !t.hiddenInList);
 }
 
 function updateProtoTask(id, patch) {
@@ -544,7 +572,7 @@ function renderDetail(reminders) {
     return `<header class="st-subhead"><button type="button" class="st-back" data-st-back>← Back</button><p>Task not found.</p></header>`;
   }
   const pct = taskProgress(task);
-  const proto = isProtoTaskId(detailTaskId) || loadProtoTasks().some((t) => t.id === detailTaskId && !t.hiddenInList);
+  const proto = isMutableTaskId(detailTaskId);
   const schedule = Array.isArray(task.reminderSchedule) ? task.reminderSchedule : [];
   const scheduleHtml = schedule.length
     ? `<h3 class="st-detail-h">Reminder schedule</h3><ul class="st-detail-schedule">${schedule
@@ -768,26 +796,25 @@ function bind(root, reminders) {
   if (view === 'detail' && detailTaskId) {
     root.querySelectorAll('[data-st-check]').forEach((box) => {
       box.addEventListener('change', () => {
-        if (!loadProtoTasks().some((t) => t.id === detailTaskId && !t.hiddenInList)) return;
+        if (!isMutableTaskId(detailTaskId)) return;
         const task = findTaskById(detailTaskId, reminders);
         if (!task || !Array.isArray(task.checklist)) return;
         const idx = Number(box.getAttribute('data-st-check'));
         const checklist = task.checklist.map((c, i) => (i === idx ? { ...c, done: box.checked } : c));
-        updateProtoTask(detailTaskId, { checklist, progress: checklistProgress(checklist) });
-        paint();
+        void persistTaskUpdate(detailTaskId, { checklist, progress: checklistProgress(checklist) }).then(() => paint());
       });
     });
     root.querySelector('[data-st-complete-task]')?.addEventListener('click', () => {
-      if (loadProtoTasks().some((t) => t.id === detailTaskId)) {
-        updateProtoTask(detailTaskId, { status: 'completed', progress: 100 });
-        hooks.toast?.('Task marked complete.');
-      } else {
-        hooks.toast?.('Live reminders complete in My Notifications.');
-      }
-      view = 'hub';
-      tab = 'completed';
-      detailTaskId = null;
-      paint();
+      void (async () => {
+        if (isMutableTaskId(detailTaskId)) {
+          await persistTaskUpdate(detailTaskId, { status: 'completed', progress: 100 });
+          hooks.toast?.('Task marked complete.');
+        } else hooks.toast?.('Live reminders complete in My Notifications.');
+        view = 'hub';
+        tab = 'completed';
+        detailTaskId = null;
+        paint();
+      })();
     });
     root.querySelector('[data-st-cancel-task]')?.addEventListener('click', () => {
       deleteProtoTask(detailTaskId);
@@ -811,36 +838,40 @@ function bind(root, reminders) {
     });
     root.querySelectorAll('[data-st-snooze]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const mins = Number(btn.getAttribute('data-st-snooze')) || 15;
-        const task = loadProtoTasks().find((t) => t.id === detailTaskId);
-        if (!task?.dueAt) {
-          hooks.toast?.('No due time to snooze.');
-          return;
-        }
-        let add = mins * 60_000;
-        if (mins === 1440) {
-          const d = new Date();
-          d.setDate(d.getDate() + 1);
-          d.setHours(9, 0, 0, 0);
-          add = d.getTime() - Date.parse(task.dueAt);
-        }
-        const dueAt = new Date(Date.parse(task.dueAt) + add).toISOString();
-        updateProtoTask(detailTaskId, { dueAt, status: 'open' });
-        hooks.toast?.('Snoozed.');
-        paint();
+        void (async () => {
+          const mins = Number(btn.getAttribute('data-st-snooze')) || 15;
+          const task = findTaskById(detailTaskId, reminders);
+          if (!task?.dueAt) {
+            hooks.toast?.('No due time to snooze.');
+            return;
+          }
+          let add = mins * 60_000;
+          if (mins === 1440) {
+            const d = new Date();
+            d.setDate(d.getDate() + 1);
+            d.setHours(9, 0, 0, 0);
+            add = d.getTime() - Date.parse(task.dueAt);
+          }
+          const dueAt = new Date(Date.parse(task.dueAt) + add).toISOString();
+          await persistTaskUpdate(detailTaskId, { dueAt, status: 'open' });
+          hooks.toast?.('Snoozed.');
+          paint();
+        })();
       });
     });
     root.querySelector('#stRescheduleForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
-      const form = e.target;
-      const dueAt = combineDateTime(form.querySelector('[name=date]')?.value, form.querySelector('[name=time]')?.value);
-      if (!dueAt) {
-        hooks.toast?.('Pick date and time.');
-        return;
-      }
-      updateProtoTask(detailTaskId, { dueAt });
-      hooks.toast?.('Rescheduled.');
-      paint();
+      void (async () => {
+        const form = e.target;
+        const dueAt = combineDateTime(form.querySelector('[name=date]')?.value, form.querySelector('[name=time]')?.value);
+        if (!dueAt) {
+          hooks.toast?.('Pick date and time.');
+          return;
+        }
+        await persistTaskUpdate(detailTaskId, { dueAt });
+        hooks.toast?.('Rescheduled.');
+        paint();
+      })();
     });
   }
 
@@ -854,46 +885,52 @@ function bind(root, reminders) {
   const interview = root.querySelector('#stInterviewForm');
   interview?.addEventListener('submit', (e) => {
     e.preventDefault();
-    saveProto({
-      title: `Interview prep — ${interview.querySelector('[name=company]')?.value || interview.querySelector('[name=position]')?.value}`,
-      dueAt: combineDateTime(
-        interview.querySelector('[name=date]')?.value,
-        interview.querySelector('[name=time]')?.value
-      ),
-      status: 'open',
-      categoryId: 'preparation',
-      taskType: 'interview',
-      taskKind: 'preparation',
-      checklist: INTERVIEW_CHECKLIST.map((label) => ({ label, done: false })),
-      progress: 0,
-      meta: Object.fromEntries(new FormData(interview)),
-    });
-    hooks.toast?.('Preparation task saved — open it for checklist and mock interview.');
-    view = 'hub';
-    tab = 'preparation';
-    paint();
+    void (async () => {
+      const saved = await persistTaskCreate({
+        title: `Interview prep — ${interview.querySelector('[name=company]')?.value || interview.querySelector('[name=position]')?.value}`,
+        dueAt: combineDateTime(
+          interview.querySelector('[name=date]')?.value,
+          interview.querySelector('[name=time]')?.value
+        ),
+        status: 'open',
+        categoryId: 'preparation',
+        taskType: 'interview',
+        taskKind: 'preparation',
+        checklist: INTERVIEW_CHECKLIST.map((label) => ({ label, done: false })),
+        progress: 0,
+        meta: Object.fromEntries(new FormData(interview)),
+      });
+      if (!saved) return;
+      hooks.toast?.('Preparation task saved — open it for checklist and mock interview.');
+      view = 'hub';
+      tab = 'preparation';
+      paint();
+    })();
   });
 
   const trip = root.querySelector('#stTripForm');
   trip?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const fd = new FormData(trip);
-    saveProto({
-      title: `Trip — ${fd.get('destination') || 'Travel'}`,
-      dueAt: combineDateTime(fd.get('date'), fd.get('time')),
-      status: 'open',
-      categoryId: 'preparation',
-      taskType: 'trip',
-      taskKind: 'preparation',
-      checklist: TRIP_CHECKLIST.map((label) => ({ label, done: false })),
-      progress: 0,
-      notes: fd.get('accommodation') || '',
-      meta: Object.fromEntries(fd),
-    });
-    hooks.toast?.('Trip preparation saved.');
-    view = 'hub';
-    tab = 'preparation';
-    paint();
+    void (async () => {
+      const fd = new FormData(trip);
+      const saved = await persistTaskCreate({
+        title: `Trip — ${fd.get('destination') || 'Travel'}`,
+        dueAt: combineDateTime(fd.get('date'), fd.get('time')),
+        status: 'open',
+        categoryId: 'preparation',
+        taskType: 'trip',
+        taskKind: 'preparation',
+        checklist: TRIP_CHECKLIST.map((label) => ({ label, done: false })),
+        progress: 0,
+        notes: fd.get('accommodation') || '',
+        meta: Object.fromEntries(fd),
+      });
+      if (!saved) return;
+      hooks.toast?.('Trip preparation saved.');
+      view = 'hub';
+      tab = 'preparation';
+      paint();
+    })();
   });
 
   const departure = root.querySelector('#stDepartureForm');
@@ -923,59 +960,69 @@ function bind(root, reminders) {
     });
     departure.addEventListener('submit', (e) => {
       e.preventDefault();
-      const key = sel.value;
-      const fd = new FormData(departure);
-      if (fd.get('saveProfile')) {
-        profiles[key] = [...depItems];
-        saveDepartureProfiles(profiles);
-      }
-      const timeVal = fd.get('time');
-      saveProto({
-        title: `Before you leave — ${key.replace(/_/g, ' ')}`,
-        dueAt: timeVal
-          ? combineDateTime(new Date().toISOString().slice(0, 10), timeVal)
-          : new Date(Date.now() + 3600000).toISOString(),
-        status: 'open',
-        categoryId: 'preparation',
-        taskType: 'departure',
-        taskKind: 'preparation',
-        progress: 0,
-        checklist: depItems.map((label) => ({ label, done: false })),
-      });
-      hooks.toast?.('Checklist ready — tap the task to tick items off.');
-      view = 'hub';
-      tab = 'preparation';
-      paint();
+      void (async () => {
+        const key = sel.value;
+        const fd = new FormData(departure);
+        if (fd.get('saveProfile')) {
+          profiles[key] = [...depItems];
+          saveDepartureProfiles(profiles);
+        }
+        const timeVal = fd.get('time');
+        const saved = await persistTaskCreate({
+          title: `Before you leave — ${key.replace(/_/g, ' ')}`,
+          dueAt: timeVal
+            ? combineDateTime(new Date().toISOString().slice(0, 10), timeVal)
+            : new Date(Date.now() + 3600000).toISOString(),
+          status: 'open',
+          categoryId: 'preparation',
+          taskType: 'departure',
+          taskKind: 'preparation',
+          progress: 0,
+          checklist: depItems.map((label) => ({ label, done: false })),
+        });
+        if (!saved) return;
+        hooks.toast?.('Checklist ready — tap the task to tick items off.');
+        view = 'hub';
+        tab = 'preparation';
+        paint();
+      })();
     });
   }
 
   const schemaForm = root.querySelector('#stSchemaForm');
   schemaForm?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const fd = new FormData(schemaForm);
-    const key = schemaForm.getAttribute('data-schema-key') || taskTypeId;
-    const schema = SCHEMA_FORMS[key];
-    const title = schema?.buildTitle ? schema.buildTitle(fd) : String(fd.get('title') || key);
-    const isExecution = schema?.kind === 'execution' || isExecutionTaskType(key) || categoryId === 'delegate';
-    const date = fd.get('date') || fd.get('deadline') || fd.get('start');
-    const time = fd.get('time');
-    saveProto({
-      title,
-      dueAt: combineDateTime(date, time) || (date ? combineDateTime(date, '09:00') : null) || new Date(Date.now() + 3600000).toISOString(),
-      status: isExecution ? 'waiting' : 'open',
-      categoryId,
-      taskType: key,
-      taskKind: isExecution ? 'execution' : categoryId === 'reminders' ? 'reminder' : 'preparation',
-      progress: 0,
-      notes: fd.get('notes') || fd.get('list') || '',
-      checklist: (schema?.checklist || []).map((label) => ({ label, done: false })),
-      meta: Object.fromEntries(fd),
-    });
-  if (isExecution) hooks.toast?.('Saved — Sarah will help after you approve in chat.');
-    else hooks.toast?.('Task saved.');
-    view = 'hub';
-    tab = isExecution ? 'waiting' : 'open';
-    paint();
+    void (async () => {
+      const fd = new FormData(schemaForm);
+      const key = schemaForm.getAttribute('data-schema-key') || taskTypeId;
+      const schema = SCHEMA_FORMS[key];
+      const title = schema?.buildTitle ? schema.buildTitle(fd) : String(fd.get('title') || key);
+      const isExecution = schema?.kind === 'execution' || isExecutionTaskType(key) || categoryId === 'delegate';
+      const date = fd.get('date') || fd.get('deadline') || fd.get('start');
+      const time = fd.get('time');
+      const taskKind = isExecution ? 'execution' : categoryId === 'reminders' ? 'reminder' : 'preparation';
+      const saved = await persistTaskCreate({
+        title,
+        dueAt:
+          combineDateTime(date, time) ||
+          (date ? combineDateTime(date, '09:00') : null) ||
+          new Date(Date.now() + 3600000).toISOString(),
+        status: isExecution ? 'waiting' : taskKind === 'reminder' ? 'scheduled' : 'open',
+        categoryId,
+        taskType: key,
+        taskKind,
+        progress: 0,
+        notes: fd.get('notes') || fd.get('list') || '',
+        checklist: (schema?.checklist || []).map((label) => ({ label, done: false })),
+        meta: Object.fromEntries(fd),
+      });
+      if (!saved) return;
+      if (isExecution) hooks.toast?.('Saved — Sarah will help after you approve in chat.');
+      else hooks.toast?.('Task saved.');
+      view = 'hub';
+      tab = isExecution ? 'waiting' : 'open';
+      paint();
+    })();
   });
 }
 
@@ -993,6 +1040,35 @@ function saveProto(task) {
   if (idx >= 0) list[idx] = row;
   else list.unshift(row);
   saveProtoTasks(list);
+  return row;
+}
+
+async function persistTaskCreate(task) {
+  if (hooks.createTask) {
+    const res = await hooks.createTask(task);
+    if (res?.error) {
+      if (res.code === 'TASK_ALLOWANCE') {
+        hooks.toast?.('Sarah Tasks need a paid plan. Upgrade in Billing.');
+      } else hooks.toast?.(res.error || 'Could not save task.');
+      return null;
+    }
+    invalidateReminderCache();
+    return res.task;
+  }
+  return saveProto(task);
+}
+
+async function persistTaskUpdate(id, patch) {
+  if (hooks.updateTask && String(id).startsWith('task-')) {
+    const res = await hooks.updateTask(id, patch);
+    if (res?.error) {
+      hooks.toast?.(res.error || 'Could not update task.');
+      return null;
+    }
+    invalidateReminderCache();
+    return res.task;
+  }
+  return updateProtoTask(id, patch);
 }
 
 function meetingLeadMinutes(fd) {
@@ -1110,7 +1186,7 @@ async function submitMeeting(form) {
     hooks.onReminderCreated?.(res.reminder);
     invalidateReminderCache();
     if (res.reminder?.id) {
-      saveProto({
+      await persistTaskCreate({
         id: `st-shadow-${res.reminder.id}`,
         hiddenInList: true,
         title,
@@ -1127,17 +1203,17 @@ async function submitMeeting(form) {
     }
     void scheduleClientReminders(schedule.slice(1), title, primaryNote);
   } else {
-    saveProto({
+    await persistTaskCreate({
       title,
       dueAt: reminderAt,
-      status: 'open',
+      status: 'scheduled',
       categoryId: 'reminders',
       taskType: 'meeting',
       taskKind: 'reminder',
       progress: 0,
       notes: primaryNote,
       reminderSchedule: schedule,
-      meta: { with: withWho, travel },
+      meta: { with: withWho, travel, ...Object.fromEntries(fd) },
     });
     void scheduleClientReminders(schedule, title, primaryNote);
   }

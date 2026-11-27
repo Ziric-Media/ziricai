@@ -595,6 +595,43 @@ export async function fetchPersonalReminders({ limit = 50 } = {}) {
   return { reminders: res.data?.reminders || [] };
 }
 
+export async function fetchPersonalSarahTasks({ limit = 50, status } = {}) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const cap = Math.min(Math.max(Number(limit) || 50, 1), 100);
+  let path = `/api/personal-sarah/tasks?limit=${cap}`;
+  if (status) path += `&status=${encodeURIComponent(status)}`;
+  const res = await apiRequest(path, { silent: true });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { tasks: res.data?.tasks || [] };
+}
+
+export async function createPersonalSarahTask(body = {}) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const res = await apiRequest('/api/personal-sarah/tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { task: res.data?.task };
+}
+
+export async function updatePersonalSarahTask(taskId, patch = {}) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const id = String(taskId || '').trim();
+  if (!id) return { error: 'Task id required', code: 'TASK_ID_REQUIRED' };
+  const res = await apiRequest(`/api/personal-sarah/tasks/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { task: res.data?.task };
+}
+
 export async function pollSarahNewsDelivery() {
   const blocked = await requireSignedInConsumer();
   if (blocked) return blocked;
@@ -1450,6 +1487,9 @@ function mountPublicApi() {
     fetchPersonalWorkEstimate,
     createPersonalReminder,
     fetchPersonalReminders,
+    fetchPersonalSarahTasks,
+    createPersonalSarahTask,
+    updatePersonalSarahTask,
     pollDuePersonalReminders,
     pollSarahNewsDelivery,
     checkPersonalReminderGeofence,

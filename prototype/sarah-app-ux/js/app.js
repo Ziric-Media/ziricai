@@ -5072,7 +5072,10 @@ function sarahTasksHubOptions() {
     escapeHtml,
     toast: showProtoToast,
     fetchReminders: (opts) => window.SarahLive?.fetchPersonalReminders?.(opts),
+    fetchTasks: (opts) => window.SarahLive?.fetchPersonalSarahTasks?.(opts),
     createReminder: (body) => window.SarahLive?.createPersonalReminder?.(body),
+    createTask: (body) => window.SarahLive?.createPersonalSarahTask?.(body),
+    updateTask: (id, patch) => window.SarahLive?.updatePersonalSarahTask?.(id, patch),
     onReminderCreated: async (rem) => {
       if (rem?.id) {
         try {
