@@ -4,6 +4,7 @@
  */
 import { resolveAuthFromRequest } from "./authService.js";
 import { getConsumerProfile } from "../users/consumerProfileService.js";
+import { touchConsumerLastActive } from "../users/consumerLastActive.js";
 import { auditLog } from "../audit/auditLog.js";
 
 /**
@@ -40,6 +41,7 @@ export function requireConsumerScope() {
                 globalProfile: auth.profile || null,
             };
             req.auth = auth;
+            void touchConsumerLastActive(auth.uid);
             next();
         } catch (err) {
             console.error("[requireConsumerScope]", err.message);

@@ -94,7 +94,9 @@ function renderProfileDetail(detailEl, d, uid) {
     </div>
     <p class="mc-user-privacy-note">Private chat content is not shown. Safety excerpts are redacted previews only.</p>
     <div class="mc-user-detail-stats">
-      <div class="mc-user-stat"><span class="label">Account created</span><span class="value">${escapeHtml(fmtDate(d.profile.createdAt))}</span></div>
+      <div class="mc-user-stat"><span class="label">First name</span><span class="value">${escapeHtml(d.profile.firstName || '—')}</span></div>
+      <div class="mc-user-stat"><span class="label">Surname</span><span class="value">${escapeHtml(d.profile.lastName || '—')}</span></div>
+      <div class="mc-user-stat"><span class="label">Registered</span><span class="value">${escapeHtml(fmtDate(d.overview.registeredAt || d.profile.createdAt))}</span></div>
       <div class="mc-user-stat"><span class="label">Last active</span><span class="value">${escapeHtml(fmtDate(d.overview.lastActiveAt))}</span></div>
       <div class="mc-user-stat"><span class="label">Subscription</span><span class="value">${escapeHtml(d.overview.subscriptionStatus)}</span></div>
       <div class="mc-user-stat"><span class="label">Open safety cases</span><span class="value">${escapeHtml(String(d.safety?.openCases ?? 0))}</span></div>
@@ -141,15 +143,18 @@ export async function renderMcPlatformUsers(container) {
     </div>
     <div class="table-container">
       <table class="org-table">
-        <thead><tr><th>User</th><th>Package</th><th>Status</th><th>Safety</th><th>Last active</th><th></th></tr></thead>
+        <thead><tr><th>First name</th><th>Surname</th><th>Email</th><th>Package</th><th>Status</th><th>Safety</th><th>Registered</th><th>Last active</th><th></th></tr></thead>
         <tbody>
           ${rows
             .map(
               (r) => `<tr class="mc-user-row${r.uid === activeProfileUid ? ' is-active' : ''}">
-              <td>${escapeHtml(r.displayName)}<div class="panel-hint">${escapeHtml(r.uid)}</div></td>
+              <td>${escapeHtml(r.firstName || '—')}</td>
+              <td>${escapeHtml(r.lastName || '—')}</td>
+              <td class="is-email">${escapeHtml(r.email || '—')}<div class="panel-hint">${escapeHtml(r.uid)}</div></td>
               <td>${escapeHtml(r.tier)}</td>
               <td>${escapeHtml(r.subscriptionStatus)}</td>
               <td><span class="${safetyBadge(r.safetyStatus)}">${escapeHtml(r.safetyStatus)}</span></td>
+              <td>${escapeHtml(fmtDate(r.registeredAt || r.createdAt))}</td>
               <td>${escapeHtml(fmtDate(r.lastActiveAt))}</td>
               <td><button type="button" class="btn btn-secondary btn-sm mc-user-open" data-uid="${escapeHtml(r.uid)}">Open</button></td>
             </tr>`

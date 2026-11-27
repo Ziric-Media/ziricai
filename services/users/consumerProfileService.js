@@ -99,6 +99,8 @@ export async function bootstrapConsumerProfile(uid, input = {}) {
 
     const firstName = String(input.firstName || input.preferredName || "").trim();
     const preferredName = String(input.preferredName || firstName || "").trim();
+    const city = input.city ? String(input.city).trim() : null;
+    const country = input.country ? String(input.country).trim() : null;
     const email = input.email ? String(input.email).trim() : null;
     const fullName =
         String(input.fullName || "").trim() ||
@@ -115,6 +117,8 @@ export async function bootstrapConsumerProfile(uid, input = {}) {
         fullName,
         onboardingCompletedAt: null,
         popiaConsentVersion: input.popiaConsentVersion ? String(input.popiaConsentVersion) : null,
+        city,
+        country,
         createdAt: Date.now(),
         updatedAt: Date.now(),
     };
@@ -160,6 +164,8 @@ const PROFILE_PATCH_KEYS = new Set([
     "fullName",
     "locale",
     "onboardingCompletedAt",
+    "city",
+    "country",
 ]);
 
 /**
@@ -187,6 +193,9 @@ export async function updateConsumerProfile(uid, patch = {}) {
     const updates = {};
     for (const [key, value] of Object.entries(patch)) {
         if (PROFILE_PATCH_KEYS.has(key)) updates[key] = value;
+    }
+    if (updates.firstName && !updates.preferredName && !patch.preferredName) {
+        updates.preferredName = updates.firstName;
     }
     if (patch.locale && getConfiguredStorageBackend() !== "memory") {
         await setDoc(userPreferencesRef(uid), { locale: patch.locale, updatedAt: serverTimestamp() }, { merge: true });

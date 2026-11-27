@@ -2893,7 +2893,7 @@ function getEffectiveUserAvatar() {
   if (cached) return cached;
   const local = loadStoredProfileDataUrl(PROFILE_AVATAR_STORAGE_KEY);
   if (local) return local;
-  return MOCK_USER.avatar;
+  return SARAH_AVATAR_SRC;
 }
 
 function getEffectiveProfileCover() {
@@ -3123,7 +3123,7 @@ function applyStoredProfileMedia() {
       img.onerror = function onAvatarErr() {
         if (this.dataset.fb) return;
         this.dataset.fb = '1';
-        this.src = prototypeAsset(MOCK_PROFILE?.avatarFallback || 'assets/discover/green-haven-fallback.svg');
+        this.src = prototypeAsset(SARAH_AVATAR_SRC);
       };
     });
 }
@@ -4112,7 +4112,7 @@ function syncSarahTimeGreetings() {
 function consumerDisplayFirstName(profile) {
   if (!profile) return '';
   return String(
-    profile.preferredName || profile.firstName || profile.displayName || profile.fullName || profile.name || ''
+    profile.firstName || profile.preferredName || profile.displayName || profile.fullName || profile.name || ''
   )
     .trim()
     .split(/\s+/)[0];
@@ -4205,18 +4205,43 @@ function renderRegisterDetails() {
   if (statusEl) statusEl.textContent = '';
 }
 
+function clearLegacySampleProfileAvatar() {
+  try {
+    const raw = localStorage.getItem(PROFILE_AVATAR_STORAGE_KEY) || '';
+    if (/spencer-avatar|profile\/spencer/i.test(raw)) {
+      localStorage.removeItem(PROFILE_AVATAR_STORAGE_KEY);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 function applyConsumerProfileToUi(profile) {
   if (!profile) return;
-  const name = profile.preferredName || profile.firstName || MOCK_USER.name;
-  MOCK_USER.name = name;
+  if (!String(profile.photoURL || '').trim()) clearLegacySampleProfileAvatar();
+  const first = consumerDisplayFirstName(profile) || 'Member';
+  const full =
+    [profile.firstName, profile.lastName].filter(Boolean).join(' ') ||
+    profile.fullName ||
+    profile.preferredName ||
+    first;
+  MOCK_USER.name = first;
   if (profile.email) MOCK_USER.email = profile.email;
-  syncUserAvatars();
-  document.querySelectorAll('[data-profile-name][data-profile-kind="persona"], [data-profile-name]:not([data-profile-kind])').forEach((el) => {
-    el.textContent = name;
+  document.querySelectorAll('[data-profile-name-mode="first"], .ms-drawer-user-name').forEach((el) => {
+    el.textContent = first;
+  });
+  document.querySelectorAll('[data-profile-name][data-profile-kind="persona"]').forEach((el) => {
+    el.textContent = full;
+  });
+  document.querySelectorAll('[data-profile-name]:not([data-profile-name-mode="first"])').forEach((el) => {
+    if (el.classList.contains('ms-drawer-user-name')) return;
+    if (el.dataset.profileKind === 'business') return;
+    el.textContent = full;
   });
   syncSarahTimeGreetings();
   syncUserAvatars();
   applyStoredProfileMedia();
+  void syncSarahPlanLabels();
 }
 
 async function syncPersonalSarahSessionsFromServer({ force = false, silent = false } = {}) {
@@ -12112,10 +12137,35 @@ function buildSarahPlanUsageHistoryMarkup(snap, { limit = 10, compact = false, s
   </section>`;
 }
 
+async function syncSarahPlanLabels() {
+  const snap = await fetchSarahPlanUsageSnapshot();
+  const label = snap.tierName || 'Sarah Free';
+  document.querySelectorAll('[data-sarah-plan-label], .ms-drawer-user-plan').forEach((el) => {
+    el.textContent = label;
+  });
+  if (snap.tierId) {
+    MOCK_SARAH_BILLING_TIERS.forEach((t) => {
+      t.current = t.id === snap.tierId;
+    });
+  }
+  return snap;
+}
+
 async function fetchSarahPlanUsageSnapshot() {
   let tierName = currentBillingTier().name;
   let tierId = currentBillingTier().id;
   let skuId = SARAH_TIER_SKU[tierId] || SARAH_TIER_SKU.free;
+
+  if (personalSarahLiveActive() && window.SarahLive?.fetchMySubscription) {
+    const subRes = await window.SarahLive.fetchMySubscription();
+    const liveSku = subRes?.subscription?.skuId || subRes?.entitlement?.skuId;
+    if (liveSku) {
+      skuId = liveSku;
+      tierId = tierIdFromSkuId(liveSku);
+      const tier = MOCK_SARAH_BILLING_TIERS.find((t) => t.id === tierId);
+      if (tier?.name) tierName = tier.name;
+    }
+  }
 
   if (personalSarahLiveActive() && window.SarahLive?.fetchPersonalQuota) {
     const res = await window.SarahLive.fetchPersonalQuota();
@@ -12376,6 +12426,15 @@ async function refreshSarahPlanUsageUi(surfaces) {
 
   if (!want.size) return;
   const snap = await fetchSarahPlanUsageSnapshot();
+  const label = snap.tierName || 'Sarah Free';
+  document.querySelectorAll('[data-sarah-plan-label], .ms-drawer-user-plan').forEach((el) => {
+    el.textContent = label;
+  });
+  if (snap.tierId) {
+    MOCK_SARAH_BILLING_TIERS.forEach((t) => {
+      t.current = t.id === snap.tierId;
+    });
+  }
 
   if (want.has('billing')) {
     const el = document.getElementById('msBillingUsage');
@@ -14337,7 +14396,7 @@ function syncUserAvatars() {
       img.onerror = function onUserAvatarErr() {
         if (this.dataset.fb) return;
         this.dataset.fb = '1';
-        this.src = prototypeAsset(MOCK_PROFILE?.avatarFallback || 'assets/discover/green-haven-fallback.svg');
+        this.src = prototypeAsset(SARAH_AVATAR_SRC);
       };
     }
   });
@@ -14505,7 +14564,7 @@ function bindSarahLiveAuth() {
       firstName,
       lastName,
       preferredName: firstName,
-      fullName: [firstName, lastName].join(' '),
+      fullName: [firstName, lastName].join(' ').trim(),
       city,
       country,
       onboardingCompletedAt: new Date().toISOString(),

@@ -83,7 +83,7 @@ async function runPersonalDemoMode(ctx, message, session) {
     };
     }
 
-    const name = ctx.preferredName || "there";
+    const name = ctx.firstName || ctx.preferredName || "there";
     const reply = `Hi ${name}! I'm your personal Sarah (demo mode — add OPENAI_API_KEY for full replies). Ask me to set a reminder, plan your week, or prepare for finding a business on Discover soon.`;
     await appendPersonalSarahMessage(session, "user", message, { attachments: [] });
     await appendPersonalSarahMessage(session, "assistant", reply);

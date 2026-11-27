@@ -8,7 +8,7 @@ import { PERSONAL_SARAH_INTIMATE_VOICE_RULES } from "./personalSarahConversation
 const FOUNDER_COMPANY_IDENTITY_BLOCK = buildFounderCompanyIdentityBriefBlock();
 
 export function buildPersonalSarahSystemPrompt(ctx) {
-    const name = ctx.preferredName || ctx.firstName || "there";
+    const name = ctx.firstName || ctx.preferredName || "there";
     const knowledgeBlock = ctx.knowledgeDigest
         ? `Authorized My Knowledge (user-controlled):\n${ctx.knowledgeDigest}`
         : "My Knowledge: user has not shared any sections with you yet, or sections are empty.";
@@ -96,7 +96,7 @@ export async function buildPersonalSarahContext(input) {
         uid: input.uid,
         persona: SARAH_PERSONA.PERSONAL_ASSISTANT,
         surface: "personal_app",
-        preferredName: profile.preferredName || profile.firstName || profile.fullName || null,
+        preferredName: profile.firstName || profile.preferredName || profile.fullName || null,
         firstName: profile.firstName || null,
         lastName: profile.lastName || null,
         fullName: profile.fullName || null,

@@ -3,9 +3,9 @@ window.SARAH_PROTOTYPE = {
   SARAH_AVATAR_SRC: 'assets/sarah-avatar.svg',
 
   MOCK_USER: {
-    name: 'Spencer',
-    email: 'spencer@example.com',
-    avatar: 'assets/profile/spencer-avatar.jpg',
+    name: 'Member',
+    email: '',
+    avatar: 'assets/sarah-avatar.svg',
   },
 
   /**

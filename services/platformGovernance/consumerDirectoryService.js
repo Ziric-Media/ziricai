@@ -3,6 +3,7 @@
  */
 import { getConsumerSubscription } from "../revenue/consumerSubscriptionService.js";
 import { DEFAULT_CONSUMER_SKU } from "../revenue/legacyPlanAliases.js";
+import { getCatalogueSku } from "../revenue/catalogueService.js";
 import { getConsumerProfile, listConsumerProfilesForPlatform, profileTimestampMs } from "../users/consumerProfileService.js";
 import { formatConsumerFieldTime } from "./consumerTimestampFormat.js";
 import { listConnectionsForUser } from "../network/connectionService.js";
@@ -14,20 +15,33 @@ function tierFromSku(skuId) {
     return m ? m[1] : "free";
 }
 
+function tierLabelFromSku(skuId) {
+    const sku = getCatalogueSku(skuId);
+    if (sku?.name) return sku.name;
+    const id = tierFromSku(skuId);
+    const labels = { free: "Sarah Free", plus: "Sarah Plus", premium: "Sarah Premium", ultimate: "Sarah Ultimate" };
+    return labels[id] || id;
+}
+
 function toDirectoryRow(profile, sub) {
     const skuId = sub?.skuId || DEFAULT_CONSUMER_SKU;
+    const lastActiveAt =
+        formatConsumerFieldTime(profile, "lastActiveAt") ||
+        formatConsumerFieldTime(profile, "lastLoginAt") ||
+        null;
+    const registeredAt = formatConsumerFieldTime(profile, "createdAt") || profile.createdAt || null;
     return {
         uid: profile.uid,
         displayName: profile.preferredName || profile.fullName || profile.firstName || profile.uid,
+        firstName: profile.firstName || null,
+        lastName: profile.lastName || null,
         email: profile.email || null,
-        createdAt: formatConsumerFieldTime(profile, "createdAt") || profile.createdAt || null,
-        lastActiveAt:
-            formatConsumerFieldTime(profile, "lastActiveAt") ||
-            formatConsumerFieldTime(profile, "lastLoginAt") ||
-            formatConsumerFieldTime(profile, "updatedAt") ||
-            null,
+        registeredAt,
+        createdAt: registeredAt,
+        lastActiveAt,
         onboardingCompletedAt: profile.onboardingCompletedAt || null,
-        tier: tierFromSku(skuId),
+        tier: tierLabelFromSku(skuId),
+        tierId: tierFromSku(skuId),
         skuId,
         subscriptionStatus: sub?.status || "free",
         safetyStatus: profile.platformSafety?.status || "ok",
@@ -45,14 +59,22 @@ export async function listConsumersForPlatform({ q = "", limit = 50, cursor = ""
     let filtered = profiles;
     if (needle) {
         filtered = profiles.filter((p) => {
-            const hay = `${p.uid} ${p.email || ""} ${p.preferredName || ""} ${p.fullName || ""}`.toLowerCase();
+            const hay = `${p.uid} ${p.email || ""} ${p.preferredName || ""} ${p.fullName || ""} ${p.firstName || ""} ${p.lastName || ""}`.toLowerCase();
             return hay.includes(needle);
         });
     }
     filtered.sort((a, b) => {
-        const ta = profileTimestampMs(b, "updatedAt") ?? 0;
-        const tb = profileTimestampMs(a, "updatedAt") ?? 0;
-        return ta - tb;
+        const ta =
+            profileTimestampMs(a, "lastActiveAt") ??
+            profileTimestampMs(a, "lastLoginAt") ??
+            profileTimestampMs(a, "updatedAt") ??
+            0;
+        const tb =
+            profileTimestampMs(b, "lastActiveAt") ??
+            profileTimestampMs(b, "lastLoginAt") ??
+            profileTimestampMs(b, "updatedAt") ??
+            0;
+        return tb - ta;
     });
     let start = 0;
     if (cursor) {

@@ -11,6 +11,7 @@ import {
 } from "../users/consumerProfileService.js";
 import { auditLog } from "../audit/auditLog.js";
 import { getConsumerEntitlements } from "../revenue/entitlementEngine.js";
+import { touchConsumerLastActive } from "../users/consumerLastActive.js";
 
 /**
  * @param {import('express').Express} app
@@ -27,8 +28,11 @@ export function mountConsumerRoutes(app) {
                 lastName: body.lastName,
                 preferredName: body.preferredName,
                 fullName: body.fullName,
+                city: body.city,
+                country: body.country,
                 popiaConsentVersion: body.popiaConsentVersion,
             });
+            await touchConsumerLastActive(uid, { force: true });
             auditLog("consumer_bootstrap", { uid, created: result.created });
             const entitlementSnapshot = await getConsumerEntitlements(uid);
             res.status(result.created ? 201 : 200).json({
