@@ -48,12 +48,14 @@
 
 .app-frame {
   max-width: 430px;
+  width: 100%;
   margin: 0 auto;
   min-height: 100dvh;
   padding-top: 0;
   padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0));
   background: var(--color-bg);
   position: relative;
+  overflow-x: clip;
 }
 
 .view {
@@ -2009,10 +2011,15 @@ body.is-feed-comment-open {
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .my-sarah-scroll {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: hidden;
   display: flex;
   flex-direction: column;
   padding: 6px 16px 88px;
+  box-sizing: border-box;
 }
 
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-panel[data-ms-panel='home'] {
@@ -2026,7 +2033,11 @@ body.is-feed-comment-open {
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-chat-zone {
   flex: 1;
   min-height: 0;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
+  align-self: stretch;
+  box-sizing: border-box;
   /* Small / short phones: allow scroll so cards stay readable; design tokens preserved */
   overflow-x: hidden;
   overflow-y: auto;
@@ -2080,26 +2091,27 @@ body.is-feed-comment-open {
   align-self: stretch;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  /* Square 2×2 tile block — height tracks width so every cell stays square */
-  aspect-ratio: 1;
+  grid-auto-rows: 1fr;
   gap: 8px;
   margin-bottom: 0;
   margin-top: 6px;
+  contain: inline-size;
 }
 
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-card-wrap {
+  position: relative;
   min-width: 0;
   max-width: 100%;
-  min-height: 0;
   width: 100%;
-  height: 100%;
+  aspect-ratio: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .my-sarah-view.is-active[data-view='home'][data-ms-panel='home'] .ms-quick-card {
@@ -5659,18 +5671,22 @@ body.is-feed-comment-open {
 
 .ms-quick-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 16px;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .ms-quick-card-wrap {
   position: relative;
   min-width: 0;
   max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .ms-quick-card {
@@ -5687,6 +5703,7 @@ body.is-feed-comment-open {
   min-height: 108px;
   min-width: 0;
   max-width: 100%;
+  width: 100%;
   box-sizing: border-box;
   overflow: hidden;
 }
