@@ -420,6 +420,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
+  height: 100%;
   padding: 16px;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
@@ -429,8 +430,11 @@
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
+.st-cat-card .st-cat-select {
+  margin-top: auto;
+}
+
 .st-cat-select {
-  margin-top: 8px;
   align-self: stretch;
   border: 0;
   border-radius: 10px;
@@ -459,6 +463,8 @@
 }
 
 .st-cat-desc {
+  flex: 1 1 auto;
+  width: 100%;
   font-size: 12px;
   color: #64748b;
   line-height: 1.4;
@@ -573,6 +579,45 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.st-dep-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 14px;
+}
+
+.st-dep-remove {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.st-dep-remove:hover {
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
+.st-task-card-status--waiting {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.st-task-card-status--cancelled {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .st-templates {

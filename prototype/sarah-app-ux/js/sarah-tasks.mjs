@@ -11,6 +11,7 @@ import {
   loadDepartureProfiles,
   saveDepartureProfiles,
   isExecutionTaskType,
+  schemaKeyFor,
 } from './sarah-tasks-catalog.mjs';
 
 const STORAGE_KEY = 'sarah.st.tasks.proto.v1';
@@ -111,11 +112,18 @@ function iconSvg(name) {
   return `<svg class="icon-svg icon-svg--md st-cat-icon" viewBox="0 0 24 24" aria-hidden="true">${map[name] || map.spark}</svg>`;
 }
 
+function taskStatusLabel(status) {
+  if (status === 'completed') return 'Done';
+  if (status === 'waiting') return 'Waiting';
+  if (status === 'cancelled') return 'Cancelled';
+  return 'Open';
+}
+
 function mapServerTask(t) {
   const raw = String(t?.status || '').toLowerCase();
   let status = 'open';
   if (raw === 'fired' || raw === 'completed') status = 'completed';
-  else if (raw === 'cancelled' || raw === 'dismissed') status = 'completed';
+  else if (raw === 'cancelled' || raw === 'dismissed') status = 'cancelled';
   else if (raw === 'waiting') status = 'waiting';
   else if (raw === 'scheduled') status = 'open';
   else if (raw) status = raw;
@@ -170,13 +178,14 @@ async function ensureReminders({ force = false } = {}) {
 
 function allTasks(reminders) {
   const proto = loadProtoTasks().filter((t) => !t.hiddenInList);
+  const visible = (list) => list.filter((t) => t.status !== 'cancelled');
   if (hooks.fetchTasks && reminders.length) {
     const serverIds = new Set(reminders.map((t) => t.id));
     const shadowOnly = proto.filter((t) => t.meta?.reminderId && serverIds.has(t.meta.reminderId));
     const localOnly = proto.filter((t) => !serverIds.has(t.id) && !t.meta?.reminderId);
-    return [...reminders, ...shadowOnly, ...localOnly];
+    return visible([...reminders, ...shadowOnly, ...localOnly]);
   }
-  return [...proto, ...reminders];
+  return visible([...proto, ...reminders]);
 }
 
 function filterTab(tasks, which) {
@@ -185,24 +194,27 @@ function filterTab(tasks, which) {
   startToday.setHours(0, 0, 0, 0);
   const endToday = new Date(startToday);
   endToday.setDate(endToday.getDate() + 1);
+  const isActive = (t) => t.status !== 'cancelled' && t.status !== 'completed';
   if (which === 'today') {
     return tasks.filter((t) => {
       const ms = Date.parse(t.dueAt);
-      return t.status === 'open' && Number.isFinite(ms) && ms >= startToday.getTime() && ms < endToday.getTime();
+      return isActive(t) && (t.status === 'open' || t.status === 'waiting') && Number.isFinite(ms) && ms >= startToday.getTime() && ms < endToday.getTime();
     });
   }
   if (which === 'upcoming') {
     return tasks.filter((t) => {
       const ms = Date.parse(t.dueAt);
-      return t.status === 'open' && Number.isFinite(ms) && ms >= endToday.getTime();
+      return isActive(t) && (t.status === 'open' || t.status === 'waiting') && Number.isFinite(ms) && ms >= endToday.getTime();
     });
   }
   if (which === 'preparation') {
     return tasks.filter(
-      (t) => (t.categoryId === 'preparation' || t.taskKind === 'preparation') && t.status !== 'completed'
+      (t) => isActive(t) && (t.categoryId === 'preparation' || t.taskKind === 'preparation')
     );
   }
-  if (which === 'open') return tasks.filter((t) => t.status === 'open' || t.status === 'active');
+  if (which === 'open') {
+    return tasks.filter((t) => isActive(t) && (t.status === 'open' || t.status === 'active' || t.status === 'waiting'));
+  }
   if (which === 'waiting') return tasks.filter((t) => t.status === 'waiting');
   if (which === 'completed') return tasks.filter((t) => t.status === 'completed');
   if (which === 'templates') return [];
@@ -227,7 +239,9 @@ function relTime(ms) {
 }
 
 function buildNextActions(tasks) {
-  const open = tasks.filter((t) => t.status === 'open' || t.status === 'active');
+  const open = tasks.filter(
+    (t) => t.status !== 'cancelled' && (t.status === 'open' || t.status === 'active' || t.status === 'waiting')
+  );
   const actions = [];
   for (const t of open) {
     const due = Date.parse(t.dueAt);
@@ -299,7 +313,7 @@ function renderTaskCards(tasks) {
       (t) => `<li class="st-task-card"><button type="button" class="st-task-card-btn" data-st-task="${esc(t.id)}">
         <div class="st-task-card-top">
           <span class="st-task-card-title">${esc(t.title)}</span>
-          <span class="st-task-card-status st-task-card-status--${esc(t.status)}">${esc(t.status === 'completed' ? 'Done' : 'Open')}</span>
+          <span class="st-task-card-status st-task-card-status--${esc(t.status)}">${esc(taskStatusLabel(t.status))}</span>
         </div>
         <p class="st-task-card-when">${t.dueAt ? esc(formatWhen(t.dueAt)) : 'No due date'}</p>
         <div class="st-task-card-bar"><span style="width:${taskProgress(t)}%"></span></div>
@@ -433,7 +447,7 @@ function renderMeetingForm() {
       </fieldset>
       <label class="st-field"><span>Notes</span><textarea name="notes" rows="3" placeholder="Agenda, parking, dial-in…"></textarea></label>
       <aside class="st-preview" id="stFormPreview" aria-live="polite"></aside>
-      <p class="st-proto-note">Earliest selected reminder is sent via Sarah now; other times activate with ST-03 scheduling.</p>
+      <p class="st-proto-note">Sarah saves one meeting task and schedules each reminder time on your account.</p>
       <button type="submit" class="st-submit-btn">Create task</button>
     </form>`;
 }
@@ -533,7 +547,7 @@ function renderSchemaForm(schema) {
     </header>
     <form class="st-form" id="stSchemaForm" data-schema-key="${esc(schema.taskType)}">
       ${fields}
-      <p class="st-proto-note">${esc(schema.footnote || 'Saved on this device until ST-02 syncs to your Sarah Task Engine.')}</p>
+      <p class="st-proto-note">${esc(schema.footnote || 'Saved to your Sarah account when signed in on a paid plan.')}</p>
       <button type="submit" class="st-submit-btn">Save task</button>
     </form>`;
 }
@@ -577,7 +591,7 @@ function renderDetail(reminders) {
   const scheduleHtml = schedule.length
     ? `<h3 class="st-detail-h">Reminder schedule</h3><ul class="st-detail-schedule">${schedule
         .map((r) => `<li>${esc(r.label || 'Reminder')} · ${esc(formatWhen(r.at))}</li>`)
-        .join('')}</ul><p class="st-proto-note">Additional fires sync on device now; full multi-push in ST-03.</p>`
+        .join('')}</ul><p class="st-proto-note">Sarah schedules each time on your account. In-app chimes still run while Sarah is open.</p>`
   : '';
   const checklist =
     Array.isArray(task.checklist) && task.checklist.length
@@ -591,7 +605,7 @@ function renderDetail(reminders) {
     <header class="st-subhead">
       <button type="button" class="st-back" data-st-back>← Back</button>
       <h2>${esc(task.title)}</h2>
-      <p class="st-detail-meta"><span class="st-task-card-status st-task-card-status--${esc(task.status)}">${esc(task.status === 'completed' ? 'Done' : 'Open')}</span>
+      <p class="st-detail-meta"><span class="st-task-card-status st-task-card-status--${esc(task.status)}">${esc(taskStatusLabel(task.status))}</span>
       ${task.dueAt ? ` · ${esc(formatWhen(task.dueAt))}` : ''}</p>
     </header>
     <section class="st-detail">
@@ -635,7 +649,8 @@ function pickForm() {
   if (kind === 'interview') return renderInterviewForm();
   if (kind === 'departure') return renderDepartureForm();
   if (kind === 'trip') return renderTripForm();
-  const schema = SCHEMA_FORMS[kind];
+  const schemaKey = schemaKeyFor(categoryId, kind) || kind;
+  const schema = SCHEMA_FORMS[schemaKey] || SCHEMA_FORMS[kind];
   if (schema) return renderSchemaForm(schema);
   const types = CATEGORY_TYPES[categoryId] || [];
   const t = types.find((x) => x.id === kind);
@@ -817,11 +832,18 @@ function bind(root, reminders) {
       })();
     });
     root.querySelector('[data-st-cancel-task]')?.addEventListener('click', () => {
-      deleteProtoTask(detailTaskId);
-      hooks.toast?.('Task removed.');
-      view = 'hub';
-      detailTaskId = null;
-      paint();
+      void (async () => {
+        if (String(detailTaskId).startsWith('task-')) {
+          await persistTaskUpdate(detailTaskId, { status: 'cancelled' });
+        } else {
+          deleteProtoTask(detailTaskId);
+        }
+        hooks.toast?.('Task cancelled.');
+        invalidateReminderCache();
+        view = 'hub';
+        detailTaskId = null;
+        paint();
+      })();
     });
     root.querySelector('[data-st-ask-sarah]')?.addEventListener('click', () => {
       const task = findTaskById(detailTaskId, reminders);
@@ -941,7 +963,20 @@ function bind(root, reminders) {
     const paintDepList = () => {
       const list = root.querySelector('#stDepList');
       if (!list) return;
-      list.innerHTML = depItems.map((i) => `<li><label class="st-check"><span>${esc(i)}</span></label></li>`).join('');
+      list.innerHTML = depItems
+        .map(
+          (i, idx) =>
+            `<li class="st-dep-row"><span>${esc(i)}</span><button type="button" class="st-dep-remove" data-st-dep-rm="${idx}" aria-label="Remove item">×</button></li>`
+        )
+        .join('');
+      list.querySelectorAll('[data-st-dep-rm]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.getAttribute('data-st-dep-rm'));
+          if (!Number.isFinite(idx)) return;
+          depItems.splice(idx, 1);
+          paintDepList();
+        });
+      });
     };
     const loadProfile = () => {
       const key = sel?.value || 'leaving_home';
@@ -1173,50 +1208,22 @@ async function submitMeeting(form) {
   const schedule = buildMeetingSchedule(fd, meetingMs);
   const primaryNote = notes || title;
 
-  if (hooks.createReminder) {
-    const res = await hooks.createReminder({
-      title,
-      dueAt: reminderAt,
-      notes: primaryNote,
-    });
-    if (res?.error) {
-      hooks.toast?.(res.error);
-      return;
-    }
-    hooks.onReminderCreated?.(res.reminder);
-    invalidateReminderCache();
-    if (res.reminder?.id) {
-      await persistTaskCreate({
-        id: `st-shadow-${res.reminder.id}`,
-        hiddenInList: true,
-        title,
-        dueAt: reminderAt,
-        status: 'open',
-        categoryId: 'reminders',
-        taskType: 'meeting',
-        taskKind: 'reminder',
-        progress: 0,
-        notes: primaryNote,
-        reminderSchedule: schedule,
-        meta: { reminderId: res.reminder.id, with: withWho, travel, ...Object.fromEntries(fd) },
-      });
-    }
-    void scheduleClientReminders(schedule.slice(1), title, primaryNote);
-  } else {
-    await persistTaskCreate({
-      title,
-      dueAt: reminderAt,
-      status: 'scheduled',
-      categoryId: 'reminders',
-      taskType: 'meeting',
-      taskKind: 'reminder',
-      progress: 0,
-      notes: primaryNote,
-      reminderSchedule: schedule,
-      meta: { with: withWho, travel, ...Object.fromEntries(fd) },
-    });
-    void scheduleClientReminders(schedule, title, primaryNote);
-  }
+  const saved = await persistTaskCreate({
+    title,
+    dueAt: dueIso,
+    status: 'scheduled',
+    categoryId: 'reminders',
+    taskType: 'meeting',
+    taskKind: 'reminder',
+    progress: 0,
+    notes: primaryNote,
+    reminderSchedule: schedule.length ? schedule : [{ label: `${leadMin} min before`, at: reminderAt }],
+    meta: { with: withWho, travel, ...Object.fromEntries(fd) },
+  });
+  if (!saved) return;
+  invalidateReminderCache();
+  hooks.onReminderCreated?.(saved);
+  void scheduleClientReminders(schedule, title, primaryNote);
   hooks.toast?.('Meeting reminder created.');
   view = 'hub';
   tab = 'today';

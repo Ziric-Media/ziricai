@@ -13,6 +13,7 @@ import {
     updatePersonalSarahTask,
     listPersonalSarahTasks,
 } from "../services/sarah/personal/personalSarahTaskStore.js";
+import { schedulePersonalTaskReminderNotifications } from "../services/sarah/personal/personalSarahTaskReminders.js";
 
 await bootstrapConsumerProfile("u-ps-1", {
     email: "spencer@test.com",
@@ -49,6 +50,20 @@ const patched = await updatePersonalSarahTask("u-ps-1", prep.id, {
 assert.equal(patched.progress, 100);
 const listed = await listPersonalSarahTasks("u-ps-1", { limit: 10 });
 assert.ok(listed.length >= 2);
+
+const cancelled = await updatePersonalSarahTask("u-ps-1", prep.id, { status: "cancelled" });
+assert.equal(cancelled.status, "cancelled");
+
+const meet = await createPersonalSarahTask("u-ps-1", {
+    title: "Board meeting",
+    taskKind: "reminder",
+    dueAt: new Date(Date.now() + 86400000).toISOString(),
+    reminderSchedule: [
+        { label: "30 min before", at: new Date(Date.now() + 86400000 - 30 * 60000).toISOString() },
+    ],
+});
+const sched = await schedulePersonalTaskReminderNotifications("u-ps-1", meet);
+assert.ok(sched.scheduled >= 1);
 
 const r2 = await handlePersonalSarahChat(
     {

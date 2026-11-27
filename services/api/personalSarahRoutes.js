@@ -637,13 +637,10 @@ export async function handleCreatePersonalSarahReminder(req, res) {
         const timeZone = profile.timeZone || profile.timezone || "Africa/Johannesburg";
         const task = await createPersonalReminderFromApi(uid, { ...(req.body || {}), timeZone });
         try {
-            const { createSarahReminderScheduledNotification } = await import("../network/notificationService.js");
-            await createSarahReminderScheduledNotification(uid, {
-                reminderId: task.id,
-                title: task.title,
-                body: task.notes || task.title,
-                dueAt: task.dueAt,
-            });
+            const { schedulePersonalTaskReminderNotifications } = await import(
+                "../sarah/personal/personalSarahTaskReminders.js"
+            );
+            await schedulePersonalTaskReminderNotifications(uid, task);
         } catch (err) {
             console.warn("[api/personal-sarah/reminders]", err?.message || err);
         }
@@ -685,15 +682,12 @@ export async function handleCreatePersonalSarahTask(req, res) {
             body.status = body.status || "scheduled";
         }
         const task = await createPersonalSarahTask(uid, body);
-        if (task.taskKind === "reminder" && task.dueAt) {
+        if (task.taskKind === "reminder" || task.type === "reminder" || (task.reminderSchedule || []).length) {
             try {
-                const { createSarahReminderScheduledNotification } = await import("../network/notificationService.js");
-                await createSarahReminderScheduledNotification(uid, {
-                    reminderId: task.id,
-                    title: task.title,
-                    body: task.notes || task.title,
-                    dueAt: task.dueAt,
-                });
+                const { schedulePersonalTaskReminderNotifications } = await import(
+                    "../sarah/personal/personalSarahTaskReminders.js"
+                );
+                await schedulePersonalTaskReminderNotifications(uid, task);
             } catch (err) {
                 console.warn("[api/personal-sarah/tasks]", err?.message || err);
             }

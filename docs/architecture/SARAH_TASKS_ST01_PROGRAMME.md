@@ -1,6 +1,6 @@
 # Sarah Tasks — ST-01 programme (UX-first)
 
-**Status:** ST-01 in progress · **ST-02 blocked until ST-01E sign-off** (Spencer / Astra).
+**Status:** ST-01E engineering complete (pending Spencer item 6) · **ST-02 v1 live** · **ST-03 reminder series v1** (inbox slots per `reminderSchedule`).
 
 ## Product principles
 
@@ -19,8 +19,8 @@
 | ST-01C | Detail | Open task → detail, checklist, status actions |
 | ST-01D | Templates | Before You Leave profiles, trip/interview prep plans |
 | ST-01E | Gate | UX review + formal approval → unlock ST-02 |
-| ST-02 | Engine | **In progress** — Firestore tasks API, allowance, client sync (`/api/personal-sarah/tasks`) |
-| ST-03 | Reminders | Server scheduling, push, snooze, history |
+| ST-02 | Engine | **v1 shipped** — Firestore tasks API, allowance, client sync (`/api/personal-sarah/tasks`) |
+| ST-03 | Reminders | **v1 partial** — multi-slot inbox scheduling; full closed-app push/history ongoing |
 | ST-04 | Intelligence | Generated checklists, timelines, suggestions |
 | ST-05 | Execution | Research, drafts, bookings with approval |
 | ST-06 | Personalisation | Routines, templates, learning |
@@ -35,8 +35,9 @@
 
 ## Current prototype limits (honest UX copy)
 
-- Proto tasks: `localStorage` + meeting reminders via live API only.  
-- Multi-reminder, snooze on task detail, and closed-app delivery land in ST-02/ST-03.
+- Unsigned / free create: local fallback or allowance block.  
+- In-app chimes for extra meeting reminders while Sarah is open; server schedules inbox rows per slot.  
+- ST-03+ still owns push-when-closed hardening and delivery history.
 
 ## ST-01B2 (pre sign-off)
 
@@ -48,9 +49,9 @@
 
 ## Approval checklist (ST-01E)
 
-- [ ] Category → type → form flows for all six categories  
-- [ ] Task detail + checklist progress  
-- [ ] Before You Leave profiles editable  
-- [ ] Dashboard Next Actions + Preparation tab  
-- [ ] Visual identity unchanged (purple / white)  
-- [ ] Spencer go for ST-02 technical brief
+- [x] Category → type → form flows for all six categories (`SCHEMA_FORMS` + meeting/interview/trip/departure)  
+- [x] Task detail + checklist progress (server `task-*` PATCH, progress bar)  
+- [x] Before You Leave profiles editable (add/remove items, save profile)  
+- [x] Dashboard Next Actions + Preparation tab  
+- [x] Visual identity unchanged (purple / white)  
+- [ ] Spencer go for ST-02 technical brief (UAT pasteback)
