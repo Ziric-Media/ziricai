@@ -181,12 +181,16 @@ export const SCHEMA_FORMS = {
   recurring: {
     heading: 'Recurring reminder',
     taskType: 'recurring',
-    buildTitle: (fd) => fd.get('title') || 'Recurring reminder',
+    taskKind: 'reminder',
+    buildTitle: (fd) => `${fd.get('title') || 'Reminder'} (${fd.get('freq') || 'repeat'})`,
+    footnote: 'Sarah will repeat this on your schedule once ST-03 server recurrence is live.',
     fields: [
       { name: 'title', label: 'What to remember', type: 'text', required: true },
       { name: 'freq', label: 'How often', type: 'select', options: ['Daily', 'Weekly', 'Monthly'], required: true },
+      { name: 'weekdays', label: 'Weekdays (if weekly)', type: 'text', placeholder: 'e.g. Mon, Wed, Fri' },
       { name: 'time', label: 'Time', type: 'time', required: true },
       { name: 'start', label: 'Starts on', type: 'date', required: true },
+      { name: 'until', label: 'Until (optional)', type: 'date' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
   },
@@ -264,7 +268,337 @@ export const SCHEMA_FORMS = {
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
   },
+  bursary: {
+    heading: 'Bursary application',
+    taskType: 'bursary',
+    buildTitle: (fd) => `Bursary — ${fd.get('provider') || 'application'}`,
+    checklist: ['Check eligibility', 'Gather transcripts', 'Prepare motivation letter', 'Submit before deadline', 'Track outcome'],
+    fields: [
+      { name: 'provider', label: 'Bursary or fund name', type: 'text', required: true },
+      { name: 'deadline', label: 'Deadline', type: 'date', required: true },
+      { name: 'documents', label: 'Required documents', type: 'textarea' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  funding: {
+    heading: 'Funding application',
+    taskType: 'funding',
+    buildTitle: (fd) => `Funding — ${fd.get('programme') || 'grant'}`,
+    checklist: ['Read criteria', 'Budget breakdown', 'Supporting letters', 'Submit application'],
+    fields: [
+      { name: 'programme', label: 'Grant or programme', type: 'text', required: true },
+      { name: 'deadline', label: 'Deadline', type: 'date', required: true },
+      { name: 'amount', label: 'Amount requested', type: 'text' },
+      { name: 'documents', label: 'Required documents', type: 'textarea' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  loan: {
+    heading: 'Loan application',
+    taskType: 'loan',
+    buildTitle: (fd) => `Loan — ${fd.get('lender') || 'application'}`,
+    checklist: ['Proof of income', 'Bank statements', 'ID documents', 'Submit application'],
+    fields: [
+      { name: 'lender', label: 'Lender', type: 'text', required: true },
+      { name: 'amount', label: 'Loan amount', type: 'text' },
+      { name: 'deadline', label: 'Submit by', type: 'date' },
+      { name: 'documents', label: 'Required documents', type: 'textarea' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  accommodation: {
+    heading: 'Accommodation application',
+    taskType: 'accommodation',
+    buildTitle: (fd) => `Accommodation — ${fd.get('place') || 'application'}`,
+    fields: [
+      { name: 'place', label: 'Residence or rental', type: 'text', required: true },
+      { name: 'deadline', label: 'Apply by', type: 'date', required: true },
+      { name: 'deposit', label: 'Deposit / budget', type: 'text' },
+      { name: 'documents', label: 'Required documents', type: 'textarea' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  government: {
+    heading: 'Government service',
+    taskType: 'government',
+    buildTitle: (fd) => `${fd.get('service') || 'Government'} application`,
+    fields: [
+      { name: 'service', label: 'Service or department', type: 'text', required: true },
+      { name: 'reference', label: 'Reference number', type: 'text' },
+      { name: 'deadline', label: 'Appointment or due date', type: 'date' },
+      { name: 'documents', label: 'Bring / submit', type: 'textarea' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  collect: {
+    heading: 'Collect an order',
+    taskType: 'collect',
+    buildTitle: (fd) => `Collect — ${fd.get('store') || 'order'}`,
+    fields: [
+      { name: 'store', label: 'Collection point', type: 'text', required: true },
+      { name: 'reference', label: 'Order reference', type: 'text', required: true },
+      { name: 'date', label: 'Collect on', type: 'date', required: true },
+      { name: 'time', label: 'Time', type: 'time' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  payment: {
+    heading: 'Make a payment',
+    taskType: 'payment',
+    buildTitle: (fd) => `Pay — ${fd.get('payee') || 'recipient'}`,
+    fields: [
+      { name: 'payee', label: 'Pay to', type: 'text', required: true },
+      { name: 'amount', label: 'Amount', type: 'text', required: true },
+      { name: 'method', label: 'Payment method', type: 'text', placeholder: 'EFT, card, cash…' },
+      { name: 'date', label: 'Pay by', type: 'date', required: true },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  delivery: {
+    heading: 'Arrange delivery',
+    taskType: 'delivery',
+    buildTitle: (fd) => `Delivery — ${fd.get('item') || 'items'}`,
+    fields: [
+      { name: 'item', label: 'What is being delivered', type: 'text', required: true },
+      { name: 'address', label: 'Delivery address', type: 'text', required: true },
+      { name: 'date', label: 'Delivery date', type: 'date' },
+      { name: 'window', label: 'Time window', type: 'text' },
+      { name: 'notes', label: 'Instructions', type: 'textarea' },
+    ],
+  },
+  errands: {
+    heading: 'Run errands',
+    taskType: 'errands',
+    buildTitle: (fd) => `Errands — ${fd.get('area') || 'today'}`,
+    fields: [
+      { name: 'area', label: 'Area or route', type: 'text' },
+      { name: 'stops', label: 'Stops (one per line)', type: 'textarea', required: true },
+      { name: 'date', label: 'Date', type: 'date' },
+      { name: 'time', label: 'Start time', type: 'time' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  compare: {
+    heading: 'Compare products',
+    taskType: 'compare',
+    kind: 'execution',
+    buildTitle: (fd) => `Compare — ${(fd.get('item') || 'products').slice(0, 40)}`,
+    fields: [
+      { name: 'item', label: 'What to compare', type: 'text', required: true },
+      { name: 'budget', label: 'Budget', type: 'text' },
+      { name: 'criteria', label: 'Criteria', type: 'textarea', placeholder: 'Price, warranty, reviews…' },
+      { name: 'deadline', label: 'Decide by', type: 'date' },
+    ],
+  },
+  vehicle: {
+    heading: 'Vehicle servicing',
+    taskType: 'vehicle',
+    buildTitle: (fd) => `Service — ${fd.get('vehicle') || 'vehicle'}`,
+    fields: [
+      { name: 'vehicle', label: 'Vehicle', type: 'text', required: true },
+      { name: 'workshop', label: 'Workshop', type: 'text' },
+      { name: 'date', label: 'Service date', type: 'date', required: true },
+      { name: 'time', label: 'Drop-off time', type: 'time' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  renew: {
+    heading: 'Renew documents',
+    taskType: 'renew',
+    buildTitle: (fd) => `Renew — ${fd.get('document') || 'document'}`,
+    fields: [
+      { name: 'document', label: 'Document', type: 'text', required: true },
+      { name: 'expires', label: 'Expires on', type: 'date', required: true },
+      { name: 'location', label: 'Where to renew', type: 'text' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  followup: {
+    heading: 'Follow up with someone',
+    taskType: 'followup',
+    buildTitle: (fd) => `Follow up — ${fd.get('person') || 'contact'}`,
+    fields: [
+      { name: 'person', label: 'Who', type: 'text', required: true },
+      { name: 'topic', label: 'About', type: 'text', required: true },
+      { name: 'date', label: 'Follow up on', type: 'date', required: true },
+      { name: 'time', label: 'Time', type: 'time' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  goals: {
+    heading: 'Personal goal',
+    taskType: 'goals',
+    buildTitle: (fd) => fd.get('goal') || 'Personal goal',
+    fields: [
+      { name: 'goal', label: 'Goal', type: 'text', required: true },
+      { name: 'milestone', label: 'Next milestone', type: 'text' },
+      { name: 'date', label: 'Target date', type: 'date' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  wellness: {
+    heading: 'Health and wellness',
+    taskType: 'wellness',
+    buildTitle: (fd) => fd.get('routine') || 'Wellness routine',
+    fields: [
+      { name: 'routine', label: 'Routine or habit', type: 'text', required: true },
+      { name: 'freq', label: 'How often', type: 'select', options: ['Daily', 'Weekly', 'As needed'] },
+      { name: 'time', label: 'Time', type: 'time' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  routine: {
+    heading: 'Regular responsibility',
+    taskType: 'routine',
+    buildTitle: (fd) => fd.get('title') || 'Regular task',
+    fields: [
+      { name: 'title', label: 'Responsibility', type: 'text', required: true },
+      { name: 'freq', label: 'How often', type: 'select', options: ['Daily', 'Weekly', 'Monthly'] },
+      { name: 'date', label: 'Next due', type: 'date' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  business_meeting: {
+    heading: 'Prepare for business meeting',
+    taskType: 'business_meeting',
+    buildTitle: (fd) => `Meeting prep — ${fd.get('title') || 'meeting'}`,
+    checklist: ['Review agenda', 'Prepare slides or notes', 'Confirm attendees', 'Test AV or link', 'Print handouts'],
+    fields: [
+      { name: 'title', label: 'Meeting subject', type: 'text', required: true },
+      { name: 'date', label: 'Date', type: 'date', required: true },
+      { name: 'time', label: 'Time', type: 'time', required: true },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  business_trip: {
+    heading: 'Business trip',
+    taskType: 'business_trip',
+    buildTitle: (fd) => `Business trip — ${fd.get('destination') || ''}`,
+    checklist: ['Flights and transfers', 'Hotel', 'Client materials', 'Expense policy', 'Pack formal wear'],
+    fields: [
+      { name: 'destination', label: 'Destination', type: 'text', required: true },
+      { name: 'date', label: 'Depart', type: 'date', required: true },
+      { name: 'return', label: 'Return', type: 'date' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  exam: {
+    heading: 'School or examination',
+    taskType: 'exam',
+    buildTitle: (fd) => `Exam — ${fd.get('subject') || 'preparation'}`,
+    checklist: ['Study schedule', 'Past papers', 'Stationery ready', 'Confirm venue', 'Rest plan'],
+    fields: [
+      { name: 'subject', label: 'Subject or module', type: 'text', required: true },
+      { name: 'date', label: 'Exam date', type: 'date', required: true },
+      { name: 'time', label: 'Time', type: 'time' },
+      { name: 'venue', label: 'Venue', type: 'text' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  event: {
+    heading: 'Event or special occasion',
+    taskType: 'event',
+    buildTitle: (fd) => `Event — ${fd.get('name') || ''}`,
+    checklist: ['Outfit', 'Gift', 'RSVP', 'Transport', 'Confirm timing'],
+    fields: [
+      { name: 'name', label: 'Event name', type: 'text', required: true },
+      { name: 'date', label: 'Date', type: 'date', required: true },
+      { name: 'time', label: 'Time', type: 'time' },
+      { name: 'location', label: 'Location', type: 'text' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  new_job: {
+    heading: 'Starting a new job',
+    taskType: 'new_job',
+    buildTitle: (fd) => `New job — ${fd.get('employer') || 'Day 1'}`,
+    checklist: ['Bank details', 'Contract signed', 'First-day attire', 'Route and parking', 'IT access'],
+    fields: [
+      { name: 'employer', label: 'Employer', type: 'text', required: true },
+      { name: 'date', label: 'Start date', type: 'date', required: true },
+      { name: 'time', label: 'Arrive at', type: 'time' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  find_provider: {
+    heading: 'Find a service provider',
+    taskType: 'find_provider',
+    kind: 'execution',
+    buildTitle: (fd) => `Find — ${(fd.get('need') || 'provider').slice(0, 40)}`,
+    fields: [
+      { name: 'need', label: 'What service do you need?', type: 'textarea', required: true },
+      { name: 'area', label: 'Area', type: 'text' },
+      { name: 'budget', label: 'Budget', type: 'text' },
+      { name: 'deadline', label: 'Need by', type: 'date' },
+    ],
+  },
+  prepare_doc: {
+    heading: 'Prepare a document',
+    taskType: 'prepare_doc',
+    kind: 'execution',
+    buildTitle: (fd) => `Document — ${(fd.get('doc') || 'draft').slice(0, 40)}`,
+    fields: [
+      { name: 'doc', label: 'Document type', type: 'text', required: true },
+      { name: 'purpose', label: 'Purpose', type: 'textarea', required: true },
+      { name: 'deadline', label: 'Due by', type: 'date' },
+    ],
+  },
+  compare_products: {
+    heading: 'Compare products',
+    taskType: 'compare_products',
+    kind: 'execution',
+    buildTitle: (fd) => `Compare — ${(fd.get('item') || '').slice(0, 35)}`,
+    fields: [
+      { name: 'item', label: 'Products to compare', type: 'text', required: true },
+      { name: 'budget', label: 'Budget', type: 'text' },
+      { name: 'notes', label: 'Must-haves', type: 'textarea' },
+    ],
+  },
+  draft_application: {
+    heading: 'Draft an application',
+    taskType: 'draft_application',
+    kind: 'execution',
+    buildTitle: (fd) => `Draft application — ${(fd.get('for') || '').slice(0, 35)}`,
+    fields: [
+      { name: 'for', label: 'Application for', type: 'text', required: true },
+      { name: 'instructions', label: 'Instructions', type: 'textarea' },
+      { name: 'deadline', label: 'Submit by', type: 'date' },
+    ],
+  },
+  find_booking: {
+    heading: 'Find a booking',
+    taskType: 'find_booking',
+    kind: 'execution',
+    buildTitle: (fd) => `Booking — ${(fd.get('type') || '').slice(0, 35)}`,
+    fields: [
+      { name: 'type', label: 'What to book', type: 'text', required: true },
+      { name: 'when', label: 'Preferred date or time', type: 'text' },
+      { name: 'location', label: 'Location', type: 'text' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
+  online_process: {
+    heading: 'Assist with online process',
+    taskType: 'online_process',
+    kind: 'execution',
+    buildTitle: (fd) => `Online assist — ${(fd.get('process') || '').slice(0, 35)}`,
+    fields: [
+      { name: 'process', label: 'Website or process', type: 'text', required: true },
+      { name: 'goal', label: 'What to complete', type: 'textarea', required: true },
+      { name: 'notes', label: 'Login or permissions', type: 'textarea' },
+    ],
+  },
 };
+
+const EXECUTION_TYPES = new Set(
+  Object.entries(SCHEMA_FORMS)
+    .filter(([, v]) => v.kind === 'execution')
+    .map(([k]) => k)
+);
+
+export function isExecutionTaskType(typeId) {
+  return EXECUTION_TYPES.has(typeId);
+}
 
 export function schemaKeyFor(categoryId, typeId) {
   if (SCHEMA_FORMS[typeId]) return typeId;

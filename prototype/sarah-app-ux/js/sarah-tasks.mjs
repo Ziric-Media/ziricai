@@ -10,6 +10,7 @@ import {
   TRIP_CHECKLIST,
   loadDepartureProfiles,
   saveDepartureProfiles,
+  isExecutionTaskType,
 } from './sarah-tasks-catalog.mjs';
 
 const STORAGE_KEY = 'sarah.st.tasks.proto.v1';
@@ -146,7 +147,8 @@ async function ensureReminders({ force = false } = {}) {
 }
 
 function allTasks(reminders) {
-  return [...loadProtoTasks(), ...reminders];
+  const proto = loadProtoTasks().filter((t) => !t.hiddenInList);
+  return [...proto, ...reminders];
 }
 
 function filterTab(tasks, which) {
@@ -503,7 +505,7 @@ function renderSchemaForm(schema) {
     </header>
     <form class="st-form" id="stSchemaForm" data-schema-key="${esc(schema.taskType)}">
       ${fields}
-      <p class="st-proto-note">Saved on this device until ST-02 syncs to your Sarah Task Engine.</p>
+      <p class="st-proto-note">${esc(schema.footnote || 'Saved on this device until ST-02 syncs to your Sarah Task Engine.')}</p>
       <button type="submit" class="st-submit-btn">Save task</button>
     </form>`;
 }
@@ -511,7 +513,14 @@ function renderSchemaForm(schema) {
 function findTaskById(id, reminders = cachedReminders) {
   const local = loadProtoTasks().find((t) => t.id === id);
   if (local) return local;
-  return allTasks(reminders).find((t) => t.id === id) || null;
+  const shadow = loadProtoTasks().find((t) => t.meta?.reminderId === id);
+  const live = allTasks(reminders).find((t) => t.id === id);
+  if (shadow && live) return { ...live, ...shadow, id, notes: shadow.notes || live.notes };
+  return live || null;
+}
+
+function isProtoTaskId(id) {
+  return loadProtoTasks().some((t) => t.id === id && !t.meta?.reminderId);
 }
 
 function updateProtoTask(id, patch) {
@@ -535,6 +544,13 @@ function renderDetail(reminders) {
     return `<header class="st-subhead"><button type="button" class="st-back" data-st-back>← Back</button><p>Task not found.</p></header>`;
   }
   const pct = taskProgress(task);
+  const proto = isProtoTaskId(detailTaskId) || loadProtoTasks().some((t) => t.id === detailTaskId && !t.hiddenInList);
+  const schedule = Array.isArray(task.reminderSchedule) ? task.reminderSchedule : [];
+  const scheduleHtml = schedule.length
+    ? `<h3 class="st-detail-h">Reminder schedule</h3><ul class="st-detail-schedule">${schedule
+        .map((r) => `<li>${esc(r.label || 'Reminder')} · ${esc(formatWhen(r.at))}</li>`)
+        .join('')}</ul><p class="st-proto-note">Additional fires sync on device now; full multi-push in ST-03.</p>`
+  : '';
   const checklist =
     Array.isArray(task.checklist) && task.checklist.length
       ? `<ul class="st-detail-checklist">${task.checklist
@@ -554,12 +570,33 @@ function renderDetail(reminders) {
       ${task.notes ? `<p class="st-detail-notes">${esc(String(task.notes))}</p>` : ''}
       <h3 class="st-detail-h">Checklist ${pct ? `(${pct}%)` : ''}</h3>
       ${checklist}
+      ${scheduleHtml}
       <h3 class="st-detail-h">Sarah’s next action</h3>
       <p class="st-detail-next">${pct >= 100 ? 'Confirm task complete when you are finished.' : 'Work through your checklist — Sarah will nudge you at reminder times.'}</p>
+      ${
+        proto
+          ? `<div class="st-detail-snooze">
+        <h3 class="st-detail-h">Snooze</h3>
+        <div class="st-snooze-row">
+          <button type="button" class="st-tab" data-st-snooze="15">15 min</button>
+          <button type="button" class="st-tab" data-st-snooze="60">1 hour</button>
+          <button type="button" class="st-tab" data-st-snooze="1440">Tomorrow</button>
+        </div>
+        <form class="st-form st-reschedule" id="stRescheduleForm">
+          <div class="st-field-row">
+            <label class="st-field"><span>Reschedule date</span><input name="date" type="date" required /></label>
+            <label class="st-field"><span>Time</span><input name="time" type="time" required /></label>
+          </div>
+          <button type="submit" class="ms-link-btn">Reschedule</button>
+        </form>
+      </div>`
+          : ''
+      }
       <div class="st-detail-actions">
+        ${task.taskType === 'interview' ? '<button type="button" class="st-cat-select" data-st-mock-interview>Practise mock interview with Sarah</button>' : ''}
         <button type="button" class="st-cat-select" data-st-complete-task>Mark complete</button>
         <button type="button" class="ms-link-btn" data-st-ask-sarah>Ask Sarah for help</button>
-        <button type="button" class="ms-link-btn st-detail-cancel" data-st-cancel-task>Cancel task</button>
+        ${proto ? '<button type="button" class="ms-link-btn st-detail-cancel" data-st-cancel-task>Cancel task</button>' : ''}
       </div>
     </section>`;
 }
@@ -731,7 +768,7 @@ function bind(root, reminders) {
   if (view === 'detail' && detailTaskId) {
     root.querySelectorAll('[data-st-check]').forEach((box) => {
       box.addEventListener('change', () => {
-        if (!loadProtoTasks().some((t) => t.id === detailTaskId)) return;
+        if (!loadProtoTasks().some((t) => t.id === detailTaskId && !t.hiddenInList)) return;
         const task = findTaskById(detailTaskId, reminders);
         if (!task || !Array.isArray(task.checklist)) return;
         const idx = Number(box.getAttribute('data-st-check'));
@@ -760,7 +797,50 @@ function bind(root, reminders) {
       paint();
     });
     root.querySelector('[data-st-ask-sarah]')?.addEventListener('click', () => {
-      hooks.onDelegate?.();
+      const task = findTaskById(detailTaskId, reminders);
+      const hint = task?.title ? `Help me with this Sarah Task: ${task.title}.` : '';
+      hooks.onDelegate?.({ prompt: hint });
+    });
+    root.querySelector('[data-st-mock-interview]')?.addEventListener('click', () => {
+      const task = findTaskById(detailTaskId, reminders);
+      const company = task?.meta?.company || task?.title || 'the company';
+      const role = task?.meta?.position || 'the role';
+      hooks.onDelegate?.({
+        prompt: `Run a short mock job interview with me for the role "${role}" at "${company}". Ask one question at a time, then brief feedback.`,
+      });
+    });
+    root.querySelectorAll('[data-st-snooze]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mins = Number(btn.getAttribute('data-st-snooze')) || 15;
+        const task = loadProtoTasks().find((t) => t.id === detailTaskId);
+        if (!task?.dueAt) {
+          hooks.toast?.('No due time to snooze.');
+          return;
+        }
+        let add = mins * 60_000;
+        if (mins === 1440) {
+          const d = new Date();
+          d.setDate(d.getDate() + 1);
+          d.setHours(9, 0, 0, 0);
+          add = d.getTime() - Date.parse(task.dueAt);
+        }
+        const dueAt = new Date(Date.parse(task.dueAt) + add).toISOString();
+        updateProtoTask(detailTaskId, { dueAt, status: 'open' });
+        hooks.toast?.('Snoozed.');
+        paint();
+      });
+    });
+    root.querySelector('#stRescheduleForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const dueAt = combineDateTime(form.querySelector('[name=date]')?.value, form.querySelector('[name=time]')?.value);
+      if (!dueAt) {
+        hooks.toast?.('Pick date and time.');
+        return;
+      }
+      updateProtoTask(detailTaskId, { dueAt });
+      hooks.toast?.('Rescheduled.');
+      paint();
     });
   }
 
@@ -876,7 +956,7 @@ function bind(root, reminders) {
     const key = schemaForm.getAttribute('data-schema-key') || taskTypeId;
     const schema = SCHEMA_FORMS[key];
     const title = schema?.buildTitle ? schema.buildTitle(fd) : String(fd.get('title') || key);
-    const isExecution = schema?.kind === 'execution' || categoryId === 'delegate';
+    const isExecution = schema?.kind === 'execution' || isExecutionTaskType(key) || categoryId === 'delegate';
     const date = fd.get('date') || fd.get('deadline') || fd.get('start');
     const time = fd.get('time');
     saveProto({
@@ -907,11 +987,11 @@ function combineDateTime(date, time) {
 
 function saveProto(task) {
   const list = loadProtoTasks();
-  list.unshift({
-    ...task,
-    id: `st-${Date.now()}`,
-    createdAt: new Date().toISOString(),
-  });
+  const id = task.id || `st-${Date.now()}`;
+  const idx = list.findIndex((t) => t.id === id);
+  const row = { ...task, id, createdAt: task.createdAt || new Date().toISOString() };
+  if (idx >= 0) list[idx] = row;
+  else list.unshift(row);
   saveProtoTasks(list);
 }
 
@@ -942,6 +1022,44 @@ function updateMeetingPreview(form) {
     ${prep ? `<p>Prepare: ${esc(prep)}</p>` : ''}
     ${take.length ? `<p>Bring: ${take.map((t) => esc(t)).join(', ')}</p>` : ''}
     ${userNotes ? `<p>${esc(userNotes)}</p>` : ''}`;
+}
+
+function buildMeetingSchedule(fd, meetingMs) {
+  const travel = Math.max(0, Number(fd.get('travel')) || 0);
+  const rows = [];
+  for (const r of fd.getAll('remind')) {
+    if (r === 'travel' && travel > 0) {
+      rows.push({
+        label: `Leave (${travel} min travel)`,
+        at: new Date(meetingMs - (travel + 5) * 60_000).toISOString(),
+      });
+    } else {
+      const off = Number(r);
+      if (Number.isFinite(off)) {
+        rows.push({ label: `${off} min before`, at: new Date(meetingMs - off * 60_000).toISOString() });
+      }
+    }
+  }
+  return rows
+    .filter((row) => Date.parse(row.at) > Date.now() + 5000)
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+}
+
+async function scheduleClientReminders(rows, title, body) {
+  if (!rows?.length) return;
+  try {
+    const alarm = await import('./sna-reminders.mjs');
+    rows.forEach((row, i) => {
+      alarm.syncServerReminderSchedule({
+        id: `st-mtg-${Date.now()}-${i}`,
+        title,
+        body: body || title,
+        dueAt: row.at,
+      });
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 async function submitMeeting(form) {
@@ -976,11 +1094,14 @@ async function submitMeeting(form) {
     .filter(Boolean)
     .join('. ');
 
+  const schedule = buildMeetingSchedule(fd, meetingMs);
+  const primaryNote = notes || title;
+
   if (hooks.createReminder) {
     const res = await hooks.createReminder({
       title,
       dueAt: reminderAt,
-      notes: notes || title,
+      notes: primaryNote,
     });
     if (res?.error) {
       hooks.toast?.(res.error);
@@ -988,6 +1109,23 @@ async function submitMeeting(form) {
     }
     hooks.onReminderCreated?.(res.reminder);
     invalidateReminderCache();
+    if (res.reminder?.id) {
+      saveProto({
+        id: `st-shadow-${res.reminder.id}`,
+        hiddenInList: true,
+        title,
+        dueAt: reminderAt,
+        status: 'open',
+        categoryId: 'reminders',
+        taskType: 'meeting',
+        taskKind: 'reminder',
+        progress: 0,
+        notes: primaryNote,
+        reminderSchedule: schedule,
+        meta: { reminderId: res.reminder.id, with: withWho, travel, ...Object.fromEntries(fd) },
+      });
+    }
+    void scheduleClientReminders(schedule.slice(1), title, primaryNote);
   } else {
     saveProto({
       title,
@@ -997,8 +1135,11 @@ async function submitMeeting(form) {
       taskType: 'meeting',
       taskKind: 'reminder',
       progress: 0,
-      notes,
+      notes: primaryNote,
+      reminderSchedule: schedule,
+      meta: { with: withWho, travel },
     });
+    void scheduleClientReminders(schedule, title, primaryNote);
   }
   hooks.toast?.('Meeting reminder created.');
   view = 'hub';

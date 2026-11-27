@@ -5090,9 +5090,10 @@ function sarahTasksHubOptions() {
       void refreshLiveNotifications();
       syncNotificationBadge();
     },
-    onDelegate: () => {
-      showProtoToast('Opening Sarah Work chat for delegated tasks…');
-      startNewWorkThread();
+    onDelegate: (payload) => {
+      const prompt = typeof payload === 'string' ? payload : payload?.prompt || '';
+      showProtoToast(prompt ? 'Opening Sarah Work…' : 'Opening Sarah Work chat…');
+      void startNewWorkThread(prompt);
     },
   };
 }
@@ -6098,8 +6099,9 @@ async function cancelWorkTaskForThread(threadId) {
   return true;
 }
 
-async function startNewWorkThread() {
+async function startNewWorkThread(prompt = '') {
   goToMySarahWork('');
+  const text = String(prompt || '').trim();
   if (personalSarahLiveActive()) {
     const res = await window.SarahLive.createPersonalSession({ title: 'New work item', mode: 'work' });
     if (res.error) {
@@ -6108,10 +6110,12 @@ async function startNewWorkThread() {
     }
     const id = upsertPersonalThreadFromSession(res.session, { partial: false });
     await openPersonalSarahThread(id);
+    if (text) await deliverPersonalSarahMessage(text, { threadId: id, work: true });
     return;
   }
   const id = createPersonalThread('', { work: true });
-  openPersonalSarahThread(id);
+  await openPersonalSarahThread(id);
+  if (text) await deliverPersonalSarahMessage(text, { threadId: id, work: true });
 }
 
 function schedulePrototypeWorkCompletion(threadId) {

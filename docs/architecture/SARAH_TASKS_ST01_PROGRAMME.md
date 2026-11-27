@@ -38,6 +38,14 @@
 - Proto tasks: `localStorage` + meeting reminders via live API only.  
 - Multi-reminder, snooze on task detail, and closed-app delivery land in ST-02/ST-03.
 
+## ST-01B2 (pre sign-off)
+
+- [x] Dedicated schemas for applications, shopping, personal, delegate, preparation subtypes  
+- [x] Task detail: snooze, reschedule, reminder schedule display  
+- [x] Meeting multi-reminder (client schedule; server multi-fire ST-03)  
+- [x] Mock interview → Sarah Work chat with prompt  
+- [x] Recurring reminder form polish (weekdays, until date)
+
 ## Approval checklist (ST-01E)
 
 - [ ] Category → type → form flows for all six categories  
