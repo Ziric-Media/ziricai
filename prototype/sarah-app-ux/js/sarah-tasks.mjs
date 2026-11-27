@@ -77,6 +77,14 @@ let tab = 'today';
 let categoryId = null;
 let formKind = null;
 let hooks = {};
+let cachedReminders = [];
+let remindersFetchedAt = 0;
+let remindersInflight = null;
+const REMINDER_CACHE_MS = 60_000;
+
+function invalidateReminderCache() {
+  remindersFetchedAt = 0;
+}
 
 function loadProtoTasks() {
   try {
@@ -113,11 +121,8 @@ function iconSvg(name) {
   return `<svg class="icon-svg icon-svg--md st-cat-icon" viewBox="0 0 24 24" aria-hidden="true">${map[name] || map.spark}</svg>`;
 }
 
-async function liveReminders() {
-  if (!hooks.fetchReminders) return [];
-  const res = await hooks.fetchReminders({ limit: 40 });
-  if (res?.error) return [];
-  return (res.reminders || []).map((r) => ({
+function mapLiveReminders(rows) {
+  return (rows || []).map((r) => ({
     id: r.id,
     title: r.title,
     dueAt: r.dueAt,
@@ -126,6 +131,29 @@ async function liveReminders() {
     categoryId: 'reminders',
     progress: r.status === 'fired' ? 100 : 0,
   }));
+}
+
+async function pullLiveReminders() {
+  if (!hooks.fetchReminders) return [];
+  const res = await hooks.fetchReminders({ limit: 40 });
+  if (res?.error) return cachedReminders;
+  return mapLiveReminders(res.reminders);
+}
+
+async function ensureReminders({ force = false } = {}) {
+  const fresh = !force && Date.now() - remindersFetchedAt < REMINDER_CACHE_MS;
+  if (fresh) return cachedReminders;
+  if (remindersInflight) return remindersInflight;
+  remindersInflight = pullLiveReminders()
+    .then((list) => {
+      cachedReminders = list;
+      remindersFetchedAt = Date.now();
+      return list;
+    })
+    .finally(() => {
+      remindersInflight = null;
+    });
+  return remindersInflight;
 }
 
 function allTasks(reminders) {
@@ -342,6 +370,27 @@ function renderDepartureForm() {
     </form>`;
 }
 
+function renderPreparationPick() {
+  return `
+    <header class="st-subhead">
+      <button type="button" class="st-back" data-st-back>← Back</button>
+      <h2>Preparation</h2>
+      <p class="st-lead">What are you preparing for?</p>
+    </header>
+    <div class="st-prep-pick">
+      <button type="button" class="st-cat-card st-prep-opt" data-st-prep="interview">
+        ${iconSvg('checklist')}
+        <span class="st-cat-title">Job interview</span>
+        <span class="st-cat-desc">Checklist and prep plan</span>
+      </button>
+      <button type="button" class="st-cat-card st-prep-opt" data-st-prep="departure">
+        ${iconSvg('home')}
+        <span class="st-cat-title">Before you leave</span>
+        <span class="st-cat-desc">Don’t forget keys, wallet, documents</span>
+      </button>
+    </div>`;
+}
+
 function renderGenericForm(cat) {
   return `
     <header class="st-subhead">
@@ -359,6 +408,7 @@ function renderGenericForm(cat) {
 }
 
 function pickForm() {
+  if (formKind === 'prep_pick') return renderPreparationPick();
   if (formKind === 'meeting') return renderMeetingForm();
   if (formKind === 'interview') return renderInterviewForm();
   if (formKind === 'departure') return renderDepartureForm();
@@ -366,58 +416,120 @@ function pickForm() {
   return renderGenericForm(cat);
 }
 
-async function paint() {
+function paintSync() {
   const root = document.getElementById('stRoot');
-  if (!root) return;
-  const reminders = await liveReminders();
+  if (!root) return null;
+  const reminders = cachedReminders;
   if (view === 'categories') root.innerHTML = renderCategories();
   else if (view === 'form') root.innerHTML = pickForm();
   else root.innerHTML = renderHub(reminders);
   bind(root, reminders);
+  return root;
+}
+
+function syncHubTabUi(root) {
+  root.querySelectorAll('[data-st-tab]').forEach((btn) => {
+    const active = btn.getAttribute('data-st-tab') === tab;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+}
+
+function repaintHubBody(root, reminders = cachedReminders) {
+  const tasks = allTasks(reminders);
+  const wrap = root.querySelector('.st-list-wrap');
+  if (!wrap) return;
+  wrap.innerHTML =
+    tab === 'templates' ? renderTemplates() : `<ul class="st-task-list">${renderTaskCards(filterTab(tasks, tab))}</ul>`;
+  syncHubTabUi(root);
+  root.querySelectorAll('[data-st-template]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-st-template') || '';
+      if (id.startsWith('departure-')) {
+        categoryId = 'preparation';
+        formKind = 'departure';
+        view = 'form';
+      } else if (id === 'interview') {
+        categoryId = 'preparation';
+        formKind = 'interview';
+        view = 'form';
+      }
+      paint();
+    });
+  });
+}
+
+function applyHubReminders(root, reminders) {
+  cachedReminders = reminders;
+  if (view !== 'hub' || !root.isConnected) return;
+  root.innerHTML = renderHub(reminders);
+  bind(root, reminders);
+}
+
+function paint() {
+  const root = paintSync();
+  if (!root) return;
+  if (view !== 'hub') return;
+  void ensureReminders()
+    .then((reminders) => applyHubReminders(root, reminders))
+    .catch(() => {
+      /* keep local proto tasks visible */
+    });
 }
 
 function bind(root, reminders) {
   root.querySelector('#stCreateTaskBtn')?.addEventListener('click', () => {
     view = 'categories';
-    void paint();
+    paint();
   });
   root.querySelectorAll('[data-st-tab]').forEach((btn) => {
     btn.addEventListener('click', () => {
       tab = btn.getAttribute('data-st-tab') || 'today';
-      void paint();
+      if (view === 'hub') repaintHubBody(root);
+      else paint();
     });
   });
   root.querySelectorAll('[data-st-back]').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (view === 'form') {
-        view = 'categories';
-        formKind = null;
+        if (formKind === 'meeting' || formKind === 'interview' || formKind === 'departure' || formKind === 'generic') {
+          if (categoryId === 'preparation' && formKind !== 'prep_pick') {
+            formKind = 'prep_pick';
+          } else {
+            view = 'categories';
+            formKind = null;
+          }
+        } else if (formKind === 'prep_pick') {
+          view = 'categories';
+          formKind = null;
+        } else {
+          view = 'categories';
+          formKind = null;
+        }
       } else {
         view = 'hub';
         categoryId = null;
       }
-      void paint();
+      paint();
     });
   });
   root.querySelectorAll('[data-st-category]').forEach((btn) => {
     btn.addEventListener('click', () => {
       categoryId = btn.getAttribute('data-st-category');
       if (categoryId === 'reminders') formKind = 'meeting';
-      else if (categoryId === 'preparation') formKind = 'interview';
+      else if (categoryId === 'preparation') formKind = 'prep_pick';
       else if (categoryId === 'delegate') {
         hooks.onDelegate?.();
         return;
-      }
+      } else formKind = 'generic';
       view = 'form';
-      if (categoryId === 'preparation') {
-        const sub = window.confirm(
-          'Job interview preparation? Choose OK. Choose Cancel for Before you leave checklist.'
-        );
-        formKind = sub ? 'interview' : 'departure';
-      } else if (!formKind) {
-        formKind = 'generic';
-      }
-      void paint();
+      paint();
+    });
+  });
+  root.querySelectorAll('[data-st-prep]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      formKind = btn.getAttribute('data-st-prep') === 'departure' ? 'departure' : 'interview';
+      paint();
     });
   });
   root.querySelectorAll('[data-st-template]').forEach((btn) => {
@@ -432,7 +544,7 @@ function bind(root, reminders) {
         formKind = 'interview';
         view = 'form';
       }
-      void paint();
+      paint();
     });
   });
 
@@ -461,7 +573,7 @@ function bind(root, reminders) {
     hooks.toast?.('Preparation task saved — see Open tasks.');
     view = 'hub';
     tab = 'open';
-    void paint();
+    paint();
   });
 
   const departure = root.querySelector('#stDepartureForm');
@@ -489,7 +601,7 @@ function bind(root, reminders) {
       hooks.toast?.('Departure checklist ready.');
       view = 'hub';
       tab = 'today';
-      void paint();
+      paint();
     });
   }
 
@@ -508,7 +620,7 @@ function bind(root, reminders) {
     hooks.toast?.('Task saved on this device.');
     view = 'hub';
     tab = 'open';
-    void paint();
+    paint();
   });
 }
 
@@ -567,27 +679,41 @@ async function submitMeeting(form) {
       return;
     }
     hooks.onReminderCreated?.(res.reminder);
+    invalidateReminderCache();
   } else {
     saveProto({ title, dueAt: reminderAt, status: 'open', categoryId: 'reminders', progress: 0, notes });
   }
   hooks.toast?.('Meeting reminder created.');
   view = 'hub';
   tab = 'today';
-  void paint();
+  paint();
 }
 
-export function mountSarahTasksHub(options = {}) {
+function applyHooks(options = {}) {
   hooks = {
-    escapeHtml: options.escapeHtml,
-    toast: options.toast,
-    fetchReminders: options.fetchReminders,
-    createReminder: options.createReminder,
-    onReminderCreated: options.onReminderCreated,
-    onDelegate: options.onDelegate,
+    escapeHtml: options.escapeHtml ?? hooks.escapeHtml,
+    toast: options.toast ?? hooks.toast,
+    fetchReminders: options.fetchReminders ?? hooks.fetchReminders,
+    createReminder: options.createReminder ?? hooks.createReminder,
+    onReminderCreated: options.onReminderCreated ?? hooks.onReminderCreated,
+    onDelegate: options.onDelegate ?? hooks.onDelegate,
   };
-  view = 'hub';
-  tab = 'today';
-  void paint();
+}
+
+export function mountSarahTasksHub(options = {}, { preserveNavigation = false } = {}) {
+  applyHooks(options);
+  if (!preserveNavigation) {
+    view = 'hub';
+    tab = 'today';
+    categoryId = null;
+    formKind = null;
+  }
+  paint();
+}
+
+export function refreshSarahTasksHub({ forceReminders = false } = {}) {
+  if (forceReminders) invalidateReminderCache();
+  paint();
 }
 
 export function resetSarahTasksView() {

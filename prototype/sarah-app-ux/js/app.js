@@ -2753,6 +2753,7 @@ function goToMySarahHome(prompt) {
 const MS_LAST_PANEL_KEY = 'sarah.home.lastMsPanel';
 
 function showWorkTasksHub(prompt = '') {
+  void loadSarahTasksModule();
   try {
     sessionStorage.setItem(MS_LAST_PANEL_KEY, 'tasks');
   } catch {
@@ -5066,9 +5067,8 @@ function loadSarahTasksModule() {
   return sarahTasksModulePromise;
 }
 
-async function initSarahTasksPanel() {
-  const mod = await loadSarahTasksModule();
-  mod.mountSarahTasksHub({
+function sarahTasksHubOptions() {
+  return {
     escapeHtml,
     toast: showProtoToast,
     fetchReminders: (opts) => window.SarahLive?.fetchPersonalReminders?.(opts),
@@ -5094,12 +5094,28 @@ async function initSarahTasksPanel() {
       showProtoToast('Opening Sarah Work chat for delegated tasks…');
       startNewWorkThread();
     },
-  });
+  };
+}
+
+let sarahTasksHubReady = false;
+
+async function initSarahTasksPanel() {
+  const mod = await loadSarahTasksModule();
+  const opts = sarahTasksHubOptions();
+  if (sarahTasksHubReady) {
+    mod.mountSarahTasksHub(opts, { preserveNavigation: true });
+    mod.refreshSarahTasksHub({ forceReminders: true });
+    return;
+  }
+  mod.mountSarahTasksHub(opts);
+  sarahTasksHubReady = true;
 }
 
 async function refreshSarahTasksPanelIfOpen() {
   if (document.querySelector('.my-sarah-view')?.dataset.msPanel !== 'tasks') return;
-  await initSarahTasksPanel();
+  const mod = await loadSarahTasksModule();
+  mod.mountSarahTasksHub(sarahTasksHubOptions(), { preserveNavigation: true });
+  mod.refreshSarahTasksHub({ forceReminders: true });
 }
 
 async function applyPersonalReminderSideEffects(actions = [], userText = '') {

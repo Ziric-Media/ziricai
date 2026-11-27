@@ -276,10 +276,16 @@
   cursor: pointer;
 }
 
-.st-cat-grid {
+.st-cat-grid,
+.st-prep-pick {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
+}
+
+.st-prep-opt {
+  width: 100%;
+  cursor: pointer;
 }
 
 .st-cat-card {
