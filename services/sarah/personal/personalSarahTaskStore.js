@@ -90,18 +90,36 @@ export async function listPersonalReminders(uid, { limit: cap = 50 } = {}) {
     return snap.docs.map((d) => ({ id: d.id, userId: uid, ...d.data() }));
 }
 
+function isTimeDuePersonalReminder(task, nowMs = Date.now()) {
+    if (!task || task.status !== "scheduled" || !task.dueAt) return false;
+    const mode = task.triggerMode || "time";
+    if (mode === "geo") return false;
+    const at = Date.parse(task.dueAt);
+    return Number.isFinite(at) && at <= nowMs;
+}
+
 /**
  * @param {string} uid
  */
 export async function listDuePersonalReminders(uid) {
     if (!uid) return [];
     const now = Date.now();
+
+    if (getConfiguredStorageBackend() === "memory" || !useAdminBackend()) {
+        const due = [];
+        for (const [key, task] of memoryTasks.entries()) {
+            if (!key.startsWith(`${uid}:`)) continue;
+            if (isTimeDuePersonalReminder(task, now)) due.push(task);
+        }
+        return due;
+    }
+
+    const col = personalSarahCollectionRef(uid, PERSONAL_SARAH_COLLECTIONS.TASKS);
+    const snap = await getDocs(query(col, queryLimit(200)));
     const due = [];
-    for (const [key, task] of memoryTasks.entries()) {
-        if (!key.startsWith(`${uid}:`)) continue;
-        if (task.status !== "scheduled" || !task.dueAt) continue;
-        const at = Date.parse(task.dueAt);
-        if (Number.isFinite(at) && at <= now) due.push(task);
+    for (const d of snap.docs) {
+        const task = { id: d.id, userId: uid, ...d.data() };
+        if (isTimeDuePersonalReminder(task, now)) due.push(task);
     }
     return due;
 }
@@ -111,11 +129,23 @@ export async function listDuePersonalReminders(uid) {
  * @param {string} taskId
  */
 export async function markPersonalReminderFired(uid, taskId) {
-    const task = memoryTasks.get(taskKey(uid, taskId));
-    if (!task) return;
-    task.status = "fired";
-    task.firedAt = Date.now();
-    memoryTasks.set(taskKey(uid, taskId), task);
+    if (!uid || !taskId) return;
+
+    const key = taskKey(uid, taskId);
+    const memTask = memoryTasks.get(key);
+    if (memTask) {
+        memTask.status = "fired";
+        memTask.firedAt = Date.now();
+        memoryTasks.set(key, memTask);
+    }
+
+    if (getConfiguredStorageBackend() === "memory" || !useAdminBackend()) return;
+
+    await setDoc(
+        personalSarahDocRef(uid, PERSONAL_SARAH_COLLECTIONS.TASKS, taskId),
+        { status: "fired", firedAt: serverTimestamp() },
+        { merge: true }
+    );
 }
 
 /**
