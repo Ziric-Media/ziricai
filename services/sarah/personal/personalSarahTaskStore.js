@@ -153,9 +153,16 @@ export async function markPersonalReminderFired(uid, taskId) {
  * @param {object} body
  */
 export async function createPersonalReminderFromApi(uid, body = {}) {
+    let dueAt = body.dueAt;
+    try {
+        const { resolveReminderDueAt } = await import("./personalSarahTools.js");
+        dueAt = resolveReminderDueAt(body.dueAt, { userMessage: body.dueAt || body.notes, title: body.title });
+    } catch {
+        /* keep raw */
+    }
     return createPersonalReminder(uid, {
         title: body.title,
-        dueAt: body.dueAt,
+        dueAt,
         notes: body.notes,
         geoLat: body.geoLat ?? body.lat,
         geoLng: body.geoLng ?? body.lng,

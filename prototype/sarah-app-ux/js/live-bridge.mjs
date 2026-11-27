@@ -586,6 +586,15 @@ export async function pollDuePersonalReminders() {
   return { delivered: res.data?.delivered ?? 0, items: res.data?.items || [] };
 }
 
+export async function fetchPersonalReminders({ limit = 50 } = {}) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const cap = Math.min(Math.max(Number(limit) || 50, 1), 100);
+  const res = await apiRequest(`/api/personal-sarah/reminders?limit=${cap}`, { silent: true });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { reminders: res.data?.reminders || [] };
+}
+
 export async function pollSarahNewsDelivery() {
   const blocked = await requireSignedInConsumer();
   if (blocked) return blocked;
@@ -852,6 +861,8 @@ export async function sendPersonalMessage(message, options = {}) {
     creditsLast: payload.creditsLast,
     creditsShadow: payload.creditsShadow,
     recommendationsUi: payload.recommendationsUi || null,
+    actions: Array.isArray(payload.actions) ? payload.actions : [],
+    workCompleted: Boolean(payload.workCompleted),
   };
 }
 
@@ -1438,6 +1449,7 @@ function mountPublicApi() {
     resolvePersonalWorkApproval,
     fetchPersonalWorkEstimate,
     createPersonalReminder,
+    fetchPersonalReminders,
     pollDuePersonalReminders,
     pollSarahNewsDelivery,
     checkPersonalReminderGeofence,

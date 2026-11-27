@@ -20,7 +20,7 @@ export async function deliverDuePersonalReminders(uid) {
             body: (task.notes || task.title) + loc,
         });
         await markPersonalReminderFired(uid, task.id);
-        items.push({ id: task.id, title: task.title });
+        items.push({ id: task.id, title: task.title, notes: task.notes || "", dueAt: task.dueAt });
     }
     return { delivered: items.length, items };
 }

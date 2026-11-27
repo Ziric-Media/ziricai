@@ -2,6 +2,7 @@
  * U2 — Personal Sarah tool implementations.
  */
 import { createPersonalReminder } from "./personalSarahTaskStore.js";
+import { createSarahReminderScheduledNotification } from "../../network/notificationService.js";
 import {
     getUserConversationByCompany,
     summarizeConversationForUser,
@@ -83,7 +84,26 @@ export function resolveReminderDueAt(dueAtInput, { userMessage = "", title = "" 
         return setClock(d, tm).toISOString();
     }
 
+    const clock24 = lower.match(/\b(?:at\s+)?(\d{1,2}):(\d{2})\b/);
+    if (clock24) {
+        const d = new Date();
+        return setClock(d, clock24).toISOString();
+    }
+
     return defaultDueAtIso(30);
+}
+
+/** Detect reminder intent from user message (used when the model skips the tool). */
+export function matchPersonalReminderIntent(message) {
+    const text = String(message || "").trim();
+    if (!text) return null;
+    if (!/\bremind\b|\breminder\b|\balarm\b|\bremember to\b/i.test(text)) return null;
+    const titleMatch = text.match(/remind(?: me)?(?: to| as(?: an?)? alarm)?\s+(.+)/i);
+    let rawTitle = (titleMatch?.[1] || text).trim();
+    rawTitle = rawTitle.replace(/\b(today|tomorrow)\b.*/i, "").trim() || rawTitle;
+    rawTitle = rawTitle.slice(0, 120) || "Reminder";
+    const dueAt = resolveReminderDueAt(null, { userMessage: text, title: rawTitle });
+    return { title: rawTitle, dueAt };
 }
 
 function formatReminderDueLabel(iso) {
@@ -174,6 +194,16 @@ export async function executePersonalSarahTool(toolName, ctx, args = {}, opts = 
                 title: args.title,
             });
             const task = await createPersonalReminder(ctx.uid, { ...args, dueAt });
+            try {
+                await createSarahReminderScheduledNotification(ctx.uid, {
+                    reminderId: task.id,
+                    title: task.title,
+                    body: task.notes || task.title,
+                    dueAt: task.dueAt,
+                });
+            } catch (err) {
+                console.warn("[personalSarah] scheduled reminder inbox:", err?.message || err);
+            }
             const when = formatReminderDueLabel(task.dueAt);
             return {
                 success: true,

@@ -28,24 +28,36 @@ function saveAll(list) {
   }
 }
 
-function playAlarmTone() {
+/** Attention alarm — school reminders & urgent announcements (app open). */
+export function playAttentionAlarm({ repeat = 3 } = {}) {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.connect(gain);
+    gain.gain.value = 0.14;
     gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    gain.gain.value = 0.08;
-    osc.start();
-    setTimeout(() => {
-      osc.stop();
-      ctx.close();
-    }, 900);
+    const pattern = [784, 988, 784, 1175];
+    let t = ctx.currentTime;
+    for (let r = 0; r < repeat; r += 1) {
+      for (const freq of pattern) {
+        const osc = ctx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        osc.start(t);
+        osc.stop(t + 0.14);
+        t += 0.18;
+      }
+      t += 0.12;
+    }
+    setTimeout(() => ctx.close(), Math.ceil((t - ctx.currentTime) * 1000) + 80);
   } catch {
     /* ignore */
   }
-  if (navigator.vibrate) navigator.vibrate([200, 120, 200]);
+  if (navigator.vibrate) navigator.vibrate([280, 120, 280, 120, 400]);
+}
+
+function playAlarmTone() {
+  playAttentionAlarm({ repeat: 3 });
 }
 
 function formatClock(ts) {
@@ -57,6 +69,8 @@ function showAlarm(reminder) {
   const shell = document.getElementById('sarahReminderAlarm');
   if (!shell) return;
   activeRing = reminder;
+  const kicker = document.getElementById('sarahReminderAlarmLabel');
+  if (kicker) kicker.textContent = reminder.alarmLabel || 'Sarah Reminder';
   document.getElementById('sarahReminderAlarmTime')?.replaceChildren(document.createTextNode(formatClock(reminder.fireAt)));
   const titleEl = document.getElementById('sarahReminderAlarmTitle');
   const bodyEl = document.getElementById('sarahReminderAlarmBody');
@@ -80,6 +94,26 @@ function acknowledge(reminderId, status) {
     r.id === reminderId ? { ...r, status, firedAt: r.firedAt || Date.now() } : r
   );
   saveAll(next);
+}
+
+/** Client-side backup when the server stored a reminder (fires even if poll is late). */
+export function syncServerReminderSchedule({ id, title, body, dueAt } = {}) {
+  if (!id || !dueAt) return null;
+  const ms = Date.parse(dueAt);
+  if (!Number.isFinite(ms)) return null;
+  const list = loadAll().filter((r) => r.id !== id);
+  const row = {
+    id: String(id),
+    title: String(title || 'Reminder').trim() || 'Reminder',
+    body: String(body || '').trim(),
+    fireAt: ms,
+    status: 'scheduled',
+    createdAt: Date.now(),
+    source: 'server',
+  };
+  list.push(row);
+  saveAll(list);
+  return row;
 }
 
 export function scheduleReminder({ title, body, fireAt, id }) {
@@ -156,4 +190,21 @@ export function triggerServerReminderAlarm({ id, title, body } = {}) {
     body: body || title || '',
     fireAt: Date.now(),
   });
+}
+
+/** School announcements that need immediate parent attention (app open). */
+export function triggerSchoolAttentionAlert({ id, title, body, label = 'School announcement' } = {}) {
+  const shell = document.getElementById('sarahReminderAlarm');
+  if (!shell) {
+    playAttentionAlarm({ repeat: 2 });
+    return;
+  }
+  showAlarm({
+    id: id || `ann-${Date.now()}`,
+    title: title || label,
+    body: body || title || '',
+    fireAt: Date.now(),
+  });
+  const kicker = document.getElementById('sarahReminderAlarmLabel');
+  if (kicker) kicker.textContent = label;
 }

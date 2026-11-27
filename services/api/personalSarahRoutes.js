@@ -628,7 +628,19 @@ export async function handleCancelPersonalSarahWork(req, res) {
 
 export async function handleCreatePersonalSarahReminder(req, res) {
     try {
-        const task = await createPersonalReminderFromApi(req.consumerAuth.uid, req.body || {});
+        const uid = req.consumerAuth.uid;
+        const task = await createPersonalReminderFromApi(uid, req.body || {});
+        try {
+            const { createSarahReminderScheduledNotification } = await import("../network/notificationService.js");
+            await createSarahReminderScheduledNotification(uid, {
+                reminderId: task.id,
+                title: task.title,
+                body: task.notes || task.title,
+                dueAt: task.dueAt,
+            });
+        } catch (err) {
+            console.warn("[api/personal-sarah/reminders]", err?.message || err);
+        }
         res.status(201).json({ reminder: task });
     } catch (err) {
         const status = err.status || 500;

@@ -15,7 +15,12 @@ import {
     recordPersonalSarahAction,
     persistPersonalSarahSession,
 } from "./personalSarahSessionStore.js";
-import { PERSONAL_SARAH_TOOL_DEFINITIONS, executePersonalSarahTool, resolveReminderDueAt } from "./personalSarahTools.js";
+import {
+    PERSONAL_SARAH_TOOL_DEFINITIONS,
+    executePersonalSarahTool,
+    resolveReminderDueAt,
+    matchPersonalReminderIntent,
+} from "./personalSarahTools.js";
 import { maybeCompleteSarahWorkTask } from "./personalSarahWorkCompletion.js";
 import { buildRecommendationsUiFromActions } from "./personalSarahRecommendationsUi.js";
 import {
@@ -41,7 +46,7 @@ function matchDemoPersonalIntent(message) {
     if (/\bnews\b|\bheadlines?\b|\bbreaking\b|\bwhat'?s happening\b|\btoday'?s news\b/i.test(lower)) {
         return { tool: "fetchSarahNewsHeadlines", args: {} };
     }
-    if (/\bremind\b|\breminder\b|\bremember to\b/.test(lower)) {
+    if (/\bremind\b|\breminder\b|\balarm\b|\bremember to\b/.test(lower)) {
         const titleMatch = message.match(/remind(?: me)?(?: to)?\s+(.+)/i);
         const rawTitle = (titleMatch?.[1] || "Reminder").trim().slice(0, 120);
         const dueAt = resolveReminderDueAt(null, { userMessage: message, title: rawTitle });
@@ -238,6 +243,37 @@ export async function handlePersonalSarahChat(auth, input) {
 
         reply = (choice.content || "").trim();
         break;
+    }
+
+    const reminderSaved = actions.some((a) => a.tool === "createPersonalReminder" && a.success);
+    const reminderIntent = matchPersonalReminderIntent(message);
+    if (!reminderSaved && reminderIntent) {
+        const intent = reminderIntent;
+        const forced = await executePersonalSarahTool(
+            "createPersonalReminder",
+            ctx,
+            { title: intent.title, dueAt: intent.dueAt },
+            { userMessage: message, sessionId: session?.id }
+        );
+        actions.push(forced);
+        await recordPersonalSarahAction(session, {
+            tool: "createPersonalReminder",
+            success: forced.success,
+            forced: true,
+        });
+        if (forced.success) {
+            reply = forced.message || reply;
+        }
+    }
+
+    if (
+        reply &&
+        /\b(can'?t|cannot|unable|don'?t have|not able|no way to)\b/i.test(reply) &&
+        /\b(remind|alarm|notification)\b/i.test(reply) &&
+        actions.some((a) => a.tool === "createPersonalReminder" && a.success)
+    ) {
+        const saved = actions.find((a) => a.tool === "createPersonalReminder" && a.success);
+        reply = saved.message || reply;
     }
 
     if (!reply) {

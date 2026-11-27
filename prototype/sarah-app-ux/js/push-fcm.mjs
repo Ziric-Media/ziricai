@@ -2,7 +2,7 @@
  * Phase 2.2 — Firebase Cloud Messaging token (web). Falls back when VAPID / messaging unavailable.
  */
 import { getApps, initializeApp } from 'firebase/app';
-import { getMessaging, getToken, isSupported } from 'firebase/messaging';
+import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 
 function cfg() {
   return window.__ZIRICAI_CONFIG__ || {};
@@ -41,5 +41,35 @@ export async function obtainFcmWebToken(existingApp) {
   } catch (err) {
     console.warn('[Sarah FCM] token unavailable', err?.message || err);
     return null;
+  }
+}
+
+/**
+ * Foreground FCM → same handler as service worker postMessage payloads.
+ * @param {(payload: object) => void} onPayload
+ */
+export async function bindFcmForegroundMessages(onPayload) {
+  if (typeof onPayload !== 'function') return;
+  if (typeof window === 'undefined') return;
+  let supported = false;
+  try {
+    supported = await isSupported();
+  } catch {
+    return;
+  }
+  if (!supported) return;
+  const fb = firebaseConfig();
+  if (!fb) return;
+  const app = getApps()[0] || initializeApp(fb);
+  try {
+    const messaging = getMessaging(app);
+    onMessage(messaging, (payload) => {
+      const data = payload?.data || {};
+      const title = payload?.notification?.title || data.title || 'Sarah';
+      const body = payload?.notification?.body || data.body || '';
+      onPayload({ ...data, title, body });
+    });
+  } catch (err) {
+    console.warn('[Sarah FCM] foreground handler unavailable', err?.message || err);
   }
 }

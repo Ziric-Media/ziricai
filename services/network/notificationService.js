@@ -156,6 +156,65 @@ async function visibleForUser(uid) {
 }
 
 /**
+ * Inbox row when a personal reminder is scheduled (before due).
+ * @param {string} uid
+ * @param {{ reminderId: string, title?: string, body?: string, dueAt?: string }} input
+ */
+export async function createSarahReminderScheduledNotification(uid, input = {}) {
+    const reminderId = String(input.reminderId || "").trim();
+    const title = String(input.title || "Reminder").trim().slice(0, 120);
+    const dueAt = String(input.dueAt || "").trim();
+    if (!uid || !reminderId) throw err(422, "REMINDER_SCHEDULE_INVALID", "uid and reminderId required.");
+    const eventId = `sarah_reminder_sched_${reminderId}`;
+    const notificationId = notificationIdFor(eventId, uid);
+    const existing = await col.get(notificationId);
+    if (existing) return { notificationId, duplicate: true };
+    let whenLabel = "";
+    if (dueAt) {
+        const ms = Date.parse(dueAt);
+        if (Number.isFinite(ms)) {
+            try {
+                whenLabel = new Date(ms).toLocaleString("en-ZA", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                });
+            } catch {
+                whenLabel = dueAt;
+            }
+        }
+    }
+    const body = String(input.body || title).trim().slice(0, 500);
+    const detail = whenLabel ? `${title} · due ${whenLabel}` : title;
+    const createdAt = new Date().toISOString();
+    await col.put(
+        notificationId,
+        {
+            notificationId,
+            uid,
+            snId: null,
+            eventId,
+            source: "sarah_reminder",
+            type: "reminder_scheduled",
+            channel: "reminders",
+            title: "Reminder scheduled",
+            body: detail || body,
+            reminderId,
+            dueAt: dueAt || null,
+            createdAt,
+            readAt: null,
+            pushedAt: null,
+            organisation: { displayName: "Sarah", verified: true },
+            schemaVersion: 1,
+        },
+        { merge: false }
+    );
+    return { notificationId, duplicate: false };
+}
+
+/**
  * SNA-01F — Sarah Work task completed: consumer inbox + optional push (not an organisation subscriber event).
  * @param {string} uid
  * @param {{ sessionId: string, taskTitle?: string, summary?: string }} input

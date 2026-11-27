@@ -96,6 +96,26 @@ function acknowledge(reminderId, status) {
   saveAll(next);
 }
 
+/** Client-side backup when the server stored a reminder (fires even if poll is late). */
+export function syncServerReminderSchedule({ id, title, body, dueAt } = {}) {
+  if (!id || !dueAt) return null;
+  const ms = Date.parse(dueAt);
+  if (!Number.isFinite(ms)) return null;
+  const list = loadAll().filter((r) => r.id !== id);
+  const row = {
+    id: String(id),
+    title: String(title || 'Reminder').trim() || 'Reminder',
+    body: String(body || '').trim(),
+    fireAt: ms,
+    status: 'scheduled',
+    createdAt: Date.now(),
+    source: 'server',
+  };
+  list.push(row);
+  saveAll(list);
+  return row;
+}
+
 export function scheduleReminder({ title, body, fireAt, id }) {
   const list = loadAll();
   const row = {

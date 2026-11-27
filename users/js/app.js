@@ -1634,15 +1634,27 @@ function bindSnaPrefsUi() {
   });
 }
 
-function tryOsPushAlert(title, body) {
+async function tryOsPushAlert(title, body) {
   const prefs = { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
   if (prefs.quietHours) {
     const h = new Date().getHours();
     if (h >= 22 || h < 7) return;
   }
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const payload = { body, tag: `sarah-${Date.now()}`, icon: '/assets/sarah-avatar.svg', badge: '/assets/sarah-avatar.svg' };
   try {
-    new Notification(title, { body, tag: `sarah-${Date.now()}` });
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg?.showNotification) {
+        await reg.showNotification(title, payload);
+        return;
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    new Notification(title, payload);
   } catch {
     /* ignore */
   }
@@ -2712,6 +2724,7 @@ function applyMySarahPanel(panel, prompt) {
   if (panel === 'tasks') {
     void refreshWorkQuotaState().then(() => {
       renderWorkQuotaBanner();
+      void renderWorkRemindersList();
       void renderSarahWorkHomeDashboard();
     });
   }
@@ -3685,7 +3698,9 @@ function getPersonalThreadPreview(thread) {
   return 'Start a conversation with Personal Sarah';
 }
 
-function listPersonalThreads() {
+function listPersonalThreads(opts = {}) {
+  const chatOnly = Boolean(opts.chatOnly);
+  const workOnly = Boolean(opts.workOnly);
   if (personalSarahUsesMockThreads()) ensurePersonalThreadsSeeded();
   const rt = getSarahRuntime();
   const ids = personalSarahUsesMockThreads()
@@ -3695,12 +3710,15 @@ function listPersonalThreads() {
     .map((id) => {
       const thread = rt.threads[id];
       if (!thread || thread.kind !== 'personal') return null;
+      if (chatOnly && thread.work) return null;
+      if (workOnly && !thread.work) return null;
       return {
         id,
         title: getPersonalThreadHeadline(thread),
         time: thread.timeLabel || formatPersonalThreadTime(thread.lastMessageAt) || '',
         preview: getPersonalThreadPreview(thread),
         lastMessageAt: thread.lastMessageAt || 0,
+        work: Boolean(thread.work),
       };
     })
     .filter(Boolean);
@@ -4671,6 +4689,7 @@ async function deliverPersonalSarahMessage(text, opts) {
         showProtoToast('Sarah Work task completed — see My Notifications.');
         void refreshLiveNotifications();
       }
+      void applyPersonalReminderSideEffects(res.actions, trimmed);
       void refreshSarahPlanUsageUi();
     }
     renderThread();
@@ -4972,6 +4991,110 @@ function buildClientWorkActivity(thread) {
     acts.push({ kind: 'cancel', kindLabel: 'Cancelled', label: 'Assignment cancelled', at: new Date().toISOString() });
   }
   return acts.slice(-48);
+}
+
+function formatWorkReminderDue(dueAt) {
+  const ms = Date.parse(dueAt);
+  if (!Number.isFinite(ms)) return String(dueAt || '');
+  try {
+    return new Date(ms).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  } catch {
+    return new Date(ms).toLocaleString();
+  }
+}
+
+function reminderActionSucceeded(actions) {
+  return (actions || []).some((a) => a.tool === 'createPersonalReminder' && a.success && a.data?.taskId);
+}
+
+async function ensureClientReminderFromMessage(userText, actions = []) {
+  if (reminderActionSucceeded(actions)) return null;
+  if (!/\b(remind|reminder|alarm|remember to)\b/i.test(String(userText || ''))) return null;
+  if (!personalSarahLiveActive() || !window.SarahLive?.createPersonalReminder) return null;
+  const title = String(userText || '')
+    .replace(/\b(remind(?: me)?(?: to| as(?: an?)? alarm)?)\b/i, '')
+    .trim()
+    .slice(0, 120);
+  const res = await window.SarahLive.createPersonalReminder({
+    title: title || 'Reminder',
+    dueAt: userText,
+    notes: userText,
+  });
+  if (res.error) return null;
+  return res.reminder || null;
+}
+
+async function applyPersonalReminderSideEffects(actions = [], userText = '') {
+  let reminder = (actions || []).find((a) => a.tool === 'createPersonalReminder' && a.success)?.data;
+  if (!reminder?.taskId) {
+    const saved = await ensureClientReminderFromMessage(userText, actions);
+    if (saved) reminder = { taskId: saved.id, dueAt: saved.dueAt, title: saved.title };
+  }
+  if (!reminder?.taskId) return;
+  try {
+    const alarm = await import('./sna-reminders.mjs');
+    alarm.syncServerReminderSchedule({
+      id: reminder.taskId,
+      title: reminder.title,
+      body: reminder.notes || reminder.title || userText,
+      dueAt: reminder.dueAt,
+    });
+  } catch {
+    /* ignore */
+  }
+  void refreshLiveNotifications();
+  void renderWorkRemindersList();
+  syncNotificationBadge();
+  if (document.querySelector('.my-sarah-view')?.dataset.msPanel === 'tasks') {
+    showProtoToast('Reminder saved — see Work and My Notifications → Reminders.');
+  }
+}
+
+async function renderWorkRemindersList() {
+  const listEl = document.getElementById('msWorkRemindersList');
+  const leadEl = document.getElementById('msWorkRemindersLead');
+  if (!listEl) return;
+  if (!personalSarahLiveActive() || !window.SarahLive?.fetchPersonalReminders) {
+    listEl.innerHTML = '<li class="sw-home-priority-item"><p class="ms-thread-empty">Sign in to save and track reminders here.</p></li>';
+    return;
+  }
+  const res = await window.SarahLive.fetchPersonalReminders({ limit: 30 });
+  if (res.error) {
+    listEl.innerHTML = '<li class="sw-home-priority-item"><p class="ms-thread-empty">Could not load reminders right now.</p></li>';
+    return;
+  }
+  const rows = (res.reminders || []).slice().sort((a, b) => Date.parse(a.dueAt || 0) - Date.parse(b.dueAt || 0));
+  const scheduled = rows.filter((r) => r.status === 'scheduled');
+  const recent = rows.filter((r) => r.status === 'fired').slice(-5).reverse();
+  if (leadEl) {
+    leadEl.textContent = scheduled.length
+      ? `${scheduled.length} scheduled — Sarah alerts you at the due time (push + alarm).`
+      : 'Ask Sarah to remind you, or tap Set reminder.';
+  }
+  if (!scheduled.length && !recent.length) {
+    listEl.innerHTML =
+      '<li class="sw-home-priority-item"><p class="ms-thread-empty">No reminders yet. Tap <strong>Set reminder</strong> or tell Sarah when to alert you.</p></li>';
+    return;
+  }
+  const html = [
+    ...scheduled.map(
+      (r) => `<li class="sw-home-priority-item sw-home-priority--planned">
+        <div class="sw-home-priority-btn" style="display:block;padding:12px 0">
+          <span class="sw-home-priority-title">${escapeHtml(r.title || 'Reminder')}</span>
+          <span class="sw-home-priority-meta"><span class="sw-home-priority-pill">Scheduled</span> ${escapeHtml(formatWorkReminderDue(r.dueAt))}</span>
+        </div>
+      </li>`
+    ),
+    ...recent.map(
+      (r) => `<li class="sw-home-priority-item sw-home-priority--completed">
+        <div class="sw-home-priority-btn" style="display:block;padding:12px 0;opacity:0.85">
+          <span class="sw-home-priority-title">${escapeHtml(r.title || 'Reminder')}</span>
+          <span class="sw-home-priority-meta"><span class="sw-home-priority-pill">Done</span> ${escapeHtml(formatWorkReminderDue(r.dueAt))}</span>
+        </div>
+      </li>`
+    ),
+  ].join('');
+  listEl.innerHTML = html;
 }
 
 async function renderSarahWorkHomeDashboard() {
@@ -6547,7 +6670,7 @@ async function renderChatsList(opts = {}) {
     if (cached.length && !host.querySelector('.chat-row')) {
       if (discoverLiveActive()) await ensureLiveDiscoverFresh();
       const businessCached = cached.filter(isBusinessChatRow).map(enrichBusinessChatRowAvatar);
-      const sarahCached = mergeSarahChatRows(cached, listPersonalThreads());
+      const sarahCached = mergeSarahChatRows(cached, listPersonalThreads({ chatOnly: true }));
       syncChatsPanelChrome(false);
       chatsListPanelCache = { businessChats: businessCached, sarahChatRows: sarahCached, orgSection: '' };
       host.innerHTML = buildChatsPanelHtml(activeChatsPanel, businessCached, sarahCached);
@@ -6587,7 +6710,7 @@ async function renderChatsList(opts = {}) {
       await syncPersonalSarahSessionsFromServer({ silent: true });
       if (gen !== chatsListLoadGen) return;
     }
-    sarahChatRows = mergeSarahChatRows(chats, listPersonalThreads());
+    sarahChatRows = mergeSarahChatRows(chats, listPersonalThreads({ chatOnly: true }));
     businessChats = chats.filter(isBusinessChatRow).map(enrichBusinessChatRowAvatar);
   }
 
@@ -11151,7 +11274,7 @@ function renderMySarahHistoryFromThreads() {
   if (!historyHost || personalSarahUsesMockThreads()) return;
   const msPanel = document.querySelector('.my-sarah-view')?.dataset.msPanel;
   if (msPanel === 'tasks') return;
-  const threads = listPersonalThreads().slice(0, 8);
+  const threads = listPersonalThreads({ chatOnly: true }).slice(0, 8);
   if (!threads.length) {
     historyHost.innerHTML = '<p class="ms-thread-empty" style="padding:8px 12px">No chats yet — start a conversation below.</p>';
     return;
@@ -11187,12 +11310,18 @@ function renderMsDrawerRecents() {
     host.innerHTML = '<p class="ms-thread-empty" style="padding:8px 12px">Loading conversations…</p>';
     return;
   }
-  const threads = listPersonalThreads();
+  const panel = document.querySelector('.my-sarah-view')?.dataset.msPanel;
+  const threads = listPersonalThreads({
+    chatOnly: panel !== 'tasks',
+    workOnly: panel === 'tasks',
+  });
   const rt = getSarahRuntime();
   const activeId = rt.activeThreadId || '';
   if (!threads.length) {
     host.innerHTML =
-      '<p class="ms-thread-empty" style="padding:8px 12px">No chats yet — tap <strong>New chat</strong> or send a message from Home.</p>';
+      panel === 'tasks'
+        ? '<p class="ms-thread-empty" style="padding:8px 12px">No work threads yet — tap <strong>New work item</strong>.</p>'
+        : '<p class="ms-thread-empty" style="padding:8px 12px">No chats yet — tap <strong>New chat</strong> or send a message from Home.</p>';
     return;
   }
   host.innerHTML = threads
@@ -14751,6 +14880,10 @@ function init() {
     .then((m) => m.initSarahReminders())
     .catch((err) => console.warn('[Sarah] reminders module', err));
 
+  document.getElementById('msWorkNewReminderBtn')?.addEventListener('click', () => {
+    goToMySarahWork('Remind me in 15 minutes — ');
+  });
+
   document.getElementById('msTryReminderDemo')?.addEventListener('click', async () => {
     const dueAt = new Date(Date.now() + 60_000).toISOString();
     if (personalSarahLiveActive() && window.SarahLive?.createPersonalReminder) {
@@ -14767,6 +14900,12 @@ function init() {
       if (rem?.dueAt) {
         import('./sna-reminders.mjs')
           .then((m) => {
+            m.syncServerReminderSchedule({
+              id: rem.id,
+              title: rem.title,
+              body: rem.notes,
+              dueAt: rem.dueAt,
+            });
             m.scheduleReminder({
               id: rem.id || `srv-${Date.now()}`,
               title: rem.title || 'Reminder',
@@ -14820,10 +14959,8 @@ function init() {
           markPushStarred(item.id);
           const title = item.title || 'Reminder';
           const body = item.notes || item.body || title;
-          if (prefs.reminders !== false) tryOsPushAlert(title, body);
-          if (!document.hidden) {
-            alarm.triggerServerReminderAlarm({ id: item.id, title, body });
-          }
+          if (prefs.reminders !== false) void tryOsPushAlert('Sarah Reminder', body || title);
+          alarm.triggerServerReminderAlarm({ id: item.id, title, body });
         }
       } catch {
         showProtoToast(`${res.delivered} reminder(s) due — check My Notifications.`);
