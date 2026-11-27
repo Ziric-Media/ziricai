@@ -199,7 +199,8 @@ export const SCHEMA_FORMS = {
     taskType: 'job',
     buildTitle: (fd) => `Apply — ${fd.get('role') || fd.get('company') || 'role'}`,
     fields: [
-      { name: 'company', label: 'Company', type: 'text', required: true },
+      { name: 'organisation', label: 'Organisation offering the role', type: 'text', required: true, placeholder: 'Company or institution name' },
+      { name: 'company', label: 'Company (if different)', type: 'text' },
       { name: 'role', label: 'Role', type: 'text', required: true },
       { name: 'deadline', label: 'Application deadline', type: 'date', required: true },
       { name: 'documents', label: 'Required documents', type: 'textarea', placeholder: 'CV, ID, certificates…' },
@@ -213,7 +214,8 @@ export const SCHEMA_FORMS = {
     taskType: 'university',
     buildTitle: (fd) => `University — ${fd.get('programme') || 'application'}`,
     fields: [
-      { name: 'institution', label: 'Institution', type: 'text', required: true },
+      { name: 'organisation', label: 'University / college', type: 'text', required: true },
+      { name: 'institution', label: 'Institution campus (optional)', type: 'text' },
       { name: 'programme', label: 'Programme', type: 'text', required: true },
       { name: 'deadline', label: 'Deadline', type: 'date', required: true },
       { name: 'documents', label: 'Required documents', type: 'textarea' },
@@ -274,7 +276,8 @@ export const SCHEMA_FORMS = {
     buildTitle: (fd) => `Bursary — ${fd.get('provider') || 'application'}`,
     checklist: ['Check eligibility', 'Gather transcripts', 'Prepare motivation letter', 'Submit before deadline', 'Track outcome'],
     fields: [
-      { name: 'provider', label: 'Bursary or fund name', type: 'text', required: true },
+      { name: 'organisation', label: 'Organisation offering the bursary', type: 'text', required: true },
+      { name: 'provider', label: 'Programme name (optional)', type: 'text' },
       { name: 'deadline', label: 'Deadline', type: 'date', required: true },
       { name: 'documents', label: 'Required documents', type: 'textarea' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
@@ -286,6 +289,7 @@ export const SCHEMA_FORMS = {
     buildTitle: (fd) => `Funding — ${fd.get('programme') || 'grant'}`,
     checklist: ['Read criteria', 'Budget breakdown', 'Supporting letters', 'Submit application'],
     fields: [
+      { name: 'organisation', label: 'Organisation / funder', type: 'text', required: true },
       { name: 'programme', label: 'Grant or programme', type: 'text', required: true },
       { name: 'deadline', label: 'Deadline', type: 'date', required: true },
       { name: 'amount', label: 'Amount requested', type: 'text' },
@@ -299,7 +303,8 @@ export const SCHEMA_FORMS = {
     buildTitle: (fd) => `Loan — ${fd.get('lender') || 'application'}`,
     checklist: ['Proof of income', 'Bank statements', 'ID documents', 'Submit application'],
     fields: [
-      { name: 'lender', label: 'Lender', type: 'text', required: true },
+      { name: 'organisation', label: 'Lender / financial institution', type: 'text', required: true },
+      { name: 'lender', label: 'Branch or product (optional)', type: 'text' },
       { name: 'amount', label: 'Loan amount', type: 'text' },
       { name: 'deadline', label: 'Submit by', type: 'date' },
       { name: 'documents', label: 'Required documents', type: 'textarea' },
@@ -311,7 +316,8 @@ export const SCHEMA_FORMS = {
     taskType: 'accommodation',
     buildTitle: (fd) => `Accommodation — ${fd.get('place') || 'application'}`,
     fields: [
-      { name: 'place', label: 'Residence or rental', type: 'text', required: true },
+      { name: 'organisation', label: 'Landlord / institution / agent', type: 'text', required: true },
+      { name: 'place', label: 'Property or residence name', type: 'text', required: true },
       { name: 'deadline', label: 'Apply by', type: 'date', required: true },
       { name: 'deposit', label: 'Deposit / budget', type: 'text' },
       { name: 'documents', label: 'Required documents', type: 'textarea' },

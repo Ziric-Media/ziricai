@@ -860,3 +860,48 @@
   font-size: 13px;
   color: #475569;
 }
+
+.st-ws-quick {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.st-ws-quick .st-tab {
+  flex: 1;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.st-ws-compose-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  justify-content: flex-end;
+}
+
+.st-gov-assists {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.st-gov-assists legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.st-gov-assist {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.st-gov-other.is-hidden {
+  display: none;
+}

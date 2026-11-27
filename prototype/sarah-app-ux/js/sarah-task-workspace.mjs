@@ -57,11 +57,22 @@ export function renderTaskWorkspace(task, session, esc) {
     </nav>
     <section class="st-ws-panel" data-st-ws-panel="chat">
       <div class="st-ws-thread" id="stWsThread">${transcript}${phaseRow}</div>
+      ${
+        task?.lifecycleState === 'awaiting_approval'
+          ? `<div class="st-ws-quick">
+        <button type="button" class="st-tab" data-st-ws-quick="Yes, go ahead and start.">Go ahead</button>
+        <button type="button" class="st-tab" data-st-ws-quick="Not yet — I need to add more details.">Not yet</button>
+      </div>`
+          : ''
+      }
       <form class="st-ws-composer" id="stWsComposer">
         <label class="st-ws-compose-label"><span class="visually-hidden">Message Sarah</span>
           <textarea name="message" rows="2" placeholder="Message Sarah about this task…" required></textarea>
         </label>
-        <button type="submit" class="st-cat-select st-ws-send">Send</button>
+        <div class="st-ws-compose-actions">
+          <button type="submit" class="st-cat-select st-ws-send">Send</button>
+          <button type="button" class="ms-link-btn" data-st-ws-complete>Mark task complete</button>
+        </div>
       </form>
     </section>
   <section class="st-ws-panel is-hidden" data-st-ws-panel="details" hidden>
@@ -93,6 +104,25 @@ export function bindTaskWorkspace(root, { esc, hooks, onBack, onRefresh }) {
   });
   root.querySelector('[data-st-back]')?.addEventListener('click', () => onBack?.());
   const form = root.querySelector('#stWsComposer');
+  root.querySelectorAll('[data-st-ws-quick]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const text = btn.getAttribute('data-st-ws-quick') || '';
+      const area = form?.querySelector('textarea[name=message]');
+      if (area) area.value = text;
+      form?.requestSubmit();
+    });
+  });
+  root.querySelector('[data-st-ws-complete]')?.addEventListener('click', () => {
+    void (async () => {
+      if (!hooks.updateTask || !hooks.workspaceTaskId) {
+        hooks.toast?.('Sign in to update this task.');
+        return;
+      }
+      await hooks.updateTask(hooks.workspaceTaskId, { status: 'completed', lifecycleState: 'completed', progress: 100 });
+      hooks.toast?.('Task marked complete.');
+      await onRefresh?.();
+    })();
+  });
   form?.addEventListener('submit', (e) => {
     e.preventDefault();
     void (async () => {

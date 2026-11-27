@@ -26,7 +26,7 @@ export const TASK_LIFECYCLE = {
 
 function needsExplicitApproval(task) {
     if (task?.taskKind === "execution" || task?.categoryId === "delegate") return true;
-    if (task?.categoryId === "applications") return true;
+    if (task?.categoryId === "applications" || task?.taskType === "government") return true;
     if (task?.categoryId === "shopping" && ["payment", "compare_products"].includes(task?.taskType)) return true;
     return false;
 }
@@ -38,6 +38,11 @@ function buildAcknowledgment(task) {
     }
     if (task.categoryId === "preparation") {
         return `I've received your preparation task: ${title}. I'll help you work through your checklist and get ready step by step.`;
+    }
+    if (task.taskType === "government" || (task.categoryId === "applications" && task.meta?.govService)) {
+        const dept = task.meta?.govDepartmentName || task.meta?.organisation || "government";
+        const svc = task.meta?.govService || title;
+        return `I've received your government service task: ${svc} (${dept}). I'll explain requirements and check the official route. I won't submit anything until you explicitly approve.`;
     }
     if (task.categoryId === "applications") {
         const org = task.meta?.organisation || task.meta?.organization || task.meta?.company || "the organisation";
@@ -164,6 +169,7 @@ export async function handlePersonalSarahTaskMessage(uid, taskId, message, auth 
             sarahPhase: "idle",
             lifecycleState: TASK_LIFECYCLE.AWAITING_USER,
         });
+        void notifyTaskUpdate(uid, taskId, workMsg.slice(0, 200));
         return { task: updated, session, reply: workMsg };
     }
 
@@ -182,6 +188,15 @@ export async function handlePersonalSarahTaskMessage(uid, taskId, message, auth 
     });
 
     return { task: updated, session: fresh || session, reply: result.reply };
+}
+
+async function notifyTaskUpdate(uid, taskId, body) {
+    try {
+        const { createSarahTaskUpdateNotification } = await import("../../network/notificationService.js");
+        await createSarahTaskUpdateNotification(uid, { taskId, title: "Sarah Tasks update", body });
+    } catch (err) {
+        console.warn("[personalSarahTaskOrchestrator] notify", err?.message || err);
+    }
 }
 
 export async function getPersonalSarahTaskWorkspace(uid, taskId) {

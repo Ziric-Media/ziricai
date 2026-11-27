@@ -100,6 +100,23 @@ assert.equal(assigned.task.sessionId, assigned.session.id);
 assert.ok((assigned.session.messages || []).length >= 1);
 assert.equal(assigned.task.lifecycleState, "awaiting_user");
 
+const govTask = await createPersonalSarahTask("u-ps-1", {
+    title: "Smart ID application",
+    taskKind: "preparation",
+    categoryId: "applications",
+    taskType: "government",
+    meta: {
+        organisation: "Department of Home Affairs",
+        govDepartmentName: "Department of Home Affairs",
+        govService: "Smart ID application",
+    },
+});
+const govAssigned = await assignPersonalSarahTask("u-ps-1", govTask.id);
+assert.equal(govAssigned.task.lifecycleState, "awaiting_approval");
+assert.ok(
+    (govAssigned.session.messages || []).some((m) => /government service/i.test(String(m.content || "")))
+);
+
 const r2 = await handlePersonalSarahChat(
     {
         uid: "u-ps-1",

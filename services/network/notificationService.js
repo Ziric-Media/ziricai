@@ -65,6 +65,8 @@ function view(row) {
         readAt: row.readAt || null,
         organisation: row.organisation || { displayName: null, verified: false },
         workSessionId: row.workSessionId || null,
+        taskId: row.taskId || null,
+        deepLink: row.deepLink || null,
     };
 }
 
@@ -262,6 +264,64 @@ export async function createSarahReminderDueNotification(uid, input = {}) {
         /* in-app is authoritative */
     }
     return { notificationId, duplicate: false };
+}
+
+/**
+ * ST-UX-04 v1 — task workspace update (inbox + push with deep link to task).
+ * @param {string} uid
+ * @param {{ taskId: string, title?: string, body?: string }} input
+ */
+export async function createSarahTaskUpdateNotification(uid, input = {}) {
+    const taskId = String(input.taskId || "").trim();
+    const title = String(input.title || "Sarah Tasks").trim().slice(0, 120);
+    const body = String(input.body || "Sarah has an update on your task.").trim().slice(0, 500);
+    if (!uid || !taskId) throw err(422, "TASK_NOTIFY_INVALID", "uid and taskId required.");
+    const eventId = `sarah_task_${taskId}_${Date.now()}`;
+    const notificationId = notificationIdFor(eventId, uid);
+    const createdAt = new Date().toISOString();
+    await col.put(
+        notificationId,
+        {
+            notificationId,
+            uid,
+            snId: null,
+            eventId,
+            source: "sarah_task",
+            type: "task_update",
+            channel: "tasks",
+            title,
+            body,
+            taskId,
+            deepLink: `tasks/${taskId}`,
+            createdAt,
+            readAt: null,
+            pushedAt: null,
+            organisation: { displayName: "Sarah", verified: true },
+            schemaVersion: 1,
+        },
+        { merge: false }
+    );
+    try {
+        const { pushed } = await pushForNotificationRows([
+            {
+                uid,
+                notificationId,
+                title,
+                body,
+                snId: null,
+                channel: "tasks",
+                pushType: "sarah_task",
+                deepLink: `tasks/${taskId}`,
+            },
+        ]);
+        if (pushed > 0) {
+            const row = await col.get(notificationId);
+            if (row) await col.put(notificationId, { ...row, pushedAt: new Date().toISOString() }, { merge: false });
+        }
+    } catch {
+        /* inbox ok */
+    }
+    return { notificationId };
 }
 
 /**

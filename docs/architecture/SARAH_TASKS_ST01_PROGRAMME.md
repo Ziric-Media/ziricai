@@ -22,6 +22,9 @@
 | ST-02 | Engine | **v1 shipped** — Firestore tasks API, allowance, client sync (`/api/personal-sarah/tasks`) |
 | ST-03 | Reminders | **v3 on prod** — per-slot delivery, server scheduler (~60s), FCM push; test matrix below |
 | ST-UX-01 | Task workspace | **v1 shipped** — Assign to Sarah, per-task session, composer, typing/working |
+| ST-UX-02 | Category forms | **v1 shipped** — organisation fields, execution approval rules, assign handoff |
+| ST-UX-03 | Government directory | **v1 shipped** — SA dept/service form, government ack + approval path |
+| ST-UX-04 | Workspace actions | **v1 partial** — Go ahead / Not yet chips, mark complete, task push deep link |
 | ST-04 | Intelligence | Generated checklists, timelines, suggestions |
 | ST-05 | Execution | Research, drafts, bookings with approval |
 | ST-06 | Personalisation | Routines, templates, learning |
@@ -68,3 +71,11 @@
 7. **Free tier** — create blocked with clear allowance message.
 
 Paste: task id, expected vs actual, screenshot of My Notifications if push fails.
+
+## Spencer UAT — ST-UX-02 / 03 / 04 (after ST-01 checklist)
+
+1. **Applications → Government service** — pick DHA + Smart ID → Assign → workspace opens; Sarah ack mentions department; lifecycle **awaiting approval** with plan.
+2. **Go ahead** chip or “yes, go ahead” → Sarah working message; optional push/inbox row with deep link back to workspace.
+3. **Job / university form** — organisation field present; assign → approval path for execution types.
+4. **Mark task complete** in workspace composer row.
+5. Tap a **Sarah Tasks** notification (or open from push `tasks/<taskId>`) → lands in task workspace.

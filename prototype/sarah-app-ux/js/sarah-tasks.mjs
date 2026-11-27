@@ -14,6 +14,7 @@ import {
   schemaKeyFor,
 } from './sarah-tasks-catalog.mjs';
 import { bindTaskWorkspace, renderTaskWorkspace } from './sarah-task-workspace.mjs';
+import { GOV_ASSIST_OPTIONS, GOV_DEPARTMENTS, departmentById } from './sarah-government-directory.mjs';
 
 const STORAGE_KEY = 'sarah.st.tasks.proto.v1';
 
@@ -687,8 +688,37 @@ function renderDetail(reminders) {
     </section>`;
 }
 
+function renderGovernmentForm() {
+  const deptOpts = GOV_DEPARTMENTS.map(
+    (d) => `<option value="${esc(d.id)}">${esc(d.name)}</option>`
+  ).join('');
+  const assist = GOV_ASSIST_OPTIONS.map(
+    (o) =>
+      `<label class="st-check st-gov-assist"><input type="checkbox" name="assist" value="${esc(o.id)}" /> ${esc(o.label)}</label>`
+  ).join('');
+  return `
+    <header class="st-subhead">
+      <button type="button" class="st-back" data-st-back>← Back</button>
+      <h2>Government service</h2>
+      <p class="st-lead">Choose a department and service. Sarah will verify official routes before any submission.</p>
+    </header>
+    <form class="st-form" id="stGovernmentForm">
+      <label class="st-field"><span>Search departments</span><input type="search" id="stGovSearch" placeholder="Type to filter…" autocomplete="off" /></label>
+      <label class="st-field"><span>Department or institution</span><select name="govDepartment" id="stGovDept" required>${deptOpts}</select></label>
+      <label class="st-field"><span>Service</span><select name="govService" id="stGovService" required></select></label>
+      <label class="st-field st-gov-other is-hidden" id="stGovOtherWrap" hidden><span>Organisation name</span><input name="otherOrganisation" placeholder="Type organisation…" /></label>
+      <fieldset class="st-field st-gov-assists"><legend>What should Sarah do?</legend>${assist}</fieldset>
+      <label class="st-field"><span>Appointment or due date</span><input name="deadline" type="date" /></label>
+      <label class="st-field"><span>Reference number (if any)</span><input name="reference" /></label>
+      <label class="st-field"><span>Documents / notes</span><textarea name="notes" rows="3"></textarea></label>
+      <p class="st-proto-note">Listing a department does not mean every programme is open — Sarah checks eligibility and official portals first.</p>
+      <button type="submit" class="st-submit-btn">Assign to Sarah</button>
+    </form>`;
+}
+
 function pickForm() {
   const kind = taskTypeId || formKind;
+  if (kind === 'government') return renderGovernmentForm();
   if (kind === 'meeting') return renderMeetingForm();
   if (kind === 'interview') return renderInterviewForm();
   if (kind === 'departure') return renderDepartureForm();
@@ -749,7 +779,9 @@ async function paintWorkspace(root) {
     esc,
     hooks: {
       ...hooks,
+      workspaceTaskId,
       sendTaskMessage: async (message) => hooks.sendTaskMessage?.(workspaceTaskId, message),
+      updateTask: (id, patch) => hooks.updateTask?.(id, patch),
     },
     onBack: () => {
       view = 'hub';
@@ -763,7 +795,9 @@ async function paintWorkspace(root) {
         esc,
         hooks: {
           ...hooks,
+          workspaceTaskId,
           sendTaskMessage: async (message) => hooks.sendTaskMessage?.(workspaceTaskId, message),
+          updateTask: (id, patch) => hooks.updateTask?.(id, patch),
         },
         onBack: () => {
           view = 'hub';
@@ -1118,6 +1152,69 @@ function bind(root, reminders) {
     });
   }
 
+  const govForm = root.querySelector('#stGovernmentForm');
+  if (govForm) {
+    const deptSel = root.querySelector('#stGovDept');
+    const svcSel = root.querySelector('#stGovService');
+    const otherWrap = root.querySelector('#stGovOtherWrap');
+    const search = root.querySelector('#stGovSearch');
+    const paintGovServices = () => {
+      const dept = departmentById(deptSel?.value || 'dha');
+      if (!svcSel) return;
+      const svcs = dept?.services?.length ? dept.services : ['General enquiry'];
+      svcSel.innerHTML = svcs.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+      const isOther = deptSel?.value === 'other';
+      if (otherWrap) {
+        otherWrap.classList.toggle('is-hidden', !isOther);
+        otherWrap.hidden = !isOther;
+      }
+    };
+    deptSel?.addEventListener('change', paintGovServices);
+    paintGovServices();
+    search?.addEventListener('input', () => {
+      const q = String(search.value || '').toLowerCase();
+      const match = GOV_DEPARTMENTS.filter((d) => d.name.toLowerCase().includes(q) || d.id.includes(q));
+      if (!deptSel) return;
+      deptSel.innerHTML = (match.length ? match : GOV_DEPARTMENTS)
+        .map((d) => `<option value="${esc(d.id)}">${esc(d.name)}</option>`)
+        .join('');
+      paintGovServices();
+    });
+    govForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      void (async () => {
+        const fd = new FormData(govForm);
+        const deptId = fd.get('govDepartment');
+        const dept = departmentById(deptId);
+        const service = String(fd.get('govService') || 'Government service');
+        const org =
+          deptId === 'other'
+            ? String(fd.get('otherOrganisation') || 'Organisation').trim()
+            : dept?.name || 'Government';
+        const saved = await persistTaskCreate({
+          title: `${service}`,
+          dueAt: fd.get('deadline') ? combineDateTime(fd.get('deadline'), '09:00') : null,
+          status: 'open',
+          categoryId: 'applications',
+          taskType: 'government',
+          taskKind: 'preparation',
+          progress: 0,
+          notes: fd.get('notes') || fd.get('reference') || '',
+          checklist: ['Confirm official portal', 'Gather ID and forms', 'Complete application', 'Book appointment if needed'],
+          meta: {
+            organisation: org,
+            govDepartment: deptId,
+            govDepartmentName: dept?.name || org,
+            govService: service,
+            assistGoals: fd.getAll('assist'),
+            reference: fd.get('reference'),
+          },
+        });
+        finishTaskAssign(saved, { tab: 'open', toast: 'Government application assigned to Sarah.' });
+      })();
+    });
+  }
+
   const schemaForm = root.querySelector('#stSchemaForm');
   schemaForm?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1332,7 +1429,19 @@ function applyHooks(options = {}) {
     onDelegate: options.onDelegate ?? hooks.onDelegate,
     fetchTaskWorkspace: options.fetchTaskWorkspace ?? hooks.fetchTaskWorkspace,
     sendTaskMessage: options.sendTaskMessage ?? hooks.sendTaskMessage,
+    updateTask: options.updateTask ?? hooks.updateTask,
+    fetchTasks: options.fetchTasks ?? hooks.fetchTasks,
+    createTask: options.createTask ?? hooks.createTask,
   };
+}
+
+export function openSarahTaskWorkspace(taskId) {
+  const id = String(taskId || '').trim();
+  if (!id) return;
+  workspaceTaskId = id;
+  detailTaskId = null;
+  view = 'workspace';
+  paint();
 }
 
 export function mountSarahTasksHub(options = {}, { preserveNavigation = false } = {}) {

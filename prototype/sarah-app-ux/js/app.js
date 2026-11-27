@@ -1131,6 +1131,7 @@ function classifyLiveNotif(n) {
   const ch = String(n.channel || '').toLowerCase();
   const type = String(n.type || '').toLowerCase();
   if (ch === 'announcements' || type.includes('announcement')) return 'announcement';
+  if (type.includes('task') || ch === 'tasks' || type === 'task_update') return 'task';
   if (type.includes('work') || ch === 'sarah_work') return 'work';
   if (type.includes('reminder') || ch === 'reminders' || ch === 'sarah_reminders') return 'reminder';
   if (type.includes('usage') || ch === 'sarah_usage' || type === 'usage_alert') return 'usage';
@@ -1173,6 +1174,10 @@ function handlePushPayload(payload = {}) {
   const deepLink = String(data.deepLink || '').toLowerCase();
   if (deepLink.startsWith('news') && typeof globalThis.setRoute === 'function') {
     globalThis.setRoute('news');
+  }
+  if (deepLink.startsWith('tasks/')) {
+    const taskId = decodeURIComponent(deepLink.slice('tasks/'.length).split('/')[0] || '').trim();
+    if (taskId) void openSarahTaskFromDeepLink(taskId);
   }
   const kind =
     rawType === 'sarah_reminder' || rawType === 'reminders' || rawType.includes('reminder') || channel === 'reminders'
@@ -1709,15 +1714,23 @@ function renderLiveNotifications(host) {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.liveNotifId;
       const item = liveNotifs.items.find((n) => n.notificationId === id);
-      if (!item || item.read) return;
-      item.read = true;
-      liveNotifs.unread = Math.max(0, liveNotifs.unread - 1);
-      btn.classList.remove('is-unread');
-      syncNotificationBadge();
-      const res = await window.SarahLive.markNotificationsRead({ ids: [id] });
-      if (!res.error && typeof res.unread === 'number') {
-        liveNotifs.unread = res.unread;
+      if (!item) return;
+      if (!item.read) {
+        item.read = true;
+        liveNotifs.unread = Math.max(0, liveNotifs.unread - 1);
+        btn.classList.remove('is-unread');
         syncNotificationBadge();
+        const res = await window.SarahLive.markNotificationsRead({ ids: [id] });
+        if (!res.error && typeof res.unread === 'number') {
+          liveNotifs.unread = res.unread;
+          syncNotificationBadge();
+        }
+      }
+      const dl = String(item.deepLink || '').toLowerCase();
+      const taskId = item.taskId || (dl.startsWith('tasks/') ? dl.slice('tasks/'.length).split('/')[0] : '');
+      if (taskId) {
+        closeProtoNotifSheet();
+        void openSarahTaskFromDeepLink(taskId);
       }
     });
   });
@@ -2764,6 +2777,15 @@ function showWorkTasksHub(prompt = '') {
     location.hash = hash;
   }
   applyMySarahPanel('tasks', prompt || '');
+}
+
+async function openSarahTaskFromDeepLink(taskId) {
+  const id = String(taskId || '').trim();
+  if (!id) return;
+  if (getRoute() !== 'home') setRoute('home');
+  showWorkTasksHub();
+  const mod = await loadSarahTasksModule();
+  mod.openSarahTaskWorkspace?.(id);
 }
 
 function goToMySarahWork(prompt) {
