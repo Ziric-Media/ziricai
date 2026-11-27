@@ -156,7 +156,12 @@ export async function createPersonalReminderFromApi(uid, body = {}) {
     let dueAt = body.dueAt;
     try {
         const { resolveReminderDueAt } = await import("./personalSarahTools.js");
-        dueAt = resolveReminderDueAt(body.dueAt, { userMessage: body.dueAt || body.notes, title: body.title });
+        const tz = String(body.timeZone || body.timezone || "Africa/Johannesburg").trim() || "Africa/Johannesburg";
+        dueAt = resolveReminderDueAt(body.dueAt, {
+            userMessage: body.dueAt || body.notes,
+            title: body.title,
+            timeZone: tz,
+        });
     } catch {
         /* keep raw */
     }

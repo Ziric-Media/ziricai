@@ -20,6 +20,7 @@ import {
     executePersonalSarahTool,
     resolveReminderDueAt,
     matchPersonalReminderIntent,
+    timeZoneForCtx,
 } from "./personalSarahTools.js";
 import { maybeCompleteSarahWorkTask } from "./personalSarahWorkCompletion.js";
 import { buildRecommendationsUiFromActions } from "./personalSarahRecommendationsUi.js";
@@ -49,7 +50,7 @@ function matchDemoPersonalIntent(message) {
     if (/\bremind\b|\breminder\b|\balarm\b|\bremember to\b/.test(lower)) {
         const titleMatch = message.match(/remind(?: me)?(?: to)?\s+(.+)/i);
         const rawTitle = (titleMatch?.[1] || "Reminder").trim().slice(0, 120);
-        const dueAt = resolveReminderDueAt(null, { userMessage: message, title: rawTitle });
+        const dueAt = resolveReminderDueAt(null, { userMessage: message, title: rawTitle, timeZone: "Africa/Johannesburg" });
         return {
             tool: "createPersonalReminder",
             args: { title: rawTitle, dueAt },
@@ -246,7 +247,7 @@ export async function handlePersonalSarahChat(auth, input) {
     }
 
     const reminderSaved = actions.some((a) => a.tool === "createPersonalReminder" && a.success);
-    const reminderIntent = matchPersonalReminderIntent(message);
+    const reminderIntent = matchPersonalReminderIntent(message, timeZoneForCtx(ctx));
     if (!reminderSaved && reminderIntent) {
         const intent = reminderIntent;
         const forced = await executePersonalSarahTool(

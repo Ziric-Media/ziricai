@@ -33,11 +33,82 @@ function defaultDueAtIso(minutesFromNow = 30) {
     return new Date(Date.now() + minutesFromNow * 60_000).toISOString();
 }
 
+function calendarYmdInZone(date, timeZone) {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(date);
+}
+
+function addDaysToYmd(ymd, days) {
+    const [y, m, d] = ymd.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d + days));
+    return dt.toISOString().slice(0, 10);
+}
+
+function localYmdInZone(ref, timeZone, dayOffset = 0) {
+    let ymd = calendarYmdInZone(ref, timeZone);
+    if (dayOffset) ymd = addDaysToYmd(ymd, dayOffset);
+    const [y, m, d] = ymd.split("-").map(Number);
+    return { y, m, d };
+}
+
+/** Wall clock in user TZ → UTC ISO (Railway runs in UTC; never use setHours on server). */
+export function wallClockToIsoUtc(y, m, d, hour, minute, timeZone) {
+    let ts = Date.UTC(y, m - 1, d, hour, minute, 0, 0);
+    for (let n = 0; n < 8; n++) {
+        const parts = new Intl.DateTimeFormat("en-GB", {
+            timeZone,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        }).formatToParts(new Date(ts));
+        const got = {
+            y: Number(parts.find((p) => p.type === "year")?.value),
+            m: Number(parts.find((p) => p.type === "month")?.value),
+            d: Number(parts.find((p) => p.type === "day")?.value),
+            h: Number(parts.find((p) => p.type === "hour")?.value),
+            mi: Number(parts.find((p) => p.type === "minute")?.value),
+        };
+        if (got.y === y && got.m === m && got.d === d && got.h === hour && got.mi === minute) {
+            return new Date(ts).toISOString();
+        }
+        const wantMin = hour * 60 + minute;
+        const gotMin = got.h * 60 + got.mi;
+        let deltaMin = wantMin - gotMin;
+        if (got.y !== y || got.m !== m || got.d !== d) {
+            deltaMin += (y - got.y) * 525_600;
+        }
+        if (deltaMin > 12 * 60) deltaMin -= 24 * 60;
+        if (deltaMin < -12 * 60) deltaMin += 24 * 60;
+        ts += deltaMin * 60_000;
+    }
+    return new Date(ts).toISOString();
+}
+
+function setWallClockInZone(ref, match, timeZone, dayOffset = 0) {
+    if (!match) return defaultDueAtIso(30);
+    let hour = Number(match[1]);
+    const minute = match[2] ? Number(match[2]) : 0;
+    const ampm = (match[3] || "").toLowerCase();
+    if (ampm === "pm" && hour < 12) hour += 12;
+    if (ampm === "am" && hour === 12) hour = 0;
+    const { y, m, d } = localYmdInZone(ref, timeZone, dayOffset);
+    return wallClockToIsoUtc(y, m, d, hour, minute, timeZone);
+}
+
 /** Resolve due time from tool args and optional user wording (ISO, relative, or short defaults). */
-export function resolveReminderDueAt(dueAtInput, { userMessage = "", title = "" } = {}) {
+export function resolveReminderDueAt(dueAtInput, { userMessage = "", title = "", timeZone = "Africa/Johannesburg" } = {}) {
+    const tz = String(timeZone || "Africa/Johannesburg").trim() || "Africa/Johannesburg";
     const rawDue = String(dueAtInput || "").trim();
     const haystack = [rawDue, String(userMessage || ""), String(title || "")].filter(Boolean).join(" ");
     const lower = haystack.toLowerCase();
+    const now = new Date();
 
     if (rawDue) {
         const explicit = Date.parse(rawDue);
@@ -57,67 +128,41 @@ export function resolveReminderDueAt(dueAtInput, { userMessage = "", title = "" 
         return new Date(Date.now() + ms).toISOString();
     }
 
-  const setClock = (baseDate, match) => {
-        if (!match) return baseDate;
-        let hour = Number(match[1]);
-        const minute = match[2] ? Number(match[2]) : 0;
-        const ampm = (match[3] || "").toLowerCase();
-        if (ampm === "pm" && hour < 12) hour += 12;
-        if (ampm === "am" && hour === 12) hour = 0;
-        baseDate.setHours(hour, minute, 0, 0);
-        return baseDate;
-    };
+    const timeMatch =
+        lower.match(/\bat\s+(\d{1,2}):(\d{2})\b/i) ||
+        lower.match(/\b(\d{1,2}):(\d{2})\b/) ||
+        lower.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i) ||
+        lower.match(/\bat\s+(\d{1,2})\b(?!\s*(am|pm))/);
 
     if (/\btomorrow\b/.test(lower)) {
-        const d = new Date();
-        d.setDate(d.getDate() + 1);
-        const tm = lower.match(/(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
-        return setClock(d, tm).toISOString();
-    }
-
-    const atTime = lower.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
-    if (atTime) {
-        const d = new Date();
-        return setClock(d, atTime).toISOString();
+        return setWallClockInZone(now, timeMatch, tz, 1);
     }
 
     if (/\bfor\s+today\b|\btoday\b|\bthis\s+evening\b|\btonight\b/i.test(lower)) {
-        const tm =
-            lower.match(/(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i) ||
-            lower.match(/\b(\d{1,2}):(\d{2})\b/);
-        const d = new Date();
-        return setClock(d, tm).toISOString();
+        return setWallClockInZone(now, timeMatch, tz, 0);
     }
 
-    const clock24 = lower.match(/\b(?:at\s+)?(\d{1,2}):(\d{2})\b/);
-    if (clock24) {
-        const d = new Date();
-        return setClock(d, clock24).toISOString();
-    }
-
-    const clockLoose = lower.match(/\bat\s+(\d{1,2})\b(?!\s*(am|pm))/);
-    if (clockLoose) {
-        const d = new Date();
-        return setClock(d, [clockLoose[1], "0", ""]).toISOString();
+    if (timeMatch) {
+        return setWallClockInZone(now, timeMatch, tz, 0);
     }
 
     return defaultDueAtIso(30);
 }
 
 /** Detect reminder intent from user message (used when the model skips the tool). */
-export function matchPersonalReminderIntent(message) {
+export function matchPersonalReminderIntent(message, timeZone = "Africa/Johannesburg") {
     const text = String(message || "").trim();
     if (!text) return null;
     if (!/\bremind\b|\breminder\b|\balarm\b|\bremember to\b|\bset\s+a\s+reminder\b/i.test(text)) return null;
     let rawTitle = text
-        .replace(/^[\s\S]*\b(?:remind(?:\s+me)?|set\s+a\s+reminder|schedule\s+a\s+reminder|reminder)\s+(?:for|to)\s+/i, "")
-        .replace(/\s+(?:at|@)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?.*$/i, "")
-        .replace(/\s+for\s+today\b.*$/i, "")
-        .replace(/\s+today\b.*$/i, "")
+        .replace(/^[\s\S]*\bremind(?:\s+me)?\s+/i, "")
+        .replace(/^(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s+/i, "")
+        .replace(/^today\s+(?:to\s+)?/i, "")
+        .replace(/^(?:for|to)\s+/i, "")
         .trim();
     if (!rawTitle) rawTitle = text.slice(0, 120);
     rawTitle = rawTitle.slice(0, 120) || "Reminder";
-    const dueAt = resolveReminderDueAt(null, { userMessage: text, title: rawTitle });
+    const dueAt = resolveReminderDueAt(null, { userMessage: text, title: rawTitle, timeZone });
     return { title: rawTitle, dueAt };
 }
 
@@ -153,7 +198,7 @@ function formatReminderDueLabel(iso, timeZone = "Africa/Johannesburg") {
     }
 }
 
-function timeZoneForCtx(ctx = {}) {
+export function timeZoneForCtx(ctx = {}) {
     const tz = String(ctx.timeZone || ctx.consumerProfile?.timeZone || "").trim();
     if (tz) return tz;
     const country = String(ctx.country || "").toUpperCase();
@@ -230,6 +275,7 @@ export async function executePersonalSarahTool(toolName, ctx, args = {}, opts = 
             const dueAt = resolveReminderDueAt(args.dueAt, {
                 userMessage: opts.userMessage || "",
                 title: args.title,
+                timeZone: timeZoneForCtx(ctx),
             });
             const task = await createPersonalReminder(ctx.uid, { ...args, dueAt });
             try {

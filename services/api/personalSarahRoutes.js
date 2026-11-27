@@ -629,7 +629,9 @@ export async function handleCancelPersonalSarahWork(req, res) {
 export async function handleCreatePersonalSarahReminder(req, res) {
     try {
         const uid = req.consumerAuth.uid;
-        const task = await createPersonalReminderFromApi(uid, req.body || {});
+        const profile = req.consumerAuth.profile || {};
+        const timeZone = profile.timeZone || profile.timezone || "Africa/Johannesburg";
+        const task = await createPersonalReminderFromApi(uid, { ...(req.body || {}), timeZone });
         try {
             const { createSarahReminderScheduledNotification } = await import("../network/notificationService.js");
             await createSarahReminderScheduledNotification(uid, {
