@@ -13,6 +13,7 @@ import {
   isExecutionTaskType,
   schemaKeyFor,
 } from './sarah-tasks-catalog.mjs';
+import { bindTaskWorkspace, renderTaskWorkspace } from './sarah-task-workspace.mjs';
 
 const STORAGE_KEY = 'sarah.st.tasks.proto.v1';
 
@@ -61,12 +62,13 @@ const CATEGORIES = [
   },
 ];
 
-let view = 'hub'; // hub | categories | types | form | detail
+let view = 'hub'; // hub | categories | types | form | detail | workspace
 let tab = 'today';
 let categoryId = null;
 let formKind = null;
 let taskTypeId = null;
 let detailTaskId = null;
+let workspaceTaskId = null;
 let hooks = {};
 let cachedReminders = [];
 let remindersFetchedAt = 0;
@@ -142,8 +144,49 @@ function mapServerTask(t) {
     notes: t.notes,
     reminderSchedule: t.reminderSchedule,
     meta: t.meta,
+    lifecycleState: t.lifecycleState,
+    sessionId: t.sessionId,
+    sarahPhase: t.sarahPhase,
+    planSummary: t.planSummary,
     source: 'server',
   };
+}
+
+function goToTask(task) {
+  if (!task?.id) return;
+  if (String(task.id).startsWith('task-')) {
+    workspaceTaskId = task.id;
+    detailTaskId = null;
+    view = 'workspace';
+  } else {
+    detailTaskId = task.id;
+    workspaceTaskId = null;
+    view = 'detail';
+  }
+}
+
+function openWorkspaceAfterAssign(saved) {
+  if (!saved?.id) return false;
+  if (String(saved.id).startsWith('task-') && saved.sessionId) {
+    workspaceTaskId = saved.id;
+    view = 'workspace';
+    detailTaskId = null;
+    return true;
+  }
+  return false;
+}
+
+function finishTaskAssign(saved, { tab: nextTab = 'open', toast } = {}) {
+  if (!saved) return;
+  if (openWorkspaceAfterAssign(saved)) {
+    hooks.toast?.(toast || 'Assigned to Sarah — opening workspace…');
+    paint();
+    return;
+  }
+  hooks.toast?.(toast || 'Saved on this device — sign in on a paid plan to assign Sarah.');
+  view = 'hub';
+  tab = nextTab;
+  paint();
 }
 
 function mapLiveReminders(rows) {
@@ -449,7 +492,7 @@ function renderMeetingForm() {
       <label class="st-field"><span>Notes</span><textarea name="notes" rows="3" placeholder="Agenda, parking, dial-in…"></textarea></label>
       <aside class="st-preview" id="stFormPreview" aria-live="polite"></aside>
       <p class="st-proto-note">Sarah saves one meeting task and schedules each reminder time on your account.</p>
-      <button type="submit" class="st-submit-btn">Create task</button>
+      <button type="submit" class="st-submit-btn">Assign to Sarah</button>
     </form>`;
 }
 
@@ -476,7 +519,7 @@ function renderInterviewForm() {
       <label class="st-field"><span>Job description (optional)</span><textarea name="jd" rows="3" placeholder="Paste key requirements…"></textarea></label>
       <label class="st-field"><span>Special instructions</span><textarea name="notes" rows="2"></textarea></label>
       <div class="st-checklist-preview"><h3>Sarah preparation plan</h3><ul>${INTERVIEW_CHECKLIST.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>
-      <button type="submit" class="st-submit-btn">Save preparation task</button>
+      <button type="submit" class="st-submit-btn">Assign to Sarah</button>
     </form>`;
 }
 
@@ -500,7 +543,7 @@ function renderDepartureForm() {
         <button type="button" class="st-cat-select st-add-item-btn" id="stDepAddItem">Add</button>
       </div>
       <label class="st-check"><input type="checkbox" name="saveProfile" checked /> Save changes to this profile</label>
-      <button type="submit" class="st-submit-btn">Create checklist task</button>
+      <button type="submit" class="st-submit-btn">Assign to Sarah</button>
     </form>`;
 }
 
@@ -523,7 +566,7 @@ function renderTripForm() {
       <label class="st-field"><span>Accommodation</span><input name="accommodation" placeholder="Hotel, address, booking ref" /></label>
       <div class="st-checklist-preview"><h3>Travel checklist</h3><ul>${TRIP_CHECKLIST.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
       <p class="st-preview-note">Timeline reminders (7 / 3 / 1 day) activate with ST-03.</p></div>
-      <button type="submit" class="st-submit-btn">Save trip preparation</button>
+      <button type="submit" class="st-submit-btn">Assign to Sarah</button>
     </form>`;
 }
 
@@ -549,7 +592,7 @@ function renderSchemaForm(schema) {
     <form class="st-form" id="stSchemaForm" data-schema-key="${esc(schema.taskType)}">
       ${fields}
       <p class="st-proto-note">${esc(schema.footnote || 'Saved to your Sarah account when signed in on a paid plan.')}</p>
-      <button type="submit" class="st-submit-btn">Save task</button>
+      <button type="submit" class="st-submit-btn">Assign to Sarah</button>
     </form>`;
 }
 
@@ -675,10 +718,66 @@ function paintSync() {
   if (view === 'categories') root.innerHTML = renderCategories();
   else if (view === 'types') root.innerHTML = renderTypePicker();
   else if (view === 'form') root.innerHTML = pickForm();
-  else if (view === 'detail') root.innerHTML = renderDetail(reminders);
+  else if (view === 'workspace') {
+    /* async workspace paint */
+  } else if (view === 'detail') root.innerHTML = renderDetail(reminders);
   else root.innerHTML = renderHub(reminders);
-  bind(root, reminders);
+  if (view !== 'workspace') bind(root, reminders);
   return root;
+}
+
+async function paintWorkspace(root) {
+  if (!workspaceTaskId) {
+    view = 'hub';
+    paint();
+    return;
+  }
+  root.innerHTML = `<p class="st-loading">Loading task workspace…</p>`;
+  const res = hooks.fetchTaskWorkspace
+    ? await hooks.fetchTaskWorkspace(workspaceTaskId)
+    : { error: 'Sign in to open task workspace.' };
+  if (res?.error || !res?.task) {
+    root.innerHTML = `<header class="st-subhead"><button type="button" class="st-back" data-st-back>← Back</button><p>${esc(res?.error || 'Task not found')}</p></header>`;
+    root.querySelector('[data-st-back]')?.addEventListener('click', () => {
+      view = 'hub';
+      paint();
+    });
+    return;
+  }
+  root.innerHTML = renderTaskWorkspace(res.task, res.session, esc);
+  bindTaskWorkspace(root, {
+    esc,
+    hooks: {
+      ...hooks,
+      sendTaskMessage: async (message) => hooks.sendTaskMessage?.(workspaceTaskId, message),
+    },
+    onBack: () => {
+      view = 'hub';
+      workspaceTaskId = null;
+      paint();
+    },
+    onRefresh: async () => {
+      const fresh = await hooks.fetchTaskWorkspace?.(workspaceTaskId);
+      if (fresh?.task) root.innerHTML = renderTaskWorkspace(fresh.task, fresh.session, esc);
+      bindTaskWorkspace(root, {
+        esc,
+        hooks: {
+          ...hooks,
+          sendTaskMessage: async (message) => hooks.sendTaskMessage?.(workspaceTaskId, message),
+        },
+        onBack: () => {
+          view = 'hub';
+          workspaceTaskId = null;
+          paint();
+        },
+        onRefresh: async () => paintWorkspace(root),
+      });
+      const thread = root.querySelector('#stWsThread');
+      if (thread) thread.scrollTop = thread.scrollHeight;
+    },
+  });
+  const thread = root.querySelector('#stWsThread');
+  if (thread) thread.scrollTop = thread.scrollHeight;
 }
 
 function syncHubTabUi(root) {
@@ -696,7 +795,7 @@ function repaintHubBody(root, reminders = cachedReminders) {
   wrap.innerHTML =
     tab === 'templates' ? renderTemplates() : `<ul class="st-task-list">${renderTaskCards(filterTab(tasks, tab))}</ul>`;
   syncHubTabUi(root);
-  bindTaskOpens(root);
+  bindTaskOpens(root, reminders);
   root.querySelectorAll('[data-st-template]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-st-template') || '';
@@ -722,6 +821,11 @@ function applyHubReminders(root, reminders) {
 }
 
 function paint() {
+  if (view === 'workspace') {
+    const root = document.getElementById('stRoot');
+    if (root) void paintWorkspace(root);
+    return;
+  }
   const root = paintSync();
   if (!root) return;
   if (view !== 'hub') return;
@@ -732,11 +836,12 @@ function paint() {
     });
 }
 
-function bindTaskOpens(root) {
+function bindTaskOpens(root, reminders = cachedReminders) {
   root.querySelectorAll('[data-st-task]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      detailTaskId = btn.getAttribute('data-st-task');
-      view = 'detail';
+      const id = btn.getAttribute('data-st-task');
+      const task = findTaskById(id, reminders) || { id };
+      goToTask(task);
       paint();
     });
   });
@@ -747,7 +852,7 @@ function bind(root, reminders) {
     view = 'categories';
     paint();
   });
-  bindTaskOpens(root);
+  bindTaskOpens(root, reminders);
   root.querySelectorAll('[data-st-tab]').forEach((btn) => {
     btn.addEventListener('click', () => {
       tab = btn.getAttribute('data-st-tab') || 'today';
@@ -923,11 +1028,7 @@ function bind(root, reminders) {
         progress: 0,
         meta: Object.fromEntries(new FormData(interview)),
       });
-      if (!saved) return;
-      hooks.toast?.('Preparation task saved — open it for checklist and mock interview.');
-      view = 'hub';
-      tab = 'preparation';
-      paint();
+      finishTaskAssign(saved, { tab: 'preparation', toast: 'Interview prep assigned to Sarah.' });
     })();
   });
 
@@ -948,11 +1049,7 @@ function bind(root, reminders) {
         notes: fd.get('accommodation') || '',
         meta: Object.fromEntries(fd),
       });
-      if (!saved) return;
-      hooks.toast?.('Trip preparation saved.');
-      view = 'hub';
-      tab = 'preparation';
-      paint();
+      finishTaskAssign(saved, { tab: 'preparation', toast: 'Trip prep assigned to Sarah.' });
     })();
   });
 
@@ -1016,11 +1113,7 @@ function bind(root, reminders) {
           progress: 0,
           checklist: depItems.map((label) => ({ label, done: false })),
         });
-        if (!saved) return;
-        hooks.toast?.('Checklist ready — tap the task to tick items off.');
-        view = 'hub';
-        tab = 'preparation';
-        paint();
+        finishTaskAssign(saved, { tab: 'preparation', toast: 'Before-you-leave checklist assigned to Sarah.' });
       })();
     });
   }
@@ -1037,6 +1130,9 @@ function bind(root, reminders) {
       const date = fd.get('date') || fd.get('deadline') || fd.get('start');
       const time = fd.get('time');
       const taskKind = isExecution ? 'execution' : categoryId === 'reminders' ? 'reminder' : 'preparation';
+      const meta = Object.fromEntries(fd);
+      const org = fd.get('company') || fd.get('institution') || fd.get('organisation');
+      if (org) meta.organisation = org;
       const saved = await persistTaskCreate({
         title,
         dueAt:
@@ -1050,14 +1146,12 @@ function bind(root, reminders) {
         progress: 0,
         notes: fd.get('notes') || fd.get('list') || '',
         checklist: (schema?.checklist || []).map((label) => ({ label, done: false })),
-        meta: Object.fromEntries(fd),
+        meta,
       });
-      if (!saved) return;
-      if (isExecution) hooks.toast?.('Saved — Sarah will help after you approve in chat.');
-      else hooks.toast?.('Task saved.');
-      view = 'hub';
-      tab = isExecution ? 'waiting' : 'open';
-      paint();
+      finishTaskAssign(saved, {
+        tab: isExecution ? 'waiting' : 'open',
+        toast: isExecution ? 'Assigned — approve in the task workspace when ready.' : 'Assigned to Sarah.',
+      });
     })();
   });
 }
@@ -1081,7 +1175,7 @@ function saveProto(task) {
 
 async function persistTaskCreate(task) {
   if (hooks.createTask) {
-    const res = await hooks.createTask(task);
+    const res = await hooks.createTask({ ...task, assignToSarah: task.assignToSarah !== false });
     if (res?.error) {
       if (res.code === 'TASK_ALLOWANCE') {
         hooks.toast?.('Sarah Tasks need a paid plan. Upgrade in Billing.');
@@ -1089,7 +1183,7 @@ async function persistTaskCreate(task) {
       return null;
     }
     invalidateReminderCache();
-    return res.task;
+    return res.task || res;
   }
   return saveProto(task);
 }
@@ -1225,10 +1319,7 @@ async function submitMeeting(form) {
   invalidateReminderCache();
   hooks.onReminderCreated?.(saved);
   void scheduleClientReminders(schedule, title, primaryNote);
-  hooks.toast?.('Meeting reminder created.');
-  view = 'hub';
-  tab = 'today';
-  paint();
+  finishTaskAssign(saved, { tab: 'today', toast: 'Meeting assigned to Sarah.' });
 }
 
 function applyHooks(options = {}) {
@@ -1239,6 +1330,8 @@ function applyHooks(options = {}) {
     createReminder: options.createReminder ?? hooks.createReminder,
     onReminderCreated: options.onReminderCreated ?? hooks.onReminderCreated,
     onDelegate: options.onDelegate ?? hooks.onDelegate,
+    fetchTaskWorkspace: options.fetchTaskWorkspace ?? hooks.fetchTaskWorkspace,
+    sendTaskMessage: options.sendTaskMessage ?? hooks.sendTaskMessage,
   };
 }
 
@@ -1267,4 +1360,5 @@ export function resetSarahTasksView() {
   formKind = null;
   taskTypeId = null;
   detailTaskId = null;
+  workspaceTaskId = null;
 }

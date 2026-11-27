@@ -5076,6 +5076,8 @@ function sarahTasksHubOptions() {
     createReminder: (body) => window.SarahLive?.createPersonalReminder?.(body),
     createTask: (body) => window.SarahLive?.createPersonalSarahTask?.(body),
     updateTask: (id, patch) => window.SarahLive?.updatePersonalSarahTask?.(id, patch),
+    fetchTaskWorkspace: (id) => window.SarahLive?.fetchPersonalSarahTaskWorkspace?.(id),
+    sendTaskMessage: (id, message) => window.SarahLive?.sendPersonalSarahTaskMessage?.(id, message),
     onReminderCreated: async (rem) => {
       if (rem?.id) {
         try {

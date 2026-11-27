@@ -16,6 +16,7 @@ import {
 import { schedulePersonalTaskReminderNotifications } from "../services/sarah/personal/personalSarahTaskReminders.js";
 import { deliverDuePersonalReminders } from "../services/sarah/personal/personalSarahReminderDelivery.js";
 import { runPersonalSarahReminderSchedulerTick } from "../services/sarah/personal/personalSarahReminderScheduler.js";
+import { assignPersonalSarahTask } from "../services/sarah/personal/personalSarahTaskOrchestrator.js";
 
 await bootstrapConsumerProfile("u-ps-1", {
     email: "spencer@test.com",
@@ -86,6 +87,18 @@ await createPersonalSarahTask("u-ps-2", {
 });
 const tick = await runPersonalSarahReminderSchedulerTick();
 assert.ok(tick.users >= 1);
+
+const assignPrep = await createPersonalSarahTask("u-ps-1", {
+    title: "Central Motors meeting prep",
+    taskKind: "preparation",
+    categoryId: "preparation",
+    taskType: "business_meeting",
+});
+const assigned = await assignPersonalSarahTask("u-ps-1", assignPrep.id);
+assert.ok(assigned.session?.id);
+assert.equal(assigned.task.sessionId, assigned.session.id);
+assert.ok((assigned.session.messages || []).length >= 1);
+assert.equal(assigned.task.lifecycleState, "awaiting_user");
 
 const r2 = await handlePersonalSarahChat(
     {

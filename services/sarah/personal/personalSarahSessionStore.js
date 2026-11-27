@@ -37,6 +37,7 @@ function normalizeSession(docId, data) {
         id: docId,
         userId: data.userId,
         surface: data.surface || SURFACE,
+        mode: data.mode || "chat",
         title: data.title || "My Sarah",
         messages: Array.isArray(data.messages) ? data.messages : [],
         recentActions: Array.isArray(data.recentActions) ? data.recentActions : [],
@@ -65,6 +66,7 @@ async function writeToFirestore(session) {
     const payload = {
         userId: session.userId,
         surface: session.surface || SURFACE,
+        mode: session.mode || "chat",
         title: session.title,
         messages: session.messages,
         recentActions: session.recentActions,
@@ -225,6 +227,8 @@ export function serializePersonalSarahSessionDetail(session) {
     return {
         id: session.id,
         title: session.title || "My Sarah",
+        mode: session.mode || "chat",
+        context: session.context || {},
         messages: session.messages || [],
         updatedAt: session.updatedAt,
         lastMessageAt: session.lastMessageAt || session.updatedAt,
@@ -251,19 +255,22 @@ export async function getPersonalSarahSessionForUser(userId, sessionId) {
 
 /**
  * @param {string} userId
- * @param {{ title?: string }} [options]
+ * @param {{ title?: string, mode?: string, context?: object }} [options]
  */
 export async function createPersonalSarahSession(userId, options = {}) {
     if (!userId) return null;
     const title = String(options.title || "My Sarah").trim() || "My Sarah";
+    const mode = String(options.mode || "chat").trim() || "chat";
+    const context = options.context && typeof options.context === "object" ? { ...options.context } : {};
     const session = {
         id: createSessionId(),
         userId,
         surface: SURFACE,
+        mode,
         title,
         messages: [],
         recentActions: [],
-        context: {},
+        context,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         lastMessageAt: Date.now(),

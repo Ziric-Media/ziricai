@@ -21,6 +21,7 @@
 | ST-01E | Gate | UX review + formal approval → unlock ST-02 |
 | ST-02 | Engine | **v1 shipped** — Firestore tasks API, allowance, client sync (`/api/personal-sarah/tasks`) |
 | ST-03 | Reminders | **v3 on prod** — per-slot delivery, server scheduler (~60s), FCM push; test matrix below |
+| ST-UX-01 | Task workspace | **v1 shipped** — Assign to Sarah, per-task session, composer, typing/working |
 | ST-04 | Intelligence | Generated checklists, timelines, suggestions |
 | ST-05 | Execution | Research, drafts, bookings with approval |
 | ST-06 | Personalisation | Routines, templates, learning |

@@ -682,6 +682,16 @@ export async function handleCreatePersonalSarahTask(req, res) {
             body.status = body.status || "scheduled";
         }
         const task = await createPersonalSarahTask(uid, body);
+        const assignToSarah = body.assignToSarah !== false;
+        let assigned = null;
+        if (assignToSarah) {
+            try {
+                const { assignPersonalSarahTask } = await import("../sarah/personal/personalSarahTaskOrchestrator.js");
+                assigned = await assignPersonalSarahTask(uid, task.id);
+            } catch (err) {
+                console.warn("[api/personal-sarah/tasks]", "assign", err?.message || err);
+            }
+        }
         if (task.taskKind === "reminder" || task.type === "reminder" || (task.reminderSchedule || []).length) {
             try {
                 const { schedulePersonalTaskReminderNotifications } = await import(
@@ -692,10 +702,78 @@ export async function handleCreatePersonalSarahTask(req, res) {
                 console.warn("[api/personal-sarah/tasks]", err?.message || err);
             }
         }
-        res.status(201).json({ task });
+        res.status(201).json({
+            task: assigned?.task || task,
+            session: assigned?.session ? { id: assigned.session.id, messages: assigned.session.messages } : null,
+        });
     } catch (err) {
         const status = err.status || 500;
         res.status(status).json({ error: err.message || "Could not create task", code: err.code || "TASK_CREATE_ERROR" });
+    }
+}
+
+export async function handleAssignPersonalSarahTask(req, res) {
+    try {
+        const { assignPersonalSarahTask } = await import("../sarah/personal/personalSarahTaskOrchestrator.js");
+        const data = await assignPersonalSarahTask(req.consumerAuth.uid, req.params?.id);
+        res.json({
+            task: data.task,
+            session: data.session
+                ? {
+                      id: data.session.id,
+                      messages: data.session.messages,
+                      title: data.session.title,
+                  }
+                : null,
+        });
+    } catch (err) {
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message || "Assign failed", code: err.code || "TASK_ASSIGN_ERROR" });
+    }
+}
+
+export async function handlePersonalSarahTaskWorkspace(req, res) {
+    try {
+        const { getPersonalSarahTaskWorkspace } = await import("../sarah/personal/personalSarahTaskOrchestrator.js");
+        const data = await getPersonalSarahTaskWorkspace(req.consumerAuth.uid, req.params?.id);
+        if (!data) return res.status(404).json({ error: "Task not found", code: "TASK_NOT_FOUND" });
+        res.json({
+            task: data.task,
+            session: data.session
+                ? {
+                      id: data.session.id,
+                      title: data.session.title,
+                      messages: data.session.messages || [],
+                  }
+                : null,
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message || "Workspace load failed", code: "TASK_WORKSPACE_ERROR" });
+    }
+}
+
+export async function handlePersonalSarahTaskChat(req, res) {
+    try {
+        const message = String(req.body?.message || "").trim();
+        if (!message) return res.status(400).json({ error: "Message required", code: "MESSAGE_REQUIRED" });
+        const { handlePersonalSarahTaskMessage } = await import("../sarah/personal/personalSarahTaskOrchestrator.js");
+        const data = await handlePersonalSarahTaskMessage(req.consumerAuth.uid, req.params?.id, message, {
+            uid: req.consumerAuth.uid,
+            consumerProfile: req.consumerAuth.profile || {},
+        });
+        res.json({
+            task: data.task,
+            reply: data.reply,
+            session: data.session
+                ? {
+                      id: data.session.id,
+                      messages: data.session.messages || [],
+                  }
+                : null,
+        });
+    } catch (err) {
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message || "Task chat failed", code: err.code || "TASK_CHAT_ERROR" });
     }
 }
 
@@ -887,6 +965,9 @@ export function mountPersonalSarahRoutes(app) {
     app.get("/api/personal-sarah/tasks", requireConsumerScope(), handleListPersonalSarahTasks);
     app.get("/api/personal-sarah/tasks/:id", requireConsumerScope(), handleGetPersonalSarahTask);
     app.patch("/api/personal-sarah/tasks/:id", requireConsumerScope(), handlePatchPersonalSarahTask);
+    app.post("/api/personal-sarah/tasks/:id/assign", requireConsumerScope(), handleAssignPersonalSarahTask);
+    app.get("/api/personal-sarah/tasks/:id/workspace", requireConsumerScope(), handlePersonalSarahTaskWorkspace);
+    app.post("/api/personal-sarah/tasks/:id/chat", requireConsumerScope(), handlePersonalSarahTaskChat);
     app.get("/api/personal-sarah/reminders/due", requireConsumerScope(), handleDuePersonalSarahReminders);
 
     app.post("/api/personal-sarah/reminders/geo-check", requireConsumerScope(), handleGeofencePersonalSarahReminders);

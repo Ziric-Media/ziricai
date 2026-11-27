@@ -618,6 +618,31 @@ export async function createPersonalSarahTask(body = {}) {
   return { task: res.data?.task };
 }
 
+export async function fetchPersonalSarahTaskWorkspace(taskId) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const id = String(taskId || '').trim();
+  if (!id) return { error: 'Task id required', code: 'TASK_ID_REQUIRED' };
+  const res = await apiRequest(`/api/personal-sarah/tasks/${encodeURIComponent(id)}/workspace`, { silent: true });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { task: res.data?.task, session: res.data?.session };
+}
+
+export async function sendPersonalSarahTaskMessage(taskId, message) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const id = String(taskId || '').trim();
+  const text = String(message || '').trim();
+  if (!id || !text) return { error: 'Task id and message required', code: 'TASK_CHAT_INVALID' };
+  const res = await apiRequest(`/api/personal-sarah/tasks/${encodeURIComponent(id)}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: text }),
+  });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { task: res.data?.task, session: res.data?.session, reply: res.data?.reply };
+}
+
 export async function updatePersonalSarahTask(taskId, patch = {}) {
   const blocked = await requireSignedInConsumer();
   if (blocked) return blocked;
@@ -1490,6 +1515,8 @@ function mountPublicApi() {
     fetchPersonalSarahTasks,
     createPersonalSarahTask,
     updatePersonalSarahTask,
+    fetchPersonalSarahTaskWorkspace,
+    sendPersonalSarahTaskMessage,
     pollDuePersonalReminders,
     pollSarahNewsDelivery,
     checkPersonalReminderGeofence,
