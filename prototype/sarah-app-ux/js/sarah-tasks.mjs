@@ -127,10 +127,11 @@ function mapServerTask(t) {
   else if (raw === 'waiting') status = 'waiting';
   else if (raw === 'scheduled') status = 'open';
   else if (raw) status = raw;
+  const displayDueAt = t.meta?.eventAt || t.meta?.meetingAt || t.dueAt;
   return {
     id: t.id,
     title: t.title,
-    dueAt: t.dueAt,
+    dueAt: displayDueAt || t.dueAt,
     status,
     kind: t.taskKind || t.type,
     categoryId: t.categoryId || (t.taskKind === 'reminder' ? 'reminders' : null),
@@ -1218,7 +1219,7 @@ async function submitMeeting(form) {
     progress: 0,
     notes: primaryNote,
     reminderSchedule: schedule.length ? schedule : [{ label: `${leadMin} min before`, at: reminderAt }],
-    meta: { with: withWho, travel, ...Object.fromEntries(fd) },
+    meta: { eventAt: dueIso, with: withWho, travel, ...Object.fromEntries(fd) },
   });
   if (!saved) return;
   invalidateReminderCache();

@@ -87,6 +87,7 @@ export async function createPersonalSarahTask(uid, body = {}, opts = {}) {
         checklist,
         progress,
         reminderSchedule: Array.isArray(body.reminderSchedule) ? body.reminderSchedule.slice(0, 24) : [],
+        firedScheduleKeys: [],
         meta: body.meta && typeof body.meta === "object" ? body.meta : {},
         hiddenInList: Boolean(body.hiddenInList),
         createdAt: Date.now(),
@@ -202,6 +203,7 @@ const TASK_PATCH_KEYS = new Set([
     "progress",
     "meta",
     "reminderSchedule",
+    "firedScheduleKeys",
     "categoryId",
     "taskType",
     "taskKind",
@@ -220,6 +222,9 @@ export async function updatePersonalSarahTask(uid, taskId, patch = {}) {
         else next[k] = v;
     }
     if (patch.checklist) next.progress = checklistProgress(next.checklist);
+    if (patch.dueAt !== undefined || patch.reminderSchedule !== undefined) {
+        next.firedScheduleKeys = [];
+    }
     if (patch.status === "completed" || patch.status === "cancelled") {
         next.completedAt = Date.now();
     }
@@ -287,23 +292,27 @@ export async function listDuePersonalReminders(uid) {
  * @param {string} taskId
  */
 export async function markPersonalReminderFired(uid, taskId) {
-    if (!uid || !taskId) return;
+    return markReminderScheduleSlotFired(uid, taskId, "__main__");
+}
 
-    const key = taskKey(uid, taskId);
-    const memTask = memoryTasks.get(key);
-    if (memTask) {
-        memTask.status = "fired";
-        memTask.firedAt = Date.now();
-        memoryTasks.set(key, memTask);
+/**
+ * @param {string} uid
+ * @param {string} taskId
+ * @param {string} slotKey
+ */
+export async function markReminderScheduleSlotFired(uid, taskId, slotKey) {
+    if (!uid || !taskId || !slotKey) return null;
+    const existing = await getPersonalSarahTask(uid, taskId);
+    if (!existing) return null;
+    const fired = [...(Array.isArray(existing.firedScheduleKeys) ? existing.firedScheduleKeys : [])];
+    if (!fired.includes(slotKey)) fired.push(slotKey);
+    const { futureSlotsRemaining } = await import("./personalSarahReminderSlots.js");
+    const patch = { firedScheduleKeys: fired };
+    if (!futureSlotsRemaining(existing, fired)) {
+        const hasChecklist = Array.isArray(existing.checklist) && existing.checklist.length > 0;
+        patch.status = hasChecklist ? "open" : "fired";
     }
-
-    if (getConfiguredStorageBackend() === "memory" || !useAdminBackend()) return;
-
-    await setDoc(
-        personalSarahDocRef(uid, PERSONAL_SARAH_COLLECTIONS.TASKS, taskId),
-        { status: "fired", firedAt: serverTimestamp() },
-        { merge: true }
-    );
+    return updatePersonalSarahTask(uid, taskId, patch);
 }
 
 /**

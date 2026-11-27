@@ -723,7 +723,24 @@ export async function handleGetPersonalSarahTask(req, res) {
 
 export async function handlePatchPersonalSarahTask(req, res) {
     try {
-        const task = await updatePersonalSarahTask(req.consumerAuth.uid, req.params?.id, req.body || {});
+        const uid = req.consumerAuth.uid;
+        const patch = req.body || {};
+        const task = await updatePersonalSarahTask(uid, req.params?.id, patch);
+        if (
+            patch.dueAt !== undefined ||
+            patch.reminderSchedule !== undefined ||
+            patch.status === "open" ||
+            patch.status === "scheduled"
+        ) {
+            try {
+                const { schedulePersonalTaskReminderNotifications } = await import(
+                    "../sarah/personal/personalSarahTaskReminders.js"
+                );
+                await schedulePersonalTaskReminderNotifications(uid, task);
+            } catch (err) {
+                console.warn("[api/personal-sarah/tasks/patch]", err?.message || err);
+            }
+        }
         res.json({ task });
     } catch (err) {
         const status = err.status || 500;

@@ -20,7 +20,7 @@
 | ST-01D | Templates | Before You Leave profiles, trip/interview prep plans |
 | ST-01E | Gate | UX review + formal approval → unlock ST-02 |
 | ST-02 | Engine | **v1 shipped** — Firestore tasks API, allowance, client sync (`/api/personal-sarah/tasks`) |
-| ST-03 | Reminders | **v1 partial** — multi-slot inbox scheduling; full closed-app push/history ongoing |
+| ST-03 | Reminders | **v2 in progress** — per-slot delivery + reschedule inbox; FCM-when-closed hardening ongoing |
 | ST-04 | Intelligence | Generated checklists, timelines, suggestions |
 | ST-05 | Execution | Research, drafts, bookings with approval |
 | ST-06 | Personalisation | Routines, templates, learning |
@@ -54,4 +54,4 @@
 - [x] Before You Leave profiles editable (add/remove items, save profile)  
 - [x] Dashboard Next Actions + Preparation tab  
 - [x] Visual identity unchanged (purple / white)  
-- [ ] Spencer go for ST-02 technical brief (UAT pasteback)
+- [x] Spencer proceed → ST-03 engineering (UAT may run in parallel)

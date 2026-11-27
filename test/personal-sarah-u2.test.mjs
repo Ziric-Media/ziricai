@@ -14,6 +14,7 @@ import {
     listPersonalSarahTasks,
 } from "../services/sarah/personal/personalSarahTaskStore.js";
 import { schedulePersonalTaskReminderNotifications } from "../services/sarah/personal/personalSarahTaskReminders.js";
+import { deliverDuePersonalReminders } from "../services/sarah/personal/personalSarahReminderDelivery.js";
 
 await bootstrapConsumerProfile("u-ps-1", {
     email: "spencer@test.com",
@@ -64,6 +65,17 @@ const meet = await createPersonalSarahTask("u-ps-1", {
 });
 const sched = await schedulePersonalTaskReminderNotifications("u-ps-1", meet);
 assert.ok(sched.scheduled >= 1);
+
+const dueSoon = await createPersonalSarahTask("u-ps-1", {
+    title: "Slot test",
+    taskKind: "reminder",
+    status: "scheduled",
+    dueAt: new Date(Date.now() + 120000).toISOString(),
+    reminderSchedule: [{ label: "now", at: new Date(Date.now() - 1000).toISOString() }],
+});
+const delivered = await deliverDuePersonalReminders("u-ps-1");
+assert.ok(delivered.delivered >= 1);
+assert.ok(delivered.items.some((i) => String(i.id).startsWith(dueSoon.id)));
 
 const r2 = await handlePersonalSarahChat(
     {
