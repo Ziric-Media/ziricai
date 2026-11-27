@@ -357,13 +357,15 @@
           </div>
 
           <section class="ms-work-reminders" id="msWorkRemindersSection" aria-label="Scheduled reminders">
-            <header class="sw-home-section-head">
-              <h3>Reminders &amp; alarms</h3>
-              <button type="button" class="ms-link-btn" id="msWorkNewReminderBtn">Set reminder</button>
+            <header class="ms-work-reminders-head">
+              <div class="ms-work-reminders-head-copy">
+                <h3>Reminders &amp; alarms</h3>
+                <button type="button" class="ms-pill-btn ms-pill-btn--compact" id="msWorkNewReminderBtn">Set reminder</button>
+              </div>
+              <p class="ms-work-reminders-lead" id="msWorkRemindersLead">Sarah saves these here and alerts you at the due time (push + alarm).</p>
             </header>
-            <p class="ms-work-reminders-lead" id="msWorkRemindersLead">Sarah saves these here and alerts you at the due time (push + alarm).</p>
-            <ul class="sw-home-priority-list" id="msWorkRemindersList"></ul>
-            <button type="button" class="ms-pill-btn ms-pill-btn--ghost" id="msTryReminderDemo">Try a 1-minute test alarm</button>
+            <ul class="ms-work-reminders-list" id="msWorkRemindersList"></ul>
+            <button type="button" class="ms-pill-btn ms-pill-btn--ghost ms-work-reminders-test" id="msTryReminderDemo">Try a 1-minute test alarm</button>
           </section>
 
           <section class="sw-home-dashboard hidden" id="msWorkDashboard" aria-label="Sarah Work dashboard" hidden>

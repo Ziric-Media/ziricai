@@ -7,8 +7,45 @@ import { PERSONAL_SARAH_INTIMATE_VOICE_RULES } from "./personalSarahConversation
 
 const FOUNDER_COMPANY_IDENTITY_BLOCK = buildFounderCompanyIdentityBriefBlock();
 
+function defaultTimeZoneForContext(ctx) {
+    const tz = String(ctx.timeZone || ctx.consumerProfile?.timeZone || "").trim();
+    if (tz) return tz;
+    const country = String(ctx.country || "").toUpperCase();
+    if (country === "ZW" || country === "ZIMBABWE") return "Africa/Harare";
+    if (country === "GB" || country === "UK") return "Europe/London";
+    return "Africa/Johannesburg";
+}
+
+/** Authoritative clock for "today" / reminder scheduling (server-side; user profile TZ). */
+export function buildPersonalSarahClockBlock(ctx = {}) {
+    const timeZone = defaultTimeZoneForContext(ctx);
+    const now = new Date();
+    const long = new Intl.DateTimeFormat("en-ZA", {
+        timeZone,
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: false,
+    }).format(now);
+    const ymd = new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(now);
+    return `Clock (authoritative — never guess the calendar date):
+- User timezone: ${timeZone}
+- Now: ${long}
+- Today (local calendar): ${ymd}
+For reminders: interpret "today" as ${ymd}, "tomorrow" as the next local day. Always call createPersonalReminder; in chat confirmations use only the due time returned by the tool (do not invent weekdays or months).`;
+}
+
 export function buildPersonalSarahSystemPrompt(ctx) {
     const name = ctx.firstName || ctx.preferredName || "there";
+    const clockBlock = buildPersonalSarahClockBlock(ctx);
     const knowledgeBlock = ctx.knowledgeDigest
         ? `Authorized My Knowledge (user-controlled):\n${ctx.knowledgeDigest}`
         : "My Knowledge: user has not shared any sections with you yet, or sections are empty.";
@@ -75,6 +112,8 @@ Formatting (when helpful — not on every message):
 
 ${FOUNDER_COMPANY_IDENTITY_BLOCK}
 
+${clockBlock}
+
 User context:
 - Preferred name: ${name}
 - Full name: ${ctx.fullName || "unknown"}
@@ -106,6 +145,7 @@ export async function buildPersonalSarahContext(input) {
         city: profile.city || null,
         country: profile.country || null,
         locale: input.preferences?.locale || "en-ZA",
+        timeZone: profile.timeZone || profile.timezone || null,
         knowledgeDigest,
         sarahBehaviorBlock,
         consumerProfile: profile,

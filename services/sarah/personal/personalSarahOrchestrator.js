@@ -280,7 +280,10 @@ export async function handlePersonalSarahChat(auth, input) {
         reply = "I'm here — could you rephrase that?";
     }
 
-    if (session.mode !== "work") {
+    const savedReminder = actions.find((a) => a.tool === "createPersonalReminder" && a.success);
+    if (savedReminder?.message) {
+        reply = String(savedReminder.message).trim();
+    } else if (session.mode !== "work") {
         reply = polishPersonalSarahReply(reply);
     }
 

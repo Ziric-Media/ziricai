@@ -41,7 +41,10 @@ export function resolveReminderDueAt(dueAtInput, { userMessage = "", title = "" 
 
     if (rawDue) {
         const explicit = Date.parse(rawDue);
-        if (Number.isFinite(explicit)) return new Date(explicit).toISOString();
+        if (Number.isFinite(explicit)) {
+            const d = new Date(explicit);
+            if (d.getTime() >= Date.now() - 60_000) return d.toISOString();
+        }
     }
 
     const rel = lower.match(/\bin\s+(\d+)\s*(minute|min|mins|hour|hr|hrs|day|days)\b/);
@@ -78,8 +81,10 @@ export function resolveReminderDueAt(dueAtInput, { userMessage = "", title = "" 
         return setClock(d, atTime).toISOString();
     }
 
-    if (/\btoday\b/.test(lower)) {
-        const tm = lower.match(/(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+    if (/\bfor\s+today\b|\btoday\b|\bthis\s+evening\b|\btonight\b/i.test(lower)) {
+        const tm =
+            lower.match(/(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i) ||
+            lower.match(/\b(\d{1,2}):(\d{2})\b/);
         const d = new Date();
         return setClock(d, tm).toISOString();
     }
@@ -90,6 +95,12 @@ export function resolveReminderDueAt(dueAtInput, { userMessage = "", title = "" 
         return setClock(d, clock24).toISOString();
     }
 
+    const clockLoose = lower.match(/\bat\s+(\d{1,2})\b(?!\s*(am|pm))/);
+    if (clockLoose) {
+        const d = new Date();
+        return setClock(d, [clockLoose[1], "0", ""]).toISOString();
+    }
+
     return defaultDueAtIso(30);
 }
 
@@ -97,30 +108,57 @@ export function resolveReminderDueAt(dueAtInput, { userMessage = "", title = "" 
 export function matchPersonalReminderIntent(message) {
     const text = String(message || "").trim();
     if (!text) return null;
-    if (!/\bremind\b|\breminder\b|\balarm\b|\bremember to\b/i.test(text)) return null;
-    const titleMatch = text.match(/remind(?: me)?(?: to| as(?: an?)? alarm)?\s+(.+)/i);
-    let rawTitle = (titleMatch?.[1] || text).trim();
-    rawTitle = rawTitle.replace(/\b(today|tomorrow)\b.*/i, "").trim() || rawTitle;
+    if (!/\bremind\b|\breminder\b|\balarm\b|\bremember to\b|\bset\s+a\s+reminder\b/i.test(text)) return null;
+    let rawTitle = text
+        .replace(/^[\s\S]*\b(?:remind(?:\s+me)?|set\s+a\s+reminder|schedule\s+a\s+reminder|reminder)\s+(?:for|to)\s+/i, "")
+        .replace(/\s+(?:at|@)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?.*$/i, "")
+        .replace(/\s+for\s+today\b.*$/i, "")
+        .replace(/\s+today\b.*$/i, "")
+        .trim();
+    if (!rawTitle) rawTitle = text.slice(0, 120);
     rawTitle = rawTitle.slice(0, 120) || "Reminder";
     const dueAt = resolveReminderDueAt(null, { userMessage: text, title: rawTitle });
     return { title: rawTitle, dueAt };
 }
 
-function formatReminderDueLabel(iso) {
+function formatReminderDueLabel(iso, timeZone = "Africa/Johannesburg") {
     if (!iso) return "";
     const ms = Date.parse(iso);
     if (!Number.isFinite(ms)) return String(iso);
     try {
-        return new Date(ms).toLocaleString("en-ZA", {
+        const now = new Date();
+        const sameLocalDay =
+            new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+                now
+            ) ===
+            new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(ms);
+        const time = new Intl.DateTimeFormat("en-ZA", {
+            timeZone,
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: false,
+        }).format(ms);
+        if (sameLocalDay) return `today at ${time}`;
+        return new Intl.DateTimeFormat("en-ZA", {
+            timeZone,
             weekday: "short",
             month: "short",
             day: "numeric",
             hour: "numeric",
             minute: "2-digit",
-        });
+            hour12: false,
+        }).format(ms);
     } catch {
         return iso;
     }
+}
+
+function timeZoneForCtx(ctx = {}) {
+    const tz = String(ctx.timeZone || ctx.consumerProfile?.timeZone || "").trim();
+    if (tz) return tz;
+    const country = String(ctx.country || "").toUpperCase();
+    if (country === "ZW" || country === "ZIMBABWE") return "Africa/Harare";
+    return "Africa/Johannesburg";
 }
 
 const PERSONAL_SARAH_CORE_TOOL_DEFINITIONS = [
@@ -204,11 +242,11 @@ export async function executePersonalSarahTool(toolName, ctx, args = {}, opts = 
             } catch (err) {
                 console.warn("[personalSarah] scheduled reminder inbox:", err?.message || err);
             }
-            const when = formatReminderDueLabel(task.dueAt);
+            const when = formatReminderDueLabel(task.dueAt, timeZoneForCtx(ctx));
             return {
                 success: true,
                 tool: toolName,
-                message: `Done — I've set your reminder "${task.title}"${when ? ` for ${when}` : ""}. You'll get a push and see it under My Notifications (★) when it's due.`,
+                message: `Done — I've set your reminder "${task.title}" for ${when || "soon"}. You'll get a push and an in-app alarm at the due time; track it under Work and My Notifications → Reminders.`,
                 data: { taskId: task.id, dueAt: task.dueAt, title: task.title },
             };
         } catch (err) {

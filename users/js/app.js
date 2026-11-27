@@ -4997,10 +4997,44 @@ function formatWorkReminderDue(dueAt) {
   const ms = Date.parse(dueAt);
   if (!Number.isFinite(ms)) return String(dueAt || '');
   try {
-    return new Date(ms).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const now = Date.now();
+    const sameDay = new Date(ms).toDateString() === new Date(now).toDateString();
+    const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: false });
+    if (sameDay) return `Today · ${timeFmt.format(ms)}`;
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (new Date(ms).toDateString() === tomorrow.toDateString()) {
+      return `Tomorrow · ${timeFmt.format(ms)}`;
+    }
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: false,
+    }).format(ms);
   } catch {
     return new Date(ms).toLocaleString();
   }
+}
+
+function workReminderCardHtml(r, { done = false } = {}) {
+  const when = formatWorkReminderDue(r.dueAt);
+  const status = done ? 'Completed' : 'Scheduled';
+  const modifier = done ? 'ms-work-reminder-card--done' : 'ms-work-reminder-card--upcoming';
+  return `<li class="ms-work-reminder-card ${modifier}">
+    <span class="ms-work-reminder-icon" aria-hidden="true">
+      <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6l4 2"/></svg>
+    </span>
+    <div class="ms-work-reminder-body">
+      <span class="ms-work-reminder-title">${escapeHtml(r.title || 'Reminder')}</span>
+      <span class="ms-work-reminder-meta">
+        <span class="ms-work-reminder-pill">${status}</span>
+        <time class="ms-work-reminder-when" datetime="${escapeHtml(String(r.dueAt || ''))}">${escapeHtml(when)}</time>
+      </span>
+    </div>
+  </li>`;
 }
 
 function reminderActionSucceeded(actions) {
@@ -5055,46 +5089,49 @@ async function renderWorkRemindersList() {
   const leadEl = document.getElementById('msWorkRemindersLead');
   if (!listEl) return;
   if (!personalSarahLiveActive() || !window.SarahLive?.fetchPersonalReminders) {
-    listEl.innerHTML = '<li class="sw-home-priority-item"><p class="ms-thread-empty">Sign in to save and track reminders here.</p></li>';
+    listEl.innerHTML = '<li class="ms-work-reminder-empty">Sign in to save and track reminders here.</li>';
     return;
   }
   const res = await window.SarahLive.fetchPersonalReminders({ limit: 30 });
   if (res.error) {
-    listEl.innerHTML = '<li class="sw-home-priority-item"><p class="ms-thread-empty">Could not load reminders right now.</p></li>';
+    listEl.innerHTML = '<li class="ms-work-reminder-empty">Could not load reminders right now.</li>';
     return;
   }
+  const now = Date.now();
   const rows = (res.reminders || []).slice().sort((a, b) => Date.parse(a.dueAt || 0) - Date.parse(b.dueAt || 0));
   const scheduled = rows.filter((r) => r.status === 'scheduled');
-  const recent = rows.filter((r) => r.status === 'fired').slice(-5).reverse();
+  const upcoming = scheduled.filter((r) => Date.parse(r.dueAt || 0) >= now - 60_000);
+  const overdue = scheduled.filter((r) => Date.parse(r.dueAt || 0) < now - 60_000);
+  const recent = rows.filter((r) => r.status === 'fired').slice(-4).reverse();
+  const upcomingCount = upcoming.length;
   if (leadEl) {
-    leadEl.textContent = scheduled.length
-      ? `${scheduled.length} scheduled — Sarah alerts you at the due time (push + alarm).`
-      : 'Ask Sarah to remind you, or tap Set reminder.';
+    if (upcomingCount) {
+      leadEl.textContent = `${upcomingCount} upcoming — alarm + push at the due time.`;
+    } else if (scheduled.length) {
+      leadEl.textContent = `${scheduled.length} waiting to fire — open Sarah near the due time or we’ll catch up on the next poll.`;
+    } else {
+      leadEl.textContent = 'Ask Sarah to remind you, or tap Set reminder.';
+    }
   }
   if (!scheduled.length && !recent.length) {
     listEl.innerHTML =
-      '<li class="sw-home-priority-item"><p class="ms-thread-empty">No reminders yet. Tap <strong>Set reminder</strong> or tell Sarah when to alert you.</p></li>';
+      '<li class="ms-work-reminder-empty">No reminders yet. Tap <strong>Set reminder</strong> or tell Sarah when to alert you.</li>';
     return;
   }
-  const html = [
-    ...scheduled.map(
-      (r) => `<li class="sw-home-priority-item sw-home-priority--planned">
-        <div class="sw-home-priority-btn" style="display:block;padding:12px 0">
-          <span class="sw-home-priority-title">${escapeHtml(r.title || 'Reminder')}</span>
-          <span class="sw-home-priority-meta"><span class="sw-home-priority-pill">Scheduled</span> ${escapeHtml(formatWorkReminderDue(r.dueAt))}</span>
-        </div>
-      </li>`
-    ),
-    ...recent.map(
-      (r) => `<li class="sw-home-priority-item sw-home-priority--completed">
-        <div class="sw-home-priority-btn" style="display:block;padding:12px 0;opacity:0.85">
-          <span class="sw-home-priority-title">${escapeHtml(r.title || 'Reminder')}</span>
-          <span class="sw-home-priority-meta"><span class="sw-home-priority-pill">Done</span> ${escapeHtml(formatWorkReminderDue(r.dueAt))}</span>
-        </div>
-      </li>`
-    ),
-  ].join('');
-  listEl.innerHTML = html;
+  const parts = [];
+  if (overdue.length) {
+    parts.push(`<li class="ms-work-reminder-group-label">Needs attention</li>`);
+    parts.push(...overdue.map((r) => workReminderCardHtml(r)));
+  }
+  if (upcoming.length) {
+    parts.push(`<li class="ms-work-reminder-group-label">${overdue.length ? 'Upcoming' : 'Scheduled'}</li>`);
+    parts.push(...upcoming.map((r) => workReminderCardHtml(r)));
+  }
+  if (recent.length) {
+    parts.push(`<li class="ms-work-reminder-group-label">Recently completed</li>`);
+    parts.push(...recent.map((r) => workReminderCardHtml(r, { done: true })));
+  }
+  listEl.innerHTML = parts.join('');
 }
 
 async function renderSarahWorkHomeDashboard() {
