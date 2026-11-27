@@ -1,7 +1,17 @@
 /**
  * ST-01 — Sarah Tasks UX (dashboard, categories, structured forms).
- * Engine persistence (ST-02+) lands later; meeting reminders use live API where available.
+ * ST-02+ adds Firestore + server scheduling; proto tasks use localStorage until then.
  */
+import {
+  CATEGORY_TYPES,
+  DEFAULT_DEPARTURE_PROFILES,
+  INTERVIEW_CHECKLIST,
+  SCHEMA_FORMS,
+  TRIP_CHECKLIST,
+  loadDepartureProfiles,
+  saveDepartureProfiles,
+} from './sarah-tasks-catalog.mjs';
+
 const STORAGE_KEY = 'sarah.st.tasks.proto.v1';
 
 const CATEGORIES = [
@@ -49,33 +59,12 @@ const CATEGORIES = [
   },
 ];
 
-const TEMPLATES = {
-  departure: {
-    leaving_home: ['Keys', 'Wallet', 'Phone', 'Medication'],
-    going_to_work: ['Laptop', 'Access card', 'Lunch', 'Phone charger'],
-    going_to_meeting: ['Documents', 'Laptop', 'Notebook and pen'],
-    going_on_trip: ['ID', 'Tickets', 'Luggage', 'Chargers'],
-    leaving_car: ['Phone', 'Keys', 'Valuables'],
-    going_to_school: ['Books', 'Stationery', 'Assignments'],
-  },
-  interview: [
-    'Prepare and print your CV',
-    'Prepare copies of your qualifications',
-    'Prepare your identity document',
-    'Research the company',
-    'Practise common interview questions',
-    'Choose appropriate interview clothing',
-    'Confirm the interview location',
-    'Check transport arrangements',
-    'Charge your phone',
-    'Set out documents the night before',
-  ],
-};
-
-let view = 'hub'; // hub | categories | form | detail
+let view = 'hub'; // hub | categories | types | form | detail
 let tab = 'today';
 let categoryId = null;
 let formKind = null;
+let taskTypeId = null;
+let detailTaskId = null;
 let hooks = {};
 let cachedReminders = [];
 let remindersFetchedAt = 0;
@@ -178,11 +167,66 @@ function filterTab(tasks, which) {
       return t.status === 'open' && Number.isFinite(ms) && ms >= endToday.getTime();
     });
   }
+  if (which === 'preparation') {
+    return tasks.filter(
+      (t) => (t.categoryId === 'preparation' || t.taskKind === 'preparation') && t.status !== 'completed'
+    );
+  }
   if (which === 'open') return tasks.filter((t) => t.status === 'open' || t.status === 'active');
   if (which === 'waiting') return tasks.filter((t) => t.status === 'waiting');
   if (which === 'completed') return tasks.filter((t) => t.status === 'completed');
   if (which === 'templates') return [];
   return tasks;
+}
+
+function checklistProgress(checklist) {
+  const list = Array.isArray(checklist) ? checklist : [];
+  if (!list.length) return 0;
+  const done = list.filter((c) => c.done).length;
+  return Math.round((100 * done) / list.length);
+}
+
+function relTime(ms) {
+  const diff = ms - Date.now();
+  if (diff < 0) return 'now';
+  const min = Math.round(diff / 60_000);
+  if (min < 60) return `${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 48) return `${h} hr`;
+  return `${Math.round(h / 24)} days`;
+}
+
+function buildNextActions(tasks) {
+  const open = tasks.filter((t) => t.status === 'open' || t.status === 'active');
+  const actions = [];
+  for (const t of open) {
+    const due = Date.parse(t.dueAt);
+    if (Number.isFinite(due)) {
+      const diff = due - Date.now();
+      if (diff > 0 && diff < 6 * 3600_000) {
+        actions.push({ id: t.id, text: `${t.title} — in ${relTime(due)}` });
+      } else if (diff > 0 && diff < 48 * 3600_000) {
+        actions.push({ id: t.id, text: `${t.title} — ${formatWhen(t.dueAt)}` });
+      }
+    }
+    if (Array.isArray(t.checklist) && t.checklist.length) {
+      const pct = checklistProgress(t.checklist);
+      if (pct > 0 && pct < 100) actions.push({ id: t.id, text: `${t.title} checklist ${pct}% complete` });
+      else if (pct === 0) actions.push({ id: t.id, text: `Start preparing: ${t.title}` });
+    }
+  }
+  return actions.slice(0, 4);
+}
+
+function renderNextActions(tasks) {
+  const actions = buildNextActions(tasks);
+  if (!actions.length) {
+    return '<section class="st-next st-next--empty"><h3 class="st-next-title">Sarah’s next actions</h3><p class="st-next-lead">No urgent actions — create a task when you’re ready.</p></section>';
+  }
+  return `<section class="st-next" aria-label="Sarah next actions">
+    <h3 class="st-next-title">Sarah’s next actions</h3>
+    <ul class="st-next-list">${actions.map((a) => `<li><button type="button" class="st-next-btn" data-st-task="${esc(a.id)}">${esc(a.text)}</button></li>`).join('')}</ul>
+  </section>`;
 }
 
 function formatWhen(iso) {
@@ -217,14 +261,14 @@ function renderTaskCards(tasks) {
   }
   return tasks
     .map(
-      (t) => `<li class="st-task-card" data-st-task="${esc(t.id)}">
+      (t) => `<li class="st-task-card"><button type="button" class="st-task-card-btn" data-st-task="${esc(t.id)}">
         <div class="st-task-card-top">
           <span class="st-task-card-title">${esc(t.title)}</span>
           <span class="st-task-card-status st-task-card-status--${esc(t.status)}">${esc(t.status === 'completed' ? 'Done' : 'Open')}</span>
         </div>
         <p class="st-task-card-when">${t.dueAt ? esc(formatWhen(t.dueAt)) : 'No due date'}</p>
-        <div class="st-task-card-bar"><span style="width:${Math.min(100, t.progress || 0)}%"></span></div>
-      </li>`
+        <div class="st-task-card-bar"><span style="width:${Math.min(100, t.progress ?? checklistProgress(t.checklist) || 0)}%"></span></div>
+      </button></li>`
     )
     .join('');
 }
@@ -237,6 +281,7 @@ function renderHub(reminders) {
     ['today', 'Today'],
     ['upcoming', 'Upcoming'],
     ['open', 'Open'],
+    ['preparation', 'Preparation'],
     ['waiting', 'Waiting on me'],
     ['completed', 'Completed'],
     ['templates', 'Templates'],
@@ -257,6 +302,7 @@ function renderHub(reminders) {
       <article class="st-stat st-stat--green"><span class="st-stat-val">${stats.done}</span><span class="st-stat-label">Completed</span></article>
       <article class="st-stat st-stat--amber"><span class="st-stat-val">${stats.waiting}</span><span class="st-stat-label">Waiting</span></article>
     </section>
+    ${renderNextActions(tasks)}
     <nav class="st-tabs" role="tablist">${tabs
       .map(
         ([id, label]) =>
@@ -266,12 +312,13 @@ function renderHub(reminders) {
       )
       .join('')}</nav>
     <section class="st-list-wrap">${tab === 'templates' ? renderTemplates() : `<ul class="st-task-list">${renderTaskCards(list)}</ul>`}</section>
-    <p class="st-footnote">ST-01 UX — full task engine (ST-02) adds server scheduling when Sarah is closed.</p>
+    <p class="st-footnote">Tasks sync to Sarah’s cloud engine in ST-02 — reliable push when the app is closed arrives with ST-03.</p>
   `;
 }
 
 function renderTemplates() {
-  const rows = Object.entries(TEMPLATES.departure)
+  const profiles = loadDepartureProfiles();
+  const rows = Object.entries(profiles)
     .map(
       ([key, items]) => `<article class="st-template-card">
         <h4>${esc(key.replace(/_/g, ' '))}</h4>
@@ -280,7 +327,27 @@ function renderTemplates() {
       </article>`
     )
     .join('');
-  return `<div class="st-templates">${rows}<article class="st-template-card"><h4>Job interview prep</h4><ul>${TEMPLATES.interview.map((i) => `<li>${esc(i)}</li>`).join('')}</ul><button type="button" class="ms-link-btn" data-st-template="interview">Use template</button></article></div>`;
+  return `<div class="st-templates">${rows}<article class="st-template-card"><h4>Job interview prep</h4><ul>${INTERVIEW_CHECKLIST.map((i) => `<li>${esc(i)}</li>`).join('')}</ul><button type="button" class="ms-link-btn" data-st-template="interview">Use template</button></article></div>`;
+}
+
+function renderTypePicker() {
+  const types = CATEGORY_TYPES[categoryId] || [];
+  const cat = CATEGORIES.find((c) => c.id === categoryId);
+  return `
+    <header class="st-subhead">
+      <button type="button" class="st-back" data-st-back>← Back</button>
+      <h2>${esc(cat?.title || 'Task type')}</h2>
+      <p class="st-lead">Choose the option that matches what you need.</p>
+    </header>
+    <div class="st-cat-grid">${types
+      .map(
+        (t) => `<article class="st-cat-card">
+        <span class="st-cat-title">${esc(t.title)}</span>
+        <span class="st-cat-desc">${esc(t.desc)}</span>
+        <button type="button" class="st-cat-select" data-st-type="${esc(t.id)}">Select</button>
+      </article>`
+      )
+      .join('')}</div>`;
 }
 
 function renderCategories() {
@@ -305,28 +372,33 @@ function renderMeetingForm() {
   return `
     <header class="st-subhead">
       <button type="button" class="st-back" data-st-back>← Back</button>
-      <h2>Create meeting reminder</h2>
+      <h2>Meeting reminder</h2>
     </header>
     <form class="st-form" id="stMeetingForm">
       <label class="st-field"><span>Meeting title</span><input name="title" required placeholder="e.g. Central Motors review" /></label>
+      <label class="st-field"><span>Meeting with</span><input name="with" placeholder="People or organisation" /></label>
       <label class="st-field"><span>Location</span><input name="location" placeholder="Address or online link" /></label>
       <div class="st-field-row">
         <label class="st-field"><span>Date</span><input name="date" type="date" required value="${today}" /></label>
         <label class="st-field"><span>Time</span><input name="time" type="time" required /></label>
       </div>
-      <fieldset class="st-fieldset"><legend>What should you take?</legend>
+      <label class="st-field"><span>Travel time (minutes)</span><input name="travel" type="number" min="0" step="5" placeholder="e.g. 45" /></label>
+      <label class="st-field"><span>Prepare beforehand</span><textarea name="preparation" rows="2" placeholder="Documents to print, briefing to read…"></textarea></label>
+      <fieldset class="st-fieldset"><legend>What to bring</legend>
         <label class="st-check"><input type="checkbox" name="take" value="Laptop" /> Laptop</label>
         <label class="st-check"><input type="checkbox" name="take" value="Meeting documents" /> Meeting documents</label>
         <label class="st-check"><input type="checkbox" name="take" value="Notebook and pen" /> Notebook and pen</label>
       </fieldset>
-      <fieldset class="st-fieldset"><legend>Remind me before</legend>
-        <label class="st-radio"><input type="radio" name="lead" value="15" checked /> 15 minutes</label>
-        <label class="st-radio"><input type="radio" name="lead" value="30" /> 30 minutes</label>
-        <label class="st-radio"><input type="radio" name="lead" value="60" /> 1 hour</label>
-        <label class="st-radio"><input type="radio" name="lead" value="1440" /> 1 day</label>
+      <fieldset class="st-fieldset"><legend>Remind me (select all that apply)</legend>
+        <label class="st-check"><input type="checkbox" name="remind" value="1440" checked /> 1 day before</label>
+        <label class="st-check"><input type="checkbox" name="remind" value="60" checked /> 1 hour before</label>
+        <label class="st-check"><input type="checkbox" name="remind" value="30" /> 30 minutes before</label>
+        <label class="st-check"><input type="checkbox" name="remind" value="15" checked /> 15 minutes before</label>
+        <label class="st-check"><input type="checkbox" name="remind" value="travel" checked /> When I should leave (uses travel time)</label>
       </fieldset>
-      <label class="st-field"><span>Notes</span><textarea name="notes" rows="3" placeholder="Agenda, parking, who to meet, dial-in details…"></textarea></label>
+      <label class="st-field"><span>Notes</span><textarea name="notes" rows="3" placeholder="Agenda, parking, dial-in…"></textarea></label>
       <aside class="st-preview" id="stFormPreview" aria-live="polite"></aside>
+      <p class="st-proto-note">Earliest selected reminder is sent via Sarah now; other times activate with ST-03 scheduling.</p>
       <button type="submit" class="st-submit-btn">Create task</button>
     </form>`;
 }
@@ -348,76 +420,166 @@ function renderInterviewForm() {
       <label class="st-field"><span>Online or in person?</span>
         <select name="mode"><option value="in_person">In person</option><option value="online">Online</option></select>
       </label>
+      <label class="st-field"><span>Interview format</span>
+        <select name="format"><option value="panel">In person — panel</option><option value="one">In person — one-to-one</option><option value="video">Video call</option><option value="phone">Phone</option></select>
+      </label>
+      <label class="st-field"><span>Job description (optional)</span><textarea name="jd" rows="3" placeholder="Paste key requirements…"></textarea></label>
       <label class="st-field"><span>Special instructions</span><textarea name="notes" rows="2"></textarea></label>
-      <div class="st-checklist-preview"><h3>Sarah preparation plan</h3><ul>${TEMPLATES.interview.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>
+      <div class="st-checklist-preview"><h3>Sarah preparation plan</h3><ul>${INTERVIEW_CHECKLIST.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>
       <button type="submit" class="st-submit-btn">Save preparation task</button>
     </form>`;
 }
 
 function renderDepartureForm() {
-  const opts = Object.keys(TEMPLATES.departure)
+  const profiles = loadDepartureProfiles();
+  const opts = Object.keys(profiles)
     .map((k) => `<option value="${k}">${k.replace(/_/g, ' ')}</option>`)
     .join('');
   return `
     <header class="st-subhead">
       <button type="button" class="st-back" data-st-back>← Back</button>
       <h2>Before you leave</h2>
-      <p class="st-lead">Tick items before you walk out — Sarah nudges you at the right time.</p>
+      <p class="st-lead">Reusable checklists — add your own items and save the profile.</p>
     </header>
     <form class="st-form" id="stDepartureForm">
       <label class="st-field"><span>Profile</span><select name="profile">${opts}</select></label>
-      <label class="st-field"><span>Remind me at</span><input name="time" type="time" required /></label>
+      <label class="st-field"><span>Optional reminder time</span><input name="time" type="time" /></label>
       <ul class="st-dep-checklist" id="stDepList"></ul>
-      <button type="submit" class="st-submit-btn">Start checklist</button>
+      <div class="st-add-item">
+        <input type="text" name="newItem" placeholder="Add custom item" id="stDepNewItem" />
+        <button type="button" class="st-cat-select st-add-item-btn" id="stDepAddItem">Add</button>
+      </div>
+      <label class="st-check"><input type="checkbox" name="saveProfile" checked /> Save changes to this profile</label>
+      <button type="submit" class="st-submit-btn">Create checklist task</button>
     </form>`;
 }
 
-function renderPreparationPick() {
+function renderTripForm() {
+  const today = new Date().toISOString().slice(0, 10);
   return `
     <header class="st-subhead">
       <button type="button" class="st-back" data-st-back>← Back</button>
-      <h2>Preparation</h2>
-      <p class="st-lead">What are you preparing for?</p>
+      <h2>Prepare for a trip</h2>
     </header>
-    <div class="st-prep-pick">
-      <article class="st-cat-card">
-        ${iconSvg('checklist')}
-        <span class="st-cat-title">Job interview</span>
-        <span class="st-cat-desc">Checklist and prep plan</span>
-        <button type="button" class="st-cat-select" data-st-prep="interview">Select</button>
-      </article>
-      <article class="st-cat-card">
-        ${iconSvg('home')}
-        <span class="st-cat-title">Before you leave</span>
-        <span class="st-cat-desc">Don’t forget keys, wallet, documents</span>
-        <button type="button" class="st-cat-select" data-st-prep="departure">Select</button>
-      </article>
-    </div>`;
+    <form class="st-form" id="stTripForm">
+      <label class="st-field"><span>Destination</span><input name="destination" required /></label>
+      <div class="st-field-row">
+        <label class="st-field"><span>Depart date</span><input name="date" type="date" required value="${today}" /></label>
+        <label class="st-field"><span>Depart time</span><input name="time" type="time" required /></label>
+      </div>
+      <label class="st-field"><span>Return date</span><input name="return" type="date" /></label>
+      <label class="st-field"><span>Purpose</span><input name="purpose" placeholder="Holiday, family, work…" /></label>
+      <label class="st-field"><span>Transport</span><input name="transport" placeholder="Flight, car, train…" /></label>
+      <label class="st-field"><span>Accommodation</span><input name="accommodation" placeholder="Hotel, address, booking ref" /></label>
+      <div class="st-checklist-preview"><h3>Travel checklist</h3><ul>${TRIP_CHECKLIST.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
+      <p class="st-preview-note">Timeline reminders (7 / 3 / 1 day) activate with ST-03.</p></div>
+      <button type="submit" class="st-submit-btn">Save trip preparation</button>
+    </form>`;
 }
 
-function renderGenericForm(cat) {
+function renderSchemaForm(schema) {
+  const fields = (schema.fields || [])
+    .map((f) => {
+      if (f.type === 'textarea') {
+        return `<label class="st-field"><span>${esc(f.label)}</span><textarea name="${esc(f.name)}" rows="3"${f.required ? ' required' : ''}${f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''}></textarea></label>`;
+      }
+      if (f.type === 'select') {
+        const opts = (f.options || []).map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+        return `<label class="st-field"><span>${esc(f.label)}</span><select name="${esc(f.name)}"${f.required ? ' required' : ''}>${opts}</select></label>`;
+      }
+      const inputType = f.type === 'date' || f.type === 'time' || f.type === 'number' ? f.type : 'text';
+      return `<label class="st-field"><span>${esc(f.label)}</span><input name="${esc(f.name)}" type="${inputType}"${f.required ? ' required' : ''}${f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''} /></label>`;
+    })
+    .join('');
   return `
     <header class="st-subhead">
       <button type="button" class="st-back" data-st-back>← Back</button>
-      <h2>${esc(cat?.title || 'New task')}</h2>
+      <h2>${esc(schema.heading)}</h2>
     </header>
-    <form class="st-form" id="stGenericForm">
-      <label class="st-field"><span>What should Sarah help with?</span><input name="title" required placeholder="Short title" /></label>
-      <label class="st-field"><span>Details</span><textarea name="notes" rows="3" placeholder="Dates, people, deadlines…"></textarea></label>
-      <label class="st-field"><span>Due date</span><input name="date" type="date" /></label>
-      <label class="st-field"><span>Due time</span><input name="time" type="time" /></label>
-      <p class="st-proto-note">Prototype task — saved on this device until ST-02 syncs to Sarah Task Engine.</p>
+    <form class="st-form" id="stSchemaForm" data-schema-key="${esc(schema.taskType)}">
+      ${fields}
+      <p class="st-proto-note">Saved on this device until ST-02 syncs to your Sarah Task Engine.</p>
       <button type="submit" class="st-submit-btn">Save task</button>
     </form>`;
 }
 
+function findTaskById(id, reminders = cachedReminders) {
+  const local = loadProtoTasks().find((t) => t.id === id);
+  if (local) return local;
+  return allTasks(reminders).find((t) => t.id === id) || null;
+}
+
+function updateProtoTask(id, patch) {
+  const list = loadProtoTasks();
+  const idx = list.findIndex((t) => t.id === id);
+  if (idx < 0) return null;
+  const next = { ...list[idx], ...patch };
+  if (patch.checklist) next.progress = checklistProgress(patch.checklist);
+  list[idx] = next;
+  saveProtoTasks(list);
+  return next;
+}
+
+function deleteProtoTask(id) {
+  saveProtoTasks(loadProtoTasks().filter((t) => t.id !== id));
+}
+
+function renderDetail(reminders) {
+  const task = findTaskById(detailTaskId, reminders);
+  if (!task) {
+    return `<header class="st-subhead"><button type="button" class="st-back" data-st-back>← Back</button><p>Task not found.</p></header>`;
+  }
+  const pct = task.progress ?? checklistProgress(task.checklist);
+  const checklist =
+    Array.isArray(task.checklist) && task.checklist.length
+      ? `<ul class="st-detail-checklist">${task.checklist
+          .map(
+            (c, i) => `<li><label class="st-check"><input type="checkbox" data-st-check="${i}" ${c.done ? 'checked' : ''} /> ${esc(c.label)}</label></li>`
+          )
+          .join('')}</ul>`
+      : '<p class="st-detail-empty">No checklist items.</p>';
+  return `
+    <header class="st-subhead">
+      <button type="button" class="st-back" data-st-back>← Back</button>
+      <h2>${esc(task.title)}</h2>
+      <p class="st-detail-meta"><span class="st-task-card-status st-task-card-status--${esc(task.status)}">${esc(task.status === 'completed' ? 'Done' : 'Open')}</span>
+      ${task.dueAt ? ` · ${esc(formatWhen(task.dueAt))}` : ''}</p>
+    </header>
+    <section class="st-detail">
+      ${task.notes ? `<p class="st-detail-notes">${esc(String(task.notes))}</p>` : ''}
+      <h3 class="st-detail-h">Checklist ${pct ? `(${pct}%)` : ''}</h3>
+      ${checklist}
+      <h3 class="st-detail-h">Sarah’s next action</h3>
+      <p class="st-detail-next">${pct >= 100 ? 'Confirm task complete when you are finished.' : 'Work through your checklist — Sarah will nudge you at reminder times.'}</p>
+      <div class="st-detail-actions">
+        <button type="button" class="st-cat-select" data-st-complete-task>Mark complete</button>
+        <button type="button" class="ms-link-btn" data-st-ask-sarah>Ask Sarah for help</button>
+        <button type="button" class="ms-link-btn st-detail-cancel" data-st-cancel-task>Cancel task</button>
+      </div>
+    </section>`;
+}
+
 function pickForm() {
-  if (formKind === 'prep_pick') return renderPreparationPick();
-  if (formKind === 'meeting') return renderMeetingForm();
-  if (formKind === 'interview') return renderInterviewForm();
-  if (formKind === 'departure') return renderDepartureForm();
-  const cat = CATEGORIES.find((c) => c.id === categoryId);
-  return renderGenericForm(cat);
+  const kind = taskTypeId || formKind;
+  if (kind === 'meeting') return renderMeetingForm();
+  if (kind === 'interview') return renderInterviewForm();
+  if (kind === 'departure') return renderDepartureForm();
+  if (kind === 'trip') return renderTripForm();
+  const schema = SCHEMA_FORMS[kind];
+  if (schema) return renderSchemaForm(schema);
+  const types = CATEGORY_TYPES[categoryId] || [];
+  const t = types.find((x) => x.id === kind);
+  return renderSchemaForm({
+    heading: t?.title || 'New task',
+    taskType: kind,
+    buildTitle: (fd) => String(fd.get('title') || t?.title || 'Task'),
+    fields: [
+      { name: 'title', label: 'Title', type: 'text', required: true },
+      { name: 'date', label: 'Due date', type: 'date' },
+      { name: 'time', label: 'Due time', type: 'time' },
+      { name: 'notes', label: 'Details', type: 'textarea' },
+    ],
+  });
 }
 
 function paintSync() {
@@ -425,7 +587,9 @@ function paintSync() {
   if (!root) return null;
   const reminders = cachedReminders;
   if (view === 'categories') root.innerHTML = renderCategories();
+  else if (view === 'types') root.innerHTML = renderTypePicker();
   else if (view === 'form') root.innerHTML = pickForm();
+  else if (view === 'detail') root.innerHTML = renderDetail(reminders);
   else root.innerHTML = renderHub(reminders);
   bind(root, reminders);
   return root;
@@ -446,6 +610,7 @@ function repaintHubBody(root, reminders = cachedReminders) {
   wrap.innerHTML =
     tab === 'templates' ? renderTemplates() : `<ul class="st-task-list">${renderTaskCards(filterTab(tasks, tab))}</ul>`;
   syncHubTabUi(root);
+  bindTaskOpens(root);
   root.querySelectorAll('[data-st-template]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-st-template') || '';
@@ -481,11 +646,22 @@ function paint() {
     });
 }
 
+function bindTaskOpens(root) {
+  root.querySelectorAll('[data-st-task]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      detailTaskId = btn.getAttribute('data-st-task');
+      view = 'detail';
+      paint();
+    });
+  });
+}
+
 function bind(root, reminders) {
   root.querySelector('#stCreateTaskBtn')?.addEventListener('click', () => {
     view = 'categories';
     paint();
   });
+  bindTaskOpens(root);
   root.querySelectorAll('[data-st-tab]').forEach((btn) => {
     btn.addEventListener('click', () => {
       tab = btn.getAttribute('data-st-tab') || 'today';
@@ -495,21 +671,18 @@ function bind(root, reminders) {
   });
   root.querySelectorAll('[data-st-back]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      if (view === 'form') {
-        if (formKind === 'meeting' || formKind === 'interview' || formKind === 'departure' || formKind === 'generic') {
-          if (categoryId === 'preparation' && formKind !== 'prep_pick') {
-            formKind = 'prep_pick';
-          } else {
-            view = 'categories';
-            formKind = null;
-          }
-        } else if (formKind === 'prep_pick') {
-          view = 'categories';
-          formKind = null;
-        } else {
-          view = 'categories';
-          formKind = null;
-        }
+      if (view === 'detail') {
+        view = 'hub';
+        detailTaskId = null;
+      } else if (view === 'form') {
+        view = 'types';
+        formKind = null;
+      } else if (view === 'types') {
+        view = 'categories';
+        categoryId = null;
+        taskTypeId = null;
+      } else if (view === 'categories') {
+        view = 'hub';
       } else {
         view = 'hub';
         categoryId = null;
@@ -520,37 +693,71 @@ function bind(root, reminders) {
   root.querySelectorAll('[data-st-category]').forEach((btn) => {
     btn.addEventListener('click', () => {
       categoryId = btn.getAttribute('data-st-category');
-      if (categoryId === 'reminders') formKind = 'meeting';
-      else if (categoryId === 'preparation') formKind = 'prep_pick';
-      else if (categoryId === 'delegate') {
-        hooks.onDelegate?.();
-        return;
-      } else formKind = 'generic';
-      view = 'form';
+      taskTypeId = null;
+      formKind = null;
+      view = 'types';
       paint();
     });
   });
-  root.querySelectorAll('[data-st-prep]').forEach((btn) => {
+  root.querySelectorAll('[data-st-type]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      formKind = btn.getAttribute('data-st-prep') === 'departure' ? 'departure' : 'interview';
+      taskTypeId = btn.getAttribute('data-st-type');
+      formKind = taskTypeId;
+      view = 'form';
       paint();
     });
   });
   root.querySelectorAll('[data-st-template]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-st-template') || '';
+      categoryId = 'preparation';
       if (id.startsWith('departure-')) {
-        categoryId = 'preparation';
+        taskTypeId = 'departure';
         formKind = 'departure';
-        view = 'form';
-      } else if (id === 'interview') {
-        categoryId = 'preparation';
+      } else {
+        taskTypeId = 'interview';
         formKind = 'interview';
-        view = 'form';
       }
+      view = 'form';
       paint();
     });
   });
+
+  if (view === 'detail' && detailTaskId) {
+    root.querySelectorAll('[data-st-check]').forEach((box) => {
+      box.addEventListener('change', () => {
+        if (!loadProtoTasks().some((t) => t.id === detailTaskId)) return;
+        const task = findTaskById(detailTaskId, reminders);
+        if (!task || !Array.isArray(task.checklist)) return;
+        const idx = Number(box.getAttribute('data-st-check'));
+        const checklist = task.checklist.map((c, i) => (i === idx ? { ...c, done: box.checked } : c));
+        updateProtoTask(detailTaskId, { checklist, progress: checklistProgress(checklist) });
+        paint();
+      });
+    });
+    root.querySelector('[data-st-complete-task]')?.addEventListener('click', () => {
+      if (loadProtoTasks().some((t) => t.id === detailTaskId)) {
+        updateProtoTask(detailTaskId, { status: 'completed', progress: 100 });
+        hooks.toast?.('Task marked complete.');
+      } else {
+        hooks.toast?.('Live reminders complete in My Notifications.');
+      }
+      view = 'hub';
+      tab = 'completed';
+      detailTaskId = null;
+      paint();
+    });
+    root.querySelector('[data-st-cancel-task]')?.addEventListener('click', () => {
+      deleteProtoTask(detailTaskId);
+      hooks.toast?.('Task removed.');
+      view = 'hub';
+      detailTaskId = null;
+      paint();
+    });
+    root.querySelector('[data-st-ask-sarah]')?.addEventListener('click', () => {
+      hooks.onDelegate?.();
+    });
+  }
 
   const meeting = root.querySelector('#stMeetingForm');
   meeting?.addEventListener('input', () => updateMeetingPreview(meeting));
@@ -570,60 +777,119 @@ function bind(root, reminders) {
       ),
       status: 'open',
       categoryId: 'preparation',
-      checklist: TEMPLATES.interview.map((label) => ({ label, done: false })),
+      taskType: 'interview',
+      taskKind: 'preparation',
+      checklist: INTERVIEW_CHECKLIST.map((label) => ({ label, done: false })),
       progress: 0,
       meta: Object.fromEntries(new FormData(interview)),
     });
-    hooks.toast?.('Preparation task saved — see Open tasks.');
+    hooks.toast?.('Preparation task saved — open it for checklist and mock interview.');
     view = 'hub';
-    tab = 'open';
+    tab = 'preparation';
+    paint();
+  });
+
+  const trip = root.querySelector('#stTripForm');
+  trip?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(trip);
+    saveProto({
+      title: `Trip — ${fd.get('destination') || 'Travel'}`,
+      dueAt: combineDateTime(fd.get('date'), fd.get('time')),
+      status: 'open',
+      categoryId: 'preparation',
+      taskType: 'trip',
+      taskKind: 'preparation',
+      checklist: TRIP_CHECKLIST.map((label) => ({ label, done: false })),
+      progress: 0,
+      notes: fd.get('accommodation') || '',
+      meta: Object.fromEntries(fd),
+    });
+    hooks.toast?.('Trip preparation saved.');
+    view = 'hub';
+    tab = 'preparation';
     paint();
   });
 
   const departure = root.querySelector('#stDepartureForm');
   if (departure) {
+    const profiles = loadDepartureProfiles();
     const sel = departure.querySelector('[name=profile]');
-    const syncList = () => {
-      const key = sel?.value || 'leaving_home';
-      const items = TEMPLATES.departure[key] || [];
+    let depItems = [];
+    const paintDepList = () => {
       const list = root.querySelector('#stDepList');
-      if (list) list.innerHTML = items.map((i) => `<li><label class="st-check"><input type="checkbox" /> ${esc(i)}</label></li>`).join('');
+      if (!list) return;
+      list.innerHTML = depItems.map((i) => `<li><label class="st-check"><span>${esc(i)}</span></label></li>`).join('');
     };
-    sel?.addEventListener('change', syncList);
-    syncList();
+    const loadProfile = () => {
+      const key = sel?.value || 'leaving_home';
+      depItems = [...(profiles[key] || DEFAULT_DEPARTURE_PROFILES[key] || [])];
+      paintDepList();
+    };
+    sel?.addEventListener('change', loadProfile);
+    loadProfile();
+    root.querySelector('#stDepAddItem')?.addEventListener('click', () => {
+      const input = root.querySelector('#stDepNewItem');
+      const val = String(input?.value || '').trim();
+      if (!val) return;
+      depItems.push(val);
+      input.value = '';
+      paintDepList();
+    });
     departure.addEventListener('submit', (e) => {
       e.preventDefault();
       const key = sel.value;
+      const fd = new FormData(departure);
+      if (fd.get('saveProfile')) {
+        profiles[key] = [...depItems];
+        saveDepartureProfiles(profiles);
+      }
+      const timeVal = fd.get('time');
       saveProto({
         title: `Before you leave — ${key.replace(/_/g, ' ')}`,
-        dueAt: combineDateTime(new Date().toISOString().slice(0, 10), departure.time.value),
+        dueAt: timeVal
+          ? combineDateTime(new Date().toISOString().slice(0, 10), timeVal)
+          : new Date(Date.now() + 3600000).toISOString(),
         status: 'open',
         categoryId: 'preparation',
+        taskType: 'departure',
+        taskKind: 'preparation',
         progress: 0,
-        checklist: (TEMPLATES.departure[key] || []).map((label) => ({ label, done: false })),
+        checklist: depItems.map((label) => ({ label, done: false })),
       });
-      hooks.toast?.('Departure checklist ready.');
+      hooks.toast?.('Checklist ready — tap the task to tick items off.');
       view = 'hub';
-      tab = 'today';
+      tab = 'preparation';
       paint();
     });
   }
 
-  const generic = root.querySelector('#stGenericForm');
-  generic?.addEventListener('submit', (e) => {
+  const schemaForm = root.querySelector('#stSchemaForm');
+  schemaForm?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const fd = new FormData(generic);
+    const fd = new FormData(schemaForm);
+    const key = schemaForm.getAttribute('data-schema-key') || taskTypeId;
+    const schema = SCHEMA_FORMS[key];
+    const title = schema?.buildTitle ? schema.buildTitle(fd) : String(fd.get('title') || key);
+    const isExecution = schema?.kind === 'execution' || categoryId === 'delegate';
+    const date = fd.get('date') || fd.get('deadline') || fd.get('start');
+    const time = fd.get('time');
     saveProto({
-      title: String(fd.get('title') || 'Task'),
-      dueAt: combineDateTime(fd.get('date'), fd.get('time')) || new Date(Date.now() + 3600000).toISOString(),
-      status: 'open',
+      title,
+      dueAt: combineDateTime(date, time) || (date ? combineDateTime(date, '09:00') : null) || new Date(Date.now() + 3600000).toISOString(),
+      status: isExecution ? 'waiting' : 'open',
       categoryId,
+      taskType: key,
+      taskKind: isExecution ? 'execution' : categoryId === 'reminders' ? 'reminder' : 'preparation',
       progress: 0,
-      notes: fd.get('notes'),
+      notes: fd.get('notes') || fd.get('list') || '',
+      checklist: (schema?.checklist || []).map((label) => ({ label, done: false })),
+      meta: Object.fromEntries(fd),
     });
-    hooks.toast?.('Task saved on this device.');
+  if (isExecution) hooks.toast?.('Saved — Sarah will help after you approve in chat.');
+    else hooks.toast?.('Task saved.');
     view = 'hub';
-    tab = 'open';
+    tab = isExecution ? 'waiting' : 'open';
     paint();
   });
 }
@@ -644,36 +910,61 @@ function saveProto(task) {
   saveProtoTasks(list);
 }
 
+function meetingLeadMinutes(fd) {
+  const travel = Math.max(0, Number(fd.get('travel')) || 0);
+  const reminds = fd.getAll('remind');
+  const offsets = reminds
+    .map((r) => (r === 'travel' ? travel + 10 : Number(r)))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+  return offsets.length ? Math.max(...offsets) : 15;
+}
+
 function updateMeetingPreview(form) {
   const fd = new FormData(form);
   const title = fd.get('title') || 'Meeting';
   const loc = fd.get('location') || 'your meeting';
-  const lead = Number(fd.get('lead')) || 15;
+  const withWho = fd.get('with');
+  const travel = Number(fd.get('travel')) || 0;
+  const lead = meetingLeadMinutes(fd);
   const take = fd.getAll('take').filter(Boolean);
   const userNotes = String(fd.get('notes') || '').trim();
+  const prep = String(fd.get('preparation') || '').trim();
   const el = form.querySelector('#stFormPreview');
   if (!el) return;
-  el.innerHTML = `<h4>Preview</h4><p>Your meeting at <strong>${esc(String(loc))}</strong> is in ${lead} minutes.</p>${
-    take.length ? `<p>Remember: ${take.map((t) => esc(t)).join(', ')}</p>` : ''
-  }${userNotes ? `<p>${esc(userNotes)}</p>` : ''}<p class="st-preview-note">${esc(title)}</p>`;
+  el.innerHTML = `<h4>Preview</h4>
+    <p>Meeting: <strong>${esc(String(title))}</strong>${withWho ? ` with ${esc(String(withWho))}` : ''}</p>
+    <p>At <strong>${esc(String(loc))}</strong> · first reminder about <strong>${lead}</strong> min before (or leave ${travel} min travel).</p>
+    ${prep ? `<p>Prepare: ${esc(prep)}</p>` : ''}
+    ${take.length ? `<p>Bring: ${take.map((t) => esc(t)).join(', ')}</p>` : ''}
+    ${userNotes ? `<p>${esc(userNotes)}</p>` : ''}`;
 }
 
 async function submitMeeting(form) {
   const fd = new FormData(form);
   const title = String(fd.get('title') || 'Meeting').trim();
   const location = String(fd.get('location') || '').trim();
-  const leadMin = Number(fd.get('lead')) || 15;
+  const withWho = String(fd.get('with') || '').trim();
+  const travel = Math.max(0, Number(fd.get('travel')) || 0);
+  const leadMin = meetingLeadMinutes(fd);
   const dueIso = combineDateTime(fd.get('date'), fd.get('time'));
   if (!dueIso) {
     hooks.toast?.('Enter a valid date and time.');
     return;
   }
-  const dueMs = Date.parse(dueIso) - leadMin * 60_000;
-  const reminderAt = new Date(Math.max(Date.now() + 30_000, dueMs)).toISOString();
+  const meetingMs = Date.parse(dueIso);
+  let fireMs = meetingMs - leadMin * 60_000;
+  if (fd.getAll('remind').includes('travel') && travel > 0) {
+    fireMs = Math.min(fireMs, meetingMs - (travel + 5) * 60_000);
+  }
+  const reminderAt = new Date(Math.max(Date.now() + 30_000, fireMs)).toISOString();
   const take = fd.getAll('take').filter(Boolean);
   const userNotes = String(fd.get('notes') || '').trim();
+  const prep = String(fd.get('preparation') || '').trim();
   const notes = [
+    withWho && `With: ${withWho}`,
     location && `Where: ${location}`,
+    travel && `Travel: ${travel} min`,
+    prep && `Prepare: ${prep}`,
     take.length && `Bring: ${take.join(', ')}`,
     userNotes && `Notes: ${userNotes}`,
   ]
@@ -693,7 +984,16 @@ async function submitMeeting(form) {
     hooks.onReminderCreated?.(res.reminder);
     invalidateReminderCache();
   } else {
-    saveProto({ title, dueAt: reminderAt, status: 'open', categoryId: 'reminders', progress: 0, notes });
+    saveProto({
+      title,
+      dueAt: reminderAt,
+      status: 'open',
+      categoryId: 'reminders',
+      taskType: 'meeting',
+      taskKind: 'reminder',
+      progress: 0,
+      notes,
+    });
   }
   hooks.toast?.('Meeting reminder created.');
   view = 'hub';
@@ -719,6 +1019,8 @@ export function mountSarahTasksHub(options = {}, { preserveNavigation = false } 
     tab = 'today';
     categoryId = null;
     formKind = null;
+    taskTypeId = null;
+    detailTaskId = null;
   }
   paint();
 }
@@ -733,4 +1035,6 @@ export function resetSarahTasksView() {
   tab = 'today';
   categoryId = null;
   formKind = null;
+  taskTypeId = null;
+  detailTaskId = null;
 }

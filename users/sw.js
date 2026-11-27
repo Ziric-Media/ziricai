@@ -2,7 +2,7 @@
  * Sarah App PWA — precache shell; API always network.
  * Never cache /api/* or authenticated responses.
  */
-const STATIC_CACHE = 'sarah-app-static-v107';
+const STATIC_CACHE = 'sarah-app-static-v108';
 
 /** Shell only — large / lazy scripts are cached on first use via fetch handler. */
 const PRECACHE = [
@@ -22,6 +22,7 @@ const PRECACHE = [
   '/js/app.js',
   '/js/live-bridge.mjs',
   '/js/sarah-tasks.mjs',
+  '/js/sarah-tasks-catalog.mjs',
   '/js/sarah-news.js',
   '/assets/favicon.png',
   '/assets/icon-192.png',
