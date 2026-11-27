@@ -63,6 +63,7 @@
   <link rel="stylesheet" href="css/design-system.css" />
   <link rel="stylesheet" href="css/icons.css" />
   <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/st-tasks.css" />
   <script src="js/boot-inline.js"></script>
 </head>
 <body>
@@ -247,6 +248,10 @@
             <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M16 12h2"/><path d="M2 10h20"/><path d="M6 6V4a2 2 0 012-2h8a2 2 0 012 2v2"/></svg>
             My Wallet
           </button>
+          <button type="button" class="ms-drawer-link" data-ms-drawer-panel="tasks">
+            <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l2 2 4-4"/><path d="M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+            Sarah Tasks
+          </button>
           <button type="button" class="ms-drawer-link ms-drawer-link--notif" data-ms-drawer-panel="notifications">
             <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
             My Notifications
@@ -290,7 +295,7 @@
         </button>
         <div class="ms-segment" role="tablist" aria-label="Chat or Work">
           <button type="button" class="ms-segment-btn is-active" role="tab" id="msSegmentChat" data-ms-mode="chat" aria-selected="true">Chat</button>
-          <button type="button" class="ms-segment-btn" role="tab" id="msSegmentWork" data-ms-mode="work" aria-selected="false">Work</button>
+          <button type="button" class="ms-segment-btn" role="tab" id="msSegmentWork" data-ms-mode="work" aria-selected="false">Tasks</button>
         </div>
         <button type="button" class="ms-icon-tool ms-icon-tool--notif" id="homeNotifBtn" aria-label="Notifications">
           <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -312,6 +317,11 @@
               <img class="ms-avatar-main sarah-brand-img" src="assets/sarah-avatar.svg" alt="Personal Sarah" width="120" height="120" />
             </div>
             <p class="ms-greeting-bubble"></p>
+            <button type="button" class="st-home-entry" id="msHomeSarahTasksBtn" aria-label="Open Sarah Tasks">
+              <span class="st-home-entry-kicker">Sarah Tasks</span>
+              <span class="st-home-entry-title">Plan it · Prepare for it · Remember it · Get it done</span>
+              <span class="st-home-entry-cta">Open Tasks</span>
+            </button>
             <div class="ms-quick-grid" id="msQuickGrid"></div>
             <section class="ms-home-more hidden" id="msHomeMore" aria-label="More suggestions"></section>
             <p class="ms-home-prefs hidden" id="msHomePrefs">
@@ -321,73 +331,8 @@
         </div>
 
         <div class="ms-panel" data-ms-panel="tasks" role="tabpanel" hidden>
-          <h5 class="ms-headline">Tell Sarah what to get done</h5>
-          <p class="ms-work-lead">Work is where Sarah runs tasks for you — reminders, alarms, follow-ups, and assignments. Casual chat stays under <strong>Chats</strong>.</p>
-          <p class="ms-work-quota" id="msWorkQuota" role="status"></p>
-
-          <div class="ms-action-grid">
-            <article class="ms-card ms-card--primary">
-              <h3 class="ms-card-title">Run a task with Sarah</h3>
-              <p class="ms-card-desc">Describe the outcome — approve a booking, nudge a business, or plan your week.</p>
-              <button type="button" class="ms-pill-btn" id="msStartWorkTask">
-                New work item
-                <svg class="icon-svg icon-svg--xs" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-              </button>
-            </article>
-            <div class="ms-card-stack">
-              <button type="button" class="ms-card ms-card--mini" data-ms-work-prompt="Approve my SmileMore booking and remind me if they don't reply.">
-                <span class="ms-mini-icon" aria-hidden="true">
-                  <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><path d="M9 12l2 2 4-4"/></svg>
-                </span>
-                <span class="ms-mini-label">Approve booking</span>
-                <span class="ms-mini-arrow" aria-hidden="true">
-                  <svg class="icon-svg icon-svg--xs" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H9M17 7v8"/></svg>
-                </span>
-              </button>
-              <button type="button" class="ms-card ms-card--mini" data-ms-work-prompt="Follow up with Central Motors about my test drive request.">
-                <span class="ms-mini-icon" aria-hidden="true">
-                  <svg class="icon-svg icon-svg--sm" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/></svg>
-                </span>
-                <span class="ms-mini-label">Follow up</span>
-                <span class="ms-mini-arrow" aria-hidden="true">
-                  <svg class="icon-svg icon-svg--xs" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H9M17 7v8"/></svg>
-                </span>
-              </button>
-            </div>
-          </div>
-
-          <section class="ms-work-reminders" id="msWorkRemindersSection" aria-label="Scheduled reminders">
-            <header class="ms-work-reminders-head">
-              <div class="ms-work-reminders-head-copy">
-                <h3>Reminders &amp; alarms</h3>
-                <button type="button" class="ms-pill-btn ms-pill-btn--compact" id="msWorkNewReminderBtn">Set reminder</button>
-              </div>
-              <p class="ms-work-reminders-lead" id="msWorkRemindersLead">Sarah saves these here and alerts you at the due time (push + alarm).</p>
-            </header>
-            <ul class="ms-work-reminders-list" id="msWorkRemindersList"></ul>
-            <button type="button" class="ms-pill-btn ms-pill-btn--ghost ms-work-reminders-test" id="msTryReminderDemo">Try a 1-minute test alarm</button>
-          </section>
-
-          <section class="sw-home-dashboard hidden" id="msWorkDashboard" aria-label="Sarah Work dashboard" hidden>
-            <article class="sw-home-ai-card" id="msWorkDaySummary">
-              <span class="sw-home-ai-kicker">Today</span>
-              <p class="sw-home-ai-text"></p>
-            </article>
-            <div class="sw-home-stats" id="msWorkStats" role="list"></div>
-            <div class="sw-home-cap-chips" id="msWorkCapabilityChips" role="list" aria-label="Assignments by capability"></div>
-            <header class="sw-home-section-head">
-              <h3>Priority assignments</h3>
-            </header>
-            <ul class="sw-home-priority-list" id="msWorkPriorityList"></ul>
-          </section>
-
-          <section class="ms-history">
-            <header class="ms-section-head">
-              <h3>All assignments</h3>
-              <button type="button" class="ms-link-btn" data-ms-mode="chat">Open Chat</button>
-            </header>
-            <div class="ms-history-list" id="msHistoryList"></div>
-          </section>
+          <p class="ms-work-quota st-quota" id="msWorkQuota" role="status"></p>
+          <div id="stRoot" class="st-root" aria-label="Sarah Tasks"></div>
         </div>
 
         <div class="ms-panel" data-ms-panel="knowledge" role="tabpanel" hidden>

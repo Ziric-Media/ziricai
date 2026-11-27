@@ -2670,7 +2670,7 @@ const MS_PANEL_DISPLAY_TITLES = {
   wallet: 'Wallet',
   pay: 'Pay',
   organisations: 'Organisations',
-  tasks: 'Work',
+  tasks: 'Sarah Tasks',
   billing: 'Billing',
   notifications: 'My Notifications',
 };
@@ -2694,7 +2694,7 @@ function applyMySarahPanel(panel, prompt) {
   const compose = document.getElementById('personalChatForm');
   const composeInput = document.getElementById('personalChatInput');
   const showCompose =
-    panel === 'home' || panel === 'tasks' || panel === 'organisations' || panel === 'wallet' || panel === 'pay';
+    panel === 'home' || panel === 'organisations' || panel === 'wallet' || panel === 'pay';
   compose?.classList.toggle('hidden', !showCompose);
   if (composeInput) {
     if (panel === 'tasks') composeInput.placeholder = 'Tell Sarah what to do…';
@@ -2724,8 +2724,7 @@ function applyMySarahPanel(panel, prompt) {
   if (panel === 'tasks') {
     void refreshWorkQuotaState().then(() => {
       renderWorkQuotaBanner();
-      void renderWorkRemindersList();
-      void renderSarahWorkHomeDashboard();
+      void initSarahTasksPanel();
     });
   }
   if (panel === 'home' || panel === 'tasks') renderMsDrawerRecents();
@@ -5058,6 +5057,51 @@ async function ensureClientReminderFromMessage(userText, actions = []) {
   return res.reminder || null;
 }
 
+let sarahTasksModulePromise = null;
+
+function loadSarahTasksModule() {
+  if (!sarahTasksModulePromise) {
+    sarahTasksModulePromise = import('./sarah-tasks.mjs');
+  }
+  return sarahTasksModulePromise;
+}
+
+async function initSarahTasksPanel() {
+  const mod = await loadSarahTasksModule();
+  mod.mountSarahTasksHub({
+    escapeHtml,
+    toast: showProtoToast,
+    fetchReminders: (opts) => window.SarahLive?.fetchPersonalReminders?.(opts),
+    createReminder: (body) => window.SarahLive?.createPersonalReminder?.(body),
+    onReminderCreated: async (rem) => {
+      if (rem?.id) {
+        try {
+          const alarm = await import('./sna-reminders.mjs');
+          alarm.syncServerReminderSchedule({
+            id: rem.id,
+            title: rem.title,
+            body: rem.notes || rem.title,
+            dueAt: rem.dueAt,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+      void refreshLiveNotifications();
+      syncNotificationBadge();
+    },
+    onDelegate: () => {
+      showProtoToast('Opening Sarah Work chat for delegated tasks…');
+      startNewWorkThread();
+    },
+  });
+}
+
+async function refreshSarahTasksPanelIfOpen() {
+  if (document.querySelector('.my-sarah-view')?.dataset.msPanel !== 'tasks') return;
+  await initSarahTasksPanel();
+}
+
 async function applyPersonalReminderSideEffects(actions = [], userText = '') {
   let reminder = (actions || []).find((a) => a.tool === 'createPersonalReminder' && a.success)?.data;
   if (!reminder?.taskId) {
@@ -5078,9 +5122,10 @@ async function applyPersonalReminderSideEffects(actions = [], userText = '') {
   }
   void refreshLiveNotifications();
   void renderWorkRemindersList();
+  void refreshSarahTasksPanelIfOpen();
   syncNotificationBadge();
   if (document.querySelector('.my-sarah-view')?.dataset.msPanel === 'tasks') {
-    showProtoToast('Reminder saved — see Work and My Notifications → Reminders.');
+    showProtoToast('Reminder saved — see Sarah Tasks and My Notifications → Reminders.');
   }
 }
 
@@ -11243,6 +11288,7 @@ function bindMySarahInteractions() {
   document.getElementById('msStartWorkTask')?.addEventListener('click', () => startNewWorkThread());
 
   document.getElementById('msDrawerOpen')?.addEventListener('click', () => openMsDrawer());
+  document.getElementById('msHomeSarahTasksBtn')?.addEventListener('click', () => showWorkTasksHub());
   document.getElementById('msSubmoduleBack')?.addEventListener('click', () => goToMySarahHome());
   document.getElementById('msDrawerClose')?.addEventListener('click', () => closeMsDrawer());
   document.getElementById('msDrawerBackdrop')?.addEventListener('click', () => closeMsDrawer());
@@ -11902,6 +11948,8 @@ function selectHomeCardsForGrid(primary, extra, prefs, mode) {
 
 async function activateSarahHomeCard(card) {
   const action = card?.action;
+  if (bindSarahHomeCardAction(card)) return;
+
   const work = msHomeCardMode() === 'work';
   const message = homeCardLaunchMessage(card);
 
