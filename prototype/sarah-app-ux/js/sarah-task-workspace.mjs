@@ -15,6 +15,39 @@ function lifecycleLabel(state) {
     return map[state] || 'Open';
 }
 
+function formatTimelineWhen(at) {
+    if (!at) return 'When you set a date';
+    const ms = Date.parse(at);
+    if (!Number.isFinite(ms)) return String(at);
+    return new Date(ms).toLocaleString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    });
+}
+
+function timelineHtml(task, esc) {
+    const rows = Array.isArray(task?.timeline) ? task.timeline : [];
+    if (!rows.length) return '<p class="st-detail-empty">Sarah will build a timeline when this task has a due date.</p>';
+    return `<ol class="st-ws-timeline">${rows
+        .map(
+            (row) =>
+                `<li class="st-ws-timeline-item st-ws-timeline-item--${esc(row.kind || 'milestone')}"><time>${esc(formatTimelineWhen(row.at))}</time><span>${esc(row.label || '')}</span></li>`
+        )
+        .join('')}</ol>`;
+}
+
+function suggestionsHtml(task, esc) {
+    const rows = Array.isArray(task?.suggestions) ? task.suggestions : [];
+    if (!rows.length) return '';
+    return `<h3 class="st-detail-h">Sarah suggests</h3><ul class="st-ws-suggestions">${rows
+        .map((s) => `<li>${esc(s)}</li>`)
+        .join('')}</ul>`;
+}
+
 function networkMatchHtml(networkMatch, esc) {
     const matches = networkMatch?.matches || [];
     if (!matches.length) {
@@ -114,8 +147,14 @@ export function renderTaskWorkspace(task, session, esc, { networkMatch } = {}) {
       ${networkMatchHtml(networkMatch, esc)}
     </section>
     <section class="st-ws-panel is-hidden" data-st-ws-panel="progress" hidden>
+      <div class="st-ws-intel-head">
+        <h3 class="st-detail-h">Timeline</h3>
+        <button type="button" class="ms-link-btn" data-st-ws-regen-intel>Refresh plan</button>
+      </div>
+      ${timelineHtml(task, esc)}
       <h3 class="st-detail-h">Checklist</h3>
       ${checklist}
+      ${suggestionsHtml(task, esc)}
       ${task?.planSummary ? `<h3 class="st-detail-h">Sarah's plan</h3><p class="st-ws-plan">${esc(task.planSummary)}</p>` : ''}
     </section>`;
 }
@@ -176,6 +215,21 @@ export function bindTaskWorkspace(root, { esc, hooks, onBack, onRefresh, network
         progress: 100,
       });
       hooks.toast?.('Task marked complete.');
+      await onRefresh?.();
+    })();
+  });
+  root.querySelector('[data-st-ws-regen-intel]')?.addEventListener('click', () => {
+    void (async () => {
+      if (!hooks.regenerateTaskIntelligence || !hooks.workspaceTaskId) {
+        hooks.toast?.('Sign in to refresh Sarah’s plan.');
+        return;
+      }
+      const res = await hooks.regenerateTaskIntelligence(hooks.workspaceTaskId);
+      if (res?.error) {
+        hooks.toast?.(res.error);
+        return;
+      }
+      hooks.toast?.('Timeline and suggestions updated.');
       await onRefresh?.();
     })();
   });

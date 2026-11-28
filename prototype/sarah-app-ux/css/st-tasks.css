@@ -980,3 +980,44 @@
   color: #64748b;
   margin: 0;
 }
+
+.st-ws-intel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.st-ws-timeline {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  border-left: 2px solid #e2e8f0;
+}
+
+.st-ws-timeline-item {
+  position: relative;
+  margin: 0 0 10px 12px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.st-ws-timeline-item time {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.st-ws-timeline-item--due span {
+  font-weight: 600;
+  color: #6d28d9;
+}
+
+.st-ws-suggestions {
+  margin: 0 0 12px;
+  padding-left: 1.1rem;
+  font-size: 13px;
+  color: #475569;
+}

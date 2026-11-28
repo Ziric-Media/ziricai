@@ -628,6 +628,20 @@ export async function fetchPersonalSarahTaskWorkspace(taskId) {
   return { task: res.data?.task, session: res.data?.session, networkMatch: res.data?.networkMatch || null };
 }
 
+export async function regeneratePersonalSarahTaskIntelligence(taskId) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const id = String(taskId || '').trim();
+  if (!id) return { error: 'Task id required', code: 'TASK_ID_REQUIRED' };
+  const res = await apiRequest(`/api/personal-sarah/tasks/${encodeURIComponent(id)}/intelligence`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { task: res.data?.task };
+}
+
 export async function searchPersonalTaskOrganisations(q) {
   const blocked = await requireSignedInConsumer();
   if (blocked) return blocked;
@@ -1530,6 +1544,7 @@ function mountPublicApi() {
     updatePersonalSarahTask,
     fetchPersonalSarahTaskWorkspace,
     searchPersonalTaskOrganisations,
+    regeneratePersonalSarahTaskIntelligence,
     sendPersonalSarahTaskMessage,
     pollDuePersonalReminders,
     pollSarahNewsDelivery,

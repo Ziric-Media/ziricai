@@ -95,6 +95,8 @@ export async function createPersonalSarahTask(uid, body = {}, opts = {}) {
         sarahPhase: body.sarahPhase ? String(body.sarahPhase) : "idle",
         planSummary: body.planSummary ? String(body.planSummary) : null,
         assignedAt: body.assignedAt || null,
+        timeline: Array.isArray(body.timeline) ? body.timeline.slice(0, 24) : [],
+        suggestions: Array.isArray(body.suggestions) ? body.suggestions.map(String).slice(0, 12) : [],
         meta: body.meta && typeof body.meta === "object" ? body.meta : {},
         hiddenInList: Boolean(body.hiddenInList),
         createdAt: Date.now(),
@@ -220,6 +222,8 @@ const TASK_PATCH_KEYS = new Set([
     "categoryId",
     "taskType",
     "taskKind",
+    "timeline",
+    "suggestions",
 ]);
 
 export async function updatePersonalSarahTask(uid, taskId, patch = {}) {

@@ -150,6 +150,8 @@ function mapServerTask(t) {
     sessionId: t.sessionId,
     sarahPhase: t.sarahPhase,
     planSummary: t.planSummary,
+    timeline: t.timeline,
+    suggestions: t.suggestions,
     source: 'server',
   };
 }
@@ -290,19 +292,37 @@ function buildNextActions(tasks) {
   );
   const actions = [];
   for (const t of open) {
+    if (t.lifecycleState === 'awaiting_approval') {
+      actions.push({ id: t.id, text: `Approve plan: ${t.title}` });
+      continue;
+    }
+    let pushed = false;
     const due = Date.parse(t.dueAt);
     if (Number.isFinite(due)) {
       const diff = due - Date.now();
       if (diff > 0 && diff < 6 * 3600_000) {
         actions.push({ id: t.id, text: `${t.title} — in ${relTime(due)}` });
+        pushed = true;
       } else if (diff > 0 && diff < 48 * 3600_000) {
         actions.push({ id: t.id, text: `${t.title} — ${formatWhen(t.dueAt)}` });
+        pushed = true;
       }
     }
     if (Array.isArray(t.checklist) && t.checklist.length) {
       const pct = checklistProgress(t.checklist);
-      if (pct > 0 && pct < 100) actions.push({ id: t.id, text: `${t.title} checklist ${pct}% complete` });
-      else if (pct === 0) actions.push({ id: t.id, text: `Start preparing: ${t.title}` });
+      if (pct > 0 && pct < 100) {
+        actions.push({ id: t.id, text: `${t.title} checklist ${pct}% complete` });
+        pushed = true;
+      }
+      else if (pct === 0) {
+        actions.push({ id: t.id, text: `Start preparing: ${t.title}` });
+        pushed = true;
+      }
+    }
+    if (!pushed && Array.isArray(t.suggestions) && t.suggestions[0] && taskProgress(t) < 25) {
+      const raw = String(t.suggestions[0]);
+      const short = raw.length > 72 ? `${raw.slice(0, 71)}…` : raw;
+      actions.push({ id: t.id, text: short });
     }
   }
   return actions.slice(0, 4);
@@ -1444,6 +1464,7 @@ function applyHooks(options = {}) {
     onDelegate: options.onDelegate ?? hooks.onDelegate,
     fetchTaskWorkspace: options.fetchTaskWorkspace ?? hooks.fetchTaskWorkspace,
     sendTaskMessage: options.sendTaskMessage ?? hooks.sendTaskMessage,
+    regenerateTaskIntelligence: options.regenerateTaskIntelligence ?? hooks.regenerateTaskIntelligence,
     updateTask: options.updateTask ?? hooks.updateTask,
     fetchTasks: options.fetchTasks ?? hooks.fetchTasks,
     createTask: options.createTask ?? hooks.createTask,

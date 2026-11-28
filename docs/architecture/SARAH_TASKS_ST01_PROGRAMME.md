@@ -26,7 +26,7 @@
 | ST-UX-03 | Government directory | **v1 shipped** — SA dept/service form, government ack + approval path |
 | ST-UX-04 | Workspace actions | **v1 shipped** — approval chips, complete/cancel, checklist, task notifications |
 | ST-UX-03b | Network org bridge | **v1 shipped** — org typeahead, workspace Network matches, Discover deep link |
-| ST-04 | Intelligence | Generated checklists, timelines, suggestions |
+| ST-04 | Intelligence | **v1 shipped** — rule-based checklist merge, timelines, suggestions |
 | ST-05 | Execution | Research, drafts, bookings with approval |
 | ST-06 | Personalisation | Routines, templates, learning |
 
@@ -88,3 +88,10 @@ Paste: task id, expected vs actual, screenshot of My Notifications if push fails
 3. **Cancel task** from workspace → returns to hub; notification optional.
 4. Application **organisation** field → type 3+ chars → Network suggestions; pick one → assign.
 5. Workspace **Details → Sarah Network** → match list → opens Discover profile.
+
+## Spencer UAT — ST-04
+
+1. Create **interview prep** with due date → open workspace **Progress** → timeline milestones + checklist + suggestions.
+2. Assign → conversation includes a **Tip:** line from suggestions.
+3. **Refresh plan** on Progress tab → checklist/timeline update without losing done items.
+4. Hub **Sarah’s next actions** shows **Approve plan** when awaiting approval.

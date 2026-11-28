@@ -681,7 +681,13 @@ export async function handleCreatePersonalSarahTask(req, res) {
             body.dueAt = dueAt;
             body.status = body.status || "scheduled";
         }
-        const task = await createPersonalSarahTask(uid, body);
+        let task = await createPersonalSarahTask(uid, body);
+        try {
+            const { applyTaskIntelligence } = await import("../sarah/personal/personalSarahTaskIntelligence.js");
+            task = await applyTaskIntelligence(uid, task);
+        } catch (err) {
+            console.warn("[api/personal-sarah/tasks]", "intelligence", err?.message || err);
+        }
         const assignToSarah = body.assignToSarah !== false;
         let assigned = null;
         if (assignToSarah) {
@@ -750,6 +756,19 @@ export async function handlePersonalSarahTaskWorkspace(req, res) {
         });
     } catch (err) {
         res.status(500).json({ error: err.message || "Workspace load failed", code: "TASK_WORKSPACE_ERROR" });
+    }
+}
+
+export async function handleRegeneratePersonalSarahTaskIntelligence(req, res) {
+    try {
+        const uid = req.consumerAuth.uid;
+        const task = await getPersonalSarahTask(uid, req.params?.id);
+        if (!task) return res.status(404).json({ error: "Task not found", code: "TASK_NOT_FOUND" });
+        const { applyTaskIntelligence } = await import("../sarah/personal/personalSarahTaskIntelligence.js");
+        const updated = await applyTaskIntelligence(uid, task);
+        res.json({ task: updated });
+    } catch (err) {
+        res.status(500).json({ error: err.message || "Intelligence refresh failed", code: "TASK_INTEL_ERROR" });
     }
 }
 
@@ -988,6 +1007,7 @@ export function mountPersonalSarahRoutes(app) {
     app.post("/api/personal-sarah/tasks", requireConsumerScope(), handleCreatePersonalSarahTask);
     app.get("/api/personal-sarah/tasks", requireConsumerScope(), handleListPersonalSarahTasks);
     app.get("/api/personal-sarah/tasks/network-search", requireConsumerScope(), handlePersonalSarahTaskNetworkSearch);
+    app.post("/api/personal-sarah/tasks/:id/intelligence", requireConsumerScope(), handleRegeneratePersonalSarahTaskIntelligence);
     app.get("/api/personal-sarah/tasks/:id", requireConsumerScope(), handleGetPersonalSarahTask);
     app.patch("/api/personal-sarah/tasks/:id", requireConsumerScope(), handlePatchPersonalSarahTask);
     app.post("/api/personal-sarah/tasks/:id/assign", requireConsumerScope(), handleAssignPersonalSarahTask);

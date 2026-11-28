@@ -115,6 +115,8 @@ export async function assignPersonalSarahTask(uid, taskId) {
 
     const ack = buildAcknowledgment(task);
     await appendPersonalSarahMessage(session, "assistant", ack);
+    const tip = Array.isArray(task.suggestions) && task.suggestions[0] ? String(task.suggestions[0]) : "";
+    if (tip) await appendPersonalSarahMessage(session, "assistant", `Tip: ${tip}`);
 
     const needsApproval = needsExplicitApproval(task);
     let planSummary = null;
