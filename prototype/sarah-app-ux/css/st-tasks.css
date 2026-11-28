@@ -1030,6 +1030,49 @@
   background: #f8fafc;
 }
 
+.st-routines {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f5f3ff 0%, #fdf2f8 100%);
+}
+
+.st-routines-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.st-routine-btn {
+  border: 1px solid #ddd6fe;
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5b21b6;
+  cursor: pointer;
+}
+
+.st-routine-count {
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.st-template-card--yours {
+  border-color: #c4b5fd;
+}
+
+.st-template-meta {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+
 .st-ws-artifact-body {
   margin: 0;
   white-space: pre-wrap;

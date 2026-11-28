@@ -759,6 +759,92 @@ export async function handlePersonalSarahTaskWorkspace(req, res) {
     }
 }
 
+export async function handleGetTaskPersonalisation(req, res) {
+    try {
+        const { getTaskPersonalisation } = await import("../sarah/personal/personalSarahTaskPersonalisation.js");
+        const data = await getTaskPersonalisation(req.consumerAuth.uid);
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message || "Personalisation load failed", code: "TASK_PERSONALISATION_ERROR" });
+    }
+}
+
+export async function handleSaveTaskTemplate(req, res) {
+    try {
+        const uid = req.consumerAuth.uid;
+        const task = await getPersonalSarahTask(uid, req.params?.id);
+        if (!task) return res.status(404).json({ error: "Task not found", code: "TASK_NOT_FOUND" });
+        const { saveTaskAsTemplate } = await import("../sarah/personal/personalSarahTaskPersonalisation.js");
+        const template = await saveTaskAsTemplate(uid, task, { name: req.body?.name });
+        res.status(201).json({ template });
+    } catch (err) {
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message || "Save template failed", code: err.code || "TEMPLATE_SAVE_ERROR" });
+    }
+}
+
+export async function handleCreateTaskFromTemplate(req, res) {
+    try {
+        const uid = req.consumerAuth.uid;
+        const templateId = String(req.body?.templateId || "").trim();
+        if (!templateId) return res.status(400).json({ error: "templateId required", code: "TEMPLATE_ID_REQUIRED" });
+        const { createTaskFromTemplate } = await import("../sarah/personal/personalSarahTaskPersonalisation.js");
+        let task = await createTaskFromTemplate(uid, templateId, {
+            dueAt: req.body?.dueAt || null,
+            assignToSarah: req.body?.assignToSarah !== false,
+        });
+        try {
+            const { applyTaskIntelligence } = await import("../sarah/personal/personalSarahTaskIntelligence.js");
+            task = await applyTaskIntelligence(uid, task);
+        } catch {
+            /* ignore */
+        }
+        if (req.body?.assignToSarah !== false) {
+            try {
+                const { assignPersonalSarahTask } = await import("../sarah/personal/personalSarahTaskOrchestrator.js");
+                const assigned = await assignPersonalSarahTask(uid, task.id);
+                task = assigned.task;
+            } catch (err) {
+                console.warn("[api/personal-sarah/tasks/from-template]", err?.message || err);
+            }
+        }
+        res.status(201).json({ task });
+    } catch (err) {
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message || "Create from template failed", code: err.code || "TEMPLATE_CREATE_ERROR" });
+    }
+}
+
+export async function handleCreateTaskFromRoutine(req, res) {
+    try {
+        const uid = req.consumerAuth.uid;
+        const taskType = String(req.body?.taskType || "").trim();
+        if (!taskType) return res.status(400).json({ error: "taskType required", code: "ROUTINE_TYPE_REQUIRED" });
+        const { createTaskFromRoutine } = await import("../sarah/personal/personalSarahTaskPersonalisation.js");
+        let task = await createTaskFromRoutine(uid, taskType, {
+            dueAt: req.body?.dueAt || null,
+            categoryId: req.body?.categoryId,
+            taskKind: req.body?.taskKind,
+            assignToSarah: req.body?.assignToSarah !== false,
+        });
+        try {
+            const { applyTaskIntelligence } = await import("../sarah/personal/personalSarahTaskIntelligence.js");
+            task = await applyTaskIntelligence(uid, task);
+        } catch {
+            /* ignore */
+        }
+        if (req.body?.assignToSarah !== false) {
+            const { assignPersonalSarahTask } = await import("../sarah/personal/personalSarahTaskOrchestrator.js");
+            const assigned = await assignPersonalSarahTask(uid, task.id);
+            task = assigned.task;
+        }
+        res.status(201).json({ task });
+    } catch (err) {
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message || "Routine create failed", code: err.code || "ROUTINE_CREATE_ERROR" });
+    }
+}
+
 export async function handleRegeneratePersonalSarahTaskIntelligence(req, res) {
     try {
         const uid = req.consumerAuth.uid;
@@ -843,6 +929,14 @@ export async function handlePatchPersonalSarahTask(req, res) {
                 void notifyPersonalSarahTaskUpdate(uid, id, "You marked this task complete.", "Task completed");
             } else if (patch.lifecycleState === "cancelled" || patch.status === "cancelled") {
                 void notifyPersonalSarahTaskUpdate(uid, id, "This task was cancelled.", "Task cancelled");
+            }
+        } catch {
+            /* ignore */
+        }
+        try {
+            const { recordTaskLearning } = await import("../sarah/personal/personalSarahTaskPersonalisation.js");
+            if (patch.lifecycleState === "completed" || patch.status === "completed") {
+                void recordTaskLearning(uid, task);
             }
         } catch {
             /* ignore */
@@ -1007,6 +1101,10 @@ export function mountPersonalSarahRoutes(app) {
     app.post("/api/personal-sarah/tasks", requireConsumerScope(), handleCreatePersonalSarahTask);
     app.get("/api/personal-sarah/tasks", requireConsumerScope(), handleListPersonalSarahTasks);
     app.get("/api/personal-sarah/tasks/network-search", requireConsumerScope(), handlePersonalSarahTaskNetworkSearch);
+    app.get("/api/personal-sarah/tasks/personalisation", requireConsumerScope(), handleGetTaskPersonalisation);
+    app.post("/api/personal-sarah/tasks/from-template", requireConsumerScope(), handleCreateTaskFromTemplate);
+    app.post("/api/personal-sarah/tasks/from-routine", requireConsumerScope(), handleCreateTaskFromRoutine);
+    app.post("/api/personal-sarah/tasks/:id/save-template", requireConsumerScope(), handleSaveTaskTemplate);
     app.post("/api/personal-sarah/tasks/:id/intelligence", requireConsumerScope(), handleRegeneratePersonalSarahTaskIntelligence);
     app.get("/api/personal-sarah/tasks/:id", requireConsumerScope(), handleGetPersonalSarahTask);
     app.patch("/api/personal-sarah/tasks/:id", requireConsumerScope(), handlePatchPersonalSarahTask);

@@ -628,6 +628,52 @@ export async function fetchPersonalSarahTaskWorkspace(taskId) {
   return { task: res.data?.task, session: res.data?.session, networkMatch: res.data?.networkMatch || null };
 }
 
+export async function fetchTaskPersonalisation() {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const res = await apiRequest('/api/personal-sarah/tasks/personalisation', { silent: true });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return res.data || {};
+}
+
+export async function savePersonalTaskTemplate(taskId, name) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const id = String(taskId || '').trim();
+  if (!id) return { error: 'Task id required', code: 'TASK_ID_REQUIRED' };
+  const res = await apiRequest(`/api/personal-sarah/tasks/${encodeURIComponent(id)}/save-template`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(name ? { name } : {}),
+  });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { template: res.data?.template };
+}
+
+export async function createPersonalTaskFromTemplate(templateId, body = {}) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const res = await apiRequest('/api/personal-sarah/tasks/from-template', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ templateId, ...body }),
+  });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { task: res.data?.task };
+}
+
+export async function createPersonalTaskFromRoutine(taskType, body = {}) {
+  const blocked = await requireSignedInConsumer();
+  if (blocked) return blocked;
+  const res = await apiRequest('/api/personal-sarah/tasks/from-routine', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskType, ...body }),
+  });
+  if (res.error) return { error: res.error, code: res.code, status: res.status };
+  return { task: res.data?.task };
+}
+
 export async function regeneratePersonalSarahTaskIntelligence(taskId) {
   const blocked = await requireSignedInConsumer();
   if (blocked) return blocked;
@@ -1545,6 +1591,10 @@ function mountPublicApi() {
     fetchPersonalSarahTaskWorkspace,
     searchPersonalTaskOrganisations,
     regeneratePersonalSarahTaskIntelligence,
+    fetchTaskPersonalisation,
+    savePersonalTaskTemplate,
+    createPersonalTaskFromTemplate,
+    createPersonalTaskFromRoutine,
     sendPersonalSarahTaskMessage,
     pollDuePersonalReminders,
     pollSarahNewsDelivery,

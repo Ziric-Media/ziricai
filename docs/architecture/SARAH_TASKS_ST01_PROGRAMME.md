@@ -28,7 +28,7 @@
 | ST-UX-03b | Network org bridge | **v1 shipped** — org typeahead, workspace Network matches, Discover deep link |
 | ST-04 | Intelligence | **v1 shipped** — rule-based checklist merge, timelines, suggestions |
 | ST-05 | Execution | **v1 shipped** — artifacts, review + approve submit gate |
-| ST-06 | Personalisation | Routines, templates, learning |
+| ST-06 | Personalisation | **v1 shipped** — save templates, routines strip, completion learning |
 
 ## Implementation priorities (ST-01B/D)
 
@@ -102,3 +102,9 @@ Paste: task id, expected vs actual, screenshot of My Notifications if push fails
 2. Lifecycle **Review Sarah’s draft** → **Approve submit** chip → status **Approved — you submit**.
 3. Confirm no payment/submit copy in Sarah’s confirmation message.
 4. **Government or job application** task → go-ahead produces **application** artifact type.
+
+## Spencer UAT — ST-06
+
+1. Workspace → **Save as template** → Templates tab → **Saved by you** → **Use my template** → new assigned task.
+2. Mark same task type **complete** twice → hub shows **Your routines** chip; tap → quick create.
+3. Third create of that type → suggestion mentions prior completions (ST-04 intelligence).

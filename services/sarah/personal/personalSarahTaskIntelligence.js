@@ -125,10 +125,14 @@ function timelineForTask(task) {
     return [{ at: null, label: "Set a due date to unlock a timeline", kind: "hint" }];
 }
 
-function suggestionsForTask(task) {
+function suggestionsForTask(task, personalisation = null) {
     const type = String(task.taskType || "").toLowerCase();
     const cat = String(task.categoryId || "").toLowerCase();
     const out = [];
+    const prior = personalisation?.learning?.counts?.[task.taskType || type];
+    if (prior && prior >= 2) {
+        out.push(`You've completed similar tasks ${prior} times — your saved patterns are applied.`);
+    }
     if (TYPE_SUGGESTIONS[type]) out.push(...TYPE_SUGGESTIONS[type]);
     if (CATEGORY_SUGGESTIONS[cat]) out.push(...CATEGORY_SUGGESTIONS[cat]);
     if (task.lifecycleState === "awaiting_approval") {
@@ -166,10 +170,10 @@ function checklistForTask(task) {
 /**
  * @param {object} task
  */
-export function generateTaskIntelligence(task) {
+export function generateTaskIntelligence(task, personalisation = null) {
     const checklist = checklistForTask(task);
     const timeline = timelineForTask(task);
-    const suggestions = suggestionsForTask(task);
+    const suggestions = suggestionsForTask(task, personalisation);
     return {
         checklist,
         timeline,
@@ -200,7 +204,18 @@ export function mergeTaskChecklists(existing, generated) {
  */
 export async function applyTaskIntelligence(uid, task) {
     const { updatePersonalSarahTask } = await import("./personalSarahTaskStore.js");
-    const intel = generateTaskIntelligence(task);
+    let personalisation = null;
+    try {
+        const { getTaskPersonalisation } = await import("./personalSarahTaskPersonalisation.js");
+        personalisation = await getTaskPersonalisation(uid);
+        const tpl = (personalisation.templates || []).find((t) => t.taskType === task.taskType);
+        if (tpl?.checklist?.length && !(task.checklist?.length)) {
+            task = { ...task, checklist: tpl.checklist.map((c) => ({ ...c, done: false })) };
+        }
+    } catch {
+        /* ignore */
+    }
+    const intel = generateTaskIntelligence(task, personalisation);
     const checklist = mergeTaskChecklists(task.checklist, intel.checklist);
     const done = checklist.filter((c) => c.done).length;
     const progress = checklist.length ? Math.round((100 * done) / checklist.length) : task.progress || 0;

@@ -76,6 +76,9 @@ let cachedReminders = [];
 let remindersFetchedAt = 0;
 let remindersInflight = null;
 const REMINDER_CACHE_MS = 60_000;
+let cachedPersonalisation = null;
+let personalisationFetchedAt = 0;
+const PERSONALISATION_CACHE_MS = 120_000;
 
 function invalidateReminderCache() {
   remindersFetchedAt = 0;
@@ -334,6 +337,32 @@ function buildNextActions(tasks) {
   return actions.slice(0, 4);
 }
 
+async function ensurePersonalisation() {
+  if (cachedPersonalisation && Date.now() - personalisationFetchedAt < PERSONALISATION_CACHE_MS) {
+    return cachedPersonalisation;
+  }
+  if (!hooks.fetchTaskPersonalisation) return { templates: [], routines: [] };
+  const res = await hooks.fetchTaskPersonalisation();
+  if (res?.error) return { templates: [], routines: [] };
+  cachedPersonalisation = res;
+  personalisationFetchedAt = Date.now();
+  return cachedPersonalisation;
+}
+
+function renderRoutinesStrip(personalisation) {
+  const routines = personalisation?.routines || [];
+  if (!routines.length) return '';
+  return `<section class="st-routines" aria-label="Your routines">
+    <h3 class="st-next-title">Your routines</h3>
+    <ul class="st-routines-list">${routines
+      .map(
+        (r) =>
+          `<li><button type="button" class="st-routine-btn" data-st-routine="${esc(r.taskType)}">${esc(r.label)} <span class="st-routine-count">×${r.count}</span></button></li>`
+      )
+      .join('')}</ul>
+  </section>`;
+}
+
 function renderNextActions(tasks) {
   const actions = buildNextActions(tasks);
   if (!actions.length) {
@@ -394,7 +423,7 @@ function renderTaskCards(tasks) {
     .join('');
 }
 
-function renderHub(reminders) {
+function renderHub(reminders, personalisation = cachedPersonalisation) {
   const tasks = allTasks(reminders);
   const stats = buildStats(tasks);
   const list = filterTab(tasks, tab);
@@ -423,6 +452,7 @@ function renderHub(reminders) {
       <article class="st-stat st-stat--green"><span class="st-stat-val">${stats.done}</span><span class="st-stat-label">Completed</span></article>
       <article class="st-stat st-stat--amber"><span class="st-stat-val">${stats.waiting}</span><span class="st-stat-label">Waiting</span></article>
     </section>
+    ${renderRoutinesStrip(personalisation)}
     ${renderNextActions(tasks)}
     <nav class="st-tabs" role="tablist">${tabs
       .map(
@@ -432,13 +462,23 @@ function renderHub(reminders) {
           }">${label}</button>`
       )
       .join('')}</nav>
-    <section class="st-list-wrap">${tab === 'templates' ? renderTemplates() : `<ul class="st-task-list">${renderTaskCards(list)}</ul>`}</section>
+    <section class="st-list-wrap">${tab === 'templates' ? renderTemplates(personalisation) : `<ul class="st-task-list">${renderTaskCards(list)}</ul>`}</section>
     <p class="st-footnote">Tasks save to your Sarah account when signed in. Reliable push when the app is closed arrives with ST-03.</p>
   `;
 }
 
-function renderTemplates() {
+function renderTemplates(personalisation = cachedPersonalisation) {
   const profiles = loadDepartureProfiles();
+  const userRows = (personalisation?.templates || [])
+    .map(
+      (t) => `<article class="st-template-card st-template-card--yours">
+        <h4>${esc(t.name || t.title)}</h4>
+        <p class="st-template-meta">${esc(t.taskType || '')} · used ${t.useCount || 0}×</p>
+        ${t.checklist?.length ? `<ul>${t.checklist.slice(0, 4).map((c) => `<li>${esc(c.label)}</li>`).join('')}</ul>` : ''}
+        <button type="button" class="ms-link-btn" data-st-user-template="${esc(t.id)}">Use my template</button>
+      </article>`
+    )
+    .join('');
   const rows = Object.entries(profiles)
     .map(
       ([key, items]) => `<article class="st-template-card">
@@ -448,7 +488,7 @@ function renderTemplates() {
       </article>`
     )
     .join('');
-  return `<div class="st-templates">${rows}<article class="st-template-card"><h4>Job interview prep</h4><ul>${INTERVIEW_CHECKLIST.map((i) => `<li>${esc(i)}</li>`).join('')}</ul><button type="button" class="ms-link-btn" data-st-template="interview">Use template</button></article></div>`;
+  return `<div class="st-templates">${userRows ? `<h3 class="st-detail-h">Saved by you</h3>${userRows}` : ''}<h3 class="st-detail-h">Built-in</h3>${rows}<article class="st-template-card"><h4>Job interview prep</h4><ul>${INTERVIEW_CHECKLIST.map((i) => `<li>${esc(i)}</li>`).join('')}</ul><button type="button" class="ms-link-btn" data-st-template="interview">Use template</button></article></div>`;
 }
 
 function renderTypePicker() {
@@ -816,6 +856,7 @@ async function paintWorkspace(root) {
       workspaceTaskId,
       workspaceTask: res.task,
       sendTaskMessage: async (message) => hooks.sendTaskMessage?.(workspaceTaskId, message),
+      saveTaskTemplate: (id) => hooks.saveTaskTemplate?.(id),
       updateTask: (id, patch) => hooks.updateTask?.(id, patch),
     },
     networkMatch: res.networkMatch,
@@ -836,6 +877,7 @@ async function paintWorkspace(root) {
           workspaceTaskId,
           workspaceTask: fresh?.task,
           sendTaskMessage: async (message) => hooks.sendTaskMessage?.(workspaceTaskId, message),
+          saveTaskTemplate: (id) => hooks.saveTaskTemplate?.(id),
           updateTask: (id, patch) => hooks.updateTask?.(id, patch),
         },
         networkMatch: fresh?.networkMatch,
@@ -867,9 +909,47 @@ function repaintHubBody(root, reminders = cachedReminders) {
   const wrap = root.querySelector('.st-list-wrap');
   if (!wrap) return;
   wrap.innerHTML =
-    tab === 'templates' ? renderTemplates() : `<ul class="st-task-list">${renderTaskCards(filterTab(tasks, tab))}</ul>`;
+    tab === 'templates'
+      ? renderTemplates(cachedPersonalisation)
+      : `<ul class="st-task-list">${renderTaskCards(filterTab(tasks, tab))}</ul>`;
   syncHubTabUi(root);
   bindTaskOpens(root, reminders);
+  root.querySelectorAll('[data-st-user-template]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      void (async () => {
+        const templateId = btn.getAttribute('data-st-user-template');
+        if (!hooks.createTaskFromTemplate) {
+          hooks.toast?.('Sign in to use saved templates.');
+          return;
+        }
+        const res = await hooks.createTaskFromTemplate(templateId);
+        if (res?.error) {
+          hooks.toast?.(res.error);
+          return;
+        }
+        finishTaskAssign(res.task, { toast: 'Created from your template.' });
+        invalidateReminderCache();
+      })();
+    });
+  });
+  root.querySelectorAll('[data-st-routine]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      void (async () => {
+        const taskType = btn.getAttribute('data-st-routine');
+        if (!hooks.createTaskFromRoutine) {
+          hooks.toast?.('Sign in to use routines.');
+          return;
+        }
+        const res = await hooks.createTaskFromRoutine(taskType);
+        if (res?.error) {
+          hooks.toast?.(res.error);
+          return;
+        }
+        finishTaskAssign(res.task, { toast: 'Routine task created.' });
+        invalidateReminderCache();
+      })();
+    });
+  });
   root.querySelectorAll('[data-st-template]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-st-template') || '';
@@ -887,10 +967,10 @@ function repaintHubBody(root, reminders = cachedReminders) {
   });
 }
 
-function applyHubReminders(root, reminders) {
+function applyHubReminders(root, reminders, personalisation) {
   cachedReminders = reminders;
   if (view !== 'hub' || !root.isConnected) return;
-  root.innerHTML = renderHub(reminders);
+  root.innerHTML = renderHub(reminders, personalisation);
   bind(root, reminders);
 }
 
@@ -903,8 +983,8 @@ function paint() {
   const root = paintSync();
   if (!root) return;
   if (view !== 'hub') return;
-  void ensureReminders()
-    .then((reminders) => applyHubReminders(root, reminders))
+  void Promise.all([ensureReminders(), ensurePersonalisation()])
+    .then(([reminders, personalisation]) => applyHubReminders(root, reminders, personalisation))
     .catch(() => {
       /* keep local proto tasks visible */
     });
@@ -985,6 +1065,42 @@ function bind(root, reminders) {
       }
       view = 'form';
       paint();
+    });
+  });
+  root.querySelectorAll('[data-st-user-template]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      void (async () => {
+        const templateId = btn.getAttribute('data-st-user-template');
+        if (!hooks.createTaskFromTemplate) {
+          hooks.toast?.('Sign in to use saved templates.');
+          return;
+        }
+        const res = await hooks.createTaskFromTemplate(templateId);
+        if (res?.error) {
+          hooks.toast?.(res.error);
+          return;
+        }
+        finishTaskAssign(res.task, { toast: 'Created from your template.' });
+        invalidateReminderCache();
+      })();
+    });
+  });
+  root.querySelectorAll('[data-st-routine]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      void (async () => {
+        const taskType = btn.getAttribute('data-st-routine');
+        if (!hooks.createTaskFromRoutine) {
+          hooks.toast?.('Sign in to use routines.');
+          return;
+        }
+        const res = await hooks.createTaskFromRoutine(taskType);
+        if (res?.error) {
+          hooks.toast?.(res.error);
+          return;
+        }
+        finishTaskAssign(res.task, { toast: 'Routine task created.' });
+        invalidateReminderCache();
+      })();
     });
   });
 
@@ -1471,6 +1587,10 @@ function applyHooks(options = {}) {
     fetchTaskWorkspace: options.fetchTaskWorkspace ?? hooks.fetchTaskWorkspace,
     sendTaskMessage: options.sendTaskMessage ?? hooks.sendTaskMessage,
     regenerateTaskIntelligence: options.regenerateTaskIntelligence ?? hooks.regenerateTaskIntelligence,
+    fetchTaskPersonalisation: options.fetchTaskPersonalisation ?? hooks.fetchTaskPersonalisation,
+    saveTaskTemplate: options.saveTaskTemplate ?? hooks.saveTaskTemplate,
+    createTaskFromTemplate: options.createTaskFromTemplate ?? hooks.createTaskFromTemplate,
+    createTaskFromRoutine: options.createTaskFromRoutine ?? hooks.createTaskFromRoutine,
     updateTask: options.updateTask ?? hooks.updateTask,
     fetchTasks: options.fetchTasks ?? hooks.fetchTasks,
     createTask: options.createTask ?? hooks.createTask,
@@ -1500,7 +1620,10 @@ export function mountSarahTasksHub(options = {}, { preserveNavigation = false } 
 }
 
 export function refreshSarahTasksHub({ forceReminders = false } = {}) {
-  if (forceReminders) invalidateReminderCache();
+  if (forceReminders) {
+    invalidateReminderCache();
+    personalisationFetchedAt = 0;
+  }
   paint();
 }
 

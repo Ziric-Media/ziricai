@@ -5136,6 +5136,10 @@ function sarahTasksHubOptions() {
     fetchTaskWorkspace: (id) => window.SarahLive?.fetchPersonalSarahTaskWorkspace?.(id),
     sendTaskMessage: (id, message) => window.SarahLive?.sendPersonalSarahTaskMessage?.(id, message),
     regenerateTaskIntelligence: (id) => window.SarahLive?.regeneratePersonalSarahTaskIntelligence?.(id),
+    fetchTaskPersonalisation: () => window.SarahLive?.fetchTaskPersonalisation?.(),
+    saveTaskTemplate: (id, name) => window.SarahLive?.savePersonalTaskTemplate?.(id, name),
+    createTaskFromTemplate: (templateId, body) => window.SarahLive?.createPersonalTaskFromTemplate?.(templateId, body),
+    createTaskFromRoutine: (taskType, body) => window.SarahLive?.createPersonalTaskFromRoutine?.(taskType, body),
     onReminderCreated: async (rem) => {
       if (rem?.id) {
         try {

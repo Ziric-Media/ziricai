@@ -115,6 +115,7 @@ export function renderTaskWorkspace(task, session, esc, { networkMatch } = {}) {
           : `<div class="st-ws-compose-actions">
           <button type="submit" class="st-cat-select st-ws-send">Send</button>
           <button type="button" class="ms-link-btn" data-st-ws-complete>Mark complete</button>
+          <button type="button" class="ms-link-btn" data-st-ws-save-template>Save as template</button>
           <button type="button" class="ms-link-btn st-detail-cancel" data-st-ws-cancel>Cancel task</button>
         </div>`;
 
@@ -218,6 +219,20 @@ export function bindTaskWorkspace(root, { esc, hooks, onBack, onRefresh, network
       if (area) area.value = text;
       form?.requestSubmit();
     });
+  });
+  root.querySelector('[data-st-ws-save-template]')?.addEventListener('click', () => {
+    void (async () => {
+      if (!hooks.saveTaskTemplate || !hooks.workspaceTaskId) {
+        hooks.toast?.('Sign in to save templates.');
+        return;
+      }
+      const res = await hooks.saveTaskTemplate(hooks.workspaceTaskId);
+      if (res?.error) {
+        hooks.toast?.(res.error);
+        return;
+      }
+      hooks.toast?.('Saved to Templates tab.');
+    })();
   });
   root.querySelector('[data-st-ws-complete]')?.addEventListener('click', () => {
     void (async () => {
