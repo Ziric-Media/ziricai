@@ -80,3 +80,11 @@ Paste: task id, expected vs actual, screenshot of My Notifications if push fails
 3. **Job / university form** — organisation field present; assign → approval path for execution types.
 4. **Mark task complete** in workspace composer row.
 5. Tap a **Sarah Tasks** notification (or open from push `tasks/<taskId>`) → lands in task workspace.
+
+## Spencer UAT — ST-UX-04 / 03b
+
+1. Assign an **application** task → inbox notification **Approval needed** (optional push).
+2. Workspace → **Progress** → toggle checklist items; confirm persistence after refresh.
+3. **Cancel task** from workspace → returns to hub; notification optional.
+4. Application **organisation** field → type 3+ chars → Network suggestions; pick one → assign.
+5. Workspace **Details → Sarah Network** → match list → opens Discover profile.
