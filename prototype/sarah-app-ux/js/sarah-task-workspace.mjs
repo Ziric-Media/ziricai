@@ -11,6 +11,8 @@ function lifecycleLabel(state) {
         assigned: 'Assigned',
         completed: 'Completed',
         cancelled: 'Cancelled',
+        awaiting_review: 'Review Sarah’s draft',
+        submitted_pending_external: 'Approved — you submit',
     };
     return map[state] || 'Open';
 }
@@ -38,6 +40,15 @@ function timelineHtml(task, esc) {
                 `<li class="st-ws-timeline-item st-ws-timeline-item--${esc(row.kind || 'milestone')}"><time>${esc(formatTimelineWhen(row.at))}</time><span>${esc(row.label || '')}</span></li>`
         )
         .join('')}</ol>`;
+}
+
+function artifactsHtml(task, esc) {
+    const rows = Array.isArray(task?.artifacts) ? task.artifacts : [];
+    if (!rows.length) return '';
+    const latest = rows[rows.length - 1];
+    const status = latest.status === 'approved' ? 'Approved' : 'Draft';
+    return `<h3 class="st-detail-h">Execution artifact <span class="st-ws-pill">${esc(status)}</span></h3>
+      <article class="st-ws-artifact"><pre class="st-ws-artifact-body">${esc(latest.body || '')}</pre></article>`;
 }
 
 function suggestionsHtml(task, esc) {
@@ -126,7 +137,11 @@ export function renderTaskWorkspace(task, session, esc, { networkMatch } = {}) {
         <button type="button" class="st-tab" data-st-ws-quick="Yes, go ahead and start.">Go ahead</button>
         <button type="button" class="st-tab" data-st-ws-quick="Not yet — I need to add more details.">Not yet</button>
       </div>`
-          : ''
+          : task?.lifecycleState === 'awaiting_review'
+            ? `<div class="st-ws-quick">
+        <button type="button" class="st-tab" data-st-ws-quick="Approve submit — this draft is final for me to use.">Approve submit</button>
+      </div>`
+            : ''
       }
       <form class="st-ws-composer" id="stWsComposer">
         <label class="st-ws-compose-label"><span class="visually-hidden">Message Sarah</span>
@@ -154,6 +169,7 @@ export function renderTaskWorkspace(task, session, esc, { networkMatch } = {}) {
       ${timelineHtml(task, esc)}
       <h3 class="st-detail-h">Checklist</h3>
       ${checklist}
+      ${artifactsHtml(task, esc)}
       ${suggestionsHtml(task, esc)}
       ${task?.planSummary ? `<h3 class="st-detail-h">Sarah's plan</h3><p class="st-ws-plan">${esc(task.planSummary)}</p>` : ''}
     </section>`;

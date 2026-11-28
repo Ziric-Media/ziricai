@@ -43,6 +43,9 @@ const TYPE_SUGGESTIONS = {
     meeting: ["Add attendees in chat if Sarah should draft an agenda."],
     delegate: ["Be explicit about what Sarah may do without asking again."],
     research: ["List must-have vs nice-to-have in your first message."],
+    compare_products: ["After the draft appears, use Approve submit only when you're ready."],
+    draft_application: ['Say "approve submit" in chat when the draft is final — Sarah will not file automatically.'],
+    find_booking: ["Sarah proposes options only — you confirm the booking yourself in v1."],
 };
 
 const CATEGORY_SUGGESTIONS = {

@@ -97,6 +97,8 @@ export async function createPersonalSarahTask(uid, body = {}, opts = {}) {
         assignedAt: body.assignedAt || null,
         timeline: Array.isArray(body.timeline) ? body.timeline.slice(0, 24) : [],
         suggestions: Array.isArray(body.suggestions) ? body.suggestions.map(String).slice(0, 12) : [],
+        artifacts: Array.isArray(body.artifacts) ? body.artifacts.slice(0, 8) : [],
+        executionState: body.executionState && typeof body.executionState === "object" ? body.executionState : null,
         meta: body.meta && typeof body.meta === "object" ? body.meta : {},
         hiddenInList: Boolean(body.hiddenInList),
         createdAt: Date.now(),
@@ -224,6 +226,8 @@ const TASK_PATCH_KEYS = new Set([
     "taskKind",
     "timeline",
     "suggestions",
+    "artifacts",
+    "executionState",
 ]);
 
 export async function updatePersonalSarahTask(uid, taskId, patch = {}) {

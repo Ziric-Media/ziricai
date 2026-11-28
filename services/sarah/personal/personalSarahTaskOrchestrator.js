@@ -49,7 +49,7 @@ function buildAcknowledgment(task) {
         return `I've received your application task for ${title} (${org}). I'll research requirements and prepare a plan. I won't submit or pay anything until you explicitly approve.`;
     }
     if (task.categoryId === "delegate" || task.taskKind === "execution") {
-        return `I've received your request: ${title}. I'll propose a plan first, then wait for your go-ahead before doing any external action.`;
+        return `I've received your request: ${title}. I'll propose a plan first, then wait for your go-ahead before doing any external action. After I post a draft, say "approve submit" only when you're ready to treat it as final.`;
     }
     return `I've received your task: ${title}. Tell me what you'd like me to focus on first, or say "go ahead" if you want me to start helping.`;
 }
@@ -174,14 +174,27 @@ export async function handlePersonalSarahTaskMessage(uid, taskId, message, auth 
     if (task.lifecycleState === TASK_LIFECYCLE.AWAITING_APPROVAL && isGoAheadMessage(text)) {
         await appendPersonalSarahMessage(session, "user", text);
         await updatePersonalSarahTask(uid, taskId, { sarahPhase: "working", lifecycleState: TASK_LIFECYCLE.IN_PROGRESS });
-        const workMsg = buildWorkingResult(task);
+        const { runPersonalSarahTaskExecution } = await import("./personalSarahTaskExecution.js");
+        const exec = await runPersonalSarahTaskExecution(uid, task);
+        const workMsg = exec.reply;
         await appendPersonalSarahMessage(session, "assistant", workMsg);
-        const updated = await updatePersonalSarahTask(uid, taskId, {
-            sarahPhase: "idle",
-            lifecycleState: TASK_LIFECYCLE.AWAITING_USER,
-        });
-        void notifyPersonalSarahTaskUpdate(uid, taskId, workMsg.slice(0, 200), "Sarah is working on your task");
+        const updated = await updatePersonalSarahTask(uid, taskId, { sarahPhase: "idle" });
+        void notifyPersonalSarahTaskUpdate(uid, taskId, "Sarah posted a draft for your review.", "Review draft");
         return { task: updated, session, reply: workMsg };
+    }
+
+    const { EXECUTION_REVIEW, isSubmitApprovalMessage, approveTaskArtifactForSubmit } = await import(
+        "./personalSarahTaskExecution.js"
+    );
+    if (task.lifecycleState === EXECUTION_REVIEW && isSubmitApprovalMessage(text)) {
+        await appendPersonalSarahMessage(session, "user", text);
+        const approved = await approveTaskArtifactForSubmit(uid, task);
+        const confirm =
+            "Understood — I've marked this artifact as approved for you to use externally. I have not paid or submitted on any portal in this version.";
+        await appendPersonalSarahMessage(session, "assistant", confirm);
+        const fresh = await getPersonalSarahSessionForUser(uid, task.sessionId);
+        void notifyPersonalSarahTaskUpdate(uid, taskId, confirm, "Artifact approved");
+        return { task: approved, session: fresh || session, reply: confirm };
     }
 
     const result = await handlePersonalSarahChat(

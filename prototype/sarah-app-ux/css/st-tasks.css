@@ -1021,3 +1021,22 @@
   font-size: 13px;
   color: #475569;
 }
+
+.st-ws-artifact {
+  margin: 0 0 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.st-ws-artifact-body {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #334155;
+  max-height: 280px;
+  overflow-y: auto;
+}

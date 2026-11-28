@@ -27,7 +27,7 @@
 | ST-UX-04 | Workspace actions | **v1 shipped** — approval chips, complete/cancel, checklist, task notifications |
 | ST-UX-03b | Network org bridge | **v1 shipped** — org typeahead, workspace Network matches, Discover deep link |
 | ST-04 | Intelligence | **v1 shipped** — rule-based checklist merge, timelines, suggestions |
-| ST-05 | Execution | Research, drafts, bookings with approval |
+| ST-05 | Execution | **v1 shipped** — artifacts, review + approve submit gate |
 | ST-06 | Personalisation | Routines, templates, learning |
 
 ## Implementation priorities (ST-01B/D)
@@ -95,3 +95,10 @@ Paste: task id, expected vs actual, screenshot of My Notifications if push fails
 2. Assign → conversation includes a **Tip:** line from suggestions.
 3. **Refresh plan** on Progress tab → checklist/timeline update without losing done items.
 4. Hub **Sarah’s next actions** shows **Approve plan** when awaiting approval.
+
+## Spencer UAT — ST-05
+
+1. **Sarah, do this for me → Compare products** → Assign → **Go ahead** → artifact in Progress + chat.
+2. Lifecycle **Review Sarah’s draft** → **Approve submit** chip → status **Approved — you submit**.
+3. Confirm no payment/submit copy in Sarah’s confirmation message.
+4. **Government or job application** task → go-ahead produces **application** artifact type.

@@ -152,6 +152,8 @@ function mapServerTask(t) {
     planSummary: t.planSummary,
     timeline: t.timeline,
     suggestions: t.suggestions,
+    artifacts: t.artifacts,
+    executionState: t.executionState,
     source: 'server',
   };
 }
@@ -294,6 +296,10 @@ function buildNextActions(tasks) {
   for (const t of open) {
     if (t.lifecycleState === 'awaiting_approval') {
       actions.push({ id: t.id, text: `Approve plan: ${t.title}` });
+      continue;
+    }
+    if (t.lifecycleState === 'awaiting_review') {
+      actions.push({ id: t.id, text: `Review draft: ${t.title}` });
       continue;
     }
     let pushed = false;
