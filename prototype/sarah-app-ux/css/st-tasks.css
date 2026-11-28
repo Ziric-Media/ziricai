@@ -905,3 +905,78 @@
 .st-gov-other.is-hidden {
   display: none;
 }
+
+.st-org-field {
+  position: relative;
+}
+
+.st-org-suggest {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(30, 27, 75, 0.12);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.st-org-match {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.st-org-match:hover {
+  background: #f5f3ff;
+}
+
+.st-org-match-badge {
+  font-size: 11px;
+  color: #6d28d9;
+  font-weight: 600;
+}
+
+.st-network-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.st-network-match {
+  margin-bottom: 6px;
+}
+
+.st-ws-check--live .st-ws-check-btn {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  padding: 6px 0;
+  cursor: pointer;
+  color: #1e1b4b;
+}
+
+.st-ws-check-btn.is-done {
+  text-decoration: line-through;
+  color: #64748b;
+}
+
+.st-ws-done-note {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}

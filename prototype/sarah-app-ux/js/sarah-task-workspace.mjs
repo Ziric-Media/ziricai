@@ -1,5 +1,5 @@
 /**
- * ST-UX-01 — task conversation workspace (composer, typing/working, details).
+ * ST-UX-01 / ST-UX-04 — task conversation workspace.
  */
 
 function lifecycleLabel(state) {
@@ -15,9 +15,25 @@ function lifecycleLabel(state) {
     return map[state] || 'Open';
 }
 
-export function renderTaskWorkspace(task, session, esc) {
+function networkMatchHtml(networkMatch, esc) {
+    const matches = networkMatch?.matches || [];
+    if (!matches.length) {
+        return '<p class="st-detail-empty">No Sarah Network listing matched this organisation yet. Sarah can still help using your notes.</p>';
+    }
+    const items = matches
+        .map(
+            (m) =>
+                `<li class="st-network-match"><button type="button" class="ms-link-btn" data-st-open-discover="${esc(m.companyId)}">${esc(m.displayName)}${m.verified ? ' · verified' : ''}</button></li>`
+        )
+        .join('');
+    return `<ul class="st-network-list">${items}</ul>`;
+}
+
+export function renderTaskWorkspace(task, session, esc, { networkMatch } = {}) {
     const messages = session?.messages || [];
     const phase = task?.sarahPhase || 'idle';
+    const isDone = task?.lifecycleState === 'completed' || task?.status === 'completed';
+    const isCancelled = task?.lifecycleState === 'cancelled' || task?.status === 'cancelled';
     const phaseRow =
         phase === 'typing'
             ? `<article class="st-ws-bubble st-ws-bubble--sarah st-ws-bubble--phase" aria-busy="true"><div class="st-ws-typing"><span></span><span></span><span></span></div><p class="st-ws-phase-label">Sarah is typing…</p></article>`
@@ -37,12 +53,26 @@ export function renderTaskWorkspace(task, session, esc) {
 
     const checklist =
         Array.isArray(task?.checklist) && task.checklist.length
-            ? `<ul class="st-ws-check">${task.checklist
-                  .map((c) => `<li class="${c.done ? 'is-done' : ''}">${esc(c.label)}</li>`)
+            ? `<ul class="st-ws-check st-ws-check--live">${task.checklist
+                  .map(
+                      (c, i) =>
+                          `<li><button type="button" class="st-ws-check-btn${c.done ? ' is-done' : ''}" data-st-check-idx="${i}">${esc(c.label)}</button></li>`
+                  )
                   .join('')}</ul>`
             : '<p class="st-detail-empty">No checklist yet.</p>';
 
     const due = task?.dueAt ? esc(new Date(task.dueAt).toLocaleString()) : 'No due date';
+    const org = task?.meta?.organisation || task?.meta?.govDepartmentName || '';
+
+    const actionRow = isDone
+        ? '<p class="st-ws-done-note">This task is marked complete.</p>'
+        : isCancelled
+          ? '<p class="st-ws-done-note">This task was cancelled.</p>'
+          : `<div class="st-ws-compose-actions">
+          <button type="submit" class="st-cat-select st-ws-send">Send</button>
+          <button type="button" class="ms-link-btn" data-st-ws-complete>Mark complete</button>
+          <button type="button" class="ms-link-btn st-detail-cancel" data-st-ws-cancel>Cancel task</button>
+        </div>`;
 
     return `
     <header class="st-ws-head">
@@ -58,7 +88,7 @@ export function renderTaskWorkspace(task, session, esc) {
     <section class="st-ws-panel" data-st-ws-panel="chat">
       <div class="st-ws-thread" id="stWsThread">${transcript}${phaseRow}</div>
       ${
-        task?.lifecycleState === 'awaiting_approval'
+        task?.lifecycleState === 'awaiting_approval' && !isDone && !isCancelled
           ? `<div class="st-ws-quick">
         <button type="button" class="st-tab" data-st-ws-quick="Yes, go ahead and start.">Go ahead</button>
         <button type="button" class="st-tab" data-st-ws-quick="Not yet — I need to add more details.">Not yet</button>
@@ -67,12 +97,9 @@ export function renderTaskWorkspace(task, session, esc) {
       }
       <form class="st-ws-composer" id="stWsComposer">
         <label class="st-ws-compose-label"><span class="visually-hidden">Message Sarah</span>
-          <textarea name="message" rows="2" placeholder="Message Sarah about this task…" required></textarea>
+          <textarea name="message" rows="2" placeholder="Message Sarah about this task…" required ${isDone || isCancelled ? 'disabled' : ''}></textarea>
         </label>
-        <div class="st-ws-compose-actions">
-          <button type="submit" class="st-cat-select st-ws-send">Send</button>
-          <button type="button" class="ms-link-btn" data-st-ws-complete>Mark task complete</button>
-        </div>
+        ${actionRow}
       </form>
     </section>
   <section class="st-ws-panel is-hidden" data-st-ws-panel="details" hidden>
@@ -81,7 +108,10 @@ export function renderTaskWorkspace(task, session, esc) {
         <dt>Category</dt><dd>${esc(task?.categoryId || '—')}</dd>
         <dt>Type</dt><dd>${esc(task?.taskType || '—')}</dd>
         <dt>Kind</dt><dd>${esc(task?.taskKind || '—')}</dd>
+        ${org ? `<dt>Organisation</dt><dd>${esc(org)}</dd>` : ''}
       </dl>
+      <h3 class="st-detail-h">Sarah Network</h3>
+      ${networkMatchHtml(networkMatch, esc)}
     </section>
     <section class="st-ws-panel is-hidden" data-st-ws-panel="progress" hidden>
       <h3 class="st-detail-h">Checklist</h3>
@@ -90,7 +120,7 @@ export function renderTaskWorkspace(task, session, esc) {
     </section>`;
 }
 
-export function bindTaskWorkspace(root, { esc, hooks, onBack, onRefresh }) {
+export function bindTaskWorkspace(root, { esc, hooks, onBack, onRefresh, networkMatch }) {
   root.querySelectorAll('[data-st-ws-tab]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-st-ws-tab');
@@ -103,6 +133,28 @@ export function bindTaskWorkspace(root, { esc, hooks, onBack, onRefresh }) {
     });
   });
   root.querySelector('[data-st-back]')?.addEventListener('click', () => onBack?.());
+  root.querySelectorAll('[data-st-open-discover]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-st-open-discover');
+      if (id && typeof globalThis.openDiscoverCompany === 'function') globalThis.openDiscoverCompany(id);
+      else hooks.toast?.('Open Discover to view this organisation.');
+    });
+  });
+  root.querySelectorAll('[data-st-check-idx]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      void (async () => {
+        const idx = Number(btn.getAttribute('data-st-check-idx'));
+        if (!Number.isFinite(idx) || !hooks.updateTask || !hooks.workspaceTaskId || !hooks.workspaceTask) return;
+        const list = [...(hooks.workspaceTask.checklist || [])];
+        if (!list[idx]) return;
+        list[idx] = { ...list[idx], done: !list[idx].done };
+        const done = list.filter((c) => c.done).length;
+        const progress = list.length ? Math.round((done / list.length) * 100) : 0;
+        await hooks.updateTask(hooks.workspaceTaskId, { checklist: list, progress });
+        await onRefresh?.();
+      })();
+    });
+  });
   const form = root.querySelector('#stWsComposer');
   root.querySelectorAll('[data-st-ws-quick]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -118,9 +170,22 @@ export function bindTaskWorkspace(root, { esc, hooks, onBack, onRefresh }) {
         hooks.toast?.('Sign in to update this task.');
         return;
       }
-      await hooks.updateTask(hooks.workspaceTaskId, { status: 'completed', lifecycleState: 'completed', progress: 100 });
+      await hooks.updateTask(hooks.workspaceTaskId, {
+        status: 'completed',
+        lifecycleState: 'completed',
+        progress: 100,
+      });
       hooks.toast?.('Task marked complete.');
       await onRefresh?.();
+    })();
+  });
+  root.querySelector('[data-st-ws-cancel]')?.addEventListener('click', () => {
+    void (async () => {
+      if (!hooks.updateTask || !hooks.workspaceTaskId) return;
+      if (!globalThis.confirm?.('Cancel this task?')) return;
+      await hooks.updateTask(hooks.workspaceTaskId, { status: 'cancelled', lifecycleState: 'cancelled' });
+      hooks.toast?.('Task cancelled.');
+      onBack?.();
     })();
   });
   form?.addEventListener('submit', (e) => {

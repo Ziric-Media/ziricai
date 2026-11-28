@@ -746,9 +746,22 @@ export async function handlePersonalSarahTaskWorkspace(req, res) {
                       messages: data.session.messages || [],
                   }
                 : null,
+            networkMatch: data.networkMatch || null,
         });
     } catch (err) {
         res.status(500).json({ error: err.message || "Workspace load failed", code: "TASK_WORKSPACE_ERROR" });
+    }
+}
+
+export async function handlePersonalSarahTaskNetworkSearch(req, res) {
+    try {
+        const q = String(req.query?.q || "").trim();
+        if (q.length < 2) return res.json({ matches: [], query: q, total: 0 });
+        const { matchOrganisationOnNetwork } = await import("../sarah/personal/personalSarahTaskNetworkMatch.js");
+        const data = await matchOrganisationOnNetwork(q, { limit: 8 });
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message || "Network search failed", code: "TASK_NETWORK_SEARCH_ERROR" });
     }
 }
 
@@ -804,6 +817,17 @@ export async function handlePatchPersonalSarahTask(req, res) {
         const uid = req.consumerAuth.uid;
         const patch = req.body || {};
         const task = await updatePersonalSarahTask(uid, req.params?.id, patch);
+        try {
+            const { notifyPersonalSarahTaskUpdate } = await import("../sarah/personal/personalSarahTaskOrchestrator.js");
+            const id = req.params?.id;
+            if (patch.lifecycleState === "completed" || patch.status === "completed") {
+                void notifyPersonalSarahTaskUpdate(uid, id, "You marked this task complete.", "Task completed");
+            } else if (patch.lifecycleState === "cancelled" || patch.status === "cancelled") {
+                void notifyPersonalSarahTaskUpdate(uid, id, "This task was cancelled.", "Task cancelled");
+            }
+        } catch {
+            /* ignore */
+        }
         if (
             patch.dueAt !== undefined ||
             patch.reminderSchedule !== undefined ||
@@ -963,6 +987,7 @@ export function mountPersonalSarahRoutes(app) {
 
     app.post("/api/personal-sarah/tasks", requireConsumerScope(), handleCreatePersonalSarahTask);
     app.get("/api/personal-sarah/tasks", requireConsumerScope(), handleListPersonalSarahTasks);
+    app.get("/api/personal-sarah/tasks/network-search", requireConsumerScope(), handlePersonalSarahTaskNetworkSearch);
     app.get("/api/personal-sarah/tasks/:id", requireConsumerScope(), handleGetPersonalSarahTask);
     app.patch("/api/personal-sarah/tasks/:id", requireConsumerScope(), handlePatchPersonalSarahTask);
     app.post("/api/personal-sarah/tasks/:id/assign", requireConsumerScope(), handleAssignPersonalSarahTask);

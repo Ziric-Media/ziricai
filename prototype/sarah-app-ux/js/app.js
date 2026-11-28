@@ -950,6 +950,10 @@ function scanNewLiveNotifications(items) {
     known.add(id);
     if (!announce || n.read) continue;
     const row = mapLiveNotifToRow(n);
+    if (row.kind === 'task') {
+      void tryOsPushAlert(row.title, row.body);
+      continue;
+    }
     void attentionForSubscriberNotif(row.kind, {
       id: row.id,
       title: row.title,
@@ -1182,6 +1186,8 @@ function handlePushPayload(payload = {}) {
   const kind =
     rawType === 'sarah_reminder' || rawType === 'reminders' || rawType.includes('reminder') || channel === 'reminders'
       ? 'reminder'
+      : rawType === 'sarah_task' || channel === 'tasks' || rawType.includes('task')
+        ? 'task'
       : rawType.includes('announcement') || channel === 'announcements'
         ? 'announcement'
         : rawType === 'sarah_usage' || rawType.includes('usage')
@@ -1189,7 +1195,9 @@ function handlePushPayload(payload = {}) {
           : 'notification';
   const prefs = { ...defaultSnaGlobalPrefs(), ...(loadSnaGlobalPrefs() || {}) };
   const org = data.orgName || data.organisationName || '';
-  if (kind === 'reminder' && prefs.reminders !== false) {
+  if (kind === 'task') {
+    void tryOsPushAlert(title, body);
+  } else if (kind === 'reminder' && prefs.reminders !== false) {
     void attentionForSubscriberNotif('reminder', { id, title, body: body || title, org });
   } else if (kind === 'announcement' && prefs.announcements !== false) {
     void attentionForSubscriberNotif('announcement', { id, title, body: body || title, org });
@@ -1235,14 +1243,18 @@ function mapLiveNotifToRow(n) {
     live: true,
     viaPush: isPushStarred(id),
     actionLabel:
-      kind === 'work'
-        ? 'View report'
-        : kind === 'reminder'
-          ? 'Open reminder'
-          : kind === 'usage'
-            ? 'View plan'
-            : 'View details',
+      kind === 'task'
+        ? 'Open task'
+        : kind === 'work'
+          ? 'View report'
+          : kind === 'reminder'
+            ? 'Open reminder'
+            : kind === 'usage'
+              ? 'View plan'
+              : 'View details',
     threadId: n.workSessionId || null,
+    taskId: n.taskId || null,
+    deepLink: n.deepLink || null,
   };
 }
 
@@ -1397,6 +1409,19 @@ function showNotificationDetail(row) {
     actionBtn.textContent = label;
     actionBtn.classList.toggle('hidden', false);
     actionBtn.onclick = async () => {
+      if (row.kind === 'task') {
+        const taskId =
+          row.taskId ||
+          (String(row.deepLink || '').toLowerCase().startsWith('tasks/')
+            ? row.deepLink.slice('tasks/'.length).split('/')[0]
+            : '');
+        if (taskId) {
+          hideNotificationDetail();
+          closeMsDrawer();
+          await openSarahTaskFromDeepLink(taskId);
+        }
+        return;
+      }
       if (isWork) {
         const sessionId = row.threadId || row.workSessionId;
         if (sessionId) await openWorkReport(sessionId);
@@ -1471,6 +1496,16 @@ async function openInboxNotification(id, kind) {
     if (!res?.error && typeof res.unread === 'number') liveNotifs.unread = res.unread;
   }
   syncNotificationBadge();
+  if (row?.kind === 'task') {
+    const taskId =
+      row.taskId ||
+      (String(row.deepLink || '').toLowerCase().startsWith('tasks/') ? row.deepLink.slice('tasks/'.length).split('/')[0] : '');
+    if (taskId) {
+      closeMsDrawer();
+      void openSarahTaskFromDeepLink(taskId);
+      return;
+    }
+  }
   if (row) {
     if (row.live && kind === 'work') {
       const liveRow = liveNotifs.items.find((n) => n.notificationId === id);
@@ -13679,6 +13714,7 @@ function openDiscoverCompany(id) {
   if (!id) return;
   location.hash = `discover/${id}`;
 }
+globalThis.openDiscoverCompany = openDiscoverCompany;
 
 /**
  * SNET-01b + public Discover: live mode = the Sarah Network directory (public listed businesses, readable signed

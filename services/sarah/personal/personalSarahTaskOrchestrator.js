@@ -135,6 +135,15 @@ export async function assignPersonalSarahTask(uid, taskId) {
         status: task.status === "draft" ? "open" : task.status,
     });
 
+    if (needsApproval) {
+        void notifyPersonalSarahTaskUpdate(
+            uid,
+            taskId,
+            "Sarah posted a plan — open your task workspace to approve or add details.",
+            "Approval needed"
+        );
+    }
+
     return { task: updated, session };
 }
 
@@ -169,7 +178,7 @@ export async function handlePersonalSarahTaskMessage(uid, taskId, message, auth 
             sarahPhase: "idle",
             lifecycleState: TASK_LIFECYCLE.AWAITING_USER,
         });
-        void notifyTaskUpdate(uid, taskId, workMsg.slice(0, 200));
+        void notifyPersonalSarahTaskUpdate(uid, taskId, workMsg.slice(0, 200), "Sarah is working on your task");
         return { task: updated, session, reply: workMsg };
     }
 
@@ -190,10 +199,10 @@ export async function handlePersonalSarahTaskMessage(uid, taskId, message, auth 
     return { task: updated, session: fresh || session, reply: result.reply };
 }
 
-async function notifyTaskUpdate(uid, taskId, body) {
+export async function notifyPersonalSarahTaskUpdate(uid, taskId, body, title = "Sarah Tasks update") {
     try {
         const { createSarahTaskUpdateNotification } = await import("../../network/notificationService.js");
-        await createSarahTaskUpdateNotification(uid, { taskId, title: "Sarah Tasks update", body });
+        await createSarahTaskUpdateNotification(uid, { taskId, title, body });
     } catch (err) {
         console.warn("[personalSarahTaskOrchestrator] notify", err?.message || err);
     }
@@ -203,5 +212,13 @@ export async function getPersonalSarahTaskWorkspace(uid, taskId) {
     const task = await getPersonalSarahTask(uid, taskId);
     if (!task) return null;
     const session = task.sessionId ? await getPersonalSarahSessionForUser(uid, task.sessionId) : null;
-    return { task, session };
+    let networkMatch = null;
+    try {
+        const { organisationQueryFromTask, matchOrganisationOnNetwork } = await import("./personalSarahTaskNetworkMatch.js");
+        const q = organisationQueryFromTask(task);
+        if (q) networkMatch = await matchOrganisationOnNetwork(q, { limit: 4 });
+    } catch (err) {
+        console.warn("[personalSarahTaskOrchestrator] networkMatch", err?.message || err);
+    }
+    return { task, session, networkMatch };
 }

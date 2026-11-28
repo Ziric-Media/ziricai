@@ -24,7 +24,8 @@
 | ST-UX-01 | Task workspace | **v1 shipped** — Assign to Sarah, per-task session, composer, typing/working |
 | ST-UX-02 | Category forms | **v1 shipped** — organisation fields, execution approval rules, assign handoff |
 | ST-UX-03 | Government directory | **v1 shipped** — SA dept/service form, government ack + approval path |
-| ST-UX-04 | Workspace actions | **v1 partial** — Go ahead / Not yet chips, mark complete, task push deep link |
+| ST-UX-04 | Workspace actions | **v1 shipped** — approval chips, complete/cancel, checklist, task notifications |
+| ST-UX-03b | Network org bridge | **v1 shipped** — org typeahead, workspace Network matches, Discover deep link |
 | ST-04 | Intelligence | Generated checklists, timelines, suggestions |
 | ST-05 | Execution | Research, drafts, bookings with approval |
 | ST-06 | Personalisation | Routines, templates, learning |

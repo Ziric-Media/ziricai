@@ -15,6 +15,7 @@ import {
 } from './sarah-tasks-catalog.mjs';
 import { bindTaskWorkspace, renderTaskWorkspace } from './sarah-task-workspace.mjs';
 import { GOV_ASSIST_OPTIONS, GOV_DEPARTMENTS, departmentById } from './sarah-government-directory.mjs';
+import { bindOrganisationNetworkLookup, orgMetaFromForm } from './sarah-task-network.mjs';
 
 const STORAGE_KEY = 'sarah.st.tasks.proto.v1';
 
@@ -581,6 +582,13 @@ function renderSchemaForm(schema) {
         const opts = (f.options || []).map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
         return `<label class="st-field"><span>${esc(f.label)}</span><select name="${esc(f.name)}"${f.required ? ' required' : ''}>${opts}</select></label>`;
       }
+      if (f.name === 'organisation' || f.networkLookup) {
+        const listId = `stOrgList-${esc(f.name)}`;
+        const inputType = f.type === 'date' || f.type === 'time' || f.type === 'number' ? f.type : 'text';
+        return `<label class="st-field st-org-field"><span>${esc(f.label)}</span>
+        <input name="${esc(f.name)}" type="${inputType}" data-st-org-input aria-controls="${listId}" autocomplete="organization"${f.required ? ' required' : ''}${f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''} />
+        <div class="st-org-suggest" id="${listId}" hidden role="listbox" aria-label="Sarah Network matches"></div></label>`;
+      }
       const inputType = f.type === 'date' || f.type === 'time' || f.type === 'number' ? f.type : 'text';
       return `<label class="st-field"><span>${esc(f.label)}</span><input name="${esc(f.name)}" type="${inputType}"${f.required ? ' required' : ''}${f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''} /></label>`;
     })
@@ -774,15 +782,17 @@ async function paintWorkspace(root) {
     });
     return;
   }
-  root.innerHTML = renderTaskWorkspace(res.task, res.session, esc);
+  root.innerHTML = renderTaskWorkspace(res.task, res.session, esc, { networkMatch: res.networkMatch });
   bindTaskWorkspace(root, {
     esc,
     hooks: {
       ...hooks,
       workspaceTaskId,
+      workspaceTask: res.task,
       sendTaskMessage: async (message) => hooks.sendTaskMessage?.(workspaceTaskId, message),
       updateTask: (id, patch) => hooks.updateTask?.(id, patch),
     },
+    networkMatch: res.networkMatch,
     onBack: () => {
       view = 'hub';
       workspaceTaskId = null;
@@ -790,15 +800,19 @@ async function paintWorkspace(root) {
     },
     onRefresh: async () => {
       const fresh = await hooks.fetchTaskWorkspace?.(workspaceTaskId);
-      if (fresh?.task) root.innerHTML = renderTaskWorkspace(fresh.task, fresh.session, esc);
+      if (fresh?.task) {
+        root.innerHTML = renderTaskWorkspace(fresh.task, fresh.session, esc, { networkMatch: fresh.networkMatch });
+      }
       bindTaskWorkspace(root, {
         esc,
         hooks: {
           ...hooks,
           workspaceTaskId,
+          workspaceTask: fresh?.task,
           sendTaskMessage: async (message) => hooks.sendTaskMessage?.(workspaceTaskId, message),
           updateTask: (id, patch) => hooks.updateTask?.(id, patch),
         },
+        networkMatch: fresh?.networkMatch,
         onBack: () => {
           view = 'hub';
           workspaceTaskId = null;
@@ -1215,6 +1229,7 @@ function bind(root, reminders) {
     });
   }
 
+  bindOrganisationNetworkLookup(root, { esc });
   const schemaForm = root.querySelector('#stSchemaForm');
   schemaForm?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1227,8 +1242,8 @@ function bind(root, reminders) {
       const date = fd.get('date') || fd.get('deadline') || fd.get('start');
       const time = fd.get('time');
       const taskKind = isExecution ? 'execution' : categoryId === 'reminders' ? 'reminder' : 'preparation';
-      const meta = Object.fromEntries(fd);
-      const org = fd.get('company') || fd.get('institution') || fd.get('organisation');
+      const meta = { ...Object.fromEntries(fd), ...orgMetaFromForm(schemaForm) };
+      const org = meta.organisation || fd.get('company') || fd.get('institution');
       if (org) meta.organisation = org;
       const saved = await persistTaskCreate({
         title,
